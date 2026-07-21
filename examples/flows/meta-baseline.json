@@ -61,8 +61,8 @@
       "id": "answer",
       "type": "llm_call",
       "position": {
-        "x": -220,
-        "y": -120
+        "x": -200,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -159,8 +159,8 @@
       "id": "meta",
       "type": "code",
       "position": {
-        "x": 60,
-        "y": 120
+        "x": 200,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -207,8 +207,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 340,
-        "y": -120
+        "x": 200,
+        "y": 0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -313,6 +313,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-16T01:12:37.047816+00:00",
-  "updated_at": "2026-07-16T01:12:37.047816+00:00"
+  "created_at": "2026-07-20T13:28:57.809073+00:00",
+  "updated_at": "2026-07-20T13:28:57.809073+00:00"
 }

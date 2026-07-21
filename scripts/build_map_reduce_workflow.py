@@ -59,52 +59,59 @@ def build_flow():
         W.pin("provider", "provider", "provider_text"),
         W.pin("model", "model", "model"),
     ]
+    # Layout grid (2026-07-20 clean-layout pass): the main exec lane runs
+    # left-to-right at y=0 (start -> init var -> foreach -> reduce -> end);
+    # the LOOP BODY is a raised lane at y=-400 (map_llm -> set_acc) with its
+    # pure helpers stacked above their consumers (map_prompt over map_llm;
+    # get_acc -> append column over set_acc); the reduce/assemble pure
+    # helpers sit in a row at y=380 under their consumers. Box model ~300
+    # wide, 90+26*pins tall; every gap >= 60px.
     flow["nodes"] = [
         W.start_node("Items + instructions", fields, -1100, 0, pin_defaults={
             "item_instruction": "Process this item.",
             "reduce_instruction": "Synthesize the per-item results into one coherent answer.",
         }),
         # reset the accumulator var before the loop
-        W.code_node("reset", "Reset accumulator", RESET_CODE, -760, 200, [], output_type="array"),
-        W.set_var("init_acc", "Init results var", "mr.results", -760, 0),
-        W.foreach_node("each", "Map over items", -420, 0),
-        # body
-        W.code_node("map_prompt", "Compose item prompt", MAP_PROMPT_CODE, -80, -160,
+        W.code_node("reset", "Reset accumulator", RESET_CODE, -700, 380, [], output_type="array"),
+        W.set_var("init_acc", "Init results var", "mr.results", -700, 0),
+        W.foreach_node("each", "Map over items", -300, 0),
+        # body (raised loop lane)
+        W.code_node("map_prompt", "Compose item prompt", MAP_PROMPT_CODE, 100, -660,
                     [W.pin("item", "item", "any"),
                      W.pin("index", "index", "number"),
                      W.pin("item_instruction", "item_instruction", "string")],
                     output_type="string"),
-        W.llm_node("map_llm", "Per-item LLM", -80, 40, pin_defaults={
+        W.llm_node("map_llm", "Per-item LLM", 100, -400, pin_defaults={
             "system": "You process one item at a time following the given instruction. Answer concisely.",
             "temperature": 0.2,
         }),
-        W.get_var("get_acc", "mr.results", [], 280, 200),
-        W.code_node("append", "Append result", APPEND_CODE, 280, 40,
+        W.get_var("get_acc", "mr.results", [], 500, -890),
+        W.code_node("append", "Append result", APPEND_CODE, 500, -660,
                     [W.pin("results_so_far", "results_so_far", "array"),
                      W.pin("item_result", "item_result", "string"),
                      W.pin("index", "index", "number")],
                     output_type="array"),
-        W.set_var("set_acc", "Persist results", "mr.results", 620, 40),
-        # reduce (after loop)
-        W.get_var("get_all", "mr.results", [], -80, 420),
-        W.code_node("reduce_prompt", "Compose reduce prompt", REDUCE_PROMPT_CODE, 280, 500,
+        W.set_var("set_acc", "Persist results", "mr.results", 500, -400),
+        # reduce (after loop, back on the main lane)
+        W.get_var("get_all", "mr.results", [], -300, 380),
+        W.code_node("reduce_prompt", "Compose reduce prompt", REDUCE_PROMPT_CODE, 100, 380,
                     [W.pin("results", "results", "array"),
                      W.pin("reduce_instruction", "reduce_instruction", "string")],
                     output_type="string"),
-        W.llm_node("reduce_llm", "Reduce / synthesize LLM", 620, 420, pin_defaults={
+        W.llm_node("reduce_llm", "Reduce / synthesize LLM", 100, 0, pin_defaults={
             "system": "You synthesize many per-item results into one coherent, well-structured output.",
             "temperature": 0.3,
         }),
-        W.get_var("get_final", "mr.results", [], 620, 620),
-        W.code_node("final", "Assemble", FINAL_CODE, 960, 620,
+        W.get_var("get_final", "mr.results", [], 500, 380),
+        W.code_node("final", "Assemble", FINAL_CODE, 900, 380,
                     [W.pin("results", "results", "array")]),
-        W.get_node("get_results", "results", [], 1300, 540),
-        W.get_node("get_count", "count", 0, 1300, 660),
+        W.get_node("get_results", "results", [], 1300, 380),
+        W.get_node("get_count", "count", 0, 1300, 610),
         W.end_node("Map-reduce result", [
             W.pin("results", "results", "array"),
             W.pin("count", "count", "number"),
             W.pin("synthesis", "synthesis", "string"),
-        ], 1300, 420),
+        ], 1300, 0),
     ]
     flow["edges"] = [
         # exec spine: init var -> foreach; loop body; done -> reduce -> end
@@ -148,8 +155,27 @@ def build_flow():
 
 def main():
     flow = build_flow()
-    print("edge problems:", W.validate_edges(flow))
+    # Fail LOUDLY on edge problems (the old build printed them and returned 0,
+    # so a broken graph could ship green through automation).
+    problems = W.validate_edges(flow)
+    if problems:
+        for p in problems:
+            print(f"EDGE ERROR [map-reduce]: {p}")
+        return 1
     W.write_json(W.FLOWS_DIR / "map-reduce.json", flow)
+    print(f"wrote map-reduce.json ({len(flow['nodes'])} nodes, {len(flow['edges'])} edges)")
+    W.compile_check("map-reduce", ["map-reduce"])
+    print("compiled ok")
+    # Repack the shipped bundle so the gateway serves the same graph as the
+    # example JSON (bundle_version bumps are the release process's job).
+    out = W.pack_bundle(
+        root_flow_id="map-reduce",
+        bundle_id="map-reduce",
+        bundle_version="0.1.1",
+        entrypoints=["map-reduce"],
+        metadata={"family": "map-reduce", "purpose": "map-reduce"},
+    )
+    print(f"packed {out}")
     return 0
 
 

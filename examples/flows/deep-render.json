@@ -8,8 +8,8 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -900,
-        "y": 0
+        "x": 0.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -85,8 +85,8 @@
       "id": "derive_settings",
       "type": "code",
       "position": {
-        "x": -640,
-        "y": -160
+        "x": 440.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "code",
@@ -158,8 +158,8 @@
       "id": "input_json",
       "type": "make_object",
       "position": {
-        "x": -520,
-        "y": 120
+        "x": 440.0,
+        "y": 274.0
       },
       "data": {
         "nodeType": "make_object",
@@ -236,8 +236,8 @@
       "id": "prompt_json",
       "type": "stringify_json",
       "position": {
-        "x": -160,
-        "y": 120
+        "x": 880.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "stringify_json",
@@ -277,8 +277,8 @@
       "id": "get_provider",
       "type": "get",
       "position": {
-        "x": -160,
-        "y": -220
+        "x": 880.0,
+        "y": -496.0
       },
       "data": {
         "nodeType": "get",
@@ -324,8 +324,8 @@
       "id": "get_model",
       "type": "get",
       "position": {
-        "x": -160,
-        "y": -120
+        "x": 880.0,
+        "y": -248.0
       },
       "data": {
         "nodeType": "get",
@@ -371,8 +371,8 @@
       "id": "writer",
       "type": "llm_call",
       "position": {
-        "x": 220,
-        "y": 0
+        "x": 1320.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -629,8 +629,8 @@
       "id": "normalize_report_markdown",
       "type": "code",
       "position": {
-        "x": 620,
-        "y": -160
+        "x": 2200.0,
+        "y": -248.0
       },
       "data": {
         "nodeType": "code",
@@ -675,7 +675,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "def _as_text(value):\n    if value is None:\n        return \"\"\n    return str(value).strip()\n\n\ndef _source_list(value):\n    if isinstance(value, list):\n        return value\n    if isinstance(value, dict):\n        nested = value.get(\"source_ledger\") or value.get(\"sources\") or value.get(\"items\")\n        if isinstance(nested, list):\n            return nested\n    return []\n\n\ndef _heading_title(line):\n    stripped = str(line or \"\").strip()\n    if not stripped.startswith(\"#\"):\n        return \"\"\n    count = 0\n    while count < len(stripped) and stripped[count] == \"#\":\n        count = count + 1\n    if count < 1 or count > 6:\n        return \"\"\n    if count >= len(stripped) or stripped[count] not in (\" \", \"\\t\"):\n        return \"\"\n    return stripped[count:].strip().strip(\"#\").strip().lower()\n\n\ndef _is_blocked_heading(title, remove_references):\n    compact = \" \".join(\n        str(title or \"\").strip(\" :.;\").replace(\"-\", \" \").replace(\"_\", \" \").replace(\"/\", \" \").split()\n    )\n    if bool(remove_references) and compact == \"references\":\n        return True\n    return compact in (\n        \"evidence table\",\n        \"evidence matrix\",\n        \"bibliography\",\n        \"claim evidence matrix\",\n        \"citation index\",\n        \"citation ids\",\n        \"citation list\",\n        \"citations\",\n        \"citations source ids\",\n        \"citations and source ids\",\n        \"source ids\",\n        \"source id list\",\n        \"source index\",\n        \"source list\",\n        \"sources cited\",\n        \"works cited\",\n    )\n\n\ndef _has_references_heading(text):\n    for line in str(text or \"\").split(\"\\n\"):\n        if _heading_title(line) == \"references\":\n            return True\n    return False\n\n\ndef _remove_blocked_sections(text, remove_references):\n    kept = []\n    skip = False\n    for line in str(text or \"\").split(\"\\n\"):\n        title = _heading_title(line)\n        if title:\n            if _is_blocked_heading(title, remove_references):\n                skip = True\n                continue\n            if skip:\n                skip = False\n        if not skip:\n            kept.append(line)\n    return \"\\n\".join(kept)\n\n\ndef _reference_line(source):\n    if not isinstance(source, dict):\n        return \"\"\n    source_id = _as_text(source.get(\"source_id\") or source.get(\"id\"))\n    if not source_id:\n        return \"\"\n    title = _as_text(source.get(\"title\")) or \"Untitled source\"\n    url_or_path = _as_text(source.get(\"url_or_path\") or source.get(\"url\") or source.get(\"path\"))\n    source_type = _as_text(source.get(\"source_type\") or source.get(\"type\"))\n    fetched = source.get(\"fetched\")\n    quality = _as_text(source.get(\"evidence_quality\") or source.get(\"quality\"))\n    parts = [f\"- [{source_id}] {title}\"]\n    if url_or_path:\n        parts.append(url_or_path)\n    details = []\n    if source_type:\n        details.append(f\"type: {source_type}\")\n    if fetched is not None:\n        details.append(f\"fetched: {bool(fetched)}\")\n    if quality:\n        details.append(f\"evidence quality: {quality}\")\n    line = \". \".join(parts)\n    if details:\n        line = f\"{line} ({'; '.join(details)})\"\n    return line\n\n\nsources = _source_list(source_ledger)\ntext = _as_text(report_markdown).replace(\"\\r\\n\", \"\\n\").replace(\"\\r\", \"\\n\")\ntext = _remove_blocked_sections(text, bool(sources))\nwhile \"\\n\\n\\n\" in text:\n    text = text.replace(\"\\n\\n\\n\", \"\\n\\n\")\ntext = text.strip()\n\nif sources:\n    references = [_reference_line(source) for source in sources]\n    references = [line for line in references if line]\n    if references:\n        text = f\"{text}\\n\\n## References\\n\" + \"\\n\".join(references)\n\nif not text:\n    text = \"# Research Report\\n\\nNo report content was produced.\\n\"\n\nreturn text.rstrip() + \"\\n\""
+        "codeBody": "def _as_text(value):\n    if value is None:\n        return \"\"\n    return str(value).strip()\n\n\ndef _source_list(value):\n    if isinstance(value, list):\n        return value\n    if isinstance(value, dict):\n        nested = value.get(\"source_ledger\") or value.get(\"sources\") or value.get(\"items\")\n        if isinstance(nested, list):\n            return nested\n    return []\n\n\ndef _heading_title(line):\n    stripped = str(line or \"\").strip()\n    if not stripped.startswith(\"#\"):\n        return \"\"\n    count = 0\n    while count < len(stripped) and stripped[count] == \"#\":\n        count = count + 1\n    if count < 1 or count > 6:\n        return \"\"\n    if count >= len(stripped) or stripped[count] not in (\" \", \"\\t\"):\n        return \"\"\n    return stripped[count:].strip().strip(\"#\").strip().lower()\n\n\ndef _is_blocked_heading(title, remove_references):\n    compact = \" \".join(\n        str(title or \"\").strip(\" :.;\").replace(\"-\", \" \").replace(\"_\", \" \").replace(\"/\", \" \").split()\n    )\n    if bool(remove_references) and compact == \"references\":\n        return True\n    return compact in (\n        \"evidence table\",\n        \"evidence matrix\",\n        \"bibliography\",\n        \"claim evidence matrix\",\n        \"citation index\",\n        \"citation ids\",\n        \"citation list\",\n        \"citations\",\n        \"citations source ids\",\n        \"citations and source ids\",\n        \"source ids\",\n        \"source id list\",\n        \"source index\",\n        \"source list\",\n        \"sources cited\",\n        \"works cited\",\n    )\n\n\ndef _remove_blocked_sections(text, remove_references):\n    kept = []\n    skip = False\n    for line in str(text or \"\").split(\"\\n\"):\n        title = _heading_title(line)\n        if title:\n            if _is_blocked_heading(title, remove_references):\n                skip = True\n                continue\n            if skip:\n                skip = False\n        if not skip:\n            kept.append(line)\n    return \"\\n\".join(kept)\n\n\ndef _reference_line(source):\n    if not isinstance(source, dict):\n        return \"\"\n    source_id = _as_text(source.get(\"source_id\") or source.get(\"id\"))\n    if not source_id:\n        return \"\"\n    title = _as_text(source.get(\"title\")) or \"Untitled source\"\n    url_or_path = _as_text(source.get(\"url_or_path\") or source.get(\"url\") or source.get(\"path\"))\n    source_type = _as_text(source.get(\"source_type\") or source.get(\"type\"))\n    fetched = source.get(\"fetched\")\n    quality = _as_text(source.get(\"evidence_quality\") or source.get(\"quality\"))\n    parts = [f\"- [{source_id}] {title}\"]\n    if url_or_path:\n        parts.append(url_or_path)\n    details = []\n    if source_type:\n        details.append(f\"type: {source_type}\")\n    if fetched is not None:\n        details.append(f\"fetched: {bool(fetched)}\")\n    if quality:\n        details.append(f\"evidence quality: {quality}\")\n    line = \". \".join(parts)\n    if details:\n        line = f\"{line} ({'; '.join(details)})\"\n    return line\n\n\nsources = _source_list(source_ledger)\ntext = _as_text(report_markdown).replace(\"\\r\\n\", \"\\n\").replace(\"\\r\", \"\\n\")\ntext = _remove_blocked_sections(text, bool(sources))\nwhile \"\\n\\n\\n\" in text:\n    text = text.replace(\"\\n\\n\\n\", \"\\n\\n\")\ntext = text.strip()\n\nif sources:\n    references = [_reference_line(source) for source in sources]\n    references = [line for line in references if line]\n    if references:\n        text = f\"{text}\\n\\n## References\\n\" + \"\\n\".join(references)\n\nif not text:\n    text = \"# Research Report\\n\\nNo report content was produced.\\n\"\n\nreturn text.rstrip() + \"\\n\""
       },
       "label": null,
       "icon": null,
@@ -687,8 +687,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 1800,
-        "y": 0
+        "x": 2640.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -764,8 +764,8 @@
       "id": "get_report_markdown",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 504
+        "x": 1760.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "get",
@@ -811,8 +811,8 @@
       "id": "get_research_run_manifest",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 540
+        "x": 1760.0,
+        "y": 568.0
       },
       "data": {
         "nodeType": "get",
@@ -858,8 +858,8 @@
       "id": "get_source_ledger",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 576
+        "x": 1760.0,
+        "y": 816.0
       },
       "data": {
         "nodeType": "get",
@@ -905,8 +905,8 @@
       "id": "get_claim_evidence_matrix",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 612
+        "x": 1760.0,
+        "y": 1064.0
       },
       "data": {
         "nodeType": "get",
@@ -952,8 +952,8 @@
       "id": "get_iteration_log",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 648
+        "x": 1760.0,
+        "y": 1312.0
       },
       "data": {
         "nodeType": "get",
@@ -999,8 +999,8 @@
       "id": "get_adversarial_review_summary",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 684
+        "x": 2200.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "get",
@@ -1046,8 +1046,8 @@
       "id": "get_limitations",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 720
+        "x": 2200.0,
+        "y": 568.0
       },
       "data": {
         "nodeType": "get",
@@ -1093,8 +1093,8 @@
       "id": "get_warnings",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 756
+        "x": 2200.0,
+        "y": 816.0
       },
       "data": {
         "nodeType": "get",
@@ -1140,8 +1140,8 @@
       "id": "get_export_status",
       "type": "get",
       "position": {
-        "x": 620,
-        "y": 792
+        "x": 2200.0,
+        "y": 1064.0
       },
       "data": {
         "nodeType": "get",
@@ -1531,6 +1531,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-13T15:52:45.565884+00:00",
-  "updated_at": "2026-07-13T15:52:45.565884+00:00"
+  "created_at": "2026-07-20T13:28:25.593086+00:00",
+  "updated_at": "2026-07-20T13:28:25.593086+00:00"
 }

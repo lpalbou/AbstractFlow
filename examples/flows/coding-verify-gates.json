@@ -8,7 +8,7 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -1400,
+        "x": -2000,
         "y": 0
       },
       "data": {
@@ -75,8 +75,8 @@
       "id": "listing_args",
       "type": "code",
       "position": {
-        "x": -1400,
-        "y": 220
+        "x": -2000,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -128,7 +128,7 @@
       "id": "list_call",
       "type": "call_tool",
       "position": {
-        "x": -1160,
+        "x": -1620,
         "y": 0
       },
       "data": {
@@ -191,8 +191,8 @@
       "id": "gate0",
       "type": "code",
       "position": {
-        "x": -1160,
-        "y": 220
+        "x": -1620,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -249,8 +249,8 @@
       "id": "entry_args",
       "type": "code",
       "position": {
-        "x": -940,
-        "y": 220
+        "x": -1240,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -307,7 +307,7 @@
       "id": "entry_read",
       "type": "call_tool",
       "position": {
-        "x": -920,
+        "x": -1240,
         "y": 0
       },
       "data": {
@@ -370,8 +370,8 @@
       "id": "gate1",
       "type": "code",
       "position": {
-        "x": -720,
-        "y": 220
+        "x": -860,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -433,8 +433,8 @@
       "id": "script_args",
       "type": "code",
       "position": {
-        "x": -820,
-        "y": 420
+        "x": -480,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -491,7 +491,7 @@
       "id": "script_read",
       "type": "call_tool",
       "position": {
-        "x": -800,
+        "x": -860,
         "y": 0
       },
       "data": {
@@ -554,8 +554,8 @@
       "id": "gate4",
       "type": "code",
       "position": {
-        "x": -600,
-        "y": 560
+        "x": -480,
+        "y": 700
       },
       "data": {
         "nodeType": "code",
@@ -622,8 +622,8 @@
       "id": "det",
       "type": "code",
       "position": {
-        "x": -720,
-        "y": 420
+        "x": -100,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -685,7 +685,7 @@
       "id": "if_det",
       "type": "if",
       "position": {
-        "x": -680,
+        "x": -480,
         "y": 0
       },
       "data": {
@@ -728,8 +728,8 @@
       "id": "set_verdict_det",
       "type": "set_var",
       "position": {
-        "x": -440,
-        "y": -180
+        "x": -100,
+        "y": -220
       },
       "data": {
         "nodeType": "set_var",
@@ -779,8 +779,8 @@
       "id": "if_web",
       "type": "if",
       "position": {
-        "x": -440,
-        "y": 60
+        "x": -100,
+        "y": 0
       },
       "data": {
         "nodeType": "if",
@@ -822,8 +822,8 @@
       "id": "probe_args",
       "type": "code",
       "position": {
-        "x": -440,
-        "y": 420
+        "x": 280,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -880,8 +880,8 @@
       "id": "probe_call",
       "type": "call_tool",
       "position": {
-        "x": -220,
-        "y": 60
+        "x": 280,
+        "y": 0
       },
       "data": {
         "nodeType": "call_tool",
@@ -943,8 +943,8 @@
       "id": "gate3",
       "type": "code",
       "position": {
-        "x": -220,
-        "y": 420
+        "x": 660,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -1006,8 +1006,8 @@
       "id": "if_probe",
       "type": "if",
       "position": {
-        "x": 0,
-        "y": 60
+        "x": 660,
+        "y": 0
       },
       "data": {
         "nodeType": "if",
@@ -1049,8 +1049,8 @@
       "id": "probe_verdict",
       "type": "code",
       "position": {
-        "x": 0,
-        "y": 420
+        "x": 1040,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -1107,8 +1107,8 @@
       "id": "set_verdict_probe",
       "type": "set_var",
       "position": {
-        "x": 240,
-        "y": -60
+        "x": 1040,
+        "y": -220
       },
       "data": {
         "nodeType": "set_var",
@@ -1158,8 +1158,8 @@
       "id": "verifier_prompt",
       "type": "code",
       "position": {
-        "x": 240,
-        "y": 420
+        "x": 1040,
+        "y": 700
       },
       "data": {
         "nodeType": "code",
@@ -1224,7 +1224,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nbuild_cmd = str(build_command or \"\").strip()\nrun_cmd = str(run_command or \"\").strip()\ng0 = gate0_out or {}\ng3 = gate3_out or {}\nfiles = [str(f) for f in (g0.get(\"files\") or [])]\nweb = bool(g0.get(\"web_class\"))\nentry = str(g0.get(\"entrypoint\") or \"\")\n\nparts = []\nparts.append(\"You are an INDEPENDENT code verifier. Do NOT edit any code. Run the checks and report a structured verdict.\")\nparts.append(\"\")\nparts.append(\"## The task the code was meant to satisfy\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"## Ground truth already verified mechanically (do not re-derive)\")\nparts.append(\"Delivered files (\" + str(len(files)) + \"): \" + \", \".join(files[:40]))\nif web:\n    parts.append(\"Artifact class: web. Entrypoint: \" + entry + \". Reference integrity already checked.\")\n    if bool(g3.get(\"ran\")):\n        diag = g3.get(\"diag\") or {}\n        probe_line = \"A browser probe already EXECUTED the entrypoint world-side (engine: \" + str(g3.get(\"engine\") or \"?\") + \"; loaded ok: \" + str(bool(g3.get(\"probe_ok\"))) + \"; canvas present: \" + str(bool(diag.get(\"has_canvas\"))) + \"; non-blank samples: \" + str(diag.get(\"non_blank_samples\")) + \"). Its result decides the executes gate and will override whatever you report there. Do not try to execute the page yourself.\"\n        parts.append(probe_line)\nelse:\n    parts.append(\"Artifact class: non-web (no .html entrypoint detected).\")\n# Agent-lane discipline line (c2847 precision 1): judgments must anchor on\n# the gate outputs above, or the LLM re-derives executes-shaped opinions.\nparts.append(\"Be strict: only count claims supported by the gate outputs above and by what your own tool calls actually observed.\")\nparts.append(\"\")\nparts.append(\"## Gate 1 - BUILDS\")\nif build_cmd:\n    parts.append(\"Run this build command with execute_command and record whether it succeeds: \" + build_cmd)\nelse:\n    parts.append(\"Run the appropriate build/compile/syntax-check command with execute_command for the delivered files listed above. For interpreted languages with no build step, treat import/syntax check as the build (e.g. python -m py_compile). For plain static web files with no build step, builds=true.\")\nparts.append(\"On failure, capture the exact error output in build_error.\")\nparts.append(\"\")\nparts.append(\"## Gate 2 - EXECUTES\")\nif web:\n    parts.append(\"Already executed world-side by the browser probe (see ground truth above): set executes=false with run_error='decided by browser probe' — the merge substitutes the probe's result. Do NOT attempt to run browser code with execute_command.\")\nelif run_cmd:\n    parts.append(\"Run this command with execute_command and record whether it runs without error: \" + run_cmd)\nelse:\n    parts.append(\"Run the program (or its tests / a smoke invocation) with execute_command and capture any traceback/runtime error in run_error.\")\n    parts.append(\"FAIL CLOSED: a gate you could not actually execute is NOT a pass. If no executor exists for the artifact class on this host, set executes=false AND add one line to environment_failures[] naming the missing executor. NEVER claim executes=true because a file merely exists or 'loads'.\")\n    parts.append(\"environment_failures[] is ONLY for missing executors/runtimes on this host — real crashes, tracebacks and errors from code you DID run go in failures[].\")\nparts.append(\"\")\nparts.append(\"## Gate 3 - MATCHES THE ASK\")\nparts.append(\"Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').\")\nparts.append(\"\")\nparts.append(\"## Verdict\")\nparts.append(\"Set all_passed=true ONLY if builds AND executes AND matches are all true AND environment_failures is empty. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.\")\nparts.append(\"In artifacts[], list the produced file paths you actually observed, WORKSPACE-RELATIVE like ./pong.html — use an absolute path only for a file outside the workspace root. Entrypoint first (the file a user opens/runs). Never list files you did not see.\")\nreturn \"\\n\".join(parts)"
+        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nbuild_cmd = str(build_command or \"\").strip()\nrun_cmd = str(run_command or \"\").strip()\ng0 = gate0_out or {}\ng3 = gate3_out or {}\nfiles = [str(f) for f in (g0.get(\"files\") or [])]\nweb = bool(g0.get(\"web_class\"))\nentry = str(g0.get(\"entrypoint\") or \"\")\n\nparts = []\nparts.append(\"You are an INDEPENDENT code verifier. Do NOT edit any code. Run the checks and report a structured verdict.\")\nparts.append(\"\")\nparts.append(\"## The task the code was meant to satisfy\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"## Ground truth already verified mechanically (do not re-derive)\")\nparts.append(\"Delivered files (\" + str(len(files)) + \"): \" + \", \".join(files[:40]))\nif web:\n    parts.append(\"Artifact class: web. Entrypoint: \" + entry + \". Reference integrity already checked.\")\n    if bool(g3.get(\"ran\")):\n        diag = g3.get(\"diag\") or {}\n        probe_line = \"A browser probe already EXECUTED the entrypoint world-side (engine: \" + str(g3.get(\"engine\") or \"?\") + \"; loaded ok: \" + str(bool(g3.get(\"probe_ok\"))) + \"; canvas present: \" + str(bool(diag.get(\"has_canvas\"))) + \"; non-blank samples: \" + str(diag.get(\"non_blank_samples\")) + \"). Its result decides the executes gate and will override whatever you report there. Do not try to execute the page yourself.\"\n        parts.append(probe_line)\nelse:\n    parts.append(\"Artifact class: non-web (no .html entrypoint detected).\")\n# Agent-lane discipline line (c2847 precision 1): judgments must anchor on\n# the gate outputs above, or the LLM re-derives executes-shaped opinions.\nparts.append(\"Be strict: only count claims supported by the gate outputs above and by what your own tool calls actually observed.\")\nparts.append(\"\")\nparts.append(\"## Gate 1 - BUILDS\")\nif build_cmd:\n    parts.append(\"Run this build command with execute_command and record whether it succeeds: \" + build_cmd)\nelse:\n    parts.append(\"Run the appropriate build/compile/syntax-check command with execute_command for the delivered files listed above. For interpreted languages with no build step, treat import/syntax check as the build (e.g. python -m py_compile). For plain static web files with no build step, builds=true.\")\nparts.append(\"On failure, capture the exact error output in build_error.\")\nparts.append(\"\")\nparts.append(\"## Gate 2 - EXECUTES\")\nif web:\n    parts.append(\"Already executed world-side by the browser probe (see ground truth above): set executes=false with run_error='decided by browser probe' — the merge substitutes the probe's result. Do NOT attempt to run browser code with execute_command.\")\nelse:\n    if run_cmd:\n        parts.append(\"Run this command with execute_command and record whether it runs without error: \" + run_cmd)\n    else:\n        parts.append(\"Run the program (or its tests / a smoke invocation) with execute_command and capture any traceback/runtime error in run_error.\")\n    # Fail-closed applies to BOTH non-web branches: an explicit run_command\n    # that cannot run on this host is exactly the missing-executor class.\n    parts.append(\"FAIL CLOSED: a gate you could not actually execute is NOT a pass. If no executor exists for the artifact class on this host, set executes=false AND add one line to environment_failures[] naming the missing executor. NEVER claim executes=true because a file merely exists or 'loads'.\")\n    parts.append(\"environment_failures[] is ONLY for missing executors/runtimes on this host — real crashes, tracebacks and errors from code you DID run go in failures[].\")\nparts.append(\"\")\nparts.append(\"## Gate 3 - MATCHES THE ASK\")\nparts.append(\"Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').\")\n# C3 (plan improving-code, 2026-07-21): non-vacuity. The dead-ripple defect\n# passed every structural check — a feature was PRESENT and ran cleanly yet\n# its output never varied. Structure-present is not behavior-correct: the\n# verifier must confirm each task-named feature's output DEPENDS on its\n# input, and treat a provably-constant output as a MATCH FAILURE.\nparts.append(\"NON-VACUITY (required): for each behavior the task names, confirm its output actually DEPENDS on its input — that the feature reacts, not merely exists. Read SELFCHECK.md if present for the builder's claimed evidence, but do not trust it: check the code path yourself (does the output derive from the input, or is it hard-coded / a constant / an always-empty result?). If a task-named feature's output is provably constant or always-empty across the inputs it is supposed to respond to, that is matches=false with a failures[] line NAMING the mechanism (e.g. 'ripple effect computes the same 0 for every cell because it never reads neighbor state'). A feature that is present but vacuous is a FAILURE, not a pass.\")\nparts.append(\"\")\nparts.append(\"## Verdict\")\nparts.append(\"Set all_passed=true ONLY if builds AND executes AND matches are all true AND environment_failures is empty. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.\")\nparts.append(\"In artifacts[], list the produced file paths you actually observed, WORKSPACE-RELATIVE like ./pong.html — use an absolute path only for a file outside the workspace root. Entrypoint first (the file a user opens/runs). Never list files you did not see.\")\nreturn \"\\n\".join(parts)"
       },
       "label": null,
       "icon": null,
@@ -1236,8 +1236,8 @@
       "id": "verifier",
       "type": "agent",
       "position": {
-        "x": 240,
-        "y": 120
+        "x": 1040,
+        "y": 0
       },
       "data": {
         "nodeType": "agent",
@@ -1412,8 +1412,8 @@
       "id": "merge",
       "type": "code",
       "position": {
-        "x": 560,
-        "y": 420
+        "x": 1420,
+        "y": 400
       },
       "data": {
         "nodeType": "code",
@@ -1425,6 +1425,16 @@
             "id": "verifier_data",
             "label": "verifier_data",
             "type": "object"
+          },
+          {
+            "id": "verifier_ok",
+            "label": "verifier_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "verifier_response",
+            "label": "verifier_response",
+            "type": "string"
           },
           {
             "id": "gate0_out",
@@ -1468,7 +1478,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "v = verifier_data or {}\ng0 = gate0_out or {}\ng1 = gate1_out or {}\ng3 = gate3_out or {}\nweb = bool(g0.get(\"web_class\"))\nbuilds = bool(v.get(\"builds\"))\nmatches = bool(v.get(\"matches\"))\nfailures = v.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nfailures = [str(f) for f in failures]\nenv_failures = v.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\nenv_failures = [str(f) for f in env_failures]\nwarnings = [str(w) for w in (g3.get(\"warnings\") or [])]\nif web:\n    # World-side truth: the probe decided executes; its environment failures\n    # ride regardless of what the LLM reported.\n    executes = bool(g3.get(\"executes_web\"))\n    for f in (g3.get(\"environment_failures\") or []):\n        if str(f) not in env_failures:\n            env_failures.append(str(f))\nelse:\n    executes = bool(v.get(\"executes\"))\nall_passed = builds and executes and matches and len(env_failures) == 0\narts = [str(a).strip() for a in (v.get(\"artifacts\") or []) if str(a).strip()]\nif not arts:\n    entry = str(g0.get(\"entrypoint\") or \"\")\n    arts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\nreturn {\n    \"builds\": builds,\n    \"executes\": executes,\n    \"matches\": matches,\n    \"all_passed\": all_passed,\n    \"failures\": failures,\n    \"environment_failures\": env_failures,\n    \"warnings\": warnings,\n    \"build_error\": str(v.get(\"build_error\") or \"\"),\n    \"run_error\": str(v.get(\"run_error\") or \"\"),\n    \"mismatch\": str(v.get(\"mismatch\") or \"\"),\n    \"summary\": str(v.get(\"summary\") or \"\"),\n    \"artifacts\": arts,\n    \"gate_source\": \"verifier+deterministic+probe\" if web else \"verifier+deterministic\",\n    \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}} if web else {},\n    \"deterministic\": {\n        \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n        \"integration_ok\": bool(g1.get(\"integration_ok\")),\n        \"web_class\": web,\n        \"entrypoint\": str(g0.get(\"entrypoint\") or \"\"),\n        \"files_count\": len(g0.get(\"files\") or []),\n    },\n}"
+        "codeBody": "v = verifier_data if isinstance(verifier_data, dict) else {}\ng0 = gate0_out or {}\ng1 = gate1_out or {}\ng3 = gate3_out or {}\nweb = bool(g0.get(\"web_class\"))\n# A verifier that RAN always returns the strict-schema keys (all fields are\n# required); a verdict carrying neither gate key is a verifier that DIED or\n# returned nothing parseable — \"delivered, not verifiable\", never \"failed\".\nverdict_missing = (\"builds\" not in v) and (\"all_passed\" not in v)\nif verdict_missing:\n    env_failures = [str(f) for f in (g3.get(\"environment_failures\") or [])]\n    note = str(verifier_response or \"\").strip()\n    if verifier_ok is False:\n        cause = \"the verifier agent failed before returning a verdict\"\n    else:\n        cause = \"the verifier returned no parseable verdict\"\n    passed_gates = \"delivery, integration\"\n    if web and bool(g3.get(\"executes_web\")):\n        passed_gates = passed_gates + \", browser probe\"\n    env_failures.append(\n        \"verification unavailable: \" + cause\n        + ((\": \" + note[:240]) if note else \"\")\n        + \" — deterministic gates (\" + passed_gates + \") passed; the artifact is delivered but could not be independently verified here\"\n    )\n    entry = str(g0.get(\"entrypoint\") or \"\")\n    arts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\n    return {\n        \"builds\": False,\n        \"executes\": bool(g3.get(\"executes_web\")) if web else False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": [],\n        \"environment_failures\": env_failures,\n        \"warnings\": [str(w) for w in (g3.get(\"warnings\") or [])],\n        \"build_error\": \"\",\n        \"run_error\": \"\",\n        \"mismatch\": \"\",\n        \"summary\": \"delivered, verification incomplete: the deterministic gates passed but the LLM verifier died before reporting\",\n        \"artifacts\": arts,\n        \"verifier_died\": True,\n        \"delivered\": bool(g0.get(\"delivery_ok\")),\n        \"gate_source\": (\"deterministic+probe\" if web else \"deterministic\") + \" (verifier unavailable)\",\n        \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}} if web else {},\n        \"deterministic\": {\n            \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n            \"integration_ok\": bool(g1.get(\"integration_ok\")),\n            \"web_class\": web,\n            \"entrypoint\": entry,\n            \"files_count\": len(g0.get(\"files\") or []),\n        },\n    }\nbuilds = bool(v.get(\"builds\"))\nmatches = bool(v.get(\"matches\"))\nfailures = v.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nfailures = [str(f) for f in failures]\nenv_failures = v.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\nenv_failures = [str(f) for f in env_failures]\nwarnings = [str(w) for w in (g3.get(\"warnings\") or [])]\nif web:\n    # World-side truth: the probe decided executes; its environment failures\n    # ride regardless of what the LLM reported.\n    executes = bool(g3.get(\"executes_web\"))\n    for f in (g3.get(\"environment_failures\") or []):\n        if str(f) not in env_failures:\n            env_failures.append(str(f))\nelse:\n    executes = bool(v.get(\"executes\"))\nall_passed = builds and executes and matches and len(env_failures) == 0\narts = [str(a).strip() for a in (v.get(\"artifacts\") or []) if str(a).strip()]\nif not arts:\n    entry = str(g0.get(\"entrypoint\") or \"\")\n    arts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\nreturn {\n    \"builds\": builds,\n    \"executes\": executes,\n    \"matches\": matches,\n    \"all_passed\": all_passed,\n    \"failures\": failures,\n    \"environment_failures\": env_failures,\n    \"warnings\": warnings,\n    \"build_error\": str(v.get(\"build_error\") or \"\"),\n    \"run_error\": str(v.get(\"run_error\") or \"\"),\n    \"mismatch\": str(v.get(\"mismatch\") or \"\"),\n    \"summary\": str(v.get(\"summary\") or \"\"),\n    \"artifacts\": arts,\n    \"gate_source\": \"verifier+deterministic+probe\" if web else \"verifier+deterministic\",\n    \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}} if web else {},\n    \"deterministic\": {\n        \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n        \"integration_ok\": bool(g1.get(\"integration_ok\")),\n        \"web_class\": web,\n        \"entrypoint\": str(g0.get(\"entrypoint\") or \"\"),\n        \"files_count\": len(g0.get(\"files\") or []),\n    },\n}"
       },
       "label": null,
       "icon": null,
@@ -1480,8 +1490,8 @@
       "id": "set_verdict_llm",
       "type": "set_var",
       "position": {
-        "x": 560,
-        "y": 120
+        "x": 1420,
+        "y": 0
       },
       "data": {
         "nodeType": "set_var",
@@ -1531,8 +1541,8 @@
       "id": "read_verdict",
       "type": "get_var",
       "position": {
-        "x": 800,
-        "y": 220
+        "x": 1800,
+        "y": 400
       },
       "data": {
         "nodeType": "get_var",
@@ -1573,7 +1583,7 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 940,
+        "x": 1800,
         "y": 0
       },
       "data": {
@@ -2068,6 +2078,22 @@
       "animated": false
     },
     {
+      "id": "e-verifier-success-merge-verifier_ok",
+      "source": "verifier",
+      "sourceHandle": "success",
+      "target": "merge",
+      "targetHandle": "verifier_ok",
+      "animated": false
+    },
+    {
+      "id": "e-verifier-response-merge-verifier_response",
+      "source": "verifier",
+      "sourceHandle": "response",
+      "target": "merge",
+      "targetHandle": "verifier_response",
+      "animated": false
+    },
+    {
       "id": "e-gate0-output-merge-gate0_out",
       "source": "gate0",
       "sourceHandle": "output",
@@ -2109,6 +2135,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-17T19:33:12.575171+00:00",
-  "updated_at": "2026-07-17T19:33:12.575171+00:00"
+  "created_at": "2026-07-21T12:26:23.599298+00:00",
+  "updated_at": "2026-07-21T12:26:23.599298+00:00"
 }

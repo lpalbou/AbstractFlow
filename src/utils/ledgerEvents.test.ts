@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { createLedgerMappingState, mapLedgerRecordToEvents, type LedgerRecord } from './ledgerEvents';
+import {
+  createLedgerMappingState,
+  mapLedgerRecordToEvents,
+  toolApprovalResumeMarker,
+  type LedgerRecord,
+} from './ledgerEvents';
 
 /**
  * Ledger→ExecutionEvent mapping contract tests.
@@ -124,6 +129,133 @@ describe('mapLedgerRecordToEvents — event-park resume payload visibility (back
     );
     const complete = events.find((ev) => ev.type === 'node_complete');
     expect(complete?.result).toEqual({ response: 'yes, continue' });
+  });
+});
+
+describe('mapLedgerRecordToEvents — tool-approval resume markers (backlog 0138)', () => {
+  function resumeRecord(waitReason: string, payload: Record<string, unknown>): LedgerRecord {
+    return {
+      run_id: 'run-1',
+      step_id: 'step-3',
+      node_id: 'tool_calls',
+      status: 'completed',
+      started_at: '2026-07-21T02:00:00+00:00',
+      ended_at: '2026-07-21T02:00:01+00:00',
+      effect: { type: 'resume', payload: { wait_reason: waitReason, wait_key: 'tool_calls:run-1:tool_calls', payload } },
+      result: { resumed: true },
+    };
+  }
+
+  it('marks an auto-approved tool-approval resume (result stays suppressed)', () => {
+    const events = mapLedgerRecordToEvents(
+      resumeRecord('user', { approved: true, auto_approved: true }),
+      createLedgerMappingState()
+    );
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete?.result).toBeUndefined();
+    expect(complete?.approval).toEqual({ approved: true, auto: true });
+  });
+
+  it('marks a manually approved tool-approval resume as non-auto', () => {
+    const events = mapLedgerRecordToEvents(
+      resumeRecord('user', { approved: true }),
+      createLedgerMappingState()
+    );
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete?.approval).toEqual({ approved: true, auto: false });
+  });
+
+  it('does not mark denied approvals', () => {
+    const events = mapLedgerRecordToEvents(
+      resumeRecord('user', { approved: false }),
+      createLedgerMappingState()
+    );
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete?.approval).toBeUndefined();
+  });
+
+  it('does not mark ordinary user replies', () => {
+    const events = mapLedgerRecordToEvents(
+      resumeRecord('user', { response: 'yes, continue' }),
+      createLedgerMappingState()
+    );
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete?.approval).toBeUndefined();
+  });
+
+  it('does not mark event resumes even when the envelope carries approved:true', () => {
+    // An external event payload may coincidentally contain an `approved`
+    // key; only WaitReason.USER resumes are tool approvals.
+    const events = mapLedgerRecordToEvents(
+      resumeRecord('event', { approved: true }),
+      createLedgerMappingState()
+    );
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete?.approval).toBeUndefined();
+  });
+
+  it('does not mark ordinary (non-resume) completed records', () => {
+    const events = mapLedgerRecordToEvents(
+      {
+        run_id: 'run-1',
+        step_id: 'step-4',
+        node_id: 'tool_calls',
+        status: 'completed',
+        result: { approved: true },
+      },
+      createLedgerMappingState()
+    );
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete?.approval).toBeUndefined();
+  });
+});
+
+describe('toolApprovalResumeMarker (pure helper)', () => {
+  it('requires effect.type=resume, result.resumed, wait_reason=user and approved===true', () => {
+    const base: LedgerRecord = {
+      run_id: 'run-1',
+      node_id: 'tool_calls',
+      status: 'completed',
+      effect: { type: 'resume', payload: { wait_reason: 'user', payload: { approved: true } } },
+      result: { resumed: true },
+    };
+    expect(toolApprovalResumeMarker(base)).toEqual({ approved: true, auto: false });
+    expect(
+      toolApprovalResumeMarker({ ...base, effect: { type: 'llm_call', payload: {} } })
+    ).toBeNull();
+    expect(toolApprovalResumeMarker({ ...base, result: { resumed: false } })).toBeNull();
+    expect(
+      toolApprovalResumeMarker({
+        ...base,
+        effect: { type: 'resume', payload: { wait_reason: 'job', payload: { approved: true } } },
+      })
+    ).toBeNull();
+    expect(
+      toolApprovalResumeMarker({
+        ...base,
+        // String "true" is not an approval decision — providers/transports
+        // must not be able to fabricate the marker with a truthy string.
+        effect: { type: 'resume', payload: { wait_reason: 'user', payload: { approved: 'true' } } },
+      })
+    ).toBeNull();
+  });
+
+  it('distinguishes auto from manual via the auto_approved stamp', () => {
+    const rec = (payload: Record<string, unknown>): LedgerRecord => ({
+      run_id: 'run-1',
+      node_id: 'tool_calls',
+      status: 'completed',
+      effect: { type: 'resume', payload: { wait_reason: 'user', payload } },
+      result: { resumed: true },
+    });
+    expect(toolApprovalResumeMarker(rec({ approved: true, auto_approved: true }))).toEqual({
+      approved: true,
+      auto: true,
+    });
+    expect(toolApprovalResumeMarker(rec({ approved: true, auto_approved: 'yes' }))).toEqual({
+      approved: true,
+      auto: false,
+    });
   });
 });
 

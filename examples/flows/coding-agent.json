@@ -10,7 +10,7 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -900,
+        "x": -1500,
         "y": 0
       },
       "data": {
@@ -79,8 +79,8 @@
       "id": "get_loop_state",
       "type": "get_var",
       "position": {
-        "x": -560,
-        "y": 200
+        "x": -1500,
+        "y": 420
       },
       "data": {
         "nodeType": "get_var",
@@ -125,8 +125,8 @@
       "id": "loop_condition",
       "type": "code",
       "position": {
-        "x": -560,
-        "y": 340
+        "x": -1120,
+        "y": 420
       },
       "data": {
         "nodeType": "code",
@@ -183,8 +183,8 @@
       "id": "rounds",
       "type": "while",
       "position": {
-        "x": -560,
-        "y": 500
+        "x": -1120,
+        "y": 0
       },
       "data": {
         "nodeType": "while",
@@ -239,8 +239,8 @@
       "id": "get_state_body",
       "type": "get_var",
       "position": {
-        "x": -220,
-        "y": -120
+        "x": -1120,
+        "y": -300
       },
       "data": {
         "nodeType": "get_var",
@@ -285,8 +285,8 @@
       "id": "builder_prompt",
       "type": "code",
       "position": {
-        "x": -220,
-        "y": 60
+        "x": -740,
+        "y": -300
       },
       "data": {
         "nodeType": "code",
@@ -336,7 +336,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "req = str(request or \"\").strip()\nstate = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nfailures = state.get(\"failures\") or []\nws = str(workspace_root or \"\").strip()\n\nparts = []\nparts.append(\"# Coding task\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Work inside the workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"Delivery rules (verified mechanically after every round):\")\nparts.append(\"- Every produced file must live in the run workspace — never /tmp or another directory.\")\nparts.append(\"- For small web builds (games, pages, demos): prefer ONE self-contained entrypoint (index.html with inline script/styles) unless the task explicitly requires multiple files.\")\nparts.append(\"- If you do split files, the entrypoint must actually load every sibling (script src / link href) — an unreferenced file is a delivery failure, not a bonus.\")\nif completed > 0 and failures:\n    parts.append(\"\")\n    parts.append(\"# Previous attempt FAILED these checks — fix EXACTLY these, do not start over:\")\n    for i, f in enumerate(failures, 1):\n        parts.append(str(i) + \". \" + str(f))\n    parts.append(\"\")\n    parts.append(\"Make the minimal changes that resolve the specific failures above, then stop.\")\nelse:\n    parts.append(\"\")\n    parts.append(\"Write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.\")\nreturn \"\\n\".join(parts)"
+        "codeBody": "req = str(request or \"\").strip()\nstate = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nfailures = state.get(\"failures\") or []\nws = str(workspace_root or \"\").strip()\n\nparts = []\nparts.append(\"# Coding task\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Work inside the workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"Delivery rules (verified mechanically after every round):\")\nparts.append(\"- Every produced file must live in the run workspace — never /tmp or another directory.\")\nparts.append(\"- For small web builds (games, pages, demos): prefer ONE self-contained entrypoint (index.html with inline script/styles) unless the task explicitly requires multiple files.\")\nparts.append(\"- If you do split files, the entrypoint must actually load every sibling (script src / link href) — an unreferenced file is a delivery failure, not a bonus.\")\n# C1 (plan improving-code, 2026-07-21): codex-grade engineering rules. The\n# dead-temporal-ripple defect (0,0,0 samples across all three 0.2.2 runs)\n# came from code that ran WITHOUT error yet computed a constant — the class\n# these rules target. Phrased general-purpose (every coding task), not\n# graph-specific.\nparts.append(\"\")\nparts.append(\"Engineering rules (a clean run is not enough — the output must be CORRECT):\")\nparts.append(\"- Bound every traversal, recursion, and iteration with an explicit limit (max depth/hops, a per-step cap, a visited set) — an unbounded or accidentally-empty loop is a bug even when it does not crash.\")\nparts.append(\"- Before writing logic over any data structure, VERIFY its actual shape and the DIRECTION of its references (which field points at which; source vs target; parent vs child) by inspecting a real sample — do not assume the direction from the name.\")\nparts.append(\"- Same output for every input is BROKEN even without an error: if a feature is meant to react to its input, its result MUST change when the input changes. Never ship a function whose output is provably constant across the inputs it is supposed to respond to.\")\nparts.append(\"- Self-probe before you finish: actually exercise the code on representative input (run it, or for a web build load it and observe) and confirm the task-named behavior is VISIBLE and VARIES — do not declare done on 'it compiles' or 'it loads'.\")\nif completed > 0 and failures:\n    parts.append(\"\")\n    parts.append(\"# Previous attempt FAILED these checks — fix EXACTLY these, do not start over:\")\n    for i, f in enumerate(failures, 1):\n        parts.append(str(i) + \". \" + str(f))\n    parts.append(\"\")\n    parts.append(\"Make the minimal changes that resolve the specific failures above, then stop.\")\nelse:\n    parts.append(\"\")\n    # C2 (plan improving-code, 2026-07-21): round-0 data profiling. Findings\n    # ride as a source comment block so the verifier (and the next round) can\n    # see what the input actually looked like — the antidote to logic built\n    # on an assumed data shape/direction.\n    parts.append(\"First, PROFILE the inputs before writing logic: inspect the real data/assets/parameters the task operates on (shape, ranges, reference direction, edge cases, whether fields are populated), and record what you found as a short comment block at the top of your main source file (a `PROFILE:`/`DATA NOTES:` header). Build the logic to match what you OBSERVED, not what the names suggest.\")\n    parts.append(\"Then write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.\")\n# C8 (plan improving-code, 2026-07-21): SELFCHECK.md evidence file. Ranked\n# below the mechanical gates deliberately (a self-report is confabulation-\n# aware, not proof) — it makes the builder's own verification claims\n# auditable against the deterministic gates + probe.\nparts.append(\"\")\nparts.append(\"Before finishing, write a SELFCHECK.md in the workspace: for EACH behavior the task named, one line stating how you verified it and the CONCRETE evidence you observed (the command you ran and its output, or the on-screen result and how it VARIED with input) — not 'looks correct'. If you could not verify something, say so plainly. This file is evidence for an independent verifier, so claims without observed evidence are worse than an honest 'unverified'.\")\nreturn \"\\n\".join(parts)"
       },
       "label": null,
       "icon": null,
@@ -348,8 +348,8 @@
       "id": "builder",
       "type": "agent",
       "position": {
-        "x": 140,
-        "y": -40
+        "x": -740,
+        "y": 0
       },
       "data": {
         "nodeType": "agent",
@@ -468,8 +468,8 @@
       "id": "verify_input",
       "type": "make_object",
       "position": {
-        "x": 500,
-        "y": 160
+        "x": -360,
+        "y": 420
       },
       "data": {
         "nodeType": "make_object",
@@ -531,8 +531,8 @@
       "id": "verify",
       "type": "subflow",
       "position": {
-        "x": 500,
-        "y": -40
+        "x": -360,
+        "y": 0
       },
       "data": {
         "nodeType": "subflow",
@@ -583,8 +583,8 @@
       "id": "get_verdict",
       "type": "get",
       "position": {
-        "x": 860,
-        "y": 120
+        "x": 20,
+        "y": 420
       },
       "data": {
         "nodeType": "get",
@@ -630,8 +630,8 @@
       "id": "next_state",
       "type": "code",
       "position": {
-        "x": 860,
-        "y": 280
+        "x": 400,
+        "y": 420
       },
       "data": {
         "nodeType": "code",
@@ -642,6 +642,11 @@
           {
             "id": "verifier",
             "label": "verifier",
+            "type": "object"
+          },
+          {
+            "id": "verify_meta",
+            "label": "verify_meta",
             "type": "object"
           },
           {
@@ -676,7 +681,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "verdict = verifier or {}\nnext_round = int(round_index or 0) + 1\nall_passed = bool(verdict.get(\"all_passed\"))\nfailures = verdict.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nenv_failures = verdict.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\n# Belt: if the verdict claims pass but a gate is false, do not trust the pass.\nif all_passed and not (verdict.get(\"builds\") and verdict.get(\"executes\") and verdict.get(\"matches\")):\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed but a gate was false\"]\nif all_passed and env_failures:\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed despite environment_failures\"]\nreturn {\n    \"rounds_completed\": next_round,\n    \"all_passed\": all_passed,\n    \"failures\": [str(f) for f in failures],\n    \"environment_failures\": [str(f) for f in env_failures],\n    \"last_verdict\": verdict,\n}"
+        "codeBody": "verdict = verifier if isinstance(verifier, dict) else {}\nnext_round = int(round_index or 0) + 1\nverdict_missing = (\"builds\" not in verdict) and (\"all_passed\" not in verdict)\nif verdict_missing:\n    meta = verify_meta if isinstance(verify_meta, dict) else {}\n    err = str(meta.get(\"error\") or \"the verification subflow returned no verdict\")\n    env_line = \"verification unavailable: the verification subflow failed before returning a verdict: \" + err[:300]\n    synth = {\n        \"builds\": False,\n        \"executes\": False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": [],\n        \"environment_failures\": [env_line],\n        \"summary\": \"the verification subflow failed before returning a verdict; the build round finished but is unverified\",\n        \"artifacts\": [],\n        \"verifier_died\": True,\n        \"gate_source\": \"none (verification subflow failed)\",\n    }\n    return {\n        \"rounds_completed\": next_round,\n        \"all_passed\": False,\n        \"failures\": [],\n        \"environment_failures\": [env_line],\n        \"last_verdict\": synth,\n    }\nall_passed = bool(verdict.get(\"all_passed\"))\nfailures = verdict.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nenv_failures = verdict.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\n# Belt: if the verdict claims pass but a gate is false, do not trust the pass.\nif all_passed and not (verdict.get(\"builds\") and verdict.get(\"executes\") and verdict.get(\"matches\")):\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed but a gate was false\"]\nif all_passed and env_failures:\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed despite environment_failures\"]\nreturn {\n    \"rounds_completed\": next_round,\n    \"all_passed\": all_passed,\n    \"failures\": [str(f) for f in failures],\n    \"environment_failures\": [str(f) for f in env_failures],\n    \"last_verdict\": verdict,\n}"
       },
       "label": null,
       "icon": null,
@@ -688,8 +693,8 @@
       "id": "set_state",
       "type": "set_var",
       "position": {
-        "x": 860,
-        "y": 460
+        "x": 20,
+        "y": 0
       },
       "data": {
         "nodeType": "set_var",
@@ -736,11 +741,127 @@
       "outputs": []
     },
     {
+      "id": "final_args",
+      "type": "code",
+      "position": {
+        "x": -1880,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose final listing call",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws = str(workspace_root or \"\").strip()\nreturn {\n    \"name\": \"list_files\",\n    \"arguments\": {\n        \"directory_path\": ws if ws else \".\",\n        \"recursive\": True,\n        \"include_hidden\": False,\n        \"head_limit\": None,\n    },\n    \"call_id\": \"final-delivery-listing\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final_list",
+      "type": "call_tool",
+      "position": {
+        "x": -1880,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Final delivery listing",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "list_files"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "get_final_state",
       "type": "get_var",
       "position": {
-        "x": -200,
-        "y": 640
+        "x": -1500,
+        "y": 900
       },
       "data": {
         "nodeType": "get_var",
@@ -785,8 +906,8 @@
       "id": "final_report",
       "type": "code",
       "position": {
-        "x": 160,
-        "y": 640
+        "x": -1120,
+        "y": 900
       },
       "data": {
         "nodeType": "code",
@@ -798,6 +919,16 @@
             "id": "loop_state",
             "label": "loop_state",
             "type": "object"
+          },
+          {
+            "id": "final_listing",
+            "label": "final_listing",
+            "type": "any"
+          },
+          {
+            "id": "final_listing_ok",
+            "label": "final_listing_ok",
+            "type": "boolean"
           },
           {
             "id": "permissions",
@@ -826,7 +957,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "state = loop_state or {}\nverdict = state.get(\"last_verdict\") or {}\nrounds = int(state.get(\"rounds_completed\", 0) or 0)\npassed = bool(state.get(\"all_passed\"))\nlines = []\nlines.append(\"# Coding agent result\")\nlines.append(\"\")\nlines.append(\"Status: \" + (\"PASSED all gates\" if passed else \"STOPPED with open gate failures\"))\nlines.append(\"Rounds used: \" + str(rounds))\nlines.append(\"\")\nlines.append(\"Gate verdict (last round):\")\nlines.append(\"- builds: \" + str(bool(verdict.get(\"builds\"))))\nlines.append(\"- executes: \" + str(bool(verdict.get(\"executes\"))))\nlines.append(\"- matches: \" + str(bool(verdict.get(\"matches\"))))\n# Name WHERE the produced files live (verifier-observed, workspace-relative)\n# so the report is self-sufficient on every host — the operator should never\n# need a second agent to FIND the artifact (code seat ask, 2026-07-16).\narts = [str(a).strip() for a in (verdict.get(\"artifacts\") or []) if str(a).strip()]\nif arts:\n    lines.append(\"\")\n    lines.append(\"Artifacts (paths relative to the run workspace root):\")\n    for a in arts:\n        lines.append(\"- \" + a)\nelse:\n    lines.append(\"\")\n    lines.append(\"Artifacts: none observed by the verifier (#FALLBACK: report cannot name the produced file paths)\")\nenv_failures = [str(f) for f in (state.get(\"environment_failures\") or [])]\nwarnings = [str(w) for w in (verdict.get(\"warnings\") or [])]\nif warnings:\n    lines.append(\"\")\n    lines.append(\"Advisory (did not fail the run):\")\n    for w in warnings:\n        lines.append(\"- \" + w)\nif not passed:\n    fixable = [str(f) for f in (state.get(\"failures\") or [])]\n    if fixable:\n        lines.append(\"\")\n        lines.append(\"Open failures:\")\n        for f in fixable:\n            lines.append(\"- \" + f)\n    if env_failures:\n        lines.append(\"\")\n        lines.append(\"Not verifiable in this environment (missing executor — not a code defect; the loop stops instead of burning repair rounds):\")\n        for f in env_failures:\n            lines.append(\"- \" + f)\nif verdict.get(\"summary\"):\n    lines.append(\"\")\n    lines.append(\"Summary: \" + str(verdict.get(\"summary\")))\nreturn {\n    \"report_markdown\": \"\\n\".join(lines),\n    \"passed\": passed,\n    \"rounds_used\": rounds,\n    \"gate_verdict\": verdict,\n    \"artifacts\": arts,\n    \"open_failures\": (state.get(\"failures\") or []) + env_failures,\n}"
+        "codeBody": "state = loop_state or {}\nverdict = state.get(\"last_verdict\") or {}\nrounds = int(state.get(\"rounds_completed\", 0) or 0)\npassed = bool(state.get(\"all_passed\"))\nfixable = [str(f) for f in (state.get(\"failures\") or [])]\nenv_failures = [str(f) for f in (state.get(\"environment_failures\") or [])]\nverifier_died = bool(verdict.get(\"verifier_died\"))\n# Terminal delivery ground truth: parse the final listing the way G0 does.\ntext = str(final_listing or \"\")\nfiles = []\nif bool(final_listing_ok):\n    for ln in text.split(\"\\n\")[1:]:\n        if not ln.startswith(\"  \"):\n            continue\n        s = ln.strip()\n        if not s or s.endswith(\"/\"):\n            continue\n        if s.endswith(\" bytes)\") or s.endswith(\" byte)\"):\n            cut = s.rfind(\" (\")\n            if cut > 0:\n                s = s[:cut]\n        files.append(s)\ndet = verdict.get(\"deterministic\") or {}\ndelivered = len(files) > 0 or bool(det.get(\"delivery_ok\"))\nunverified_only = (not passed) and delivered and len(fixable) == 0 and (len(env_failures) > 0 or verifier_died)\nsuccess = passed or unverified_only\nlines = []\nlines.append(\"# Coding agent result\")\nlines.append(\"\")\nif passed:\n    lines.append(\"Status: PASSED all gates\")\nelif unverified_only:\n    lines.append(\"Status: DELIVERED — NOT VERIFIABLE HERE (the artifact is present and no gate reported a code failure, but independent verification could not complete in this environment)\")\nelse:\n    lines.append(\"Status: STOPPED with open gate failures\")\nlines.append(\"Rounds used: \" + str(rounds))\nlines.append(\"\")\nlines.append(\"Gate verdict (last round):\")\nlines.append(\"- builds: \" + str(bool(verdict.get(\"builds\"))))\nlines.append(\"- executes: \" + str(bool(verdict.get(\"executes\"))))\nlines.append(\"- matches: \" + str(bool(verdict.get(\"matches\"))))\nif verifier_died:\n    lines.append(\"- verifier: DIED before reporting (builds/matches above are UNVERIFIED, not failed)\")\n# Name WHERE the produced files live (verifier-observed, workspace-relative)\n# so the report is self-sufficient on every host — the operator should never\n# need a second agent to FIND the artifact (code seat ask, 2026-07-16). When\n# the verifier died the terminal listing supplies the paths instead.\narts = [str(a).strip() for a in (verdict.get(\"artifacts\") or []) if str(a).strip()]\nif not arts and files:\n    arts = files[:5]\nif arts:\n    lines.append(\"\")\n    lines.append(\"Artifacts (paths relative to the run workspace root):\")\n    for a in arts:\n        lines.append(\"- \" + a)\nelse:\n    lines.append(\"\")\n    lines.append(\"Artifacts: none observed (#FALLBACK: report cannot name the produced file paths)\")\nwarnings = [str(w) for w in (verdict.get(\"warnings\") or [])]\nif warnings:\n    lines.append(\"\")\n    lines.append(\"Advisory (did not fail the run):\")\n    for w in warnings:\n        lines.append(\"- \" + w)\nif not passed:\n    if fixable:\n        lines.append(\"\")\n        lines.append(\"Open failures:\")\n        for f in fixable:\n            lines.append(\"- \" + f)\n    if env_failures:\n        lines.append(\"\")\n        lines.append(\"Not verifiable in this environment (missing executor or dead verifier — not a code defect; the loop stops instead of burning repair rounds):\")\n        for f in env_failures:\n            lines.append(\"- \" + f)\nif verdict.get(\"summary\"):\n    lines.append(\"\")\n    lines.append(\"Summary: \" + str(verdict.get(\"summary\")))\nreturn {\n    \"report_markdown\": \"\\n\".join(lines),\n    \"passed\": passed,\n    \"delivered\": delivered,\n    \"success\": success,\n    \"rounds_used\": rounds,\n    \"gate_verdict\": verdict,\n    \"artifacts\": arts,\n    \"open_failures\": fixable + env_failures,\n}"
       },
       "label": null,
       "icon": null,
@@ -838,8 +969,8 @@
       "id": "get_report_md",
       "type": "get",
       "position": {
-        "x": 520,
-        "y": 560
+        "x": -740,
+        "y": 900
       },
       "data": {
         "nodeType": "get",
@@ -885,8 +1016,8 @@
       "id": "get_passed",
       "type": "get",
       "position": {
-        "x": 520,
-        "y": 660
+        "x": -360,
+        "y": 900
       },
       "data": {
         "nodeType": "get",
@@ -932,8 +1063,8 @@
       "id": "get_rounds",
       "type": "get",
       "position": {
-        "x": 520,
-        "y": 760
+        "x": 20,
+        "y": 900
       },
       "data": {
         "nodeType": "get",
@@ -979,8 +1110,8 @@
       "id": "get_open_failures",
       "type": "get",
       "position": {
-        "x": 520,
-        "y": 860
+        "x": 400,
+        "y": 900
       },
       "data": {
         "nodeType": "get",
@@ -1026,8 +1157,8 @@
       "id": "get_artifacts",
       "type": "get",
       "position": {
-        "x": 520,
-        "y": 960
+        "x": 780,
+        "y": 900
       },
       "data": {
         "nodeType": "get",
@@ -1070,11 +1201,105 @@
       "outputs": []
     },
     {
+      "id": "get_delivered",
+      "type": "get",
+      "position": {
+        "x": 1160,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get delivered",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "delivered",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_success",
+      "type": "get",
+      "position": {
+        "x": 1160,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get success",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "success",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 900,
-        "y": 640
+        "x": 1160,
+        "y": 900
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -1095,6 +1320,16 @@
           {
             "id": "passed",
             "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "boolean"
+          },
+          {
+            "id": "success",
+            "label": "success",
             "type": "boolean"
           },
           {
@@ -1156,9 +1391,17 @@
       "animated": true
     },
     {
-      "id": "e-rounds-done-end-exec-in",
+      "id": "e-rounds-done-final_list-exec-in",
       "source": "rounds",
       "sourceHandle": "done",
+      "target": "final_list",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-final_list-exec-out-end-exec-in",
+      "source": "final_list",
+      "sourceHandle": "exec-out",
       "target": "end",
       "targetHandle": "exec-in",
       "animated": true
@@ -1324,6 +1567,14 @@
       "animated": false
     },
     {
+      "id": "e-verify-child_output-next_state-verify_meta",
+      "source": "verify",
+      "sourceHandle": "child_output",
+      "target": "next_state",
+      "targetHandle": "verify_meta",
+      "animated": false
+    },
+    {
       "id": "e-rounds-index-next_state-round_index",
       "source": "rounds",
       "sourceHandle": "index",
@@ -1337,6 +1588,38 @@
       "sourceHandle": "output",
       "target": "set_state",
       "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-final_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "final_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-final_args-output-final_list-tool_call",
+      "source": "final_args",
+      "sourceHandle": "output",
+      "target": "final_list",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-final_list-result-final_report-final_listing",
+      "source": "final_list",
+      "sourceHandle": "result",
+      "target": "final_report",
+      "targetHandle": "final_listing",
+      "animated": false
+    },
+    {
+      "id": "e-final_list-success-final_report-final_listing_ok",
+      "source": "final_list",
+      "sourceHandle": "success",
+      "target": "final_report",
+      "targetHandle": "final_listing_ok",
       "animated": false
     },
     {
@@ -1388,6 +1671,22 @@
       "animated": false
     },
     {
+      "id": "e-final_report-output-get_delivered-object",
+      "source": "final_report",
+      "sourceHandle": "output",
+      "target": "get_delivered",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-output-get_success-object",
+      "source": "final_report",
+      "sourceHandle": "output",
+      "target": "get_success",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
       "id": "e-get_report_md-value-end-report",
       "source": "get_report_md",
       "sourceHandle": "value",
@@ -1401,6 +1700,22 @@
       "sourceHandle": "value",
       "target": "end",
       "targetHandle": "passed",
+      "animated": false
+    },
+    {
+      "id": "e-get_delivered-value-end-delivered",
+      "source": "get_delivered",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "delivered",
+      "animated": false
+    },
+    {
+      "id": "e-get_success-value-end-success",
+      "source": "get_success",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "success",
       "animated": false
     },
     {
@@ -1429,6 +1744,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-17T19:33:12.575399+00:00",
-  "updated_at": "2026-07-17T19:33:12.575399+00:00"
+  "created_at": "2026-07-21T12:26:23.600187+00:00",
+  "updated_at": "2026-07-21T12:26:23.600187+00:00"
 }

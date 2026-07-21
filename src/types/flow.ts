@@ -188,6 +188,7 @@ export type NodeType =
   | 'read_pdf'
   | 'write_pdf'
   | 'write_docx'
+  | 'write_chart'
   | 'read_artifact'
   | 'list_folder_files'
   | 'import_workspace_file'
@@ -478,6 +479,12 @@ export interface ExecutionEvent {
   // (e.g. WAIT_EVENT with an idle timeout — frozen seam spec D3).
   until?: string;
   details?: Record<string, unknown>;
+  // Tool-approval resume marker (backlog 0138): set on the node_complete
+  // mapped from an APPROVED tool-approval resume record so the timeline can
+  // show which tool calls ran with (auto-)approval instead of silently
+  // suppressing the resume as bookkeeping. `auto` is true when the resume
+  // was issued by the Approve-All auto-approve path.
+  approval?: { approved: boolean; auto: boolean };
 }
 
 export interface ExecutionMetrics {

@@ -3141,6 +3141,54 @@ button.primary:hover:not(:disabled) {
   color: var(--text-secondary);
 }
 
+/* Approve-All state chip (backlog 0138): auto-approve is a standing safety
+   bypass, so while it is active the footer names it and offers Revoke. */
+.run-approval-autochip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.run-approval-autochip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--warning);
+  flex: 0 0 auto;
+  animation: run-approval-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-approval-autochip-dot {
+    animation: none;
+  }
+}
+
+.run-approval-autochip-text {
+  white-space: nowrap;
+}
+
+.run-approval-autochip-revoke {
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--warning) 60%, var(--text-primary));
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+.run-approval-autochip-revoke:hover {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+
 .run-modal-titlebar {
   flex: 0 0 auto;
   min-height: 48px;
@@ -4682,6 +4730,21 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   border-color: var(--ui-border-2);
   background: var(--ui-surface-2);
   color: var(--text-secondary);
+}
+
+/* Tool-approval resume markers (backlog 0138 — approval visibility).
+   Manual approvals read calm (success); auto-approvals read warning-toned so
+   a tool call that ran WITHOUT a prompt stays visually auditable. */
+.run-metric-badge.metric-approval {
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: color-mix(in srgb, var(--success) 55%, var(--text-primary));
+}
+
+.run-metric-badge.metric-approval.auto {
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  color: color-mix(in srgb, var(--warning) 55%, var(--text-primary));
 }
 
 .run-metric-badge.metric-number {

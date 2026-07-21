@@ -26,8 +26,10 @@ import {
   IconLifecycle,
   IconPackage,
   IconPlay,
+  IconRedo,
   IconSave,
   IconSpinner,
+  IconUndo,
 } from './ToolbarIcons';
 import { closeOpenNodes, createLedgerMappingState, mapLedgerRecordToEvents, type LedgerRecord } from '../utils/ledgerEvents';
 import { mapGatewayRunSummary } from '../utils/gatewayRuns';
@@ -35,6 +37,8 @@ import { pickFollowUpPromptKey } from '../utils/followUpInputs';
 import { extractPendingApprovalWait, extractReplayTraceEvents } from '../utils/runHistoryReplay';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
 import { computeRunPreflightIssues } from '../utils/preflight';
+import { waitNotificationText } from '../utils/waitClassification';
+import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateFlowFamily';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
 import type { PublishedBundleTarget } from '../utils/workflowBundles';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
@@ -91,6 +95,33 @@ async function duplicateFlow(source: VisualFlow, newName: string, contracts: Gat
       edges: source.edges,
       entryNode: source.entryNode,
     }, { method: 'POST' }));
+}
+
+/** Gateway-backed IO for family-aware duplication of bundled flows. */
+function familyDuplicateIO(contracts: GatewayContracts | null): DuplicateFamilyIO {
+  const collection = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows';
+  const item = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  return {
+    createFlow: (flow) => gatewayJson<VisualFlow>(gatewayPath(collection), jsonRequest(flow, { method: 'POST' })),
+    updateFlowNodes: (flowId, flow, nodes) =>
+      gatewayJson<VisualFlow>(
+        gatewayPath(item, { flow_id: flowId }),
+        jsonRequest(
+          {
+            name: flow.name,
+            description: flow.description || '',
+            interfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
+            nodes,
+            edges: flow.edges,
+            entryNode: flow.entryNode,
+          },
+          { method: 'PUT' }
+        )
+      ),
+    deleteFlow: async (flowId) => {
+      await gatewayFetch(gatewayPath(item, { flow_id: flowId }), { method: 'DELETE' });
+    },
+  };
 }
 
 /**
@@ -253,7 +284,13 @@ export function Toolbar() {
     setExecView,
     setPreflightIssues,
     clearPreflightIssues,
+    past,
+    future,
+    undo,
+    redo,
   } = useFlowStore();
+  const canUndo = past.length > 0;
+  const canRedo = future.length > 0;
 
   const [showRunModal, setShowRunModal] = useState(false);
   const [showFlowLibrary, setShowFlowLibrary] = useState(false);
@@ -570,14 +607,59 @@ export function Toolbar() {
     [bundledFlowIdSet, flowLibraryCatalog.flows, gatewayContracts, loadFlow, setFlowId]
   );
 
+  // Family-aware duplicate for read-only bundled flows: copies the root plus
+  // its readonly subflow closure into gateway storage with references
+  // remapped, so the copy is self-contained (runnable + editable). Operator
+  // ruling 2026-07-20: bundled selections must rename/duplicate, not refuse.
+  const duplicateBundledFamily = useCallback(
+    async (rootId: string, rootName: string): Promise<VisualFlow | null> => {
+      if (visualflowCrudUnavailable) {
+        toast.error(saveUnavailableReason);
+        return null;
+      }
+      const { root, copies } = await duplicateFlowFamily({
+        rootId,
+        rootName,
+        flows: flowLibraryCatalog.flows,
+        readonlyIds: bundledFlowIdSet,
+        io: familyDuplicateIO(gatewayContracts),
+      });
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
+      const helpers = copies.length - 1;
+      toast.success(
+        helpers > 0
+          ? `Copied "${root.name}" with ${helpers} subflow${helpers === 1 ? '' : 's'} into editable storage`
+          : `Copied "${root.name}" into editable storage`
+      );
+      return root;
+    },
+    [
+      bundledFlowIdSet,
+      flowLibraryCatalog.flows,
+      gatewayContracts,
+      queryClient,
+      saveUnavailableReason,
+      visualflowCrudUnavailable,
+    ]
+  );
+
   const handleRenameFlow = useCallback(
     async (id: string, nextName: string) => {
-      if (bundledFlowIdSet.has(id)) {
-        toast.error('Bundled flows are read-only. Load or duplicate first.');
-        return;
-      }
       const name = nextName.trim();
       if (!name) return;
+      if (bundledFlowIdSet.has(id)) {
+        // The shipped bundle cannot be mutated; renaming it means "give me an
+        // editable workflow under this name" — a family copy delivers exactly
+        // that without pretending the bundled original changed.
+        const root = await duplicateBundledFamily(id, name);
+        if (root) {
+          const loaded = loadFlow(root);
+          setLoadedBundledRunTarget(null);
+          setSavedFlowSignature(flowSignatureFor(loaded));
+          setShowFlowLibrary(false);
+        }
+        return;
+      }
       const updated = await renameFlow(id, name, gatewayContracts);
       if (flowId && id === flowId) {
         const loaded = loadFlow(updated);
@@ -588,7 +670,7 @@ export function Toolbar() {
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Renamed');
     },
-    [bundledFlowIdSet, flowId, gatewayContracts, loadFlow, queryClient, setFlowName]
+    [bundledFlowIdSet, duplicateBundledFamily, flowId, gatewayContracts, loadFlow, queryClient, setFlowName]
   );
 
   const handleUpdateDescription = useCallback(
@@ -661,6 +743,16 @@ export function Toolbar() {
       const src = all.find((f) => f.id === id);
       if (!src) return;
       const base = (src.name || 'Untitled').trim() || 'Untitled';
+      if (bundledFlowIdSet.has(id)) {
+        const root = await duplicateBundledFamily(id, `${base} (copy)`);
+        if (root) {
+          const loaded = loadFlow(root);
+          setLoadedBundledRunTarget(null);
+          setSavedFlowSignature(flowSignatureFor(loaded));
+          setShowFlowLibrary(false);
+        }
+        return;
+      }
       const created = await duplicateFlow(src, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       const loaded = loadFlow(created);
@@ -669,7 +761,16 @@ export function Toolbar() {
       setShowFlowLibrary(false);
       toast.success(`Duplicated as "${created.name}"`);
     },
-    [flowLibraryCatalog.flows, gatewayContracts, loadFlow, queryClient, saveUnavailableReason, visualflowCrudUnavailable]
+    [
+      bundledFlowIdSet,
+      duplicateBundledFamily,
+      flowLibraryCatalog.flows,
+      gatewayContracts,
+      loadFlow,
+      queryClient,
+      saveUnavailableReason,
+      visualflowCrudUnavailable,
+    ]
   );
 
   // Save mutation
@@ -824,8 +925,19 @@ export function Toolbar() {
       }
     },
     onWaiting: (info) => {
-      console.log('Flow waiting for user input:', info);
-      toast('Flow is waiting for your response');
+      // Reason-aware (backlog 0138): only interrupt for waits that actually
+      // need the user. Event/deadline parks (a resident agent on wait_event,
+      // a wait_until timer) keep running in the background — no force-open,
+      // no "respond" toast. The toolbar badge surfaces interactive waits for
+      // users who navigated away from the modal.
+      const interactivity = info.interactivity ?? 'prompt';
+      const text = waitNotificationText(interactivity);
+      if (interactivity === 'park') {
+        // A park is honest run state, not an interruption; the run modal (if
+        // open) still shows it, and the toolbar badge does not light up.
+        return;
+      }
+      if (text) toast(text);
       setShowRunModal(true);
     },
   });
@@ -1017,6 +1129,25 @@ export function Toolbar() {
       if (sid) setAutoApproveForSession?.(sid, true);
       const rootId = typeof ctx?.rootRunId === 'string' ? ctx.rootRunId.trim() : '';
       if (rootId) setAutoApproveForRunRoot?.(rootId, true);
+    },
+    [setAutoApproveForRunRoot, setAutoApproveForSession, stableSessionId]
+  );
+
+  // Approve-All revoke (backlog 0138): the hook setters already accept
+  // enabled=false — this is the first caller. After revoke, the hook's
+  // auto-approve check no longer matches this session/run root, so the next
+  // tool-approval wait surfaces a prompt again.
+  const handleRevokeAutoApprove = useCallback(
+    (ctx?: { rootRunId?: string; sessionId?: string }) => {
+      const sid =
+        typeof ctx?.sessionId === 'string' && ctx.sessionId.trim()
+          ? ctx.sessionId.trim()
+          : typeof stableSessionId === 'string' && stableSessionId.trim()
+            ? stableSessionId.trim()
+            : '';
+      if (sid) setAutoApproveForSession?.(sid, false);
+      const rootId = typeof ctx?.rootRunId === 'string' ? ctx.rootRunId.trim() : '';
+      if (rootId) setAutoApproveForRunRoot?.(rootId, false);
     },
     [setAutoApproveForRunRoot, setAutoApproveForSession, stableSessionId]
   );
@@ -1223,7 +1354,21 @@ export function Toolbar() {
       return;
     }
     if (loadedBundledRunTarget) {
-      toast.error('Bundled workflow families cannot be duplicated as one standalone flow because they include companion subflows.');
+      // A loaded bundle-target family duplicates as a FAMILY copy (root +
+      // readonly subflow closure, references remapped) — the standalone-copy
+      // refusal is retired (operator ruling 2026-07-20).
+      const base = (getFlow().name || loadedBundledRunTarget.flowId || 'Untitled').trim() || 'Untitled';
+      try {
+        const root = await duplicateBundledFamily(loadedBundledRunTarget.flowId, `${base} (copy)`);
+        if (root) {
+          const loaded = loadFlow(root);
+          setLoadedBundledRunTarget(null);
+          setSavedFlowSignature(flowSignatureFor(loaded));
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Duplicate failed';
+        toast.error(msg);
+      }
       return;
     }
     const flow = getFlow();
@@ -1239,7 +1384,7 @@ export function Toolbar() {
       const msg = e instanceof Error ? e.message : 'Duplicate failed';
       toast.error(msg);
     }
-  }, [gatewayContracts, getFlow, loadFlow, loadedBundledRunTarget, queryClient, saveUnavailableReason, visualflowCrudUnavailable]);
+  }, [duplicateBundledFamily, gatewayContracts, getFlow, loadFlow, loadedBundledRunTarget, queryClient, saveUnavailableReason, visualflowCrudUnavailable]);
 
   const handlePublish = useCallback(() => {
     if (!flowId) {
@@ -1304,6 +1449,26 @@ export function Toolbar() {
           onChange={(e) => setFlowName(e.target.value)}
           placeholder="Flow name..."
         />
+
+        {/* Edit: undo / redo */}
+        <div className="toolbar-group" role="group" aria-label="Edit history">
+          <ToolbarAction
+            tooltip={canUndo ? 'Undo (Ctrl/Cmd+Z)' : 'Nothing to undo'}
+            label="Undo"
+            onClick={undo}
+            disabled={!canUndo}
+          >
+            <IconUndo />
+          </ToolbarAction>
+          <ToolbarAction
+            tooltip={canRedo ? 'Redo (Shift+Ctrl/Cmd+Z)' : 'Nothing to redo'}
+            label="Redo"
+            onClick={redo}
+            disabled={!canRedo}
+          >
+            <IconRedo />
+          </ToolbarAction>
+        </div>
 
         {/* File: create / open / save / duplicate */}
         <div className="toolbar-group" role="group" aria-label="Flow file actions">
@@ -1375,6 +1540,21 @@ export function Toolbar() {
           >
             <IconHistory />
           </ToolbarAction>
+          {/* Waiting-for-you badge (backlog 0138): only for INTERACTIVE waits
+              (approval/prompt), so a user who navigated away from the modal
+              still sees that the run needs them — event/deadline parks stay
+              silent. Jumps back into the run modal. */}
+          {isWaiting && !isPaused && waitingInfo && waitingInfo.interactivity !== 'park' ? (
+            <button
+              type="button"
+              className="toolbar-wait-badge"
+              onClick={() => setShowRunModal(true)}
+              title="This run needs you — open it"
+            >
+              <span className="toolbar-wait-badge-dot" aria-hidden="true" />
+              {waitingInfo.interactivity === 'approval' ? 'Approval needed' : 'Waiting for you'}
+            </button>
+          ) : null}
         </div>
 
         {/* Gateway: publish / lifecycle / loaded models */}
@@ -1490,6 +1670,7 @@ export function Toolbar() {
 	        onFollowUpSubmit={!viewing && runWorkflowId && runWorkflowId === flowId ? handleFollowUpSubmit : undefined}
         onNewRun={handleNewRun}
         onApproveAll={handleApproveAll}
+        onRevokeAutoApprove={handleRevokeAutoApprove}
         isRunning={viewing ? runningLike : isRunning}
         isPaused={viewing ? pausedLike : isPaused}
         result={viewing ? null : runResult}

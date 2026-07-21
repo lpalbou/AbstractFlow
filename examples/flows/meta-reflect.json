@@ -61,8 +61,8 @@
       "id": "draft",
       "type": "llm_call",
       "position": {
-        "x": -560,
-        "y": -160
+        "x": -500,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -159,8 +159,8 @@
       "id": "introspect_prompt",
       "type": "code",
       "position": {
-        "x": -280,
-        "y": 120
+        "x": -100,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -217,8 +217,8 @@
       "id": "introspect",
       "type": "llm_call",
       "position": {
-        "x": -220,
-        "y": -160
+        "x": -100,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -315,8 +315,8 @@
       "id": "revise_prompt",
       "type": "code",
       "position": {
-        "x": 60,
-        "y": 120
+        "x": 300,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -378,8 +378,8 @@
       "id": "revise",
       "type": "llm_call",
       "position": {
-        "x": 340,
-        "y": -160
+        "x": 300,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -476,8 +476,8 @@
       "id": "meta",
       "type": "code",
       "position": {
-        "x": 620,
-        "y": 120
+        "x": 700,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -534,8 +534,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 900,
-        "y": -160
+        "x": 700,
+        "y": 0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -760,6 +760,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-16T01:12:37.040754+00:00",
-  "updated_at": "2026-07-16T01:12:37.040754+00:00"
+  "created_at": "2026-07-20T13:28:57.796441+00:00",
+  "updated_at": "2026-07-20T13:28:57.796441+00:00"
 }

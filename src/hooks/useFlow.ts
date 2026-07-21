@@ -56,6 +56,18 @@ interface FlowState {
   clipboard: NodeClipboard | null;
   clipboardPasteCount: number;
 
+  // Undo/redo: bounded snapshot stacks over graph state (nodes/edges/name/
+  // interfaces). `past` holds states to return TO; `future` holds states
+  // redo replays forward. Populated by graph-mutating actions (see
+  // `_captureHistory`); cleared on load/clear (a fresh document has no
+  // history). Exposed as arrays so toolbar buttons react to length.
+  past: HistoryEntry[];
+  future: HistoryEntry[];
+  // Coalescing bookkeeping (internal): rapid same-gesture pushes (a drag,
+  // consecutive keystrokes on one node) collapse into a single baseline.
+  _historyLastKey: string | null;
+  _historyLastAt: number;
+
   // Actions
   setFlowId: (id: string | null) => void;
   setFlowName: (name: string) => void;
@@ -80,6 +92,11 @@ interface FlowState {
   copySelectionToClipboard: () => number;
   pasteClipboard: () => number;
   duplicateSelection: () => number;
+  // Undo/redo actions. `_captureHistory` is the internal push (called by
+  // mutating actions before they mutate); `undo`/`redo` move between stacks.
+  _captureHistory: (coalesceKey?: string) => void;
+  undo: () => void;
+  redo: () => void;
   setExecView: (enabled: boolean) => void;
   setExecutingNodeId: (nodeId: string | null) => void;
   setIsRunning: (running: boolean) => void;
@@ -97,6 +114,20 @@ interface FlowState {
 }
 
 let nodeIdCounter = 0;
+
+// Undo/redo tuning. LIMIT caps memory (each entry is a full deep-cloned
+// graph); COALESCE_MS collapses a stream of same-gesture pushes (drag
+// frames, keystrokes on one node) into one baseline so a single logical
+// edit is one undo step, not hundreds.
+const HISTORY_LIMIT = 50;
+const HISTORY_COALESCE_MS = 600;
+
+interface HistoryEntry {
+  nodes: Node<FlowNodeData>[];
+  edges: Edge[];
+  flowName: string;
+  flowInterfaces: string[];
+}
 
 type Point = { x: number; y: number };
 
@@ -144,6 +175,18 @@ function isNodeSelected(node: Node<FlowNodeData>): boolean {
   return Boolean(node.selected);
 }
 
+/** Deep-cloned snapshot of the undoable graph state (isolated from the store). */
+function historySnapshot(
+  s: Pick<FlowState, 'nodes' | 'edges' | 'flowName' | 'flowInterfaces'>
+): HistoryEntry {
+  return {
+    nodes: deepClone(s.nodes),
+    edges: deepClone(s.edges),
+    flowName: s.flowName,
+    flowInterfaces: Array.isArray(s.flowInterfaces) ? [...s.flowInterfaces] : [],
+  };
+}
+
 function getSelection(state: Pick<FlowState, 'nodes' | 'selectedNode'>): Node<FlowNodeData>[] {
   const selected = state.nodes.filter(isNodeSelected);
   if (selected.length > 0) return selected;
@@ -186,6 +229,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   preflightIssues: [],
   clipboard: null,
   clipboardPasteCount: 0,
+  past: [],
+  future: [],
+  _historyLastKey: null,
+  _historyLastAt: 0,
 
   // Setters
   setFlowId: (id) => set({ flowId: id }),
@@ -214,6 +261,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (result.applied.length === 0) {
       return result;
     }
+    // One authoring batch = one undo step (backlog 0127: "assistant
+    // apply-turn as one entry"). Capture the pre-apply state discretely.
+    get()._captureHistory();
     syncNodeIdCounter(result.nodes);
     const selectedNode =
       result.touchedNodeIds.length > 0
@@ -231,6 +281,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   restoreAuthoringSnapshot: (snapshot) => {
+    get()._captureHistory();
     syncNodeIdCounter(snapshot.nodes);
     set({
       flowName: snapshot.flowName,
@@ -248,6 +299,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const removedNodeIds = changes
       .filter((c) => c.type === 'remove')
       .map((c) => c.id);
+
+    // History: a node removal (keyboard Delete) is a discrete step; a drag
+    // gesture coalesces its per-frame position changes into one baseline
+    // (the state before the move). Capture BEFORE applying the changes so
+    // the entry is the pre-change graph. Pure select/dimension changes do
+    // not touch history.
+    const hasDraggingChange = changes.some(
+      (c) => c.type === 'position' && (c as { dragging?: boolean }).dragging === true
+    );
+    if (removedNodeIds.length > 0) {
+      get()._captureHistory();
+    } else if (hasDraggingChange) {
+      get()._captureHistory('drag');
+    }
 
     const updatedNodes = applyNodeChanges(changes, state.nodes);
 
@@ -307,6 +372,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       .filter((c) => c.type === 'remove')
       .map((c) => c.id);
 
+    // Edge removal (keyboard Delete on a selected edge) is a discrete undo
+    // step; select-only changes are not.
+    if (removedEdgeIds.length > 0) {
+      get()._captureHistory();
+    }
+
     const updatedEdges = applyEdgeChanges(changes, state.edges);
 
     // Keep PropertiesPanel selection in sync with ReactFlow's `edge.selected` flags.
@@ -350,6 +421,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const state = get();
     if (!validateConnection(state.nodes, state.edges, connection)) return;
 
+    get()._captureHistory();
     const sourceNode = state.nodes.find((n) => n.id === connection.source);
     const sourcePin = sourceNode?.data.outputs.find((p) => p.id === connection.sourceHandle);
     const animated = sourcePin?.type === 'execution';
@@ -376,6 +448,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Add a new node
   addNode: (template, position) => {
+    get()._captureHistory();
     const id = `node-${++nodeIdCounter}`;
     const data = createNodeData(template);
 
@@ -393,6 +466,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Update node data
   updateNodeData: (nodeId, data) => {
+    // Config edits coalesce per node: rapid keystrokes in one field collapse
+    // to a single baseline (the state before the first keystroke), so one
+    // logical edit is one undo step — not one per character.
+    get()._captureHistory(`update:${nodeId}`);
     const state = get();
     const existingNode = state.nodes.find((n) => n.id === nodeId);
     const nextData = existingNode ? { ...existingNode.data, ...data } : undefined;
@@ -455,6 +532,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Delete a node
   deleteNode: (nodeId) => {
+    get()._captureHistory();
     set({
       nodes: get().nodes.filter((n) => n.id !== nodeId),
       edges: get().edges.filter(
@@ -467,6 +545,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Delete an edge
   deleteEdge: (edgeId) => {
+    get()._captureHistory();
     set({
       edges: get().edges.filter((e) => e.id !== edgeId),
       selectedEdge:
@@ -485,6 +564,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const removed = state.edges.filter(matches);
     if (removed.length === 0) return;
 
+    get()._captureHistory();
     const remaining = state.edges.filter((e) => !matches(e));
     const selectedEdgeId = state.selectedEdge?.id || null;
     const clearedSelectedEdge =
@@ -528,6 +608,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const clipboard = state.clipboard;
     if (!clipboard || clipboard.items.length === 0) return 0;
 
+    get()._captureHistory();
     const pasteIdx = (state.clipboardPasteCount || 0) + 1;
     const dx = DEFAULT_CLONE_OFFSET.x * pasteIdx;
     const dy = DEFAULT_CLONE_OFFSET.y * pasteIdx;
@@ -561,6 +642,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const selected = getSelection(state);
     if (selected.length === 0) return 0;
 
+    get()._captureHistory();
     const newNodes = selected.map((n) => {
       const id = `node-${++nodeIdCounter}`;
       return {
@@ -581,6 +663,76 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       selectedEdge: null,
     });
     return newNodes.length;
+  },
+
+  // Push the CURRENT graph state onto the undo stack (call BEFORE a mutation
+  // so the entry is the state to return to). A no-key call always pushes a
+  // discrete entry (structural ops: add/delete/connect/paste/authoring). A
+  // coalesceKey collapses a rapid same-gesture stream (a drag, keystrokes on
+  // one node) into one baseline within HISTORY_COALESCE_MS. Any push clears
+  // the redo stack — the classic "new edit forks the timeline" semantics.
+  _captureHistory: (coalesceKey) => {
+    const s = get();
+    const now = Date.now();
+    if (
+      coalesceKey &&
+      coalesceKey === s._historyLastKey &&
+      now - s._historyLastAt < HISTORY_COALESCE_MS
+    ) {
+      // Same gesture still in flight — keep the earlier baseline, slide the
+      // window so continued activity stays coalesced.
+      set({ _historyLastAt: now });
+      return;
+    }
+    set({
+      past: [...s.past, historySnapshot(s)].slice(-HISTORY_LIMIT),
+      future: [],
+      _historyLastKey: coalesceKey ?? null,
+      _historyLastAt: now,
+    });
+  },
+
+  undo: () => {
+    const s = get();
+    if (s.past.length === 0) return;
+    const previous = s.past[s.past.length - 1];
+    const current = historySnapshot(s);
+    syncNodeIdCounter(previous.nodes);
+    set({
+      past: s.past.slice(0, -1),
+      future: [current, ...s.future].slice(0, HISTORY_LIMIT),
+      // Deep-clone on restore too: the same entry may be restored again
+      // (undo → redo → undo), so the store must never alias the stack.
+      nodes: deepClone(previous.nodes),
+      edges: deepClone(previous.edges),
+      flowName: previous.flowName,
+      flowInterfaces: [...previous.flowInterfaces],
+      selectedNode: null,
+      selectedEdge: null,
+      // A restore is not a gesture — the next mutation always baselines.
+      _historyLastKey: null,
+      _historyLastAt: 0,
+    });
+  },
+
+  redo: () => {
+    const s = get();
+    if (s.future.length === 0) return;
+    const next = s.future[0];
+    const current = historySnapshot(s);
+    syncNodeIdCounter(next.nodes);
+    set({
+      past: [...s.past, current].slice(-HISTORY_LIMIT),
+      future: s.future.slice(1),
+      nodes: deepClone(next.nodes),
+      edges: deepClone(next.edges),
+      flowName: next.flowName,
+      flowInterfaces: [...next.flowInterfaces],
+      selectedNode: null,
+      selectedEdge: null,
+      _historyLastKey: null,
+      _historyLastAt: 0,
+    });
   },
 
   // Execution state
@@ -2328,6 +2480,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: displayEdges,
       selectedNode: null,
       selectedEdge: null,
+      // A freshly loaded document starts a new timeline — undoing into the
+      // PREVIOUS flow's graph would be nonsensical.
+      past: [],
+      future: [],
+      _historyLastKey: null,
+      _historyLastAt: 0,
     });
     return loadedFlow;
   },
@@ -2378,6 +2536,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       selectedEdge: null,
       clipboard: null,
       clipboardPasteCount: 0,
+      past: [],
+      future: [],
+      _historyLastKey: null,
+      _historyLastAt: 0,
     });
     nodeIdCounter = 0;
   },

@@ -43,8 +43,13 @@ RULED_MAX_ITERATIONS = 20
 # basic-agent@0.0.1.flow and start_run latest-picks it, so both must stay
 # byte-equal on their flow payloads or pip and dev behavior split silently.
 ARTIFACTS: tuple[tuple[str, str], ...] = (
-    ("basic-agent.flow", "0.0.0"),
-    ("basic-agent@0.0.1.flow", "0.0.1"),
+    # 0.0.2 = adversary wave 2026-07-20: the status helper's wait_until Delay
+    # was dead (data-only, never executed — every configured post_delay was
+    # silently dropped) and the root's memory pin was declared but unwired.
+    # Both artifacts move to one version; bundle versions are immutable by
+    # sha, so the content change forces the bump.
+    ("basic-agent.flow", "0.0.2"),
+    ("basic-agent@0.0.2.flow", "0.0.2"),
 )
 
 

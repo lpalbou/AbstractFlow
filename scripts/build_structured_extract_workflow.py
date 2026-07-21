@@ -115,51 +115,55 @@ def build_flow():
         W.pin("provider", "provider", "provider_text"),
         W.pin("model", "model", "model"),
     ]
+    # Layout: loop spine left-to-right at y=0 (start -> attempts -> extractor
+    # -> set_state); prompt helpers above the lane (y=-340), loop-condition +
+    # validate helpers below it (y=420); the after-loop result band is its own
+    # lane at y=900 ending in the flow end.
     flow["nodes"] = [
-        W.start_node("Source + schema", fields, -1000, 0,
+        W.start_node("Source + schema", fields, -1500, 0,
                      pin_defaults={"max_attempts": 3}),
         W.get_var("get_loop_state", "ex.loop_state",
-                  {"attempt": 0, "valid": False, "errors": [], "data": {}}, -660, 200),
-        W.code_node("loop_cond", "Retry until valid?", LOOP_COND_CODE, -660, 340,
+                  {"attempt": 0, "valid": False, "errors": [], "data": {}}, -1500, 420),
+        W.code_node("loop_cond", "Retry until valid?", LOOP_COND_CODE, -1120, 420,
                     [W.pin("loop_state", "loop_state", "object"),
                      W.pin("max_attempts", "max_attempts", "number")]),
-        W.while_node("attempts", "Extract-validate rounds", -660, 500),
+        W.while_node("attempts", "Extract-validate rounds", -1120, 0),
         # body
         W.get_var("get_state_body", "ex.loop_state",
-                  {"attempt": 0, "valid": False, "errors": [], "data": {}}, -320, -140),
-        W.get_node("get_state_errors", "errors", [], -320, -260),
-        W.code_node("build_prompt", "Compose extractor prompt", BUILD_PROMPT_CODE, -320, 40,
+                  {"attempt": 0, "valid": False, "errors": [], "data": {}}, -1500, -340),
+        W.get_node("get_state_errors", "errors", [], -1120, -340),
+        W.code_node("build_prompt", "Compose extractor prompt", BUILD_PROMPT_CODE, -740, -340,
                     [W.pin("source_text", "source_text", "string"),
                      W.pin("fields_spec", "fields_spec", "object"),
                      W.pin("attempt_no", "attempt_no", "number"),
                      W.pin("validation_errors", "validation_errors", "array")],
                     output_type="string"),
-        W.llm_node("extractor", "Extractor LLM", 40, -40,
+        W.llm_node("extractor", "Extractor LLM", -740, 0,
                    pin_defaults={
                        "system": "You are a precise structured-data extractor. You output only valid JSON conforming to the given schema and never invent facts absent from the source.",
                        "temperature": 0.0,
                    }),
         # resp_schema (fields_spec) makes `data` an already-parsed object.
-        W.code_node("validate", "Validate against schema", VALIDATE_CODE, 420, 40,
+        W.code_node("validate", "Validate against schema", VALIDATE_CODE, -360, 420,
                     [W.pin("extracted", "extracted", "any"),
                      W.pin("fields_spec", "fields_spec", "object"),
                      W.pin("attempt_no", "attempt_no", "number")]),
-        W.set_var("set_state", "Persist loop state", "ex.loop_state", 760, 40),
-        # after loop
+        W.set_var("set_state", "Persist loop state", "ex.loop_state", -360, 0),
+        # after loop (result band)
         W.get_var("get_final_state", "ex.loop_state",
-                  {"attempt": 0, "valid": False, "errors": [], "data": {}}, -320, 640),
-        W.code_node("final", "Assemble result", FINAL_CODE, 40, 640,
+                  {"attempt": 0, "valid": False, "errors": [], "data": {}}, -1500, 900),
+        W.code_node("final", "Assemble result", FINAL_CODE, -1120, 900,
                     [W.pin("loop_state", "loop_state", "object")]),
-        W.get_node("get_data", "data", {}, 420, 560),
-        W.get_node("get_valid", "valid", False, 420, 680),
-        W.get_node("get_attempts", "attempts", 0, 420, 800),
-        W.get_node("get_errors", "errors", [], 420, 900),
+        W.get_node("get_data", "data", {}, -740, 900),
+        W.get_node("get_valid", "valid", False, -360, 900),
+        W.get_node("get_attempts", "attempts", 0, 20, 900),
+        W.get_node("get_errors", "errors", [], 400, 900),
         W.end_node("Extracted", [
             W.pin("data", "data", "object"),
             W.pin("valid", "valid", "boolean"),
             W.pin("attempts", "attempts", "number"),
             W.pin("errors", "errors", "array"),
-        ], 800, 640),
+        ], 780, 900),
     ]
     flow["edges"] = [
         W.edge("start", "exec-out", "attempts", "exec-in", animated=True),
@@ -205,8 +209,28 @@ def build_flow():
 
 def main():
     flow = build_flow()
-    print("edge problems:", W.validate_edges(flow))
+    # Sibling-generator discipline (map-reduce precedent): edge problems FAIL
+    # the build (an advisory print let a broken graph ship), the tree compiles
+    # through the real runtime compiler, and the shipped bundle is repacked so
+    # the gateway serves the same graph as the example JSON (bundle_version
+    # bumps are the release process's job).
+    problems = W.validate_edges(flow)
+    if problems:
+        for p in problems:
+            print(f"EDGE ERROR [structured-extract]: {p}")
+        return 1
     W.write_json(W.FLOWS_DIR / "structured-extract.json", flow)
+    print(f"wrote structured-extract.json ({len(flow['nodes'])} nodes, {len(flow['edges'])} edges)")
+    W.compile_check("structured-extract", ["structured-extract"])
+    print("compiled ok")
+    out = W.pack_bundle(
+        root_flow_id="structured-extract",
+        bundle_id="structured-extract",
+        bundle_version="0.1.1",
+        entrypoints=["structured-extract"],
+        metadata={"family": "structured-extract", "purpose": "extract"},
+    )
+    print(f"packed {out}")
     return 0
 
 

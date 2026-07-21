@@ -10,7 +10,7 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -528.0,
+        "x": -540.0,
         "y": 112.0
       },
       "data": {
@@ -121,7 +121,7 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 656.0,
+        "x": 980.0,
         "y": 112.0
       },
       "data": {
@@ -168,7 +168,7 @@
       "id": "node-2",
       "type": "agent",
       "position": {
-        "x": 16.0,
+        "x": 220.0,
         "y": 112.0
       },
       "data": {
@@ -304,7 +304,7 @@
       "id": "node-4",
       "type": "subflow",
       "position": {
-        "x": -272.0,
+        "x": -160.0,
         "y": 112.0
       },
       "data": {
@@ -362,7 +362,7 @@
       "id": "node-5",
       "type": "subflow",
       "position": {
-        "x": 336.0,
+        "x": 600.0,
         "y": 112.0
       },
       "data": {
@@ -433,6 +433,14 @@
       "sourceHandle": "context",
       "target": "node-2",
       "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "edge-1784900000002",
+      "source": "node-1",
+      "sourceHandle": "memory",
+      "target": "node-2",
+      "targetHandle": "memory",
       "animated": false
     },
     {
@@ -582,5 +590,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-10T03:16:28.522693",
-  "updated_at": "2026-01-26T15:25:10.144125"
+  "updated_at": "2026-07-20T12:00:00.000000"
 }

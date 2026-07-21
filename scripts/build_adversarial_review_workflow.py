@@ -52,7 +52,19 @@ return "\\n".join(parts)
 
 MERGE_CODE = """
 def _findings(obj, lens_name):
-    obj = obj or {}
+    # Partial-failure honesty: structured critic output can arrive
+    # schema-shaped-but-wrong (the executor stores schema-parse results in
+    # `data` even when validation failed — same class as the
+    # meta-perspectives angle guard). A malformed lens must be REPORTED as a
+    # finding, never silently folded as "clean" — otherwise a broken critic
+    # upgrades the verdict toward "pass".
+    if not isinstance(obj, dict):
+        return [{
+            "severity": "P1",
+            "lens": lens_name,
+            "title": "critic output unparseable",
+            "detail": "#FALLBACK structured critic output was not an object; findings for this lens are unavailable",
+        }]
     out = []
     for f in (obj.get("findings") or []):
         if not isinstance(f, dict):
@@ -89,9 +101,10 @@ return {
 """.strip()
 
 
-def _critic(node_id, label, lens, x, y):
+def _critic(node_id, label, x, y):
     # Pure reviewers: a single structured-output llm_call (no tool loop, no
-    # subrun, no approval parks). The `lens` is baked into the composed prompt.
+    # subrun, no approval parks). The lens is baked into the composed prompt
+    # (via the prompt composer's `lens` pin default), not into this node.
     return W.llm_node(
         node_id, label, x, y,
         pin_defaults={
@@ -122,41 +135,47 @@ def build_flow():
     # Linear critic spine (simple + provably correct; critics are cheap
     # 2-iteration calls). Each critic's exec-out feeds the next; merge is a
     # pure node pulled by the end node's data reads after the spine completes.
+    #
+    # Layout grid (2026-07-20 clean-layout pass): exec spine at y=0 with a
+    # 400px x-pitch (box ~300 wide -> 100px gaps); each pure prompt composer
+    # at y=380 directly under its critic (llm boxes are ~272 tall -> >=108px
+    # vertical gap); merge in the same helper row; the four pure `get` fan-out
+    # nodes stack in a column (230px y-pitch, box ~168 tall) before the end.
     flow["nodes"] = [
         W.start_node("Artifact to review", fields, -1100, 0,
                      pin_defaults={"requirements": ""}),
     ]
-    x = -760
+    x = -700
     prev_exec = ("start", "exec-out")
     for lens_key, lens_desc in lenses:
         pc = f"prompt_{lens_key}"
         ag = f"critic_{lens_key}"
         # The lens is baked into the prompt composer's `lens` input via a pin
         # default (the composer reads it; the critic is a generic reviewer).
-        pc_node = W.code_node(pc, f"Compose {lens_key} prompt", CRITIC_PROMPT_CODE, x, 200,
+        pc_node = W.code_node(pc, f"Compose {lens_key} prompt", CRITIC_PROMPT_CODE, x, 380,
                               [W.pin("artifact", "artifact", "string"),
                                W.pin("requirements", "requirements", "string"),
                                W.pin("lens", "lens", "string")],
                               output_type="string")
         pc_node["data"]["pinDefaults"] = {"permissions": "sandbox", "lens": lens_desc}
         flow["nodes"].append(pc_node)
-        flow["nodes"].append(_critic(ag, f"Critic: {lens_key}", lens_desc, x, 0))
-        x += 340
+        flow["nodes"].append(_critic(ag, f"Critic: {lens_key}", x, 0))
+        x += 400
     flow["nodes"].extend([
-        W.code_node("merge", "Merge + rank findings", MERGE_CODE, x + 40, 200,
+        W.code_node("merge", "Merge + rank findings", MERGE_CODE, x, 380,
                     [W.pin("correctness", "correctness", "object"),
                      W.pin("design", "design", "object"),
                      W.pin("requirements_fit", "requirements_fit", "object")]),
-        W.get_node("get_findings", "findings", [], x + 380, -160),
-        W.get_node("get_verdict", "verdict", "revise", x + 380, -40),
-        W.get_node("get_blocking", "blocking_count", 0, x + 380, 80),
-        W.get_node("get_summary", "summary", "", x + 380, 200),
+        W.get_node("get_findings", "findings", [], x + 400, 0),
+        W.get_node("get_verdict", "verdict", "revise", x + 400, 230),
+        W.get_node("get_blocking", "blocking_count", 0, x + 400, 460),
+        W.get_node("get_summary", "summary", "", x + 400, 690),
         W.end_node("Review verdict", [
             W.pin("findings", "findings", "array"),
             W.pin("verdict", "verdict", "string"),
             W.pin("blocking_count", "blocking_count", "number"),
             W.pin("summary", "summary", "string"),
-        ], x + 720, 0),
+        ], x + 800, 0),
     ])
 
     edges = []
@@ -193,9 +212,27 @@ def build_flow():
 
 def main():
     flow = build_flow()
+    # Fail LOUDLY on edge problems (the old build printed them and returned 0,
+    # so a broken graph could ship green through automation).
     problems = W.validate_edges(flow)
+    if problems:
+        for p in problems:
+            print(f"EDGE ERROR [adversarial-review]: {p}")
+        return 1
     W.write_json(W.FLOWS_DIR / "adversarial-review.json", flow)
-    print("edge problems:", problems)
+    print(f"wrote adversarial-review.json ({len(flow['nodes'])} nodes, {len(flow['edges'])} edges)")
+    W.compile_check("adversarial-review", ["adversarial-review"])
+    print("compiled ok")
+    # Repack the shipped bundle so the gateway serves the same graph as the
+    # example JSON (bundle_version bumps are the release process's job).
+    out = W.pack_bundle(
+        root_flow_id="adversarial-review",
+        bundle_id="adversarial-review",
+        bundle_version="0.1.1",
+        entrypoints=["adversarial-review"],
+        metadata={"family": "adversarial-review"},
+    )
+    print(f"packed {out}")
     return 0
 
 

@@ -58,6 +58,7 @@ import { extractRunWorkspaceRoot, selectRunWorkspaceRunId } from '../utils/runWo
 import { extractFollowUpPromptText } from '../utils/followUpInputs';
 import { buildEmitEventCommandPayload, parseEventWaitKey } from '../utils/eventComposer';
 import { actOnlyRefLabel, collectActOnlyRefs } from '../utils/actOnlyRefs';
+import { unambiguousSubRunCandidate } from '../utils/subrunAttach';
 import { displayDataPinTypeLabel } from '../utils/pinTypeOptions';
 import { savedFlowSummariesFromResponse, subflowExecutionLabel } from '../utils/subflowPins';
 import {
@@ -127,6 +128,9 @@ interface RunFlowModalProps {
   }) => Promise<void> | void;
   onNewRun?: () => void;
   onApproveAll?: (ctx?: { rootRunId?: string; sessionId?: string }) => void;
+  // Approve-All revoke (backlog 0138): flips the host auto-approve state OFF
+  // for the given session/run root so the NEXT tool approval prompts again.
+  onRevokeAutoApprove?: (ctx?: { rootRunId?: string; sessionId?: string }) => void;
   isRunning: boolean;
   isPaused?: boolean;
   result: FlowRunResult | null;
@@ -1862,6 +1866,7 @@ export function RunFlowModal({
   onFollowUpSubmit,
   onNewRun,
   onApproveAll,
+  onRevokeAutoApprove,
   isRunning,
   isPaused = false,
   result,
@@ -2969,6 +2974,9 @@ export function RunFlowModal({
     metrics?: ExecutionMetrics;
     startedAt?: string;
     endedAt?: string;
+    // Approved tool-approval resume marker (backlog 0138): rendered as a
+    // small timeline badge so (auto-)approved tool calls stay auditable.
+    toolApproval?: { approved: boolean; auto: boolean };
     waiting?: {
       prompt: string;
       choices: string[];
@@ -3385,6 +3393,7 @@ export function RunFlowModal({
             metrics: ev.meta,
             provider: mi.provider,
             model: mi.model,
+            toolApproval: ev.approval ?? all[idx].toolApproval,
             runtimeStepId: all[idx].runtimeStepId ?? evStepId,
             endedAt: typeof ev.ts === 'string' ? ev.ts : all[idx].endedAt,
           };
@@ -3438,6 +3447,7 @@ export function RunFlowModal({
           nodeColor: meta?.color,
           provider: mi.provider,
           model: mi.model,
+          toolApproval: ev.approval,
           output: ev.result,
           summary: summarize(ev.result),
           metrics: ev.meta,
@@ -4525,6 +4535,36 @@ export function RunFlowModal({
     [approvalSessionId, approvalWait?.runId, approvalWait?.waitKey, onApproveAll, onResume, rootRunId]
   );
 
+  // Approve-All revoke (backlog 0138): clear the LOCAL auto-approve state so
+  // the chip disappears immediately, and tell the host to flip the hook
+  // setters off (setAutoApproveForSession/RunRoot with enabled=false). The
+  // hook's auto-approve check reads those same sets on every incoming
+  // tool-approval wait, so the next tool call prompts again.
+  const handleRevokeAutoApprove = useCallback(() => {
+    const sid = approvalSessionId.trim();
+    const rid = typeof rootRunId === 'string' ? rootRunId.trim() : '';
+    if (sid) {
+      setLocalAutoApproveSessions((prev) => {
+        if (!prev.has(sid)) return prev;
+        const next = new Set(prev);
+        next.delete(sid);
+        return next;
+      });
+    }
+    if (rid) {
+      setLocalAutoApproveRoots((prev) => {
+        if (!prev.has(rid)) return prev;
+        const next = new Set(prev);
+        next.delete(rid);
+        return next;
+      });
+    }
+    onRevokeAutoApprove?.({
+      rootRunId: rid || undefined,
+      sessionId: sid || undefined,
+    });
+  }, [approvalSessionId, onRevokeAutoApprove, rootRunId]);
+
   const waitingPayload = selectedStep?.waiting || null;
   const waitingKey = `${selectedStep?.id || ''}:${waitingPayload?.waitKey || ''}`;
   const waitingReasonRaw = typeof waitingPayload?.reason === 'string' ? waitingPayload.reason : '';
@@ -4645,13 +4685,15 @@ export function RunFlowModal({
         if (fallback) return fallback;
       }
     }
-    // Running agents don't have final output yet. Best-effort: use the latest sub-run trace_update runId.
-    for (let i = traceEvents.length - 1; i >= 0; i--) {
-      const ev = traceEvents[i];
-      if (ev.type !== 'trace_update') continue;
-      if (typeof ev.runId === 'string' && ev.runId.trim() && ev.runId !== rootRunId) return ev.runId.trim();
-    }
-    return null;
+    // Last resort for streams whose subworkflow links never carried this
+    // agent's sub_run_id: only attach an UNAMBIGUOUS candidate (backlog 0138 —
+    // the old "latest trace_update runId wins" heuristic cross-attached
+    // another agent's cycles when two agents ran concurrently).
+    return unambiguousSubRunCandidate({
+      traceEvents,
+      rootRunId,
+      linkedSubRunIds: subworkflowLinks.values(),
+    });
   }, [rootRunId, selectedStep, subworkflowLinks, traceEvents]);
 
   const selectedSubflowRunId = useMemo(() => {
@@ -4684,6 +4726,20 @@ export function RunFlowModal({
 
   const agentTracePanel = useMemo(() => {
     if (!selectedStep || selectedStep.nodeType !== 'agent') return null;
+    if (!selectedAgentSubRunId) {
+      // Without a proven sub_run_id the panel must not render: its subRunId
+      // filter is a passthrough when null, so it would show EVERY sub-run's
+      // cycles mixed together — exactly the cross-attach backlog 0138 bans.
+      return (
+        <div className="agent-trace-panel">
+          <div className="agent-trace-header">
+            <div className="agent-trace-title">Agent cycles</div>
+            <div className="agent-trace-subtitle">Waiting for sub_run_id…</div>
+          </div>
+          <div className="agent-trace-empty">No trace entries yet.</div>
+        </div>
+      );
+    }
     return <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />;
   }, [rootRunId, selectedAgentSubRunId, selectedStep, traceEvents]);
 
@@ -6647,6 +6703,18 @@ export function RunFlowModal({
                                       {stepArtifactPreviewById.get(s.id)?.kind}
                                     </span>
                                   ) : null}
+                                  {s.toolApproval?.approved ? (
+                                    <span
+                                      className={s.toolApproval.auto ? 'run-metric-badge metric-approval auto' : 'run-metric-badge metric-approval'}
+                                      title={
+                                        s.toolApproval.auto
+                                          ? 'Tool call auto-approved (Approve All active) — no prompt was shown'
+                                          : 'Tool call approved by you'
+                                      }
+                                    >
+                                      {s.toolApproval.auto ? 'auto-approved' : 'approved'}
+                                    </span>
+                                  ) : null}
                                   {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
                                   {s.status === 'completed' && s.metrics ? (
                                     <span className="run-step-metrics">
@@ -8569,7 +8637,22 @@ export function RunFlowModal({
           ) : null}
 
           <div className="run-modal-footer-actions">
-            <div className="run-modal-footer-left" />
+            <div className="run-modal-footer-left">
+              {approvalAutoApproveActive ? (
+                <div className="run-approval-autochip" role="status">
+                  <span className="run-approval-autochip-dot" aria-hidden="true" />
+                  <span className="run-approval-autochip-text">Auto-approving tool calls</span>
+                  <button
+                    type="button"
+                    className="run-approval-autochip-revoke"
+                    onClick={handleRevokeAutoApprove}
+                    title="Stop auto-approving — the next tool call will prompt again"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ) : null}
+            </div>
 
             <div className="run-modal-footer-right">
               {approvalDetails ? (

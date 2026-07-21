@@ -244,6 +244,26 @@ def write_pdf_node(node_id, label, x, y):
                          pin("content_type", "content_type", "string")])
 
 
+def write_chart_node(node_id, label, x, y):
+    """Render a STRUCTURED chart spec to a workspace PNG (+ .pdf sibling).
+
+    First-class runtime effect node (write_pdf trust class, operator ruling
+    2026-07-20): no shell, no approval prompt — the in-process replacement
+    for the write-script-then-execute_command lane. Render failures return
+    ok:false + warnings (never a flow failure) so callers keep honest
+    text fallbacks.
+    """
+    return node(node_id, "write_chart", label, x, y,
+                inputs=[EXEC_IN, pin("file_path", "file_path", "workspace_file"),
+                        pin("spec", "spec", "object")],
+                outputs=[EXEC_OUT, pin("ok", "ok", "boolean"),
+                         pin("rendered", "rendered", "boolean"),
+                         pin("file_path", "file_path", "workspace_file"),
+                         pin("pdf_path", "pdf_path", "string"),
+                         pin("error", "error", "string"),
+                         pin("warnings", "warnings", "array")])
+
+
 def write_docx_node(node_id, label, x, y):
     """Render markdown content to a DOCX at a workspace path (bytes+sha256+path)."""
     return node(node_id, "write_docx", label, x, y,
@@ -313,6 +333,24 @@ def validate_edges(flow: dict[str, Any]) -> list[str]:
             problems.append(f"{e['id']}: no out-pin {e['source']}.{e['sourceHandle']}")
         if e["targetHandle"] not in pinmap[e["target"]]["in"]:
             problems.append(f"{e['id']}: no in-pin {e['target']}.{e['targetHandle']}")
+    # Code-node INPUT COVERAGE: an unwired data input binds None silently at
+    # run time (live incident 2026-07-20: exec_args.prep had no edge, so the
+    # render command was "" and execute_command "succeeded" doing nothing —
+    # rendered:false end-to-end with a confusing warning). A declared code
+    # input must have an edge or a pin default; anything else is a build bug.
+    incoming: dict[str, set[str]] = {}
+    for e in flow["edges"]:
+        incoming.setdefault(e["target"], set()).add(e["targetHandle"])
+    for n in flow["nodes"]:
+        if n["data"].get("nodeType") != "code":
+            continue
+        defaults = n["data"].get("pinDefaults") or {}
+        for p in n["data"].get("inputs") or []:
+            pid = p.get("id")
+            if pid == "permissions" or p.get("type") == "execution":
+                continue
+            if pid not in incoming.get(n["id"], set()) and pid not in defaults:
+                problems.append(f"{n['id']}.{pid}: code input has no edge and no pin default")
     return problems
 
 

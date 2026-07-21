@@ -8,6 +8,435 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- 2026-07-21 `coding-agent@0.2.3` — semantic prompt wave (operator order,
+  laurent dm#111-112; plan/improving-code.md C1/C2/C3/C8) targeting the
+  dead-temporal-ripple defect (code that ran cleanly yet computed a constant
+  — 0,0,0 samples across all three 0.2.2 runs, from logic built on an
+  unverified reference DIRECTION). All prompt-only; the gate machinery is
+  unchanged (71/71 smoke still green). (C1) builder prompt gains
+  codex-grade engineering rules: bound every traversal/recursion/iteration;
+  verify a data structure's real shape + reference direction before writing
+  logic over it; "same output for every input is broken even without an
+  error"; self-probe (exercise the code, confirm the behavior VARIES) before
+  finishing. (C2) round-0 data profiling — profile the real inputs first and
+  record findings as a `PROFILE:` comment block at the top of the main
+  source, so logic matches observed data, not assumed names. (C3) verifier
+  prompt gains a NON-VACUITY requirement — confirm each task-named feature's
+  output DEPENDS on its input; a provably-constant/always-empty output is
+  `matches=false` with a `failures[]` line NAMING the mechanism (structure-
+  present is not behavior-correct — the exact gap that let the dead ripple
+  score 100%). (C8) the builder writes a SELFCHECK.md evidence file (per-
+  behavior: how verified + concrete observed evidence), which the verifier
+  reads but does not trust. 0.2.2 stays in the catalog for 1:1 A/B (dm#101).
+
+### Fixed
+- 2026-07-21 `coding-agent@0.2.2` — verifier-death fail-soft (operator order,
+  laurent dm#96 via the code seat): tonight's memgraph hackathon saw all
+  three coding-agent runs deliver fine artifacts (graded 100/94.4/100) yet
+  exit rc=1 — the LLM verifier's `llm_call` DIED 3× on an infra bug (core
+  `usage:null`, fixed separately) AFTER the deterministic gates (G0 delivery,
+  integration, probe) all PASSED, and the exit code lied about a good
+  artifact. Root cause (one fable5 adversary): a DIED verifier (missing
+  verdict) was indistinguishable from a verdict of failure at two folds —
+  `merge` (gates flow) and `next_state` (root flow) both treated a missing
+  verdict as `all_passed=false, failures=[]`, which the loop read as a
+  failure-free "previous attempt FAILED" reprompt, burned the budget, and
+  ended "STOPPED with open gate failures" listing zero failures. Fix: a
+  missing verdict (the strict schema guarantees a real verdict carries every
+  field) is now the "cannot verify here" class — folded into the existing
+  `environment_failures` early-stop lane, never a fabricated pass and never a
+  fabricated fixable failure. Three separated terminal states (delivered ≠
+  verified ≠ passed): PASSED all gates / DELIVERED — NOT VERIFIABLE HERE
+  (artifact present, only an env/verifier outage standing) / STOPPED with
+  open gate failures. New `delivered` + `success` end pins (success = passed
+  OR delivered-not-verifiable); `passed` stays strictly `all_passed`. A
+  terminal `list_files` gives delivery ground truth independent of the
+  verifier. All existing guarantees preserved (deterministic fails still
+  fail-fast; a verifier that REPORTS failures still reprompts; no
+  `all_passed=true` without a real verdict) — 71/71 gate-smoke incl. a new
+  scenario driving the real compiled flow with a died verifier subrun.
+  FULLY effective under the gateway runner; `abstractcode exec` needs its
+  parent-resume half (filed to the code seat — see cross-seat note).
+
+### Added
+- 2026-07-21 approval visibility + lifecycle — Approve-All revoke, timeline
+  auto-approve markers, subrun-attach tightening (backlog abstractflow-0138,
+  second slice; operator-approved with one fable5 adversary — item now
+  COMPLETE). (1) Approve-All was irrevocable and invisible: a warning-toned
+  "Auto-approving tool calls" chip with a Revoke control now shows in the
+  run-modal footer whenever auto-approve is active for the session/root;
+  Revoke clears the local + hook auto-approve sets and re-prompts on the next
+  tool call. Hardening: `setAutoApproveForSession` updates its ref
+  SYNCHRONOUSLY (the incoming-wait check reads the ref; the state→ref effect
+  lands a render late, so a wait arriving right after Revoke would otherwise
+  still auto-resume — fail-dangerous). (2) Auto-approved tool executions were
+  silently suppressed as bookkeeping — the timeline now shows an
+  "auto-approved"/"approved" badge on the step (new pure
+  `toolApprovalResumeMarker`; only tool-approval resumes, strict-boolean
+  gated; auto-vs-manual from the client `auto_approved` stamp, plain
+  "approved" as the safe default for stampless clients). (3) The agent
+  subrun-attach fallback could cross-attach a concurrent agent's cycles to
+  the selected step — new pure `unambiguousSubRunCandidate` attaches only
+  when exactly one unclaimed non-root sub-run is emitting traces (two
+  concurrent agents → no attach, trace panel shows a "waiting for
+  sub_run_id" placeholder). +14 tests.
+- 2026-07-21 waits actionable everywhere — reason-aware notifications +
+  toolbar badge (backlog abstractflow-0138, first slice). Every
+  non-subworkflow wait used to force-open the run modal and toast "waiting
+  for your response" — including event parks (a resident agent on
+  `wait_event`) and deadline parks (`wait_until`/timer) that need no
+  response. New `classifyWait` helper (reason-first, matching the ledger's
+  exact wait reasons; content-aware only where a park reason carries a real
+  host prompt) sorts waits into approval / prompt / park. `useWebSocket`
+  computes interactivity from the RAW event (before the prompt is defaulted,
+  so a placeholder never misclassifies a park) and carries it on
+  `WaitingInfo`. The Toolbar now force-opens + toasts only for interactive
+  waits (approval → "needs your approval", prompt → "waiting for your
+  response"); parks run silently. A calm-amber "Waiting for you" /
+  "Approval needed" badge appears in the run-actions group for interactive
+  waits, so a user who navigated away from the modal still sees the run
+  needs them and can jump back. 10 classifier tests. Remaining 0138 slice
+  (approval lifecycle: Approve-All revoke chip, auto-approve timeline
+  marker, subrun-attach tightening) tracked in the backlog item.
+- 2026-07-21 canvas undo/redo (backlog abstractflow-0127; work dispatch
+  c3815). Deleting a configured node was unrecoverable — a trust gap under
+  every other editing feature. A bounded (50-entry) snapshot stack over
+  graph state (nodes/edges/name/interfaces) lives in the `useFlow` store:
+  graph-mutating actions (add/delete node+edge, connect, disconnect pin,
+  paste, duplicate, node-data edit, authoring-command batch, drag-move,
+  keyboard delete) capture a pre-mutation baseline; `undo`/`redo` move
+  between past/future stacks (deep-clone on capture AND restore, so
+  undo→redo→undo never aliases). Rapid same-gesture pushes coalesce into
+  one step: a drag is one undo (its per-frame position changes collapse via
+  a `drag` coalesce key), and consecutive keystrokes on one node collapse
+  via an `update:<nodeId>` key within a 600ms window — one logical edit is
+  one undo, not hundreds. A new edit after undo forks the timeline (clears
+  redo); load/clear reset history (no undo into a previous document).
+  Ctrl/Cmd+Z undoes, Shift+Ctrl/Cmd+Z (and Ctrl+Y) redoes — guarded by the
+  same editable-target/text-selection checks as the clipboard shortcuts so
+  it never fights field-level undo while typing. Toolbar gains an Undo/Redo
+  group (disabled when the respective stack is empty). 10 store tests pin
+  the contract (discrete vs coalesced pushes, drag coalescing, timeline
+  fork, no-alias restore, 50-entry bound, load reset).
+
+### Changed
+- 2026-07-21 `co-scientist@0.1.16` — TOTAL citation-verification coverage
+  (operator ruling on the delivered 0.1.15 report's caveat "#FALLBACK: 7
+  fetched source(s) exceeded the 12-URL citation-verification budget":
+  "that should never happen, fix it. we must be thorough"). The 12-URL cap
+  in `cite_items` is GONE: every fetched ledger source is deterministically
+  re-fetched and title-verified, with no budget-overflow pathway left in
+  the report (the verification list is already bounded upstream by the
+  investigation's own iteration budget, so the loop cannot run away). The
+  unchecked-source counter survives only as a defensive anomaly check (a
+  fetched source missing a verdict is a loop defect, reported honestly —
+  never a budget). Methodology/Limitations wording restored to "EVERY
+  fetched ledger URL was title-verified", now true by construction.
+
+### Added
+- 2026-07-20 APPROVAL-FREE figure rendering (operator ruling: "co-scientist
+  is a deterministic process... you should NEVER ask for approval as long
+  as it follows the process"): `diagram-render@0.2.0` + `co-scientist@0.1.15`.
+  Root cause: v0.1.x rendered figures by writing a fixed matplotlib script
+  into the workspace and shelling `python3` through the `execute_command`
+  tool — which sits on the runtime's require-approval list, so EVERY
+  unattended co-scientist run stalled on a tool-approval prompt at the
+  figure step. An adversarial fable5 review confirmed no existing mechanism
+  satisfies "zero prompts, security intact" (run-scoped `_runtime.tool_policy`
+  has no consumer; the editor's Approve All is client-side convenience;
+  argument-inspecting auto-approve of shell strings is the defeatable-parser
+  class) and ranked a first-class effect node the only non-forgeable shape.
+  The new runtime `write_chart` node (write_pdf trust class) renders the
+  STRUCTURED spec in-process: no shell, no code authoring surface, workspace
+  path containment identical to write_file, and hard resource caps as the
+  compensating control for losing subprocess isolation (spec bytes, element
+  counts, figure inches, fixed dpi, mathtext/usetex disabled, NaN/Inf
+  rejected, figures closed in finally). Render failures return ok:false +
+  `#FALLBACK` warnings — the flow continues and callers keep text fallbacks.
+  diagram-render@0.2.0 drops the write-script/execute_command/list-files
+  triple for one write_chart node (python_bin input gone with the
+  subprocess); co-scientist@0.1.15 repacks to carry it. Editor gains the
+  Write Chart palette node + catalog entry. Proven live through the
+  restarted gateway: diagram-render@0.2.0 completed with ZERO approval
+  waits, rendered:true, PNG+PDF artifacts registered; 13 runtime tests pin
+  the hardening checklist (containment, caps, mathtext, degradation).
+- 2026-07-20 workflow-catalog adversary wave (operator directive: "there
+  should be no dead node. make sure each workflow also has a clean layout of
+  nodes" — 4 adversarial fable5 reviewers, one per generator group, gated by
+  the new deterministic `scripts/audit_flow_graph.py` (dead exec nodes, dead
+  pure nodes, orphan edges, node-box overlaps; `--all` sweeps the shipped
+  catalog)). All 21 bundled flows now audit CLEAN (baseline: ~300 overlap
+  findings + 1 real dead node). Real defects fixed beyond layout: (P0)
+  basic-agent's status helper had a dead `wait_until` — data-wired but never
+  exec-wired, so every configured `post_delay` was silently dropped; (P0)
+  the deep-research generator had drifted BEHIND the shipped bundle (the
+  artifact-registration import lane lived only in the .flow), so a rebuild
+  would have silently deleted live functionality — folded into the
+  generator, semantic-diff-verified; (P1) basic-agent's `memory` start pin
+  was declared but unwired (caller memory config silently dropped) + a stale
+  `delay_after` pinDefault named no pin; (P1) coding-agent's verifier only
+  got FAIL-CLOSED/environment_failures guidance when NO run_command was set;
+  (P1) adversarial-review's merge fold crashed on non-dict critic output and
+  folded a None payload as a CLEAN lens (a broken critic could upgrade the
+  verdict); (P1) adversarial-review/map-reduce/structured-extract generators
+  never packed their bundles (fixes could not reach the gateway) and shipped
+  broken graphs on validate errors (now exit 1 + compile-check); (P2)
+  co-scientist citation-verification honesty: no vacuous "every URL
+  verified" claim on zero-source runs, the 12-URL budget is stated and
+  unchecked overflow gets a `#FALLBACK` note; (P2) stale `dp.` get_var
+  labels; dead code bodies/helpers removed. Layout: every flow now reads
+  left-to-right (exec spine on one lane, pure helpers in rows near their
+  consumers, zero box overlaps). VERSION BUMPS (sha-immutable rule; old
+  overwritten untracked artifacts removed, tracked ones restored to original
+  bytes): coding-agent@0.2.1, co-scientist@0.1.14, deep-research@0.1.7,
+  basic-agent@0.0.2 (both artifacts), structured-extract@0.1.1,
+  adversarial-review@0.1.1, map-reduce@0.1.1, diagram-render@0.1.1, six
+  meta-*@0.1.1. Gateway reloaded + catalog verified serving exactly the new
+  versions; gateway-side filename pins (pyproject force-includes, install
+  profile + deep-research contract tests) updated in the same pass — 19
+  gateway tests green, 358 abstractflow tests green. Reported-not-fixed (on
+  the record): map-reduce reduce-prompt 1200-char unlabeled truncation;
+  structured-extract null-vs-missing required-key tension; deep-render
+  blocked-section removal is heading-level-blind (contract-pinned behavior).
+
+### Fixed
+- 2026-07-20 the Flow Library showed co-scientist with a "1 missing" chip
+  and "diagram-render (missing)" in its family panel (operator report):
+  co-scientist@0.1.12+ references diagram-render as its figure subflow and
+  the workflow ships as a gateway bundle, but the library catalog is a
+  client-side glob of bundled example JSONs that never included
+  diagram-render — runnable on the gateway, invisible to the library.
+  Added to the bundled glob + registered as a bundle run-target
+  (diagram-render@0.1.1); the family now reads 3 subflows with
+  diagram-render as a normal child.
+- 2026-07-20 pure code nodes no longer gain phantom execution pins in the
+  editor (operator report: "a lot of nodes with empty execution pins, which
+  I believe are therefore never reached"). Generator-built flows
+  (co-scientist, deep-research, meta-*) deliberately author code nodes
+  WITHOUT execution pins so the runtime compiler classifies them as PURE —
+  lazily evaluated when an exec node pulls their data outputs (the designed
+  data-flow model; exec-reachability audit: co-scientist's 35 exec nodes all
+  reached, all 57 pure nodes feed exec nodes, zero dead). But the editor's
+  code-node template merge (`mergePinDocsFromTemplate.normalizeCodeNode`)
+  APPENDED every missing template pin — including exec-in/exec-out — so
+  pure code nodes rendered dead exec triangles, and the real hazard: the
+  appended pins PERSISTED on the next editor save, flipping the runtime
+  classification to exec-node-unreachable so the node would silently never
+  run and downstream inputs resolved to nothing. Execution pins are now
+  never invented for code nodes authored without them (data-pin backfill
+  like `permissions` unchanged; exec-authored code nodes keep theirs).
+  Round-trip + doc-backfill pinned by tests; a disk audit of all 102
+  gateway-stored flows found zero generator-family copies poisoned.
+
+### Changed
+- 2026-07-20 Flow Library modal: the primary verbs moved into a PERSISTENT
+  footer — `Cancel | Rename | Duplicate | Load` — always visible, enabled
+  once a workflow is selected (operator ask: the in-preview action row sat at
+  the bottom of the scrollable preview column, so any long description pushed
+  Load/Duplicate below the fold and the modal looked action-less). Disabled
+  buttons carry the reason in their tooltip. Rename triggers the existing
+  inline rename editor; its Save/Cancel pair stays contextual in the preview
+  panel beside the input, as does Delete (destructive, with its confirm +
+  parent-break warning). The footer `Close` was renamed `Cancel` per the
+  requested layout.
+- 2026-07-20 bundled workflows now Rename/Duplicate (operator follow-up:
+  "selecting a workflow doesn't let me rename it or duplicate it. fix it").
+  Bundled flows live in the app package, not gateway storage, so the old UI
+  refused both (a standalone copy of a family root would reference subflow
+  ids the gateway cannot resolve at run time). New `duplicateFlowFamily`
+  util: Duplicate copies the root PLUS its readonly subflow closure into
+  gateway storage and remaps subflow references onto the new copies
+  (two-phase create-then-patch, so self-references and mutual cycles remap
+  correctly); references to STORED helpers stay shared (existing semantic).
+  Rename on a bundled flow creates the family copy under the chosen name and
+  loads it — the shipped bundle itself is never mutated, and the toast says
+  what happened. The toolbar Duplicate on a loaded bundle-target routes
+  through the same family copy instead of refusing. 7 unit tests pin
+  closure/remap semantics.
+
+### Added
+- 2026-07-20 renderer inline-image hardening + `co-scientist@0.1.13` — a
+  second operator report ("none of the figures are part of the pdf") exposed
+  that the running gateway was STALE (booted before the renderer fix; a
+  bundle reload does not reload Python modules — the fix reached the live
+  gateway only after a process restart), and two mandated fable5 adversaries
+  found real defects in the new inline-image path, all folded: (P0) the
+  workspace-root derivation could collapse to `/` on the scope-less path,
+  making the renderer's containment check vacuous — now tail-matches the
+  virtual path against the resolved path and refuses on any mismatch or
+  peel-past-root, so an out-of-workspace image can never embed; (P1) DOCX
+  alt text with a `"`/control char corrupted the whole document — now escaped
+  via a dedicated attribute-escaper; (P1) non-standalone image refs (in a
+  bullet/heading/mid-sentence, or an alt containing `]`/newline, or a
+  markdown-title form) leaked raw `![...]` markdown — the inline text
+  pipelines now convert any image ref to a `[figure: alt]` note (non-greedy
+  alt so a `]` inside it is still caught); (P1) DOCX had no height clamp and
+  trusted the PNG IHDR — now clamps both axes to one page and validates the
+  IHDR tag + bounds; plus size caps, unique drawing ids, underscore emphasis,
+  and a `\\\\`-UNC refusal. The co-scientist caption is sanitized (no
+  `]`/newline reaches the image line) and the baked figure caption is dropped
+  in favor of the renderer's wrapping caption (no duplicate). Version bumped
+  0.1.12→0.1.13 deliberately: a gateway that already loaded 0.1.12 refuses a
+  same-version re-publish (immutable by sha), so the fix would never reach
+  it. Proven in BOTH formats (adversary attack harness + delivered reports):
+  figures embedded in PDF (`get_images`) and DOCX (`a:blip` + `word/media`),
+  python-docx opens both, zero raw `![`, secrets/traversal refused.
+- 2026-07-20 `diagram-render@0.1.0` — NEW dedicated professional-figure
+  workflow (operator directive; one adversarial fable5 reviewer, verdict
+  "shippable after fixes", all P0/P1 + 5 of 6 P2 folded). A structured
+  diagram SPEC (data — the LLM never authors code) renders to publication
+  PNG + PDF via a FIXED matplotlib script executed through
+  `execute_command`: `layered` (architecture columns of rounded boxes with
+  labeled arrows, per-layer color coding) and `line` (trajectories, optional
+  honest `y_min` anchor). Injection-proofed per the adversary's P0: basename
+  AND out_dir AND python_bin are reduced to safe character sets before
+  quoting (traversal segments stripped, shell-active characters rejected
+  wholesale). Deterministic render gate: the tool's prose is never trusted —
+  the stdout ok-marker AND a filtered `list_files` check must both pass or
+  the workflow returns `rendered:false` + `#FALLBACK` (matplotlib missing,
+  bad spec, crash: all degrade honestly, never fail the flow). Figures
+  register as durable run artifacts. NaN/Infinity coerced to null in the
+  sandbox JSON emitter; invalid specs surface their specific reason.
+
+### Changed
+- 2026-07-20 runtime document renderers (`abstractruntime/documents/pdf.py` +
+  `docx.py`) — INLINE IMAGE EMBEDDING. Standalone markdown image lines
+  (`![alt](reports/figures/x.png)`) now embed the local image where they
+  appear — scaled to the text column with the alt text as an italic caption
+  (PDF: reportlab `Image`; DOCX: a real `word/media/*` part + drawing XML).
+  Before this, `![...](...)` printed as LITERAL markdown text in the PDF (the
+  operator screenshotted it). The `write_pdf`/`write_docx` handlers pass the
+  resolved workspace root as `base_dir`; the renderer refuses remote/`data:`
+  URLs and any path escaping base_dir (resolve + `relative_to` containment),
+  restricts to image extensions, and degrades to an italic `[figure: alt]`
+  note on any miss — never raw markdown, never an exception. Coordinated with
+  runtime (their `documents/` package; consumer-driven fix, offered for
+  ratification).
+- 2026-07-20 `co-scientist@0.1.12` — PROFESSIONAL FIGURES replace the ASCII
+  art (operator: "didn't I ask you to create a workflow dedicated to create
+  professional diagrams?"). The report now embeds the figures INLINE (relying
+  on the runtime renderer change above) instead of the earlier pypdf
+  appendix-page merge — the merge machinery (MERGE_SCRIPT / merge nodes /
+  post-merge sha) is deleted, `pdf_sha256` is write_pdf's own hash again.
+  The run timestamp is frozen once into a var (`co.ts`) before the figures
+  render, so the figure basenames and the report filenames share the SAME
+  timestamp — `system_datetime` is a volatile pure source, and reading it
+  from both the figure chain and the write chain would otherwise diverge and
+  break the embedded image path (found by the mandated adversary review). An LLM node designs a layered architecture spec
+  from the run's top hypotheses (strict schema; clamped to ≤4 layers /
+  ≤4 nodes each; dangling edges dropped); the Elo trajectory spec is fully
+  deterministic (1200-anchored y-axis). Both render through the new
+  `diagram-render` subflow; the markdown embeds the PNGs and the PDF export
+  gains the figures as appendix pages (pypdf merge — the runtime PDF writer
+  has no inline-image branch). Every failure path keeps the ASCII/text
+  fallback with a `#FALLBACK` caveat. Adversary folds: `pdf_sha256` now
+  reports the DELIVERED bytes (the merge script prints the post-merge hash;
+  pre-merge hash shipped wrong on every figure run), figure basenames carry
+  the run timestamp (fixed names collided across runs sharing a
+  workspace_root), the md never promises appendix pages the merge hasn't
+  made yet, and meta no longer emits ASCII-art architecture sketches.
+  Live-verified end-to-end: 15-page merged PDF with both figures, unattended
+  approvals. Probe fix: the gateway resume route is `POST
+  /api/gateway/commands` (run_id in the body) — `/runs/{id}/command` never
+  existed; earlier runs never noticed because web tools are safe-auto-
+  approve and `execute_command` is this flow's first ask-approval tool.
+  Build-time guard added to `wf_common.validate_edges`: a code-node data
+  input with no edge and no pin default is now a build error (live incident:
+  an unwired `exec_args.prep` made the render command empty and the tool
+  "succeeded" doing nothing).
+- 2026-07-19 `co-scientist@0.1.11` — the two-adversary before/after audit
+  wave (operator-directed 1:1 comparison of the regenerated reports against
+  the two baselines; both fable5 adversaries verdicted "genuinely better"
+  and converged on the remaining defects, now fixed). DETERMINISTIC CITATION
+  VERIFICATION: after grounding, a foreach loop re-fetches EVERY ledger URL
+  (`call_tool fetch_url`; arXiv PDF urls normalized to abs pages) and
+  token-checks the served `<title>` against the claimed title — arXiv strict
+  (a wrong id shows zero overlap), other pages loose; MISMATCH/UNREACHABLE
+  sources are barred from citation, labeled in Literature Sources, and
+  `#FALLBACK`-warned. This kills the laundering P0 both adversaries ranked
+  #1: the allowlist constrained the writer to the ledger, but the ledger
+  itself carried model-asserted wrong title↔id pairs stamped `fetched: true`
+  ("Concrete Problems in AI Safety" on the EfficientNet id, cited 8 times).
+  Live first run: caught 2 real wrong-id pairings (DNC on an id serving
+  "Range Majorities and Minorities in Arrays"; EvolveGCN on "GRET") — zero
+  banned ids reached the prose. Ranking honesty: near-identical-title
+  collapse (containment >= 0.75 — "HVGR" held ranks 2 AND 8 one qualifier
+  apart) plus visible `sibling`/`de-crowded` flags with the criterion line
+  explaining Elo non-monotonicity locally. Falsification hygiene: literal
+  HYPOTHESIZED template tokens scrubbed from criteria (deterministic) +
+  prompt FORM rules (same metric/direction as the expected effect, no
+  unadjudicated gap, no vague thresholds). Evidence-verb honesty: pool
+  hypotheses and non-ledger works may never take 'demonstrates/shows/
+  reports' (a sibling untested hypothesis was cited as established fact).
+  Meta number-fidelity: quoted scores must match the ranked data; rank-vs-
+  Elo divergences explained at the mention site. Sandbox lesson pinned: code
+  nodes have no `chr` builtin — the first launch failed live on it; all new
+  bodies are now compile+exec-checked through the real RestrictedPython
+  sandbox in the self-checks, not plain `exec`.
+- 2026-07-19 `co-scientist@0.1.10` — degraded-path fixes from the live 0.1.9
+  zero-source run (the run where deep-investigate ran 8 web searches but
+  returned an EMPTY source_ledger, exercising the honest 0-source path
+  end-to-end). Identical-title collapse in BOTH the fold and the final
+  ranking: the cycle-2 report listed the same hypothesis title twice (ranks
+  3/4 and 6/8) because an evolved copy re-entered under its parent's title
+  with a reworded statement below the token-overlap threshold — final ranking
+  now keeps only the best-ranked copy per normalized title (never cap-at-2
+  for exact duplicates). Empty-allowlist citation BAN: with 0 fetched
+  sources the prompts previously carried NO citation rule at all and the
+  meta-review name-dropped venues from parametric memory ("TGAT (KDD 2020)"
+  — wrong venue, TGAT was ICLR 2020); a zero-source run now explicitly bans
+  naming any paper/venue/year/arXiv id/DOI in every generative prompt AND at
+  meta level. Grounding reliability: MANDATORY-ledger-discipline + budget
+  guidance ("stop gathering with 2 rounds to spare") threaded through
+  deep-investigate's own `adversarial_review` input channel (two distinct
+  live failure shapes: an empty source_ledger beside findings prose, and an
+  empty forced final at max_iterations after the agent burned its whole
+  budget on searches), plus a BOUNDED RETRY BRANCH in the graph — when the
+  literature base sees 0 fetched sources it re-invokes deep-investigate once
+  at effort=thorough (10 agent rounds vs 6) with the failed attempt as
+  `prior_investigation`, and a deterministic picker keeps whichever attempt
+  grounded with honest `#FALLBACK` provenance (state rides a `co.lit` var so
+  the unexecuted branch is never dereferenced; `generate` is multi-entry).
+  Elo trajectory figure is now anchored at the 1200 tournament start instead
+  of min(best) — min-anchoring rendered cycle 1 as a single '#' and visually
+  overstated the gain. Verification run (OVH gpt-oss-120b): 9 real fetched
+  sources, every arXiv id/URL in the report resolves to the ledger (0
+  fabricated), 8 distinct titles (0 duplicate pairs vs 3 in the 0.1.9 run),
+  all report sections render, warnings empty. Backlog: `abstractflow-0147`.
+- 2026-07-19 `co-scientist@0.1.9` — report quality/depth/fidelity wave vs the
+  Nature 'AI co-scientist' paper (operator-directed; two fable5 adversaries +
+  live A/B on OVH gpt-oss-120b, two cycles). Credibility (P0): the grounding
+  gate now requires a resolvable `http(s)://` URL (a degenerate
+  `internal_agent_output` "source" no longer passes as grounded → the
+  `#FALLBACK` fires honestly), and a deterministic CITATION ALLOWLIST of the
+  fetched sources is threaded into every generative prompt so the model cites
+  only grounded literature and never invents arXiv ids / DOIs / vendor
+  whitepapers (the fabricated Gato id, Boston-Dynamics/IBM/NVIDIA
+  "whitepapers", wrong DNC id class). The meta-review prompt states what Elo
+  IS (internal self-play tournament score, not peer review / community /
+  citation impact) and bans attributing numeric results to cited works.
+  Depth: hypotheses carry a STRUCTURED experimental protocol
+  (design / metric / expected-effect / **falsification**) rendered
+  Specific-Aims style, replacing the one-line "experiment" that was usually a
+  restated title; the design field is prompted as the experimental SETUP
+  (named baselines/ablations/dataset), not the mechanism name. Ranking: a
+  NOVELTY floor + diversity de-crowding with a headline cluster-cap stop a
+  self-declared non-novel idea from holding rank 1 and stop near-duplicate
+  variants from monopolizing the top (cycle-1 crowded five routing variants).
+  Hygiene: generative stages get a decoration-free pool view AND a fold-level
+  SANITIZER belt strips `(Elo N)` / `[UNREVIEWED]` / `[UNEXPLORED]` /
+  `[id]` / `hypothesis [k]` from every incoming field so no bookkeeping or
+  internal pool id reaches the reader. Evolution rotates a distinct strategy
+  per cycle (combination / simplification / out-of-box / grounding); the
+  terminal review runs a deep-verification pass (decompose each finalist into
+  assumptions, score by the weakest). Report gains a deterministic
+  Methodology/provenance section, an ASCII Elo-evolution figure (the paper's
+  self-improving-tournament result made visible), a stated ranking-criterion
+  line, and a Limitations & threats-to-validity section. Live-verified: the
+  hardened grounding, honest Elo framing, and falsifiable protocols all
+  landed in the OVH gpt-oss-120b run; renderer image-embedding + hr/blockquote
+  gaps raised with runtime (their `documents/` package). Backlog:
+  `abstractflow-0147`.
 - 2026-07-17 `coding-agent@0.2.0` — deterministic-gates redesign of the verify
   subflow (R-Type post-mortem, agora c2725/c2735/c2736; operator: "badly
   designed — do more research and improve it"). Root cause owned: the v1

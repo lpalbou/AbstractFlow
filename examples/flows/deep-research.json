@@ -11,8 +11,8 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -900,
-        "y": 0
+        "x": 0.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -68,8 +68,8 @@
       "id": "derive_settings",
       "type": "code",
       "position": {
-        "x": -560,
-        "y": -160
+        "x": 440.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "code",
@@ -141,8 +141,8 @@
       "id": "get_max_review_rounds",
       "type": "get",
       "position": {
-        "x": -220,
-        "y": -340
+        "x": 1760.0,
+        "y": -248.0
       },
       "data": {
         "nodeType": "get",
@@ -188,8 +188,8 @@
       "id": "get_output_prefix",
       "type": "get",
       "position": {
-        "x": 3040,
-        "y": 360
+        "x": 6600.0,
+        "y": -470.0
       },
       "data": {
         "nodeType": "get",
@@ -235,8 +235,8 @@
       "id": "get_report_title",
       "type": "get",
       "position": {
-        "x": 3040,
-        "y": 500
+        "x": 6160.0,
+        "y": -248.0
       },
       "data": {
         "nodeType": "get",
@@ -282,8 +282,8 @@
       "id": "run_timestamp",
       "type": "system_datetime",
       "position": {
-        "x": -560,
-        "y": 320
+        "x": 0.0,
+        "y": 300.0
       },
       "data": {
         "nodeType": "system_datetime",
@@ -324,8 +324,8 @@
       "id": "timestamp_no_colons",
       "type": "replace",
       "position": {
-        "x": -240,
-        "y": 280
+        "x": 440.0,
+        "y": 274.0
       },
       "data": {
         "nodeType": "replace",
@@ -377,8 +377,8 @@
       "id": "timestamp_safe",
       "type": "replace",
       "position": {
-        "x": 80,
-        "y": 280
+        "x": 440.0,
+        "y": 548.0
       },
       "data": {
         "nodeType": "replace",
@@ -430,8 +430,8 @@
       "id": "set_export_timestamp",
       "type": "set_var",
       "position": {
-        "x": -180,
-        "y": 40
+        "x": 880.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "set_var",
@@ -481,8 +481,8 @@
       "id": "plan_input",
       "type": "make_object",
       "position": {
-        "x": -560,
-        "y": -260
+        "x": 880.0,
+        "y": -300.0
       },
       "data": {
         "nodeType": "make_object",
@@ -534,8 +534,8 @@
       "id": "plan",
       "type": "subflow",
       "position": {
-        "x": -180,
-        "y": -140
+        "x": 1320.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "subflow",
@@ -586,8 +586,8 @@
       "id": "get_plan",
       "type": "get",
       "position": {
-        "x": 160,
-        "y": -260
+        "x": 1760.0,
+        "y": -496.0
       },
       "data": {
         "nodeType": "get",
@@ -633,12 +633,12 @@
       "id": "get_loop_state",
       "type": "get_var",
       "position": {
-        "x": 160,
-        "y": -20
+        "x": 1760.0,
+        "y": 222.0
       },
       "data": {
         "nodeType": "get_var",
-        "label": "Get dp.loop_state",
+        "label": "Get deep.loop_state",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
         "inputs": [
@@ -678,8 +678,8 @@
       "id": "loop_condition",
       "type": "code",
       "position": {
-        "x": 160,
-        "y": 120
+        "x": 1760.0,
+        "y": 444.0
       },
       "data": {
         "nodeType": "code",
@@ -736,8 +736,8 @@
       "id": "research_rounds",
       "type": "while",
       "position": {
-        "x": 160,
-        "y": 260
+        "x": 1760.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "while",
@@ -792,12 +792,12 @@
       "id": "get_prior_investigation",
       "type": "get_var",
       "position": {
-        "x": 520,
-        "y": -340
+        "x": 2200.0,
+        "y": -444.0
       },
       "data": {
         "nodeType": "get_var",
-        "label": "Get dp.latest_investigation",
+        "label": "Get deep.latest_investigation",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
         "inputs": [
@@ -834,12 +834,12 @@
       "id": "get_prior_review",
       "type": "get_var",
       "position": {
-        "x": 520,
-        "y": -220
+        "x": 2200.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "get_var",
-        "label": "Get dp.latest_review",
+        "label": "Get deep.latest_review",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
         "inputs": [
@@ -876,8 +876,8 @@
       "id": "investigate_input",
       "type": "make_object",
       "position": {
-        "x": 520,
-        "y": -20
+        "x": 2200.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "make_object",
@@ -954,8 +954,8 @@
       "id": "investigate",
       "type": "subflow",
       "position": {
-        "x": 900,
-        "y": -140
+        "x": 2640.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "subflow",
@@ -1006,8 +1006,8 @@
       "id": "get_investigation",
       "type": "get",
       "position": {
-        "x": 1240,
-        "y": -300
+        "x": 3080.0,
+        "y": -248.0
       },
       "data": {
         "nodeType": "get",
@@ -1053,8 +1053,8 @@
       "id": "set_latest_investigation",
       "type": "set_var",
       "position": {
-        "x": 1240,
-        "y": -120
+        "x": 3080.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "set_var",
@@ -1104,8 +1104,8 @@
       "id": "review_input",
       "type": "make_object",
       "position": {
-        "x": 1600,
-        "y": -20
+        "x": 3520.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "make_object",
@@ -1177,8 +1177,8 @@
       "id": "review",
       "type": "subflow",
       "position": {
-        "x": 1980,
-        "y": -140
+        "x": 3960.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "subflow",
@@ -1229,8 +1229,8 @@
       "id": "get_review",
       "type": "get",
       "position": {
-        "x": 2320,
-        "y": -300
+        "x": 4400.0,
+        "y": -248.0
       },
       "data": {
         "nodeType": "get",
@@ -1276,8 +1276,8 @@
       "id": "set_latest_review",
       "type": "set_var",
       "position": {
-        "x": 2320,
-        "y": -120
+        "x": 4400.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "set_var",
@@ -1327,8 +1327,8 @@
       "id": "next_loop_state",
       "type": "code",
       "position": {
-        "x": 2320,
-        "y": 40
+        "x": 4840.0,
+        "y": 222.0
       },
       "data": {
         "nodeType": "code",
@@ -1385,8 +1385,8 @@
       "id": "set_loop_state",
       "type": "set_var",
       "position": {
-        "x": 2320,
-        "y": 200
+        "x": 4840.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "set_var",
@@ -1436,12 +1436,12 @@
       "id": "get_final_investigation",
       "type": "get_var",
       "position": {
-        "x": 2660,
-        "y": -300
+        "x": 5280.0,
+        "y": -444.0
       },
       "data": {
         "nodeType": "get_var",
-        "label": "Get dp.latest_investigation",
+        "label": "Get deep.latest_investigation",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
         "inputs": [
@@ -1478,12 +1478,12 @@
       "id": "get_final_review",
       "type": "get_var",
       "position": {
-        "x": 2660,
-        "y": -180
+        "x": 5280.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "get_var",
-        "label": "Get dp.latest_review",
+        "label": "Get deep.latest_review",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
         "inputs": [
@@ -1520,12 +1520,12 @@
       "id": "get_final_loop_state",
       "type": "get_var",
       "position": {
-        "x": 2660,
-        "y": -60
+        "x": 5280.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "get_var",
-        "label": "Get dp.loop_state",
+        "label": "Get deep.loop_state",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
         "inputs": [
@@ -1565,8 +1565,8 @@
       "id": "get_review_rounds_completed",
       "type": "get",
       "position": {
-        "x": 2660,
-        "y": 80
+        "x": 5280.0,
+        "y": 542.0
       },
       "data": {
         "nodeType": "get",
@@ -1612,8 +1612,8 @@
       "id": "render_input",
       "type": "make_object",
       "position": {
-        "x": 2660,
-        "y": -20
+        "x": 5280.0,
+        "y": 790.0
       },
       "data": {
         "nodeType": "make_object",
@@ -1685,8 +1685,8 @@
       "id": "render",
       "type": "subflow",
       "position": {
-        "x": 3040,
-        "y": -140
+        "x": 5720.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "subflow",
@@ -1737,8 +1737,8 @@
       "id": "get_report_markdown",
       "type": "get",
       "position": {
-        "x": 3380,
-        "y": -520
+        "x": 6160.0,
+        "y": -744.0
       },
       "data": {
         "nodeType": "get",
@@ -1784,8 +1784,8 @@
       "id": "get_manifest",
       "type": "get",
       "position": {
-        "x": 3380,
-        "y": -400
+        "x": 6160.0,
+        "y": -496.0
       },
       "data": {
         "nodeType": "get",
@@ -1831,8 +1831,8 @@
       "id": "get_source_ledger",
       "type": "get",
       "position": {
-        "x": 3380,
-        "y": -280
+        "x": 6160.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "get",
@@ -1878,8 +1878,8 @@
       "id": "get_claim_matrix",
       "type": "get",
       "position": {
-        "x": 3380,
-        "y": -160
+        "x": 6160.0,
+        "y": 568.0
       },
       "data": {
         "nodeType": "get",
@@ -1925,8 +1925,8 @@
       "id": "get_iteration_log",
       "type": "get",
       "position": {
-        "x": 3380,
-        "y": -40
+        "x": 6160.0,
+        "y": 816.0
       },
       "data": {
         "nodeType": "get",
@@ -1972,8 +1972,8 @@
       "id": "get_warnings",
       "type": "get",
       "position": {
-        "x": 3380,
-        "y": 80
+        "x": 6160.0,
+        "y": 1064.0
       },
       "data": {
         "nodeType": "get",
@@ -2019,8 +2019,8 @@
       "id": "get_model_export_status",
       "type": "get",
       "position": {
-        "x": 3380,
-        "y": 200
+        "x": 6160.0,
+        "y": 1312.0
       },
       "data": {
         "nodeType": "get",
@@ -2066,12 +2066,12 @@
       "id": "get_export_timestamp",
       "type": "get_var",
       "position": {
-        "x": 3380,
-        "y": 300
+        "x": 6600.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "get_var",
-        "label": "Get dp.export_timestamp",
+        "label": "Get deep.export_timestamp",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
         "inputs": [
@@ -2108,8 +2108,8 @@
       "id": "path_vars",
       "type": "make_object",
       "position": {
-        "x": 3380,
-        "y": 380
+        "x": 6600.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "make_object",
@@ -2146,8 +2146,8 @@
       "id": "path_md",
       "type": "string_template",
       "position": {
-        "x": 3700,
-        "y": -520
+        "x": 7040.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "string_template",
@@ -2187,8 +2187,8 @@
       "id": "path_pdf",
       "type": "string_template",
       "position": {
-        "x": 3700,
-        "y": -400
+        "x": 7480.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "string_template",
@@ -2228,8 +2228,8 @@
       "id": "path_docx",
       "type": "string_template",
       "position": {
-        "x": 3700,
-        "y": -280
+        "x": 7920.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "string_template",
@@ -2269,8 +2269,8 @@
       "id": "path_manifest",
       "type": "string_template",
       "position": {
-        "x": 3700,
-        "y": -160
+        "x": 10120.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "string_template",
@@ -2310,8 +2310,8 @@
       "id": "path_sources",
       "type": "string_template",
       "position": {
-        "x": 3700,
-        "y": -40
+        "x": 8360.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "string_template",
@@ -2351,8 +2351,8 @@
       "id": "path_claims",
       "type": "string_template",
       "position": {
-        "x": 3700,
-        "y": 80
+        "x": 8800.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "string_template",
@@ -2392,8 +2392,8 @@
       "id": "path_iterations",
       "type": "string_template",
       "position": {
-        "x": 3700,
-        "y": 200
+        "x": 9240.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "string_template",
@@ -2433,8 +2433,8 @@
       "id": "path_warnings",
       "type": "string_template",
       "position": {
-        "x": 3700,
-        "y": 320
+        "x": 9680.0,
+        "y": -222.0
       },
       "data": {
         "nodeType": "string_template",
@@ -2474,8 +2474,8 @@
       "id": "sources_json",
       "type": "stringify_json",
       "position": {
-        "x": 3700,
-        "y": 460
+        "x": 8360.0,
+        "y": 222.0
       },
       "data": {
         "nodeType": "stringify_json",
@@ -2515,8 +2515,8 @@
       "id": "claims_json",
       "type": "stringify_json",
       "position": {
-        "x": 3700,
-        "y": 580
+        "x": 8800.0,
+        "y": 222.0
       },
       "data": {
         "nodeType": "stringify_json",
@@ -2556,8 +2556,8 @@
       "id": "iterations_json",
       "type": "stringify_json",
       "position": {
-        "x": 3700,
-        "y": 700
+        "x": 9240.0,
+        "y": 222.0
       },
       "data": {
         "nodeType": "stringify_json",
@@ -2597,8 +2597,8 @@
       "id": "warnings_json",
       "type": "stringify_json",
       "position": {
-        "x": 3700,
-        "y": 820
+        "x": 9680.0,
+        "y": 222.0
       },
       "data": {
         "nodeType": "stringify_json",
@@ -2638,8 +2638,8 @@
       "id": "write_md",
       "type": "write_file",
       "position": {
-        "x": 4080,
-        "y": -520
+        "x": 7040.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "write_file",
@@ -2691,8 +2691,8 @@
       "id": "write_pdf",
       "type": "write_pdf",
       "position": {
-        "x": 4360,
-        "y": -400
+        "x": 7480.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "write_pdf",
@@ -2759,8 +2759,8 @@
       "id": "write_docx",
       "type": "write_docx",
       "position": {
-        "x": 4640,
-        "y": -280
+        "x": 7920.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "write_docx",
@@ -2827,8 +2827,8 @@
       "id": "write_sources",
       "type": "write_file",
       "position": {
-        "x": 4920,
-        "y": -40
+        "x": 8360.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "write_file",
@@ -2880,8 +2880,8 @@
       "id": "write_claims",
       "type": "write_file",
       "position": {
-        "x": 5200,
-        "y": 80
+        "x": 8800.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "write_file",
@@ -2933,8 +2933,8 @@
       "id": "write_iterations",
       "type": "write_file",
       "position": {
-        "x": 5480,
-        "y": 200
+        "x": 9240.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "write_file",
@@ -2986,8 +2986,8 @@
       "id": "write_warnings",
       "type": "write_file",
       "position": {
-        "x": 5760,
-        "y": 320
+        "x": 9680.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "write_file",
@@ -3039,8 +3039,8 @@
       "id": "post_export_manifest",
       "type": "make_object",
       "position": {
-        "x": 6040,
-        "y": -120
+        "x": 10120.0,
+        "y": 222.0
       },
       "data": {
         "nodeType": "make_object",
@@ -3152,8 +3152,8 @@
       "id": "manifest_json",
       "type": "stringify_json",
       "position": {
-        "x": 6040,
-        "y": 120
+        "x": 10120.0,
+        "y": 834.0
       },
       "data": {
         "nodeType": "stringify_json",
@@ -3193,8 +3193,8 @@
       "id": "write_manifest",
       "type": "write_file",
       "position": {
-        "x": 6320,
-        "y": -160
+        "x": 10120.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "write_file",
@@ -3243,11 +3243,239 @@
       "outputs": []
     },
     {
+      "id": "import_md",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 10560.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .md artifact",
+        "icon": "&#x2B07;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "text/markdown"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "import_pdf",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 11000.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .pdf artifact",
+        "icon": "&#x2B07;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "application/pdf"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "import_docx",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 11440.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .docx artifact",
+        "icon": "&#x2B07;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 6660,
-        "y": 0
+        "x": 11880.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -3363,219 +3591,6 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
-    },
-    {
-      "id": "import_md",
-      "type": "import_workspace_file",
-      "position": {
-        "x": 4980,
-        "y": -560
-      },
-      "data": {
-        "nodeType": "import_workspace_file",
-        "label": "Register .md artifact",
-        "icon": "&#x2B07;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "file_path",
-            "label": "file_path",
-            "type": "workspace_file"
-          },
-          {
-            "id": "content_type",
-            "label": "content_type",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "artifact",
-            "label": "artifact",
-            "type": "artifact"
-          },
-          {
-            "id": "artifact_ref",
-            "label": "artifact_ref",
-            "type": "artifact"
-          },
-          {
-            "id": "artifact_id",
-            "label": "artifact_id",
-            "type": "string"
-          },
-          {
-            "id": "content_type",
-            "label": "content_type",
-            "type": "string"
-          },
-          {
-            "id": "size_bytes",
-            "label": "size_bytes",
-            "type": "number"
-          },
-          {
-            "id": "source_path",
-            "label": "source_path",
-            "type": "workspace_file"
-          }
-        ],
-        "pinDefaults": {
-          "content_type": "text/markdown"
-        }
-      }
-    },
-    {
-      "id": "import_pdf",
-      "type": "import_workspace_file",
-      "position": {
-        "x": 4980,
-        "y": -420
-      },
-      "data": {
-        "nodeType": "import_workspace_file",
-        "label": "Register .pdf artifact",
-        "icon": "&#x2B07;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "file_path",
-            "label": "file_path",
-            "type": "workspace_file"
-          },
-          {
-            "id": "content_type",
-            "label": "content_type",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "artifact",
-            "label": "artifact",
-            "type": "artifact"
-          },
-          {
-            "id": "artifact_ref",
-            "label": "artifact_ref",
-            "type": "artifact"
-          },
-          {
-            "id": "artifact_id",
-            "label": "artifact_id",
-            "type": "string"
-          },
-          {
-            "id": "content_type",
-            "label": "content_type",
-            "type": "string"
-          },
-          {
-            "id": "size_bytes",
-            "label": "size_bytes",
-            "type": "number"
-          },
-          {
-            "id": "source_path",
-            "label": "source_path",
-            "type": "workspace_file"
-          }
-        ],
-        "pinDefaults": {
-          "content_type": "application/pdf"
-        }
-      }
-    },
-    {
-      "id": "import_docx",
-      "type": "import_workspace_file",
-      "position": {
-        "x": 4980,
-        "y": -280
-      },
-      "data": {
-        "nodeType": "import_workspace_file",
-        "label": "Register .docx artifact",
-        "icon": "&#x2B07;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "file_path",
-            "label": "file_path",
-            "type": "workspace_file"
-          },
-          {
-            "id": "content_type",
-            "label": "content_type",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "artifact",
-            "label": "artifact",
-            "type": "artifact"
-          },
-          {
-            "id": "artifact_ref",
-            "label": "artifact_ref",
-            "type": "artifact"
-          },
-          {
-            "id": "artifact_id",
-            "label": "artifact_id",
-            "type": "string"
-          },
-          {
-            "id": "content_type",
-            "label": "content_type",
-            "type": "string"
-          },
-          {
-            "id": "size_bytes",
-            "label": "size_bytes",
-            "type": "number"
-          },
-          {
-            "id": "source_path",
-            "label": "source_path",
-            "type": "workspace_file"
-          }
-        ],
-        "pinDefaults": {
-          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        }
-      }
     }
   ],
   "edges": [
@@ -3720,6 +3735,38 @@
       "source": "write_warnings",
       "sourceHandle": "exec-out",
       "target": "write_manifest",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-write_manifest-exec-out-import_md-exec-in",
+      "source": "write_manifest",
+      "sourceHandle": "exec-out",
+      "target": "import_md",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-import_md-exec-out-import_pdf-exec-in",
+      "source": "import_md",
+      "sourceHandle": "exec-out",
+      "target": "import_pdf",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-import_pdf-exec-out-import_docx-exec-in",
+      "source": "import_pdf",
+      "sourceHandle": "exec-out",
+      "target": "import_docx",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-import_docx-exec-out-end-exec-in",
+      "source": "import_docx",
+      "sourceHandle": "exec-out",
+      "target": "end",
       "targetHandle": "exec-in",
       "animated": true
     },
@@ -4484,6 +4531,54 @@
       "animated": false
     },
     {
+      "id": "e-write_md-file_path-import_md-file_path",
+      "source": "write_md",
+      "sourceHandle": "file_path",
+      "target": "import_md",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-write_pdf-file_path-import_pdf-file_path",
+      "source": "write_pdf",
+      "sourceHandle": "file_path",
+      "target": "import_pdf",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-write_docx-file_path-import_docx-file_path",
+      "source": "write_docx",
+      "sourceHandle": "file_path",
+      "target": "import_docx",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-import_md-artifact_id-end-md_artifact_id",
+      "source": "import_md",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "md_artifact_id",
+      "animated": false
+    },
+    {
+      "id": "e-import_pdf-artifact_id-end-pdf_artifact_id",
+      "source": "import_pdf",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "pdf_artifact_id",
+      "animated": false
+    },
+    {
+      "id": "e-import_docx-artifact_id-end-docx_artifact_id",
+      "source": "import_docx",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "docx_artifact_id",
+      "animated": false
+    },
+    {
       "id": "e-get_report_markdown-value-end-response",
       "source": "get_report_markdown",
       "sourceHandle": "value",
@@ -4770,83 +4865,9 @@
       "target": "render_input",
       "targetHandle": "model",
       "animated": false
-    },
-    {
-      "id": "write_manifest.exec-out->import_md.exec-in",
-      "source": "write_manifest",
-      "sourceHandle": "exec-out",
-      "target": "import_md",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "import_md.exec-out->import_pdf.exec-in",
-      "source": "import_md",
-      "sourceHandle": "exec-out",
-      "target": "import_pdf",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "import_pdf.exec-out->import_docx.exec-in",
-      "source": "import_pdf",
-      "sourceHandle": "exec-out",
-      "target": "import_docx",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "import_docx.exec-out->end.exec-in",
-      "source": "import_docx",
-      "sourceHandle": "exec-out",
-      "target": "end",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "write_md.file_path->import_md.file_path",
-      "source": "write_md",
-      "sourceHandle": "file_path",
-      "target": "import_md",
-      "targetHandle": "file_path"
-    },
-    {
-      "id": "write_pdf.file_path->import_pdf.file_path",
-      "source": "write_pdf",
-      "sourceHandle": "file_path",
-      "target": "import_pdf",
-      "targetHandle": "file_path"
-    },
-    {
-      "id": "write_docx.file_path->import_docx.file_path",
-      "source": "write_docx",
-      "sourceHandle": "file_path",
-      "target": "import_docx",
-      "targetHandle": "file_path"
-    },
-    {
-      "id": "import_md.artifact_id->end.md_artifact_id",
-      "source": "import_md",
-      "sourceHandle": "artifact_id",
-      "target": "end",
-      "targetHandle": "md_artifact_id"
-    },
-    {
-      "id": "import_pdf.artifact_id->end.pdf_artifact_id",
-      "source": "import_pdf",
-      "sourceHandle": "artifact_id",
-      "target": "end",
-      "targetHandle": "pdf_artifact_id"
-    },
-    {
-      "id": "import_docx.artifact_id->end.docx_artifact_id",
-      "source": "import_docx",
-      "sourceHandle": "artifact_id",
-      "target": "end",
-      "targetHandle": "docx_artifact_id"
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-13T15:52:45.565933+00:00",
-  "updated_at": "2026-07-13T15:52:45.565933+00:00"
+  "created_at": "2026-07-20T13:28:25.593326+00:00",
+  "updated_at": "2026-07-20T13:28:25.593326+00:00"
 }

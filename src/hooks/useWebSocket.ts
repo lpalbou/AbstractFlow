@@ -24,6 +24,7 @@ import {
 import { normalizeRunInputData, type GatewayRunInputSchema } from '../utils/gatewayInputSchema';
 import { buildDraftRunMetadata, buildPublishedRunMetadata, draftBundleVersion } from '../utils/runLifecycle';
 import { isDraftBundleVersion, type PublishedBundleTarget } from '../utils/workflowBundles';
+import { classifyWait, type WaitInteractivity } from '../utils/waitClassification';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from './useGatewayCapabilities';
 
 // Stable per-tab session id for run context continuity.
@@ -85,6 +86,11 @@ export interface WaitingInfo {
   runId?: string;
   reason?: string;
   details?: Record<string, unknown>;
+  /** What this wait needs from the user (backlog 0138): 'approval'/'prompt'
+   * are interactive; 'park' is a background wait (event/deadline) that must
+   * not interrupt. Computed from the RAW event before the prompt is
+   * defaulted, so placeholder prompts do not misclassify a park. */
+  interactivity?: WaitInteractivity;
 }
 
 type ResumePayload = {
@@ -152,6 +158,16 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const setAutoApproveForSession = useCallback((sessionId: string, enabled: boolean) => {
     const sid = typeof sessionId === 'string' ? sessionId.trim() : '';
     if (!sid) return;
+    // Sync the ref immediately: the auto-approve check on incoming waits
+    // reads the REF, and the state->ref effect only runs after the next
+    // render. For a REVOKE (backlog 0138) that gap fails dangerous — a wait
+    // arriving right after the click would still auto-approve.
+    {
+      const next = new Set(autoApproveSessionsRef.current);
+      if (enabled) next.add(sid);
+      else next.delete(sid);
+      autoApproveSessionsRef.current = next;
+    }
     setAutoApproveSessions((prev) => {
       const next = new Set(prev);
       if (enabled) next.add(sid);
@@ -426,6 +442,17 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setIsPaused(false);
           waitingRef.current = true;
           pausedRef.current = false;
+          const waitDetails =
+            event.details && typeof event.details === 'object' ? (event.details as Record<string, unknown>) : undefined;
+          // Classify from the RAW event (event.prompt is undefined for a bare
+          // park; classifying after defaulting to 'Please respond:' would
+          // misread a park as a prompt).
+          const interactivity: WaitInteractivity = classifyWait({
+            reason,
+            details: waitDetails,
+            prompt: typeof event.prompt === 'string' ? event.prompt : undefined,
+            choices: event.choices,
+          });
           const info: WaitingInfo = {
             prompt: event.prompt || 'Please respond:',
             choices: event.choices || [],
@@ -434,7 +461,8 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
             waitKey: event.wait_key,
             runId: event.runId || undefined,
             reason: reason || undefined,
-            details: event.details && typeof event.details === 'object' ? (event.details as Record<string, unknown>) : undefined,
+            details: waitDetails,
+            interactivity,
           };
           const sid = stableSessionIdRef.current;
           const rootId = info.runId ? runRootByRunIdRef.current.get(info.runId) : null;

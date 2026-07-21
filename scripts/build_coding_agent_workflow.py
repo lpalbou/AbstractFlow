@@ -31,7 +31,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.2.0.flow"
+BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.2.3.flow"
 
 AGENT_INTERFACE = "abstractcode.agent.v1"
 
@@ -189,14 +189,6 @@ def _subflow_node(node_id, label, flow_id, x, y):
                  outputs=[EXEC_OUT, _pin("output", "output", "object")],
                  pin_defaults={"inherit_context": False},
                  extra={"subflowId": flow_id})
-
-
-def _template(node_id, template_text, x, y, var_pins):
-    return _node(node_id, "string_template", "Compose", x, y,
-                 inputs=[_pin("template", "template", "string"),
-                         _pin("vars", "vars", "object")],
-                 outputs=[_pin("result", "result", "string")],
-                 pin_defaults={"template": template_text})
 
 
 def _call_tool(node_id, label, allowed, x, y):
@@ -610,8 +602,9 @@ return {
 
 # Compose the browser_probe tool call for web entrypoints (code's registered
 # tool, agora c2769). require_nonblank stays false: canvas liveness is read
-# from diag by the round policy (advisory on round 0, failing on repeats —
-# the probe blank-check has a known dark-background bias, c2736 caveat).
+# from diag by GATE3 itself — a blank canvas always FAILS (red-team fix
+# 2026-07-17); round_index only shapes the failure wording (round 0 explains
+# the dark-background caveat, repeats say "still blank").
 PROBE_ARGS_CODE = """
 g = gate0_out or {}
 entry = str(g.get("entrypoint") or "")
@@ -809,12 +802,70 @@ return {
 # world-side result — the LLM's opinion of executability never overrides the
 # browser (the v1 defect inverted). Missing artifacts fall back to the
 # deterministic listing so the report always names the delivered files.
+#
+# VERIFIER-DEATH FOLD (memgraph hackathon post-mortem 2026-07-20): a verifier
+# whose agent subrun DIED (LLM effect failure after retries) resumes this run
+# with success=false and NO data — indistinguishable, before this fold, from
+# a verifier that REPORTED failure, except that every gate reads false with
+# an EMPTY failures list. That empty-failures non-verdict burned repair
+# rounds reprompting the builder over nothing and ended runs "failed" over
+# delivered, gate-passing artifacts. A dead verifier is the "cannot verify
+# here" class, not a code defect: fold it into environment_failures (the
+# loop's early-stop lane) carrying the deterministic PASS evidence, and never
+# fabricate either a pass (nothing was verified) or a fixable failure
+# (nothing failed).
 MERGE_VERDICT_CODE = """
-v = verifier_data or {}
+v = verifier_data if isinstance(verifier_data, dict) else {}
 g0 = gate0_out or {}
 g1 = gate1_out or {}
 g3 = gate3_out or {}
 web = bool(g0.get("web_class"))
+# A verifier that RAN always returns the strict-schema keys (all fields are
+# required); a verdict carrying neither gate key is a verifier that DIED or
+# returned nothing parseable — "delivered, not verifiable", never "failed".
+verdict_missing = ("builds" not in v) and ("all_passed" not in v)
+if verdict_missing:
+    env_failures = [str(f) for f in (g3.get("environment_failures") or [])]
+    note = str(verifier_response or "").strip()
+    if verifier_ok is False:
+        cause = "the verifier agent failed before returning a verdict"
+    else:
+        cause = "the verifier returned no parseable verdict"
+    passed_gates = "delivery, integration"
+    if web and bool(g3.get("executes_web")):
+        passed_gates = passed_gates + ", browser probe"
+    env_failures.append(
+        "verification unavailable: " + cause
+        + ((": " + note[:240]) if note else "")
+        + " — deterministic gates (" + passed_gates + ") passed; the artifact is delivered but could not be independently verified here"
+    )
+    entry = str(g0.get("entrypoint") or "")
+    arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])][:5]
+    return {
+        "builds": False,
+        "executes": bool(g3.get("executes_web")) if web else False,
+        "matches": False,
+        "all_passed": False,
+        "failures": [],
+        "environment_failures": env_failures,
+        "warnings": [str(w) for w in (g3.get("warnings") or [])],
+        "build_error": "",
+        "run_error": "",
+        "mismatch": "",
+        "summary": "delivered, verification incomplete: the deterministic gates passed but the LLM verifier died before reporting",
+        "artifacts": arts,
+        "verifier_died": True,
+        "delivered": bool(g0.get("delivery_ok")),
+        "gate_source": ("deterministic+probe" if web else "deterministic") + " (verifier unavailable)",
+        "probe": {"engine": str(g3.get("engine") or ""), "stage": str(g3.get("stage") or ""), "diag": g3.get("diag") or {}} if web else {},
+        "deterministic": {
+            "delivery_ok": bool(g0.get("delivery_ok")),
+            "integration_ok": bool(g1.get("integration_ok")),
+            "web_class": web,
+            "entrypoint": entry,
+            "files_count": len(g0.get("files") or []),
+        },
+    }
 builds = bool(v.get("builds"))
 matches = bool(v.get("matches"))
 failures = v.get("failures") or []
@@ -906,6 +957,17 @@ parts.append("Delivery rules (verified mechanically after every round):")
 parts.append("- Every produced file must live in the run workspace — never /tmp or another directory.")
 parts.append("- For small web builds (games, pages, demos): prefer ONE self-contained entrypoint (index.html with inline script/styles) unless the task explicitly requires multiple files.")
 parts.append("- If you do split files, the entrypoint must actually load every sibling (script src / link href) — an unreferenced file is a delivery failure, not a bonus.")
+# C1 (plan improving-code, 2026-07-21): codex-grade engineering rules. The
+# dead-temporal-ripple defect (0,0,0 samples across all three 0.2.2 runs)
+# came from code that ran WITHOUT error yet computed a constant — the class
+# these rules target. Phrased general-purpose (every coding task), not
+# graph-specific.
+parts.append("")
+parts.append("Engineering rules (a clean run is not enough — the output must be CORRECT):")
+parts.append("- Bound every traversal, recursion, and iteration with an explicit limit (max depth/hops, a per-step cap, a visited set) — an unbounded or accidentally-empty loop is a bug even when it does not crash.")
+parts.append("- Before writing logic over any data structure, VERIFY its actual shape and the DIRECTION of its references (which field points at which; source vs target; parent vs child) by inspecting a real sample — do not assume the direction from the name.")
+parts.append("- Same output for every input is BROKEN even without an error: if a feature is meant to react to its input, its result MUST change when the input changes. Never ship a function whose output is provably constant across the inputs it is supposed to respond to.")
+parts.append("- Self-probe before you finish: actually exercise the code on representative input (run it, or for a web build load it and observe) and confirm the task-named behavior is VISIBLE and VARIES — do not declare done on 'it compiles' or 'it loads'.")
 if completed > 0 and failures:
     parts.append("")
     parts.append("# Previous attempt FAILED these checks — fix EXACTLY these, do not start over:")
@@ -915,7 +977,18 @@ if completed > 0 and failures:
     parts.append("Make the minimal changes that resolve the specific failures above, then stop.")
 else:
     parts.append("")
-    parts.append("Write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.")
+    # C2 (plan improving-code, 2026-07-21): round-0 data profiling. Findings
+    # ride as a source comment block so the verifier (and the next round) can
+    # see what the input actually looked like — the antidote to logic built
+    # on an assumed data shape/direction.
+    parts.append("First, PROFILE the inputs before writing logic: inspect the real data/assets/parameters the task operates on (shape, ranges, reference direction, edge cases, whether fields are populated), and record what you found as a short comment block at the top of your main source file (a `PROFILE:`/`DATA NOTES:` header). Build the logic to match what you OBSERVED, not what the names suggest.")
+    parts.append("Then write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.")
+# C8 (plan improving-code, 2026-07-21): SELFCHECK.md evidence file. Ranked
+# below the mechanical gates deliberately (a self-report is confabulation-
+# aware, not proof) — it makes the builder's own verification claims
+# auditable against the deterministic gates + probe.
+parts.append("")
+parts.append("Before finishing, write a SELFCHECK.md in the workspace: for EACH behavior the task named, one line stating how you verified it and the CONCRETE evidence you observed (the command you ran and its output, or the on-screen result and how it VARIED with input) — not 'looks correct'. If you could not verify something, say so plainly. This file is evidence for an independent verifier, so claims without observed evidence are worse than an honest 'unverified'.")
 return "\\n".join(parts)
 """.strip()
 
@@ -965,15 +1038,24 @@ parts.append("")
 parts.append("## Gate 2 - EXECUTES")
 if web:
     parts.append("Already executed world-side by the browser probe (see ground truth above): set executes=false with run_error='decided by browser probe' — the merge substitutes the probe's result. Do NOT attempt to run browser code with execute_command.")
-elif run_cmd:
-    parts.append("Run this command with execute_command and record whether it runs without error: " + run_cmd)
 else:
-    parts.append("Run the program (or its tests / a smoke invocation) with execute_command and capture any traceback/runtime error in run_error.")
+    if run_cmd:
+        parts.append("Run this command with execute_command and record whether it runs without error: " + run_cmd)
+    else:
+        parts.append("Run the program (or its tests / a smoke invocation) with execute_command and capture any traceback/runtime error in run_error.")
+    # Fail-closed applies to BOTH non-web branches: an explicit run_command
+    # that cannot run on this host is exactly the missing-executor class.
     parts.append("FAIL CLOSED: a gate you could not actually execute is NOT a pass. If no executor exists for the artifact class on this host, set executes=false AND add one line to environment_failures[] naming the missing executor. NEVER claim executes=true because a file merely exists or 'loads'.")
     parts.append("environment_failures[] is ONLY for missing executors/runtimes on this host — real crashes, tracebacks and errors from code you DID run go in failures[].")
 parts.append("")
 parts.append("## Gate 3 - MATCHES THE ASK")
 parts.append("Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').")
+# C3 (plan improving-code, 2026-07-21): non-vacuity. The dead-ripple defect
+# passed every structural check — a feature was PRESENT and ran cleanly yet
+# its output never varied. Structure-present is not behavior-correct: the
+# verifier must confirm each task-named feature's output DEPENDS on its
+# input, and treat a provably-constant output as a MATCH FAILURE.
+parts.append("NON-VACUITY (required): for each behavior the task names, confirm its output actually DEPENDS on its input — that the feature reacts, not merely exists. Read SELFCHECK.md if present for the builder's claimed evidence, but do not trust it: check the code path yourself (does the output derive from the input, or is it hard-coded / a constant / an always-empty result?). If a task-named feature's output is provably constant or always-empty across the inputs it is supposed to respond to, that is matches=false with a failures[] line NAMING the mechanism (e.g. 'ripple effect computes the same 0 for every cell because it never reads neighbor state'). A feature that is present but vacuous is a FAILURE, not a pass.")
 parts.append("")
 parts.append("## Verdict")
 parts.append("Set all_passed=true ONLY if builds AND executes AND matches are all true AND environment_failures is empty. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.")
@@ -983,9 +1065,46 @@ return "\\n".join(parts)
 
 # Fold the verifier verdict into the next loop state (specific failures ride;
 # environment failures ride SEPARATELY so the loop can stop early on them).
+#
+# VERIFY-SUBFLOW-DEATH FOLD (memgraph hackathon post-mortem 2026-07-20): the
+# gates run itself can DIE mid-verification (its structured-verdict LLM_CALL
+# is a direct effect of that run — three failed attempts terminal-fail it).
+# A host that resumes this parent then delivers {success: false, error} with
+# NO verdict key. Before this fold, that empty verdict read as all-gates-
+# false with an EMPTY failures list: the builder was reprompted over nothing
+# and the final report claimed gate failures no gate ever reported. Missing
+# verdict = verification-lane outage — fold it into environment_failures so
+# the loop stops honestly. Never all_passed=true (nothing was verified);
+# never a fixable failure (nothing failed); the final report's terminal
+# workspace listing supplies the delivered/artifact evidence this run-level
+# fold cannot see.
 NEXT_STATE_CODE = """
-verdict = verifier or {}
+verdict = verifier if isinstance(verifier, dict) else {}
 next_round = int(round_index or 0) + 1
+verdict_missing = ("builds" not in verdict) and ("all_passed" not in verdict)
+if verdict_missing:
+    meta = verify_meta if isinstance(verify_meta, dict) else {}
+    err = str(meta.get("error") or "the verification subflow returned no verdict")
+    env_line = "verification unavailable: the verification subflow failed before returning a verdict: " + err[:300]
+    synth = {
+        "builds": False,
+        "executes": False,
+        "matches": False,
+        "all_passed": False,
+        "failures": [],
+        "environment_failures": [env_line],
+        "summary": "the verification subflow failed before returning a verdict; the build round finished but is unverified",
+        "artifacts": [],
+        "verifier_died": True,
+        "gate_source": "none (verification subflow failed)",
+    }
+    return {
+        "rounds_completed": next_round,
+        "all_passed": False,
+        "failures": [],
+        "environment_failures": [env_line],
+        "last_verdict": synth,
+    }
 all_passed = bool(verdict.get("all_passed"))
 failures = verdict.get("failures") or []
 if not isinstance(failures, list):
@@ -1009,26 +1128,84 @@ return {
 }
 """.strip()
 
-# Final report assembly from the last verdict + loop state.
+# Compose the terminal workspace listing call: delivery ground truth for the
+# final report, INDEPENDENT of the verifier lane (post-mortem 2026-07-20: a
+# dead verifier must not erase the fact that the artifact exists — the
+# listing either shows files or it does not).
+FINAL_LISTING_ARGS_CODE = """
+ws = str(workspace_root or "").strip()
+return {
+    "name": "list_files",
+    "arguments": {
+        "directory_path": ws if ws else ".",
+        "recursive": True,
+        "include_hidden": False,
+        "head_limit": None,
+    },
+    "call_id": "final-delivery-listing",
+}
+""".strip()
+
+# Final report assembly from the last verdict + loop state + the terminal
+# workspace listing. Three honest terminal states, strictly separated
+# (delivered != verified != passed):
+#   PASSED    — every gate verified true (all_passed).
+#   DELIVERED, NOT VERIFIABLE — artifact present, no fixable failure was ever
+#               reported, but verification could not complete here (missing
+#               executor OR a verifier that died — the same "cannot verify
+#               here" class). success=true, passed stays false.
+#   STOPPED   — fixable gate failures remain (or nothing was delivered).
 FINAL_REPORT_CODE = """
 state = loop_state or {}
 verdict = state.get("last_verdict") or {}
 rounds = int(state.get("rounds_completed", 0) or 0)
 passed = bool(state.get("all_passed"))
+fixable = [str(f) for f in (state.get("failures") or [])]
+env_failures = [str(f) for f in (state.get("environment_failures") or [])]
+verifier_died = bool(verdict.get("verifier_died"))
+# Terminal delivery ground truth: parse the final listing the way G0 does.
+text = str(final_listing or "")
+files = []
+if bool(final_listing_ok):
+    for ln in text.split("\\n")[1:]:
+        if not ln.startswith("  "):
+            continue
+        s = ln.strip()
+        if not s or s.endswith("/"):
+            continue
+        if s.endswith(" bytes)") or s.endswith(" byte)"):
+            cut = s.rfind(" (")
+            if cut > 0:
+                s = s[:cut]
+        files.append(s)
+det = verdict.get("deterministic") or {}
+delivered = len(files) > 0 or bool(det.get("delivery_ok"))
+unverified_only = (not passed) and delivered and len(fixable) == 0 and (len(env_failures) > 0 or verifier_died)
+success = passed or unverified_only
 lines = []
 lines.append("# Coding agent result")
 lines.append("")
-lines.append("Status: " + ("PASSED all gates" if passed else "STOPPED with open gate failures"))
+if passed:
+    lines.append("Status: PASSED all gates")
+elif unverified_only:
+    lines.append("Status: DELIVERED — NOT VERIFIABLE HERE (the artifact is present and no gate reported a code failure, but independent verification could not complete in this environment)")
+else:
+    lines.append("Status: STOPPED with open gate failures")
 lines.append("Rounds used: " + str(rounds))
 lines.append("")
 lines.append("Gate verdict (last round):")
 lines.append("- builds: " + str(bool(verdict.get("builds"))))
 lines.append("- executes: " + str(bool(verdict.get("executes"))))
 lines.append("- matches: " + str(bool(verdict.get("matches"))))
+if verifier_died:
+    lines.append("- verifier: DIED before reporting (builds/matches above are UNVERIFIED, not failed)")
 # Name WHERE the produced files live (verifier-observed, workspace-relative)
 # so the report is self-sufficient on every host — the operator should never
-# need a second agent to FIND the artifact (code seat ask, 2026-07-16).
+# need a second agent to FIND the artifact (code seat ask, 2026-07-16). When
+# the verifier died the terminal listing supplies the paths instead.
 arts = [str(a).strip() for a in (verdict.get("artifacts") or []) if str(a).strip()]
+if not arts and files:
+    arts = files[:5]
 if arts:
     lines.append("")
     lines.append("Artifacts (paths relative to the run workspace root):")
@@ -1036,8 +1213,7 @@ if arts:
         lines.append("- " + a)
 else:
     lines.append("")
-    lines.append("Artifacts: none observed by the verifier (#FALLBACK: report cannot name the produced file paths)")
-env_failures = [str(f) for f in (state.get("environment_failures") or [])]
+    lines.append("Artifacts: none observed (#FALLBACK: report cannot name the produced file paths)")
 warnings = [str(w) for w in (verdict.get("warnings") or [])]
 if warnings:
     lines.append("")
@@ -1045,7 +1221,6 @@ if warnings:
     for w in warnings:
         lines.append("- " + w)
 if not passed:
-    fixable = [str(f) for f in (state.get("failures") or [])]
     if fixable:
         lines.append("")
         lines.append("Open failures:")
@@ -1053,7 +1228,7 @@ if not passed:
             lines.append("- " + f)
     if env_failures:
         lines.append("")
-        lines.append("Not verifiable in this environment (missing executor — not a code defect; the loop stops instead of burning repair rounds):")
+        lines.append("Not verifiable in this environment (missing executor or dead verifier — not a code defect; the loop stops instead of burning repair rounds):")
         for f in env_failures:
             lines.append("- " + f)
 if verdict.get("summary"):
@@ -1062,10 +1237,12 @@ if verdict.get("summary"):
 return {
     "report_markdown": "\\n".join(lines),
     "passed": passed,
+    "delivered": delivered,
+    "success": success,
     "rounds_used": rounds,
     "gate_verdict": verdict,
     "artifacts": arts,
-    "open_failures": (state.get("failures") or []) + env_failures,
+    "open_failures": fixable + env_failures,
 }
 """.strip()
 
@@ -1094,8 +1271,13 @@ def build_verifier_subflow() -> dict[str, Any]:
         "coding-verify-gates", "coding-verify-gates",
         "Verification gates for coding runs: deterministic delivery + web-integration checks over list_files/read_file ground truth run first (no LLM), then a browser_probe execution gate for web entrypoints (fail-closed: missing executors are environment failures, never passes), then the independent verifier agent for builds/matches. Returns a structured verdict with fixable failures separated from environment failures. Reusable as a subflow.",
     )
+    # Layout (operator directive 2026-07-20): exec spine left-to-right in one
+    # lane at y=0 on a 380px column pitch; fail-fast verdict set_vars ride an
+    # upper lane (y=-220); pure gate/compose helpers sit in rows below their
+    # consumers (y=400, overflow y=700). Box model: 300 wide,
+    # 90 + 26*max(data-ins, data-outs) tall, >=60px gaps (audited).
     flow["nodes"] = [
-        _node("start", "on_flow_start", "Verify request", -1400, 0,
+        _node("start", "on_flow_start", "Verify request", -2000, 0,
               outputs=[EXEC_OUT,
                        _pin("request", "request", "string"),
                        _pin("workspace_root", "workspace_root", "string"),
@@ -1106,52 +1288,52 @@ def build_verifier_subflow() -> dict[str, Any]:
                        _pin("model", "model", "model")],
               pin_defaults={"build_command": "", "run_command": "", "round_index": 0}),
         # --- G0/G1: deterministic gates (no LLM) ---
-        _code_node("listing_args", "Compose listing call", LISTING_ARGS_CODE, -1400, 220,
+        _code_node("listing_args", "Compose listing call", LISTING_ARGS_CODE, -2000, 400,
                    [_pin("workspace_root", "workspace_root", "string")]),
-        _call_tool("list_call", "G0: list workspace", ["list_files"], -1160, 0),
-        _code_node("gate0", "G0: delivery + classify", GATE0_CODE, -1160, 220,
+        _call_tool("list_call", "G0: list workspace", ["list_files"], -1620, 0),
+        _code_node("gate0", "G0: delivery + classify", GATE0_CODE, -1620, 400,
                    [_pin("listing", "listing", "any"),
                     _pin("listing_ok", "listing_ok", "boolean")]),
-        _code_node("entry_args", "Compose entrypoint read", ENTRY_ARGS_CODE, -940, 220,
+        _code_node("entry_args", "Compose entrypoint read", ENTRY_ARGS_CODE, -1240, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("workspace_root", "workspace_root", "string")]),
-        _call_tool("entry_read", "G1: read entrypoint", ["read_file"], -920, 0),
-        _code_node("gate1", "G1: integration check", GATE1_CODE, -720, 220,
+        _call_tool("entry_read", "G1: read entrypoint", ["read_file"], -1240, 0),
+        _code_node("gate1", "G1: integration check", GATE1_CODE, -860, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("entry_content", "entry_content", "any"),
                     _pin("entry_ok", "entry_ok", "boolean")]),
-        _code_node("script_args", "Compose script read", SCRIPT_ARGS_CODE, -820, 420,
+        _code_node("script_args", "Compose script read", SCRIPT_ARGS_CODE, -480, 400,
                    [_pin("gate1_out", "gate1_out", "object"),
                     _pin("workspace_root", "workspace_root", "string")]),
-        _call_tool("script_read", "G4: read main script", ["read_file"], -800, 0),
-        _code_node("gate4", "G4: orphan functions", GATE4_CODE, -600, 560,
+        _call_tool("script_read", "G4: read main script", ["read_file"], -860, 0),
+        _code_node("gate4", "G4: orphan functions", GATE4_CODE, -480, 700,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("entry_content", "entry_content", "any"),
                     _pin("script_content", "script_content", "any"),
                     _pin("script_ok", "script_ok", "boolean")]),
-        _code_node("det", "Deterministic verdict", DET_VERDICT_CODE, -720, 420,
+        _code_node("det", "Deterministic verdict", DET_VERDICT_CODE, -100, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("gate1_out", "gate1_out", "object"),
                     _pin("gate4_out", "gate4_out", "object")]),
-        _if("if_det", "Deterministic gates failed?", -680, 0),
-        _set_var("set_verdict_det", "Record deterministic verdict", "vg.verdict", -440, -180),
+        _if("if_det", "Deterministic gates failed?", -480, 0),
+        _set_var("set_verdict_det", "Record deterministic verdict", "vg.verdict", -100, -220),
         # --- G3 (web): world-side execution via browser_probe ---
-        _if("if_web", "Web entrypoint?", -440, 60),
-        _code_node("probe_args", "Compose probe call", PROBE_ARGS_CODE, -440, 420,
+        _if("if_web", "Web entrypoint?", -100, 0),
+        _code_node("probe_args", "Compose probe call", PROBE_ARGS_CODE, 280, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("workspace_root", "workspace_root", "string")]),
-        _call_tool("probe_call", "G3: browser probe", ["browser_probe"], -220, 60),
-        _code_node("gate3", "G3: read probe result", GATE3_CODE, -220, 420,
+        _call_tool("probe_call", "G3: browser probe", ["browser_probe"], 280, 0),
+        _code_node("gate3", "G3: read probe result", GATE3_CODE, 660, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("probe_raw", "probe_raw", "object"),
                     _pin("round_index", "round_index", "number")]),
-        _if("if_probe", "Probe found errors?", 0, 60),
-        _code_node("probe_verdict", "Probe-failure verdict", PROBE_VERDICT_CODE, 0, 420,
+        _if("if_probe", "Probe found errors?", 660, 0),
+        _code_node("probe_verdict", "Probe-failure verdict", PROBE_VERDICT_CODE, 1040, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("gate3_out", "gate3_out", "object")]),
-        _set_var("set_verdict_probe", "Record probe verdict", "vg.verdict", 240, -60),
+        _set_var("set_verdict_probe", "Record probe verdict", "vg.verdict", 1040, -220),
         # --- LLM verifier: builds / matches (executes only for non-web) ---
-        _code_node("verifier_prompt", "Compose verifier task", VERIFIER_PROMPT_CODE, 240, 420,
+        _code_node("verifier_prompt", "Compose verifier task", VERIFIER_PROMPT_CODE, 1040, 700,
                    [_pin("request", "request", "string"),
                     _pin("workspace_root", "workspace_root", "string"),
                     _pin("build_command", "build_command", "string"),
@@ -1159,7 +1341,7 @@ def build_verifier_subflow() -> dict[str, Any]:
                     _pin("gate0_out", "gate0_out", "object"),
                     _pin("gate3_out", "gate3_out", "object")],
                    output_type="string"),
-        _agent_node("verifier", "Independent verifier", 240, 120,
+        _agent_node("verifier", "Independent verifier", 1040, 0,
                     # max_output_tokens bounds the verdict call (agent precision 4,
                     # c2847: review was the one unbounded call type in their lane) —
                     # the verdict is compact JSON; tool-loop turns are unaffected.
@@ -1172,15 +1354,21 @@ def build_verifier_subflow() -> dict[str, Any]:
                         "resp_schema": VERIFIER_SCHEMA,
                         "max_output_tokens": 2000,
                     }),
-        _code_node("merge", "Merge verdict", MERGE_VERDICT_CODE, 560, 420,
+        _code_node("merge", "Merge verdict", MERGE_VERDICT_CODE, 1420, 400,
                    [_pin("verifier_data", "verifier_data", "object"),
+                    # Death detection inputs: the agent node's success pin goes
+                    # false (and data stays empty) when the verifier subrun DIED
+                    # instead of reporting; response then carries the runtime's
+                    # synthesized human-readable failure line.
+                    _pin("verifier_ok", "verifier_ok", "boolean"),
+                    _pin("verifier_response", "verifier_response", "string"),
                     _pin("gate0_out", "gate0_out", "object"),
                     _pin("gate1_out", "gate1_out", "object"),
                     _pin("gate3_out", "gate3_out", "object")]),
-        _set_var("set_verdict_llm", "Record merged verdict", "vg.verdict", 560, 120),
+        _set_var("set_verdict_llm", "Record merged verdict", "vg.verdict", 1420, 0),
         # --- shared tail ---
-        _get_var("read_verdict", "vg.verdict", {}, 800, 220),
-        _node("end", "on_flow_end", "Verdict", 940, 0,
+        _get_var("read_verdict", "vg.verdict", {}, 1800, 400),
+        _node("end", "on_flow_end", "Verdict", 1800, 0,
               inputs=[EXEC_IN, _pin("verdict", "verdict", "object")]),
     ]
     flow["edges"] = [
@@ -1252,6 +1440,8 @@ def build_verifier_subflow() -> dict[str, Any]:
         _edge("start", "provider", "verifier", "provider"),
         _edge("start", "model", "verifier", "model"),
         _edge("verifier", "data", "merge", "verifier_data"),
+        _edge("verifier", "success", "merge", "verifier_ok"),
+        _edge("verifier", "response", "merge", "verifier_response"),
         _edge("gate0", "output", "merge", "gate0_out"),
         _edge("gate1", "output", "merge", "gate1_out"),
         _edge("gate3", "output", "merge", "gate3_out"),
@@ -1270,8 +1460,12 @@ def build_root_flow() -> dict[str, Any]:
         # not the chat-agent prompt/response contract of abstractcode.agent.v1.
         ["abstractcode.coding.v1"],
     )
+    # Layout: the loop spine runs left-to-right at y=0 (start -> rounds ->
+    # builder -> verify -> set_state); prompt helpers ride above the lane
+    # (y=-300), loop-condition + verdict helpers below it (y=420); the
+    # after-loop report band is its own lane at y=900 ending in the flow end.
     flow["nodes"] = [
-        _node("start", "on_flow_start", "Coding request", -900, 0,
+        _node("start", "on_flow_start", "Coding request", -1500, 0,
               outputs=[EXEC_OUT,
                        _pin("request", "request", "string"),
                        _pin("workspace_root", "workspace_root", "string"),
@@ -1284,20 +1478,20 @@ def build_root_flow() -> dict[str, Any]:
                             "build_command": "", "run_command": "", "max_rounds": 3}),
         # Loop state var (rounds_completed / all_passed / failures / last_verdict).
         _get_var("get_loop_state", "cg.loop_state",
-                 {"rounds_completed": 0, "all_passed": False, "failures": []}, -560, 200),
-        _code_node("loop_condition", "Should keep building?", LOOP_CONDITION_CODE, -560, 340,
+                 {"rounds_completed": 0, "all_passed": False, "failures": []}, -1500, 420),
+        _code_node("loop_condition", "Should keep building?", LOOP_CONDITION_CODE, -1120, 420,
                    [_pin("loop_state", "loop_state", "object"),
                     _pin("max_rounds", "max_rounds", "number")]),
-        _while("rounds", "Verify-gated build rounds", -560, 500),
+        _while("rounds", "Verify-gated build rounds", -1120, 0),
         # --- loop body ---
         _get_var("get_state_body", "cg.loop_state",
-                 {"rounds_completed": 0, "all_passed": False, "failures": []}, -220, -120),
-        _code_node("builder_prompt", "Compose builder prompt", BUILDER_PROMPT_CODE, -220, 60,
+                 {"rounds_completed": 0, "all_passed": False, "failures": []}, -1120, -300),
+        _code_node("builder_prompt", "Compose builder prompt", BUILDER_PROMPT_CODE, -740, -300,
                    [_pin("request", "request", "string"),
                     _pin("workspace_root", "workspace_root", "string"),
                     _pin("loop_state", "loop_state", "object")],
                    output_type="string"),
-        _agent_node("builder", "Builder agent", 140, -40,
+        _agent_node("builder", "Builder agent", -740, 0,
                     extra_inputs=[_pin("workspace_root", "workspace_root", "string")],
                     pin_defaults={
                         "system": "You are a senior coding agent. You create and edit real files in the workspace to satisfy the task, using the file and shell tools. Prefer minimal, runnable code. When given specific prior failures, fix exactly those.",
@@ -1309,27 +1503,50 @@ def build_root_flow() -> dict[str, Any]:
                      [("request", "string"), ("workspace_root", "string"),
                       ("build_command", "string"), ("run_command", "string"),
                       ("round_index", "number"),
-                      ("provider", "provider_text"), ("model", "model")], 500, 160),
-        _subflow_node("verify", "Run gates", "coding-verify-gates", 500, -40),
-        _get("get_verdict", "verdict", {}, 860, 120),
-        _code_node("next_state", "Record verdict", NEXT_STATE_CODE, 860, 280,
+                      ("provider", "provider_text"), ("model", "model")], -360, 420),
+        _subflow_node("verify", "Run gates", "coding-verify-gates", -360, 0),
+        _get("get_verdict", "verdict", {}, 20, 420),
+        _code_node("next_state", "Record verdict", NEXT_STATE_CODE, 400, 420,
                    [_pin("verifier", "verifier", "object"),
+                    # Death-detection input: on a dead gates run the subflow's
+                    # `output` pin is None while the runtime-provided
+                    # `child_output` key carries {success: false, error} —
+                    # the honest cause for the environment fold.
+                    _pin("verify_meta", "verify_meta", "object"),
                     _pin("round_index", "round_index", "number")]),
-        _set_var("set_state", "Persist loop state", "cg.loop_state", 860, 460),
-        # --- after loop ---
+        _set_var("set_state", "Persist loop state", "cg.loop_state", 20, 0),
+        # --- after loop (report band) ---
+        # Terminal delivery listing: verifier-independent ground truth for the
+        # report's delivered/artifact claims (list_files is read-only safe).
+        _code_node("final_args", "Compose final listing call", FINAL_LISTING_ARGS_CODE, -1880, 900,
+                   [_pin("workspace_root", "workspace_root", "string")]),
+        _call_tool("final_list", "Final delivery listing", ["list_files"], -1880, 620),
         _get_var("get_final_state", "cg.loop_state",
-                 {"rounds_completed": 0, "all_passed": False, "failures": []}, -200, 640),
-        _code_node("final_report", "Assemble result", FINAL_REPORT_CODE, 160, 640,
-                   [_pin("loop_state", "loop_state", "object")]),
-        _get("get_report_md", "report_markdown", "", 520, 560),
-        _get("get_passed", "passed", False, 520, 660),
-        _get("get_rounds", "rounds_used", 0, 520, 760),
-        _get("get_open_failures", "open_failures", [], 520, 860),
-        _get("get_artifacts", "artifacts", [], 520, 960),
-        _node("end", "on_flow_end", "Finish", 900, 640,
+                 {"rounds_completed": 0, "all_passed": False, "failures": []}, -1500, 900),
+        _code_node("final_report", "Assemble result", FINAL_REPORT_CODE, -1120, 900,
+                   [_pin("loop_state", "loop_state", "object"),
+                    _pin("final_listing", "final_listing", "any"),
+                    _pin("final_listing_ok", "final_listing_ok", "boolean")]),
+        _get("get_report_md", "report_markdown", "", -740, 900),
+        _get("get_passed", "passed", False, -360, 900),
+        _get("get_rounds", "rounds_used", 0, 20, 900),
+        _get("get_open_failures", "open_failures", [], 400, 900),
+        _get("get_artifacts", "artifacts", [], 780, 900),
+        _get("get_delivered", "delivered", False, 1160, 420),
+        _get("get_success", "success", False, 1160, 620),
+        _node("end", "on_flow_end", "Finish", 1160, 900,
               inputs=[EXEC_IN,
                       _pin("report", "report", "string"),
+                      # Strict verification result: true only when every gate
+                      # was verified true by a real verdict.
                       _pin("passed", "passed", "boolean"),
+                      # Artifact presence at terminal time (delivered !=
+                      # verified != passed — post-mortem 2026-07-20).
+                      _pin("delivered", "delivered", "boolean"),
+                      # Delivered-aware terminal success: passed, OR delivered
+                      # with nothing fixable left and only a verification-lane
+                      # outage (env/verifier) standing.
+                      _pin("success", "success", "boolean"),
                       _pin("rounds_used", "rounds_used", "number"),
                       _pin("open_failures", "open_failures", "array"),
                       _pin("artifacts", "artifacts", "array")]),
@@ -1340,7 +1557,8 @@ def build_root_flow() -> dict[str, Any]:
         _edge("rounds", "loop", "builder", "exec-in", animated=True),
         _edge("builder", "exec-out", "verify", "exec-in", animated=True),
         _edge("verify", "exec-out", "set_state", "exec-in", animated=True),
-        _edge("rounds", "done", "end", "exec-in", animated=True),
+        _edge("rounds", "done", "final_list", "exec-in", animated=True),
+        _edge("final_list", "exec-out", "end", "exec-in", animated=True),
         # loop condition (re-evaluated each iteration from the var)
         _edge("get_loop_state", "value", "loop_condition", "loop_state"),
         _edge("start", "max_rounds", "loop_condition", "max_rounds"),
@@ -1361,8 +1579,8 @@ def build_root_flow() -> dict[str, Any]:
         _edge("start", "workspace_root", "verify_input", "workspace_root"),
         _edge("start", "build_command", "verify_input", "build_command"),
         _edge("start", "run_command", "verify_input", "run_command"),
-        # advisory-vs-failing probe policy needs the round number (blank-canvas
-        # bias caveat, c2736): round 0 warns, repeats fail.
+        # GATE3's blank-canvas failure wording needs the round number (round 0
+        # explains the dark-background caveat, repeats say "still blank").
         _edge("rounds", "index", "verify_input", "round_index"),
         _edge("start", "provider", "verify_input", "provider"),
         _edge("start", "model", "verify_input", "model"),
@@ -1370,17 +1588,31 @@ def build_root_flow() -> dict[str, Any]:
         # verdict -> next state -> persist (output object carries {verdict})
         _edge("verify", "output", "get_verdict", "object"),
         _edge("get_verdict", "value", "next_state", "verifier"),
+        # `child_output` is a RUNTIME-PROVIDED subflow output key (the whole
+        # child terminal payload, {success:false, error} on a dead child). It
+        # is deliberately NOT declared as a pin: declared extra output pins
+        # enter the compiler's output_pins remap, which would overwrite the
+        # runtime-set value with result.get("child_output") = None.
+        _edge("verify", "child_output", "next_state", "verify_meta"),
         _edge("rounds", "index", "next_state", "round_index"),
         _edge("next_state", "output", "set_state", "value"),
         # final report
+        _edge("start", "workspace_root", "final_args", "workspace_root"),
+        _edge("final_args", "output", "final_list", "tool_call"),
+        _edge("final_list", "result", "final_report", "final_listing"),
+        _edge("final_list", "success", "final_report", "final_listing_ok"),
         _edge("get_final_state", "value", "final_report", "loop_state"),
         _edge("final_report", "output", "get_report_md", "object"),
         _edge("final_report", "output", "get_passed", "object"),
         _edge("final_report", "output", "get_rounds", "object"),
         _edge("final_report", "output", "get_open_failures", "object"),
         _edge("final_report", "output", "get_artifacts", "object"),
+        _edge("final_report", "output", "get_delivered", "object"),
+        _edge("final_report", "output", "get_success", "object"),
         _edge("get_report_md", "value", "end", "report"),
         _edge("get_passed", "value", "end", "passed"),
+        _edge("get_delivered", "value", "end", "delivered"),
+        _edge("get_success", "value", "end", "success"),
         _edge("get_rounds", "value", "end", "rounds_used"),
         _edge("get_open_failures", "value", "end", "open_failures"),
         _edge("get_artifacts", "value", "end", "artifacts"),
@@ -1411,8 +1643,11 @@ def build_chat_entrypoint_flow() -> dict[str, Any]:
         "Chat-agent entrypoint for the coding-agent pipeline: takes a plain prompt (abstractcode.agent.v1), runs the verify-gated build loop in the session workspace with inferred gates (no explicit build/run commands — the verifier executes what it can and reports honestly), and returns the build report as the response.",
         ["abstractcode.agent.v1"],
     )
+    # Layout: three-node exec spine at y=0 (start -> build -> end); the input
+    # mapper and the result accessors sit in a helper row below (y=320), with
+    # the meta fold one row further down (y=640) under its four sources.
     flow["nodes"] = [
-        _node("start", "on_flow_start", "Chat request", -600, 0,
+        _node("start", "on_flow_start", "Chat request", -1140, 0,
               outputs=[EXEC_OUT,
                        _pin("prompt", "prompt", "string"),
                        _pin("provider", "provider", "provider_text"),
@@ -1424,17 +1659,25 @@ def build_chat_entrypoint_flow() -> dict[str, Any]:
         # apply: session workspace, inferred gates, 3 rounds.
         _make_object("map_input",
                      [("request", "string"),
-                      ("provider", "provider_text"), ("model", "model")], -260, 160),
-        _subflow_node("build", "Verify-gated coding run", "coding-agent", -260, -40),
-        _get("get_report", "report", "", 100, 60),
-        _get("get_passed", "passed", False, 100, 200),
-        _get("get_rounds", "rounds_used", 0, 100, 340),
-        _get("get_failures", "open_failures", [], 100, 480),
-        _get("get_artifacts", "artifacts", [], 100, 620),
+                      ("provider", "provider_text"), ("model", "model")], -1140, 320),
+        _subflow_node("build", "Verify-gated coding run", "coding-agent", -760, 0),
+        _get("get_report", "report", "", -380, 320),
+        _get("get_passed", "passed", False, 0, 320),
+        _get("get_rounds", "rounds_used", 0, 380, 320),
+        _get("get_failures", "open_failures", [], 760, 320),
+        _get("get_artifacts", "artifacts", [], 1140, 320),
+        # Delivered-aware terminal success (post-mortem 2026-07-20): the chat
+        # contract's `success` reflects "the run did its job as far as this
+        # environment allows" — passed, OR delivered with only a verification-
+        # lane outage standing. Strict verification stays visible as
+        # meta.passed; delivered != verified != passed.
+        _get("get_delivered", "delivered", False, -380, 640),
+        _get("get_success", "success", False, 0, 640),
         _make_object("meta_obj",
-                     [("passed", "boolean"), ("rounds_used", "number"),
-                      ("open_failures", "array"), ("artifacts", "array")], 460, 340),
-        _node("end", "on_flow_end", "Finish", 820, 60,
+                     [("passed", "boolean"), ("delivered", "boolean"),
+                      ("rounds_used", "number"),
+                      ("open_failures", "array"), ("artifacts", "array")], 380, 640),
+        _node("end", "on_flow_end", "Finish", 760, 0,
               inputs=[EXEC_IN,
                       _pin("response", "response", "string"),
                       _pin("success", "success", "boolean"),
@@ -1454,12 +1697,15 @@ def build_chat_entrypoint_flow() -> dict[str, Any]:
         _edge("build", "output", "get_rounds", "object"),
         _edge("build", "output", "get_failures", "object"),
         _edge("build", "output", "get_artifacts", "object"),
+        _edge("build", "output", "get_delivered", "object"),
+        _edge("build", "output", "get_success", "object"),
         _edge("get_passed", "value", "meta_obj", "passed"),
+        _edge("get_delivered", "value", "meta_obj", "delivered"),
         _edge("get_rounds", "value", "meta_obj", "rounds_used"),
         _edge("get_failures", "value", "meta_obj", "open_failures"),
         _edge("get_artifacts", "value", "meta_obj", "artifacts"),
         _edge("get_report", "value", "end", "response"),
-        _edge("get_passed", "value", "end", "success"),
+        _edge("get_success", "value", "end", "success"),
         _edge("meta_obj", "result", "end", "meta"),
     ]
     return flow
@@ -1472,9 +1718,15 @@ def write_json(path: Path, data: dict[str, Any]) -> None:
 def _validate_edges(flow: dict[str, Any]) -> list[str]:
     """Every edge endpoint must resolve to a node + declared pin — except a
     `code` node's source handles, which are runtime-resolved dict keys (the
-    deep-research idiom, e.g. loop_condition.condition -> while.condition)."""
+    deep-research idiom, e.g. loop_condition.condition -> while.condition),
+    and a `subflow` node's `child_output` handle, which the runtime always
+    writes into node outputs (the child's whole terminal payload) but which
+    must NOT be declared as a pin: declared extra output pins enter the
+    compiler's output_pins remap and would be overwritten with
+    result.get("child_output") = None."""
     ids = {n["id"] for n in flow["nodes"]}
     code_ids = {n["id"] for n in flow["nodes"] if n["data"].get("nodeType") == "code"}
+    subflow_ids = {n["id"] for n in flow["nodes"] if n["data"].get("nodeType") == "subflow"}
     pinmap = {
         n["id"]: (
             {p["id"] for p in (n["data"].get("inputs") or [])},
@@ -1487,7 +1739,11 @@ def _validate_edges(flow: dict[str, Any]) -> list[str]:
         if e["source"] not in ids or e["target"] not in ids:
             problems.append(f"{e['id']}: unknown endpoint")
             continue
-        if e["source"] not in code_ids and e["sourceHandle"] not in pinmap[e["source"]][1]:
+        if (
+            e["source"] not in code_ids
+            and not (e["source"] in subflow_ids and e["sourceHandle"] == "child_output")
+            and e["sourceHandle"] not in pinmap[e["source"]][1]
+        ):
             problems.append(f"{e['id']}: no out-pin {e['source']}.{e['sourceHandle']}")
         if e["targetHandle"] not in pinmap[e["target"]][0]:
             problems.append(f"{e['id']}: no in-pin {e['target']}.{e['targetHandle']}")
@@ -1524,14 +1780,39 @@ def main() -> int:
         # 0.2.0 = deterministic-gates redesign (R-Type post-mortem, agora
         # c2725/c2735/c2736): delivery + integration gates before the LLM,
         # fail-closed executes, environment-vs-fixable failure split.
-        bundle_version="0.2.0",
+        # 0.2.1 = adversary wave (operator directive 2026-07-20): fail-closed
+        # + environment_failures verifier guidance now also emitted when an
+        # explicit run_command is set (was no-run-command-only); readable
+        # left-to-right layout, zero node overlaps. VERSION BUMP is
+        # load-bearing: bundle versions are immutable by sha, a gateway that
+        # loaded 0.2.0 refuses a same-version re-publish.
+        # 0.2.2 = verifier-death fail-soft (operator order 2026-07-21, laurent
+        # dm#96): a DIED LLM verifier (infra failure) after the deterministic
+        # gates all PASSED no longer fabricates a failure — it folds into the
+        # environment_failures "delivered, not verifiable" terminal, the run
+        # reports delivered≠verified≠passed, and terminal success reflects a
+        # present artifact instead of lying rc=1. delivered/success end pins
+        # added. (Fully effective under the gateway runner; abstractcode exec
+        # needs the parent-resume half — filed to the code seat.)
+        # 0.2.3 = semantic prompt wave (operator order 2026-07-21, laurent
+        # dm#111-112; plan/improving-code.md C1/C2/C3/C8), targeting the
+        # dead-temporal-ripple defect (0,0,0 samples across all three 0.2.2
+        # runs — code that ran cleanly yet computed a constant): C1 builder
+        # engineering rules (bound traversals; verify reference DIRECTION
+        # before logic; same-output-for-every-input=broken; self-probe before
+        # finishing), C2 round-0 data profiling (findings as a source comment
+        # block), C3 verifier NON-VACUITY (task-named output must DEPEND on
+        # input; provably-constant ⇒ matches:false naming the mechanism),
+        # C8 SELFCHECK.md evidence file. Prompt-only; 0.2.2 stays in the
+        # catalog for 1:1 A/B (dm#101 rule).
+        bundle_version="0.2.3",
         flows_dir=FLOWS_DIR,
         entrypoints=["coding-agent", "coder"],
         default_entrypoint="coding-agent",
         metadata={
             "family": "coding-agent",
             "purpose": "recursive coding agent with deterministic delivery/integration gates + independent build/execute/match verification (fail-closed executes) and specific-failure reprompting; dual-interface (coding.v1 strict entrypoint + agent.v1 chat entrypoint with inferred gates)",
-            "outputs": ["report", "passed", "rounds_used", "open_failures"],
+            "outputs": ["report", "passed", "delivered", "success", "rounds_used", "open_failures", "artifacts"],
         },
     )
     print(f"Wrote {len(flows)} flows to {FLOWS_DIR}")

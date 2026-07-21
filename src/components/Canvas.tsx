@@ -288,6 +288,8 @@ function CanvasBody() {
     copySelectionToClipboard,
     pasteClipboard,
     duplicateSelection,
+    undo,
+    redo,
   } = useFlowStore();
 
   // Condensed execution view: only nodes linked by execution edges (and those
@@ -430,6 +432,33 @@ function CanvasBody() {
       if (!mod) return;
       const key = (e.key || '').toLowerCase();
 
+      // Undo/redo (table-stakes editor shortcut, backlog 0127): Ctrl/Cmd+Z
+      // undoes; Shift+Ctrl/Cmd+Z (and Ctrl+Y) redoes. Guarded by the same
+      // editable-target/text-selection checks as the clipboard shortcuts, so
+      // it never fights the browser's field-level undo while typing.
+      if (key === 'z') {
+        e.preventDefault();
+        const store = useFlowStore.getState();
+        if (e.shiftKey) {
+          if (store.future.length > 0) {
+            redo();
+            toast.success('Redo');
+          }
+        } else if (store.past.length > 0) {
+          undo();
+          toast.success('Undo');
+        }
+        return;
+      }
+      if (!e.shiftKey && key === 'y') {
+        e.preventDefault();
+        if (useFlowStore.getState().future.length > 0) {
+          redo();
+          toast.success('Redo');
+        }
+        return;
+      }
+
       if (!e.shiftKey && key === 'c') {
         const n = copySelectionToClipboard();
         if (n > 0) {
@@ -463,7 +492,7 @@ function CanvasBody() {
     return () => {
       window.removeEventListener('keydown', onKeyDown, opts);
     };
-  }, [copySelectionToClipboard, pasteClipboard, duplicateSelection]);
+  }, [copySelectionToClipboard, pasteClipboard, duplicateSelection, undo, redo]);
 
   useEffect(() => {
     const opts = { capture: true } as const;

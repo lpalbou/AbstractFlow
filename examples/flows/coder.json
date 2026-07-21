@@ -10,7 +10,7 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -600,
+        "x": -1140,
         "y": 0
       },
       "data": {
@@ -60,8 +60,8 @@
       "id": "map_input",
       "type": "make_object",
       "position": {
-        "x": -260,
-        "y": 160
+        "x": -1140,
+        "y": 320
       },
       "data": {
         "nodeType": "make_object",
@@ -103,8 +103,8 @@
       "id": "build",
       "type": "subflow",
       "position": {
-        "x": -260,
-        "y": -40
+        "x": -760,
+        "y": 0
       },
       "data": {
         "nodeType": "subflow",
@@ -155,8 +155,8 @@
       "id": "get_report",
       "type": "get",
       "position": {
-        "x": 100,
-        "y": 60
+        "x": -380,
+        "y": 320
       },
       "data": {
         "nodeType": "get",
@@ -202,8 +202,8 @@
       "id": "get_passed",
       "type": "get",
       "position": {
-        "x": 100,
-        "y": 200
+        "x": 0,
+        "y": 320
       },
       "data": {
         "nodeType": "get",
@@ -249,8 +249,8 @@
       "id": "get_rounds",
       "type": "get",
       "position": {
-        "x": 100,
-        "y": 340
+        "x": 380,
+        "y": 320
       },
       "data": {
         "nodeType": "get",
@@ -296,8 +296,8 @@
       "id": "get_failures",
       "type": "get",
       "position": {
-        "x": 100,
-        "y": 480
+        "x": 760,
+        "y": 320
       },
       "data": {
         "nodeType": "get",
@@ -343,8 +343,8 @@
       "id": "get_artifacts",
       "type": "get",
       "position": {
-        "x": 100,
-        "y": 620
+        "x": 1140,
+        "y": 320
       },
       "data": {
         "nodeType": "get",
@@ -387,11 +387,105 @@
       "outputs": []
     },
     {
+      "id": "get_delivered",
+      "type": "get",
+      "position": {
+        "x": -380,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get delivered",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "delivered",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_success",
+      "type": "get",
+      "position": {
+        "x": 0,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get success",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "success",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "meta_obj",
       "type": "make_object",
       "position": {
-        "x": 460,
-        "y": 340
+        "x": 380,
+        "y": 640
       },
       "data": {
         "nodeType": "make_object",
@@ -402,6 +496,11 @@
           {
             "id": "passed",
             "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
             "type": "boolean"
           },
           {
@@ -438,8 +537,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 820,
-        "y": 60
+        "x": 760,
+        "y": 0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -567,11 +666,35 @@
       "animated": false
     },
     {
+      "id": "e-build-output-get_delivered-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_delivered",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_success-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_success",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
       "id": "e-get_passed-value-meta_obj-passed",
       "source": "get_passed",
       "sourceHandle": "value",
       "target": "meta_obj",
       "targetHandle": "passed",
+      "animated": false
+    },
+    {
+      "id": "e-get_delivered-value-meta_obj-delivered",
+      "source": "get_delivered",
+      "sourceHandle": "value",
+      "target": "meta_obj",
+      "targetHandle": "delivered",
       "animated": false
     },
     {
@@ -607,8 +730,8 @@
       "animated": false
     },
     {
-      "id": "e-get_passed-value-end-success",
-      "source": "get_passed",
+      "id": "e-get_success-value-end-success",
+      "source": "get_success",
       "sourceHandle": "value",
       "target": "end",
       "targetHandle": "success",
@@ -624,6 +747,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-17T19:33:12.575437+00:00",
-  "updated_at": "2026-07-17T19:33:12.575437+00:00"
+  "created_at": "2026-07-21T12:26:23.600355+00:00",
+  "updated_at": "2026-07-21T12:26:23.600355+00:00"
 }

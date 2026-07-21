@@ -61,7 +61,7 @@ from __future__ import annotations
 
 import wf_common as W
 
-BUNDLE_VERSION = "0.1.0"
+BUNDLE_VERSION = "0.1.1"
 
 ANSWER_SYSTEM = (
     "You are a careful expert answering a question. Answer directly and "
@@ -144,32 +144,36 @@ def build_consensus() -> dict:
             W.pin("provider_b", "provider_b", "provider_text"),
             W.pin("model_b", "model_b", "model"),
         ], -900, 0, pin_defaults={"prompt": "", "provider_b": "", "model_b": ""}),
-        W.llm_node("answer_a", "Independent answer A", -560, -160,
+        # Layout grid (2026-07-20 clean-layout pass): exec spine at y=0 with a
+        # 400px x-pitch (box ~300 wide -> 100px gaps); pure helpers in one row
+        # at y=380 under their consumer (llm boxes are ~272 tall -> >=108px
+        # vertical gap). Same grid across the whole meta family.
+        W.llm_node("answer_a", "Independent answer A", -500, 0,
                    pin_defaults={"system": ANSWER_SYSTEM, "temperature": 0.3}),
-        W.llm_node("answer_b", "Independent answer B", -220, -160,
+        W.llm_node("answer_b", "Independent answer B", -100, 0,
                    pin_defaults={"system": ANSWER_SYSTEM, "temperature": 0.9}),
         # Route: answer_b uses (provider_b, model_b) when BOTH set, else the
         # primary pair. Pure code node: no exec pins, pulled on demand.
-        W.code_node("pick_b", "Second substrate", PICK_B_CODE, -560, 200,
+        W.code_node("pick_b", "Second substrate", PICK_B_CODE, -100, 380,
                     [W.pin("provider", "provider", "provider_text"),
                      W.pin("model", "model", "model"),
                      W.pin("provider_b", "provider_b", "provider_text"),
                      W.pin("model_b", "model_b", "model")]),
-        W.code_node("reconcile_prompt", "Compose reconciliation", RECONCILE_PROMPT_CODE, 60, 120,
+        W.code_node("reconcile_prompt", "Compose reconciliation", RECONCILE_PROMPT_CODE, 300, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("answer_a", "answer_a", "string"),
                      W.pin("answer_b", "answer_b", "string")],
                     output_type="string"),
-        W.llm_node("reconcile", "Reconcile to consensus", 340, -160,
+        W.llm_node("reconcile", "Reconcile to consensus", 300, 0,
                    pin_defaults={"system": "You are the reconciler: you merge independent expert answers into one final answer, resolving disagreements by your own reasoning.", "temperature": 0.2}),
-        W.code_node("meta", "Collect stages", CONSENSUS_META_CODE, 620, 120,
+        W.code_node("meta", "Collect stages", CONSENSUS_META_CODE, 700, 380,
                     [W.pin("answer_a", "answer_a", "string"),
                      W.pin("answer_b", "answer_b", "string")]),
         W.end_node("Final answer", [
             W.pin("response", "response", "string"),
             W.pin("success", "success", "boolean"),
             W.pin("meta", "meta", "object"),
-        ], 900, -160),
+        ], 700, 0),
     ]
     flow["edges"] = [
         W.edge("start", "exec-out", "answer_a", "exec-in", animated=True),
@@ -273,29 +277,31 @@ def build_debate() -> dict:
             # deliberation stages stay tool-free by design.
             W.pin("tools", "tools", "array"),
         ], -900, 0, pin_defaults={"prompt": ""}),
-        W.llm_node("propose", "Propose answer", -560, -160,
+        # Layout grid: exec spine at y=0, 400px x-pitch; pure prompt composers
+        # at y=380 directly under the llm stage they feed.
+        W.llm_node("propose", "Propose answer", -500, 0,
                    pin_defaults={"system": ANSWER_SYSTEM, "temperature": 0.3}),
-        W.code_node("challenge_prompt", "Compose attack brief", CHALLENGE_PROMPT_CODE, -280, 120,
+        W.code_node("challenge_prompt", "Compose attack brief", CHALLENGE_PROMPT_CODE, -100, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("answer", "answer", "string")],
                     output_type="string"),
-        W.llm_node("challenge", "Adversarial challenge", -220, -160,
+        W.llm_node("challenge", "Adversarial challenge", -100, 0,
                    pin_defaults={"system": "You are a rigorous adversarial reviewer. You attack answers to expose real flaws; you never invent objections against sound reasoning.", "temperature": 0.7}),
-        W.code_node("defend_prompt", "Compose defense brief", DEFEND_PROMPT_CODE, 60, 120,
+        W.code_node("defend_prompt", "Compose defense brief", DEFEND_PROMPT_CODE, 300, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("answer", "answer", "string"),
                      W.pin("challenge", "challenge", "string")],
                     output_type="string"),
-        W.llm_node("defend", "Defend and finalize", 340, -160,
+        W.llm_node("defend", "Defend and finalize", 300, 0,
                    pin_defaults={"system": "You finalize answers after adversarial review: concede what the challenger got right, rebut what they got wrong, and write the definitive answer.", "temperature": 0.2}),
-        W.code_node("meta", "Collect stages", DEBATE_META_CODE, 620, 120,
+        W.code_node("meta", "Collect stages", DEBATE_META_CODE, 700, 380,
                     [W.pin("proposal", "proposal", "string"),
                      W.pin("challenge", "challenge", "string")]),
         W.end_node("Final answer", [
             W.pin("response", "response", "string"),
             W.pin("success", "success", "boolean"),
             W.pin("meta", "meta", "object"),
-        ], 900, -160),
+        ], 700, 0),
     ]
     flow["edges"] = [
         W.edge("start", "exec-out", "propose", "exec-in", animated=True),
@@ -400,29 +406,31 @@ def build_reflect() -> dict:
             # deliberation stages stay tool-free by design.
             W.pin("tools", "tools", "array"),
         ], -900, 0, pin_defaults={"prompt": ""}),
-        W.llm_node("draft", "Draft answer", -560, -160,
+        # Layout grid: exec spine at y=0, 400px x-pitch; pure prompt composers
+        # at y=380 directly under the llm stage they feed.
+        W.llm_node("draft", "Draft answer", -500, 0,
                    pin_defaults={"system": ANSWER_SYSTEM, "temperature": 0.3}),
-        W.code_node("introspect_prompt", "Compose introspection", INTROSPECT_PROMPT_CODE, -280, 120,
+        W.code_node("introspect_prompt", "Compose introspection", INTROSPECT_PROMPT_CODE, -100, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("draft", "draft", "string")],
                     output_type="string"),
-        W.llm_node("introspect", "Introspection pass", -220, -160,
+        W.llm_node("introspect", "Introspection pass", -100, 0,
                    pin_defaults={"system": "You interrogate your own drafts with ruthless honesty: assumptions, weakest steps, missed cases, overconfidence. You are writing notes to yourself, not to a reader.", "temperature": 0.5}),
-        W.code_node("revise_prompt", "Compose revision", REVISE_PROMPT_CODE, 60, 120,
+        W.code_node("revise_prompt", "Compose revision", REVISE_PROMPT_CODE, 300, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("draft", "draft", "string"),
                      W.pin("introspection", "introspection", "string")],
                     output_type="string"),
-        W.llm_node("revise", "Revised final answer", 340, -160,
+        W.llm_node("revise", "Revised final answer", 300, 0,
                    pin_defaults={"system": "You produce final answers that fold self-critique in: fixed where wrong, kept where sound, confidence stated honestly.", "temperature": 0.2}),
-        W.code_node("meta", "Collect stages", REFLECT_META_CODE, 620, 120,
+        W.code_node("meta", "Collect stages", REFLECT_META_CODE, 700, 380,
                     [W.pin("draft", "draft", "string"),
                      W.pin("introspection", "introspection", "string")]),
         W.end_node("Final answer", [
             W.pin("response", "response", "string"),
             W.pin("success", "success", "boolean"),
             W.pin("meta", "meta", "object"),
-        ], 900, -160),
+        ], 700, 0),
     ]
     flow["edges"] = [
         W.edge("start", "exec-out", "draft", "exec-in", animated=True),
@@ -568,35 +576,37 @@ def build_perspectives() -> dict:
             # deliberately unwired — every llm node pins tools=[] so the
             # deliberation stages stay tool-free by design.
             W.pin("tools", "tools", "array"),
-        ], -1240, 0, pin_defaults={"prompt": ""}),
-        W.code_node("angles_prompt", "Compose angle brief", ANGLES_PROMPT_CODE, -960, 120,
+        ], -1300, 0, pin_defaults={"prompt": ""}),
+        # Layout grid: exec spine at y=0, 400px x-pitch; pure prompt composers
+        # at y=380 directly under the llm stage they feed.
+        W.code_node("angles_prompt", "Compose angle brief", ANGLES_PROMPT_CODE, -900, 380,
                     [W.pin("prompt", "prompt", "string")], output_type="string"),
-        W.llm_node("decompose", "Pick 3 angles", -900, -160,
+        W.llm_node("decompose", "Pick 3 angles", -900, 0,
                    pin_defaults={"system": "You choose the most revealing, mutually distinct angles to examine a question from — specific to the question, never generic.", "temperature": 0.4, "resp_schema": ANGLES_SCHEMA}),
-        W.code_node("angle_a_prompt", "Angle 1 brief", ANGLE_PROMPT_CODE, -620, 120,
+        W.code_node("angle_a_prompt", "Angle 1 brief", ANGLE_PROMPT_CODE, -500, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("angles", "angles", "object"),
                      W.pin("index", "index", "number")], output_type="string"),
-        W.code_node("angle_b_prompt", "Angle 2 brief", ANGLE_PROMPT_CODE, -340, 120,
+        W.code_node("angle_b_prompt", "Angle 2 brief", ANGLE_PROMPT_CODE, -100, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("angles", "angles", "object"),
                      W.pin("index", "index", "number")], output_type="string"),
-        W.code_node("angle_c_prompt", "Angle 3 brief", ANGLE_PROMPT_CODE, -60, 120,
+        W.code_node("angle_c_prompt", "Angle 3 brief", ANGLE_PROMPT_CODE, 300, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("angles", "angles", "object"),
                      W.pin("index", "index", "number")], output_type="string"),
-        W.llm_node("view_a", "Angle 1 view", -560, -160, pin_defaults=dict(angle_defaults)),
-        W.llm_node("view_b", "Angle 2 view", -280, -160, pin_defaults=dict(angle_defaults)),
-        W.llm_node("view_c", "Angle 3 view", 0, -160, pin_defaults=dict(angle_defaults)),
-        W.code_node("integrate_prompt", "Compose integration", INTEGRATE_PROMPT_CODE, 220, 120,
+        W.llm_node("view_a", "Angle 1 view", -500, 0, pin_defaults=dict(angle_defaults)),
+        W.llm_node("view_b", "Angle 2 view", -100, 0, pin_defaults=dict(angle_defaults)),
+        W.llm_node("view_c", "Angle 3 view", 300, 0, pin_defaults=dict(angle_defaults)),
+        W.code_node("integrate_prompt", "Compose integration", INTEGRATE_PROMPT_CODE, 700, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("angles", "angles", "object"),
                      W.pin("view_a", "view_a", "string"),
                      W.pin("view_b", "view_b", "string"),
                      W.pin("view_c", "view_c", "string")], output_type="string"),
-        W.llm_node("integrate", "Integrate final answer", 280, -160,
+        W.llm_node("integrate", "Integrate final answer", 700, 0,
                    pin_defaults={"system": "You integrate expert angle-views into one answer: keep agreements, NAME tensions and adjudicate them, conclude clearly.", "temperature": 0.2}),
-        W.code_node("meta", "Collect stages", PERSPECTIVES_META_CODE, 560, 120,
+        W.code_node("meta", "Collect stages", PERSPECTIVES_META_CODE, 1100, 380,
                     [W.pin("angles", "angles", "object"),
                      W.pin("view_a", "view_a", "string"),
                      W.pin("view_b", "view_b", "string"),
@@ -605,7 +615,7 @@ def build_perspectives() -> dict:
             W.pin("response", "response", "string"),
             W.pin("success", "success", "boolean"),
             W.pin("meta", "meta", "object"),
-        ], 840, -160),
+        ], 1100, 0),
     ]
     # Per-angle index pin defaults (static 0/1/2 — three parallel brief nodes).
     for n in flow["nodes"]:
@@ -748,29 +758,31 @@ def build_deliberate() -> dict:
             # deliberation stages stay tool-free by design.
             W.pin("tools", "tools", "array"),
         ], -900, 0, pin_defaults={"prompt": ""}),
-        W.code_node("plan_prompt", "Compose planning brief", PLAN_PROMPT_CODE, -620, 120,
+        # Layout grid: exec spine at y=0, 400px x-pitch; pure prompt composers
+        # at y=380 directly under the llm stage they feed.
+        W.code_node("plan_prompt", "Compose planning brief", PLAN_PROMPT_CODE, -500, 380,
                     [W.pin("prompt", "prompt", "string")], output_type="string"),
-        W.llm_node("plan", "Absorb and plan", -560, -160,
+        W.llm_node("plan", "Absorb and plan", -500, 0,
                    pin_defaults={"system": "You plan how to answer before answering: restate the ask, lay out the steps, name the traps, write the checklist. You never answer in the planning pass.", "temperature": 0.3}),
-        W.code_node("execute_prompt", "Compose execution", EXECUTE_PROMPT_CODE, -280, 120,
+        W.code_node("execute_prompt", "Compose execution", EXECUTE_PROMPT_CODE, -100, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("plan", "plan", "string")], output_type="string"),
-        W.llm_node("execute", "Answer following plan", -220, -160,
+        W.llm_node("execute", "Answer following plan", -100, 0,
                    pin_defaults={"system": ANSWER_SYSTEM, "temperature": 0.3}),
-        W.code_node("verify_prompt", "Compose verification", VERIFY_PROMPT_CODE, 60, 120,
+        W.code_node("verify_prompt", "Compose verification", VERIFY_PROMPT_CODE, 300, 380,
                     [W.pin("prompt", "prompt", "string"),
                      W.pin("plan", "plan", "string"),
                      W.pin("answer", "answer", "string")], output_type="string"),
-        W.llm_node("verify", "Verify against checklist", 340, -160,
+        W.llm_node("verify", "Verify against checklist", 300, 0,
                    pin_defaults={"system": "You verify answers against their plan's checklist and pitfalls, fix what fails, and output only the final answer.", "temperature": 0.2}),
-        W.code_node("meta", "Collect stages", DELIBERATE_META_CODE, 620, 120,
+        W.code_node("meta", "Collect stages", DELIBERATE_META_CODE, 700, 380,
                     [W.pin("plan", "plan", "string"),
                      W.pin("first_answer", "first_answer", "string")]),
         W.end_node("Final answer", [
             W.pin("response", "response", "string"),
             W.pin("success", "success", "boolean"),
             W.pin("meta", "meta", "object"),
-        ], 900, -160),
+        ], 700, 0),
     ]
     flow["edges"] = [
         W.edge("start", "exec-out", "plan", "exec-in", animated=True),
@@ -832,14 +844,16 @@ def build_baseline() -> dict:
             # deliberation stages stay tool-free by design.
             W.pin("tools", "tools", "array"),
         ], -600, 0, pin_defaults={"prompt": ""}),
-        W.llm_node("answer", "Direct answer", -220, -120,
+        # Layout grid: exec spine at y=0, 400px x-pitch; the pure meta stub
+        # sits at y=380 under the end node it feeds.
+        W.llm_node("answer", "Direct answer", -200, 0,
                    pin_defaults={"system": ANSWER_SYSTEM, "temperature": 0.3}),
-        W.code_node("meta", "Collect stages", BASELINE_META_CODE, 60, 120, []),
+        W.code_node("meta", "Collect stages", BASELINE_META_CODE, 200, 380, []),
         W.end_node("Final answer", [
             W.pin("response", "response", "string"),
             W.pin("success", "success", "boolean"),
             W.pin("meta", "meta", "object"),
-        ], 340, -120),
+        ], 200, 0),
     ]
     flow["edges"] = [
         W.edge("start", "exec-out", "answer", "exec-in", animated=True),

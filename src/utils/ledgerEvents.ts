@@ -104,6 +104,48 @@ function traceUpdateEvent(rec: LedgerRecord, nodeId: string, runId: string): Exe
   };
 }
 
+export interface ToolApprovalResumeMarker {
+  approved: true;
+  auto: boolean;
+}
+
+/**
+ * Tool-approval resume detection (backlog 0138 — approval visibility).
+ *
+ * An approved tool-approval resume used to be suppressed as bookkeeping,
+ * which made Approve All a silent safety bypass: the timeline showed no
+ * trace that a tool call ran without a prompt. The resume ledger record
+ * carries the needed signal end to end:
+ * - `effect.payload.wait_reason === 'user'` (tool approvals park as
+ *   WaitReason.USER; event/job/until resumes are excluded by this),
+ * - the inner resume payload carries a BOOLEAN `approved` — only approval
+ *   resumes send it (ask_user replies send response/text/value instead),
+ * - `auto_approved: true` is stamped exclusively by the client auto-approve
+ *   path, so auto vs manual approval is distinguishable.
+ *
+ * Returns a marker for APPROVED resumes only (denied tool calls never
+ * execute, so there is nothing to audit in the timeline); null otherwise.
+ */
+export function toolApprovalResumeMarker(rec: LedgerRecord): ToolApprovalResumeMarker | null {
+  const effect = rec.effect && typeof rec.effect === 'object' ? rec.effect : null;
+  if (normalizeString(effect?.type) !== 'resume') return null;
+  const resumed =
+    rec.result && typeof rec.result === 'object' ? (rec.result as Record<string, unknown>).resumed === true : false;
+  if (!resumed) return null;
+  const effectPayload = effect ? effect.payload : null;
+  const payload = effectPayload && typeof effectPayload === 'object' && !Array.isArray(effectPayload)
+    ? (effectPayload as Record<string, unknown>)
+    : null;
+  if (!payload) return null;
+  if (normalizeString(payload.wait_reason).toLowerCase() !== 'user') return null;
+  const userPayload = payload.payload && typeof payload.payload === 'object' && !Array.isArray(payload.payload)
+    ? (payload.payload as Record<string, unknown>)
+    : null;
+  if (!userPayload) return null;
+  if (userPayload.approved !== true) return null;
+  return { approved: true, auto: userPayload.auto_approved === true };
+}
+
 function resumePayloadResult(rec: LedgerRecord): Record<string, unknown> | undefined {
   const effect = rec.effect && typeof rec.effect === 'object' ? rec.effect : null;
   if (normalizeString(effect?.type) !== 'resume') return undefined;
@@ -200,6 +242,10 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
 
     const ts = endedAt || startedAt;
     const dur = durationMs(startedAt, endedAt);
+    // Approved tool-approval resumes keep their result suppressed (the
+    // decision payload is not a step output) but must not vanish: the marker
+    // lets the timeline show which tool calls ran with (auto-)approval.
+    const approvalMarker = effType === 'resume' ? toolApprovalResumeMarker(rec) : null;
     events.push({
       type: 'node_complete',
       runId,
@@ -208,6 +254,7 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
       ts,
       result: visibleResumeResult ?? (suppressResult ? undefined : rec.result),
       meta: dur !== undefined ? { duration_ms: Math.round(dur * 100) / 100 } : undefined,
+      approval: approvalMarker ?? undefined,
     });
     openNodes.delete(nodeId);
   } else if (status === 'failed') {

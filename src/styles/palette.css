@@ -743,6 +743,51 @@
   box-shadow: 0 0 8px rgba(255, 176, 0, 0.7);
 }
 
+/* "Waiting for you" badge (backlog 0138): a calm-amber pill that appears in
+   the run-actions group only for interactive waits, so a user who navigated
+   away from the run modal still knows the run needs them. */
+.toolbar-wait-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #ffb000 55%, transparent);
+  background: color-mix(in srgb, #ffb000 16%, var(--bg-primary));
+  color: color-mix(in srgb, #ffb000 88%, var(--text-primary));
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.toolbar-wait-badge:hover {
+  background: color-mix(in srgb, #ffb000 26%, var(--bg-primary));
+  border-color: color-mix(in srgb, #ffb000 75%, transparent);
+}
+
+.toolbar-wait-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ffb000;
+  box-shadow: 0 0 8px rgba(255, 176, 0, 0.8);
+  animation: toolbar-wait-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes toolbar-wait-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar-wait-badge-dot {
+    animation: none;
+  }
+}
+
 /* The gateway connection pill (dot + Connect/Disconnect) is the kit's
    AfTopBarActions cluster now — .af-topbar styles live in ui-kit theme.css. */
 

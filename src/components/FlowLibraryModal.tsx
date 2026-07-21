@@ -400,8 +400,11 @@ export function FlowLibraryModal({
     setInterfacesDraft([]);
   }, [selectedFlowId]);
 
+  // Renaming a READONLY (bundled) flow is allowed: the host handler creates
+  // an editable family copy under the new name (the shipped bundle itself
+  // cannot be mutated). Operator ruling 2026-07-20.
   const beginRename = useCallback(() => {
-    if (!selectedFlow || selectedFlowReadonly) return;
+    if (!selectedFlow) return;
     setIsRenaming(true);
     setRenameDraft(selectedFlow.name || '');
     setIsDeleteConfirm(false);
@@ -410,10 +413,10 @@ export function FlowLibraryModal({
     setIsEditingInterfaces(false);
     setInterfacesDraft([]);
     window.setTimeout(() => searchRef.current?.blur(), 0);
-  }, [selectedFlow, selectedFlowReadonly]);
+  }, [selectedFlow]);
 
   const commitRename = useCallback(async () => {
-    if (!selectedFlow || selectedFlowReadonly) return;
+    if (!selectedFlow) return;
     const next = renameDraft.trim();
     if (!next || next === selectedFlow.name) {
       setIsRenaming(false);
@@ -421,7 +424,7 @@ export function FlowLibraryModal({
     }
     await onRenameFlow(selectedFlow.id, next);
     setIsRenaming(false);
-  }, [onRenameFlow, renameDraft, selectedFlow, selectedFlowReadonly]);
+  }, [onRenameFlow, renameDraft, selectedFlow]);
 
   const beginEditDescription = useCallback(() => {
     if (!selectedFlow || selectedFlowReadonly) return;
@@ -487,6 +490,18 @@ export function FlowLibraryModal({
     if (!selectedFlow) return;
     await onDuplicateFlow(selectedFlow.id);
   }, [onDuplicateFlow, selectedFlow]);
+
+  /** Any inline editor open (rename / description / interfaces). */
+  const isEditing = isRenaming || isEditingDescription || isEditingInterfaces;
+
+  const cancelEdits = useCallback(() => {
+    setIsRenaming(false);
+    setRenameDraft('');
+    setIsEditingDescription(false);
+    setDescriptionDraft('');
+    setIsEditingInterfaces(false);
+    setInterfacesDraft([]);
+  }, []);
 
   const jumpToFlow = useCallback(
     (flowId: string) => {
@@ -840,95 +855,62 @@ export function FlowLibraryModal({
                       {selectedFlowReadonly ? (
                         <div className="flow-library-readonly-note">
                           {selectedFlowBundleTarget
-                            ? 'Bundled workflow family. Load it to run the shipped bundle; it cannot be duplicated as one standalone flow because it has companion subflows.'
-                            : 'Bundled example. Load it as an unsaved draft or duplicate it into Gateway storage to edit.'}
+                            ? 'Bundled workflow family. Load it to run the shipped bundle, or Duplicate/Rename to copy the whole family (subflows included, references remapped) into editable storage.'
+                            : 'Bundled example. Load it as an unsaved draft, or Duplicate/Rename it into Gateway storage to edit.'}
                         </div>
                       ) : null}
                     </>
                   )}
                 </div>
 
-                <div className="flow-library-preview-actions">
-                  {isRenaming || isEditingDescription || isEditingInterfaces ? (
-                    <>
-                      {isRenaming ? (
-                        <button type="button" className="modal-button primary" onClick={commitRename}>
-                          Save Name
-                        </button>
-                      ) : isEditingDescription ? (
-                        <button type="button" className="modal-button primary" onClick={commitDescription}>
-                          Save Description
-                        </button>
-                      ) : (
-                        <button type="button" className="modal-button primary" onClick={commitInterfaces}>
-                          Save Interfaces
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="modal-button cancel"
-                        onClick={() => {
-                          setIsRenaming(false);
-                          setRenameDraft('');
-                          setIsEditingDescription(false);
-                          setDescriptionDraft('');
-                          setIsEditingInterfaces(false);
-                          setInterfacesDraft([]);
-                        }}
-                      >
-                        Cancel
+                {isEditing ? (
+                  <div className="flow-library-preview-actions">
+                    {isRenaming ? (
+                      <button type="button" className="modal-button primary" onClick={commitRename}>
+                        Save Name
                       </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="modal-button primary" onClick={() => onLoadFlow(selectedFlow.id)}>
-                        Load
+                    ) : isEditingDescription ? (
+                      <button type="button" className="modal-button primary" onClick={commitDescription}>
+                        Save Description
                       </button>
-                      <button
-                        type="button"
-                        className="modal-button"
-                        onClick={handleDuplicate}
-                        disabled={selectedFlowBundleTarget}
-                        title={
-                          selectedFlowBundleTarget
-                            ? 'This bundled workflow family must run from its shipped bundle'
-                            : selectedUses.length > 0
-                              ? 'Duplicate flow (references shared subflows — they are not copied)'
-                              : 'Duplicate flow'
-                        }
-                      >
-                        Duplicate
+                    ) : (
+                      <button type="button" className="modal-button primary" onClick={commitInterfaces}>
+                        Save Interfaces
                       </button>
-                      {!selectedFlowReadonly ? (
-                        <button
-                          type="button"
-                          className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
-                          onClick={handleDelete}
-                          title={
-                            isDeleteConfirm
-                              ? 'Click again to confirm delete'
-                              : selectedUsedBy.length > 0
-                                ? `Delete flow — used by ${selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}`
-                                : 'Delete flow'
-                          }
-                        >
-                          {isDeleteConfirm
-                            ? selectedUsedBy.length > 0
-                              ? `Confirm — breaks ${selectedUsedBy.length} parent${selectedUsedBy.length === 1 ? '' : 's'}`
-                              : 'Confirm Delete'
-                            : 'Delete'}
-                        </button>
-                      ) : null}
-                    </>
-                  )}
-                  {isDeleteConfirm && selectedUsedBy.length > 0 ? (
-                    <div className="flow-library-delete-warning">
-                      Deleting breaks the subflow reference in:{' '}
-                      {selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}. Those workflows will fail
-                      to run or publish until re-wired.
-                    </div>
-                  ) : null}
-                </div>
+                    )}
+                    <button type="button" className="modal-button cancel" onClick={cancelEdits}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : !selectedFlowReadonly ? (
+                  <div className="flow-library-preview-actions">
+                    <button
+                      type="button"
+                      className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
+                      onClick={handleDelete}
+                      title={
+                        isDeleteConfirm
+                          ? 'Click again to confirm delete'
+                          : selectedUsedBy.length > 0
+                            ? `Delete flow — used by ${selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}`
+                            : 'Delete flow'
+                      }
+                    >
+                      {isDeleteConfirm
+                        ? selectedUsedBy.length > 0
+                          ? `Confirm — breaks ${selectedUsedBy.length} parent${selectedUsedBy.length === 1 ? '' : 's'}`
+                          : 'Confirm Delete'
+                        : 'Delete'}
+                    </button>
+                    {isDeleteConfirm && selectedUsedBy.length > 0 ? (
+                      <div className="flow-library-delete-warning">
+                        Deleting breaks the subflow reference in:{' '}
+                        {selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}. Those workflows will
+                        fail to run or publish until re-wired.
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             ) : (
               <div className="flow-library-empty">Select a flow to preview.</div>
@@ -936,9 +918,63 @@ export function FlowLibraryModal({
           </div>
         </div>
 
-        <div className="modal-actions">
-          <button className="modal-button cancel" onClick={onClose}>
-            Close
+        {/* Persistent action bar: the primary verbs are ALWAYS visible and
+            enable once a workflow is selected (operator ask 2026-07-20 — the
+            in-preview actions scrolled below the fold on long descriptions). */}
+        <div className="modal-actions flow-library-actions">
+          <button type="button" className="modal-button cancel" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="modal-button"
+            onClick={beginRename}
+            disabled={!selectedFlow || isEditing}
+            title={
+              !selectedFlow
+                ? 'Select a workflow first'
+                : isEditing
+                  ? 'Finish the current edit first'
+                  : selectedFlowReadonly
+                    ? 'Bundled workflows are read-only — renaming creates an editable copy under the new name'
+                    : 'Rename workflow'
+            }
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            className="modal-button"
+            onClick={handleDuplicate}
+            disabled={!selectedFlow || isEditing}
+            title={
+              !selectedFlow
+                ? 'Select a workflow first'
+                : isEditing
+                  ? 'Finish the current edit first'
+                  : selectedFlowReadonly
+                    ? 'Copies the workflow (and its bundled subflows) into editable storage'
+                    : selectedUses.length > 0
+                      ? 'Duplicate workflow (references shared subflows — they are not copied)'
+                      : 'Duplicate workflow'
+            }
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            className="modal-button primary"
+            onClick={() => selectedFlow && onLoadFlow(selectedFlow.id)}
+            disabled={!selectedFlow || isEditing}
+            title={
+              !selectedFlow
+                ? 'Select a workflow first'
+                : isEditing
+                  ? 'Finish the current edit first'
+                  : 'Load workflow into the editor'
+            }
+          >
+            Load
           </button>
         </div>
       </div>

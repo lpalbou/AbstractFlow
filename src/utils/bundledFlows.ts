@@ -24,6 +24,10 @@ const bundledFlowModules = import.meta.glob<VisualFlow>(
     '../../examples/flows/structured-extract.json',
     '../../examples/flows/map-reduce.json',
     '../../examples/flows/co-scientist.json',
+    // co-scientist's professional-figure subflow (2026-07-20): without it in
+    // the catalog the family renders a dangling "diagram-render (missing)"
+    // reference (operator report).
+    '../../examples/flows/diagram-render.json',
     // The meta-intelligence family (operator ask 2026-07-16): five
     // co-orchestrated deliberation patterns, each agent.v1-conformant so it
     // benchmarks 1:1 against an isolated LLM call.
@@ -45,14 +49,14 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // New bundle id (dp- retirement); version lineage continues from
     // deep-research@0.1.5 so ordering reads naturally across the rename.
     bundleId: 'deep-research',
-    bundleVersion: '0.1.6',
-    bundleRef: 'deep-research@0.1.6',
+    bundleVersion: '0.1.7',
+    bundleRef: 'deep-research@0.1.7',
   },
   '81795ea9': {
     flowId: '81795ea9',
     bundleId: 'basic-agent',
-    bundleVersion: '0.0.1',
-    bundleRef: 'basic-agent@0.0.1',
+    bundleVersion: '0.0.2',
+    bundleRef: 'basic-agent@0.0.2',
   },
   'coding-agent': {
     flowId: 'coding-agent',
@@ -60,69 +64,78 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // 0.2.0 = deterministic-gates redesign (R-Type post-mortem): delivery +
     // integration gates before the LLM, browser_probe execution gate for web
     // entrypoints (fail-closed), environment-vs-fixable failure split.
-    bundleVersion: '0.2.0',
-    bundleRef: 'coding-agent@0.2.0',
+    bundleVersion: '0.2.3',
+    bundleRef: 'coding-agent@0.2.3',
   },
   coder: {
     flowId: 'coder',
     bundleId: 'coding-agent',
-    bundleVersion: '0.2.0',
-    bundleRef: 'coding-agent@0.2.0',
+    bundleVersion: '0.2.3',
+    bundleRef: 'coding-agent@0.2.3',
   },
   'co-scientist': {
     flowId: 'co-scientist',
     bundleId: 'co-scientist',
+    // 0.1.8 = quality wave vs the Nature paper: hardened grounding + citation
+    // allowlist, decoration-free generative views, novelty floor + diversity,
+    // structured per-hypothesis protocols, Elo-evolution figure + methodology.
     // 0.1.7 = deep-* subflow rename (grounding via deep-plan/deep-investigate).
-    bundleVersion: '0.1.7',
-    bundleRef: 'co-scientist@0.1.7',
+    bundleVersion: '0.1.16',
+    bundleRef: 'co-scientist@0.1.16',
+  },
+  'diagram-render': {
+    flowId: 'diagram-render',
+    bundleId: 'diagram-render',
+    bundleVersion: '0.2.0',
+    bundleRef: 'diagram-render@0.2.0',
   },
   'adversarial-review': {
     flowId: 'adversarial-review',
     bundleId: 'adversarial-review',
-    bundleVersion: '0.1.0',
-    bundleRef: 'adversarial-review@0.1.0',
+    bundleVersion: '0.1.1',
+    bundleRef: 'adversarial-review@0.1.1',
   },
   'structured-extract': {
     flowId: 'structured-extract',
     bundleId: 'structured-extract',
-    bundleVersion: '0.1.0',
-    bundleRef: 'structured-extract@0.1.0',
+    bundleVersion: '0.1.1',
+    bundleRef: 'structured-extract@0.1.1',
   },
   'map-reduce': {
     flowId: 'map-reduce',
     bundleId: 'map-reduce',
-    bundleVersion: '0.1.0',
-    bundleRef: 'map-reduce@0.1.0',
+    bundleVersion: '0.1.1',
+    bundleRef: 'map-reduce@0.1.1',
   },
   'meta-consensus': {
     flowId: 'meta-consensus',
     bundleId: 'meta-consensus',
-    bundleVersion: '0.1.0',
-    bundleRef: 'meta-consensus@0.1.0',
+    bundleVersion: '0.1.1',
+    bundleRef: 'meta-consensus@0.1.1',
   },
   'meta-debate': {
     flowId: 'meta-debate',
     bundleId: 'meta-debate',
-    bundleVersion: '0.1.0',
-    bundleRef: 'meta-debate@0.1.0',
+    bundleVersion: '0.1.1',
+    bundleRef: 'meta-debate@0.1.1',
   },
   'meta-reflect': {
     flowId: 'meta-reflect',
     bundleId: 'meta-reflect',
-    bundleVersion: '0.1.0',
-    bundleRef: 'meta-reflect@0.1.0',
+    bundleVersion: '0.1.1',
+    bundleRef: 'meta-reflect@0.1.1',
   },
   'meta-perspectives': {
     flowId: 'meta-perspectives',
     bundleId: 'meta-perspectives',
-    bundleVersion: '0.1.0',
-    bundleRef: 'meta-perspectives@0.1.0',
+    bundleVersion: '0.1.1',
+    bundleRef: 'meta-perspectives@0.1.1',
   },
   'meta-deliberate': {
     flowId: 'meta-deliberate',
     bundleId: 'meta-deliberate',
-    bundleVersion: '0.1.0',
-    bundleRef: 'meta-deliberate@0.1.0',
+    bundleVersion: '0.1.1',
+    bundleRef: 'meta-deliberate@0.1.1',
   },
 };
 

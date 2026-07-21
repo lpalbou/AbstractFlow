@@ -10,7 +10,7 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -1000,
+        "x": -1500,
         "y": 0
       },
       "data": {
@@ -65,8 +65,8 @@
       "id": "get_loop_state",
       "type": "get_var",
       "position": {
-        "x": -660,
-        "y": 200
+        "x": -1500,
+        "y": 420
       },
       "data": {
         "nodeType": "get_var",
@@ -112,8 +112,8 @@
       "id": "loop_cond",
       "type": "code",
       "position": {
-        "x": -660,
-        "y": 340
+        "x": -1120,
+        "y": 420
       },
       "data": {
         "nodeType": "code",
@@ -170,8 +170,8 @@
       "id": "attempts",
       "type": "while",
       "position": {
-        "x": -660,
-        "y": 500
+        "x": -1120,
+        "y": 0
       },
       "data": {
         "nodeType": "while",
@@ -226,8 +226,8 @@
       "id": "get_state_body",
       "type": "get_var",
       "position": {
-        "x": -320,
-        "y": -140
+        "x": -1500,
+        "y": -340
       },
       "data": {
         "nodeType": "get_var",
@@ -273,8 +273,8 @@
       "id": "get_state_errors",
       "type": "get",
       "position": {
-        "x": -320,
-        "y": -260
+        "x": -1120,
+        "y": -340
       },
       "data": {
         "nodeType": "get",
@@ -320,8 +320,8 @@
       "id": "build_prompt",
       "type": "code",
       "position": {
-        "x": -320,
-        "y": 40
+        "x": -740,
+        "y": -340
       },
       "data": {
         "nodeType": "code",
@@ -388,8 +388,8 @@
       "id": "extractor",
       "type": "llm_call",
       "position": {
-        "x": 40,
-        "y": -40
+        "x": -740,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -421,6 +421,11 @@
             "id": "prompt",
             "label": "prompt",
             "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
           },
           {
             "id": "temperature",
@@ -466,6 +471,7 @@
           }
         ],
         "pinDefaults": {
+          "tools": [],
           "system": "You are a precise structured-data extractor. You output only valid JSON conforming to the given schema and never invent facts absent from the source.",
           "temperature": 0.0
         }
@@ -480,8 +486,8 @@
       "id": "validate",
       "type": "code",
       "position": {
-        "x": 420,
-        "y": 40
+        "x": -360,
+        "y": 420
       },
       "data": {
         "nodeType": "code",
@@ -543,8 +549,8 @@
       "id": "set_state",
       "type": "set_var",
       "position": {
-        "x": 760,
-        "y": 40
+        "x": -360,
+        "y": 0
       },
       "data": {
         "nodeType": "set_var",
@@ -594,8 +600,8 @@
       "id": "get_final_state",
       "type": "get_var",
       "position": {
-        "x": -320,
-        "y": 640
+        "x": -1500,
+        "y": 900
       },
       "data": {
         "nodeType": "get_var",
@@ -641,8 +647,8 @@
       "id": "final",
       "type": "code",
       "position": {
-        "x": 40,
-        "y": 640
+        "x": -1120,
+        "y": 900
       },
       "data": {
         "nodeType": "code",
@@ -694,8 +700,8 @@
       "id": "get_data",
       "type": "get",
       "position": {
-        "x": 420,
-        "y": 560
+        "x": -740,
+        "y": 900
       },
       "data": {
         "nodeType": "get",
@@ -741,8 +747,8 @@
       "id": "get_valid",
       "type": "get",
       "position": {
-        "x": 420,
-        "y": 680
+        "x": -360,
+        "y": 900
       },
       "data": {
         "nodeType": "get",
@@ -788,8 +794,8 @@
       "id": "get_attempts",
       "type": "get",
       "position": {
-        "x": 420,
-        "y": 800
+        "x": 20,
+        "y": 900
       },
       "data": {
         "nodeType": "get",
@@ -835,7 +841,7 @@
       "id": "get_errors",
       "type": "get",
       "position": {
-        "x": 420,
+        "x": 400,
         "y": 900
       },
       "data": {
@@ -882,8 +888,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 800,
-        "y": 640
+        "x": 780,
+        "y": 900
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -1161,6 +1167,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-14T11:43:31.249313+00:00",
-  "updated_at": "2026-07-14T11:43:31.249313+00:00"
+  "created_at": "2026-07-20T13:28:28.950105+00:00",
+  "updated_at": "2026-07-20T13:28:28.950105+00:00"
 }

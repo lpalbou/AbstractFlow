@@ -33,13 +33,16 @@ async function j(url, init, attempt = 0) {
 const GOAL = process.argv[2] || 'best design for a dynamic self evolving memory graph for AI';
 const MAX_CYCLES = Number(process.argv[3] || 2);
 const NUM_HYP = Number(process.argv[4] || 4);
+// Bundle version is configurable (env COSCI_VERSION) so a rebuild-and-rerun
+// does not silently execute a stale bundle — the stale-bundle lesson.
+const VERSION = process.env.COSCI_VERSION || '0.1.16';
 
 const start = await j(`${GATEWAY}/api/gateway/runs/start`, {
   method: 'POST',
   headers: H,
   body: JSON.stringify({
     bundle_id: 'co-scientist',
-    bundle_version: '0.1.7',
+    bundle_version: VERSION,
     flow_id: 'co-scientist',
     input_data: {
       research_goal: GOAL,
@@ -69,12 +72,22 @@ async function autoApprove(rid) {
       const isApproval = String(wk).startsWith('tool_approval') || (w.details && w.details.mode === 'approval_required');
       const k = `${cid}:${wk}`;
       if (isApproval && wk && !approved.has(k)) {
-        approved.add(k);
-        await j(`${GATEWAY}/api/gateway/runs/${cid}/command`, {
-          method: 'POST', headers: H,
-          body: JSON.stringify({ command_id: `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`, run_id: cid, type: 'resume', payload: { wait_key: wk, payload: { approved: true, auto_approved: true } } }),
-        }).catch((e) => note(`approve failed: ${String(e).slice(0, 120)}`));
-        note(`auto-approved ${wk} on ${cid.slice(0, 8)}`);
+        // The real route is POST /api/gateway/commands (run_id in the BODY);
+        // /runs/{id}/command does not exist — earlier runs never noticed
+        // because web tools are safe-auto-approve and no approval wait ever
+        // actually fired until execute_command entered the flow (2026-07-20).
+        // Mark approved only AFTER the POST succeeds so transient failures
+        // retry on the next poll instead of wedging the wait.
+        try {
+          await j(`${GATEWAY}/api/gateway/commands`, {
+            method: 'POST', headers: H,
+            body: JSON.stringify({ command_id: `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`, run_id: cid, type: 'resume', payload: { wait_key: wk, payload: { approved: true, auto_approved: true } } }),
+          });
+          approved.add(k);
+          note(`auto-approved ${wk} on ${cid.slice(0, 8)}`);
+        } catch (e) {
+          note(`approve failed (will retry): ${String(e).slice(0, 120)}`);
+        }
       }
     }
   } catch { /* best effort */ }

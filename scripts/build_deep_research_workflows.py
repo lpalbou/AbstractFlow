@@ -16,7 +16,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "deep-research@0.1.6.flow"
+BUNDLE_PATH = BUNDLES_DIR / "deep-research@0.1.7.flow"
 
 
 def _pin(pin_id: str, label: str, pin_type: str, description: str | None = None) -> dict[str, Any]:
@@ -208,13 +208,6 @@ def _is_blocked_heading(title, remove_references):
         "sources cited",
         "works cited",
     )
-
-
-def _has_references_heading(text):
-    for line in str(text or "").split("\\n"):
-        if _heading_title(line) == "references":
-            return True
-    return False
 
 
 def _remove_blocked_sections(text, remove_references):
@@ -463,8 +456,8 @@ def _node(
     node_id: str,
     node_type: str,
     label: str,
-    x: int,
-    y: int,
+    x: int = 0,
+    y: int = 0,
     *,
     inputs: list[dict[str, Any]] | None = None,
     outputs: list[dict[str, Any]] | None = None,
@@ -490,6 +483,7 @@ def _node(
         "get_var": "#16A085",
         "system_datetime": "#C0392B",
         "replace": "#E74C3C",
+        "import_workspace_file": "#16A085",
     }.get(node_type, "#3498DB")
     icon = {
         "on_flow_start": "&#x1F3C1;",
@@ -510,6 +504,7 @@ def _node(
         "get_var": "&#x1F4E5;",
         "system_datetime": "&#x1F552;",
         "replace": "&#x21BA;",
+        "import_workspace_file": "&#x2B07;",
     }.get(node_type, "&#x25A1;")
     data: dict[str, Any] = {
         "nodeType": node_type,
@@ -549,6 +544,78 @@ def _edge(
     }
 
 
+# ---------------------------------------------------------------------------
+# Layout engine (operator directive 2026-07-20: clean node layout, no overlap)
+#
+# Column/lane model: each pipeline stage is one column; the exec spine flows
+# left-to-right through the "spine" lane at y=0 while pure data helpers stack
+# in the "above"/"below" lanes of the column nearest their consumers. Box
+# heights use the same approximation as scripts/audit_flow_graph.py
+# (300 wide, 90 + 26 * max(#data-inputs, #data-outputs) tall) so a >=60px
+# gap here is a >=60px gap in the audit and in the editor.
+# ---------------------------------------------------------------------------
+
+NODE_WIDTH = 300.0
+COLUMN_GAP_X = 140.0
+NODE_GAP_Y = 80.0
+SPINE_Y = 0.0
+
+
+def _node_height(node: dict[str, Any]) -> float:
+    data = node.get("data") or {}
+    n_in = len([p for p in data.get("inputs") or [] if p.get("type") != "execution"])
+    n_out = len([p for p in data.get("outputs") or [] if p.get("type") != "execution"])
+    return 90.0 + 26.0 * max(n_in, n_out)
+
+
+def _apply_layout(flow: dict[str, Any], columns: list[dict[str, list[str]]]) -> None:
+    """Assign node positions from a column/lane spec.
+
+    ``columns`` is an ordered list of ``{"above": [...], "spine": [...],
+    "below": [...]}`` dicts (all keys optional). Spine nodes stack downward
+    from y=0; "above" nodes stack upward ending one gap above the spine lane;
+    "below" nodes stack downward starting one gap below the column's spine
+    stack. Every flow node must be placed exactly once (loud refusal
+    otherwise, so the spec cannot silently drift from the graph).
+    """
+    nodes = {n["id"]: n for n in flow["nodes"]}
+    placed: set[str] = set()
+    x = 0.0
+    for column in columns:
+        above = column.get("above") or []
+        spine = column.get("spine") or []
+        below = column.get("below") or []
+        for nid in (*above, *spine, *below):
+            if nid not in nodes:
+                raise ValueError(f"layout for '{flow['id']}' names unknown node '{nid}'")
+            if nid in placed:
+                raise ValueError(f"layout for '{flow['id']}' places node '{nid}' twice")
+            placed.add(nid)
+
+        y = SPINE_Y
+        for nid in spine:
+            nodes[nid]["position"] = {"x": x, "y": y}
+            y += _node_height(nodes[nid]) + NODE_GAP_Y
+        spine_bottom = y
+
+        y = SPINE_Y
+        for nid in reversed(above):
+            y -= _node_height(nodes[nid]) + NODE_GAP_Y
+            nodes[nid]["position"] = {"x": x, "y": y}
+
+        # Keep spine-less columns visually under the exec lane.
+        y = spine_bottom if spine else SPINE_Y + 320.0
+        for nid in below:
+            nodes[nid]["position"] = {"x": x, "y": y}
+            y += _node_height(nodes[nid]) + NODE_GAP_Y
+
+        x += NODE_WIDTH + COLUMN_GAP_X
+
+    missing = set(nodes) - placed
+    if missing:
+        raise ValueError(f"layout for '{flow['id']}' misses nodes: {sorted(missing)}")
+
+
 def _start_node(
     pins: list[dict[str, Any]] = START_PINS, defaults: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -556,36 +623,30 @@ def _start_node(
         "start",
         "on_flow_start",
         "Start research request",
-        -900,
-        0,
         outputs=[EXEC_OUT, *pins],
         pin_defaults=defaults or START_DEFAULTS,
     )
 
 
 def _end_node(inputs: list[dict[str, Any]]) -> dict[str, Any]:
-    return _node("end", "on_flow_end", "Finish", 1800, 0, inputs=[EXEC_IN, *inputs])
+    return _node("end", "on_flow_end", "Finish", inputs=[EXEC_IN, *inputs])
 
 
-def _make_object(node_id: str, fields: list[tuple[str, str, str]], x: int, y: int) -> dict[str, Any]:
+def _make_object(node_id: str, fields: list[tuple[str, str, str]]) -> dict[str, Any]:
     return _node(
         node_id,
         "make_object",
         "Build JSON",
-        x,
-        y,
         inputs=[_pin(field, label, pin_type) for field, label, pin_type in fields],
         outputs=[_pin("result", "result", "object")],
     )
 
 
-def _get_node(node_id: str, key: str, default: Any, x: int, y: int) -> dict[str, Any]:
+def _get_node(node_id: str, key: str, default: Any) -> dict[str, Any]:
     return _node(
         node_id,
         "get",
         f"Get {key}",
-        x,
-        y,
         inputs=[
             _pin("object", "object", "object"),
             _pin("key", "key", "string"),
@@ -596,26 +657,22 @@ def _get_node(node_id: str, key: str, default: Any, x: int, y: int) -> dict[str,
     )
 
 
-def _get_var_node(node_id: str, name: str, default: Any, x: int, y: int) -> dict[str, Any]:
+def _get_var_node(node_id: str, name: str, default: Any) -> dict[str, Any]:
     return _node(
         node_id,
         "get_var",
         f"Get {name}",
-        x,
-        y,
         inputs=[_pin("name", "name", "string"), _pin("default", "default", "any")],
         outputs=[_pin("value", "value", "any")],
         pin_defaults={"name": name, "default": default},
     )
 
 
-def _set_var_node(node_id: str, label: str, name: str, x: int, y: int) -> dict[str, Any]:
+def _set_var_node(node_id: str, label: str, name: str) -> dict[str, Any]:
     return _node(
         node_id,
         "set_var",
         label,
-        x,
-        y,
         inputs=[
             EXEC_IN,
             _pin("name", "name", "string"),
@@ -626,13 +683,11 @@ def _set_var_node(node_id: str, label: str, name: str, x: int, y: int) -> dict[s
     )
 
 
-def _settings_node(node_id: str, x: int, y: int) -> dict[str, Any]:
+def _settings_node(node_id: str) -> dict[str, Any]:
     return _node(
         node_id,
         "code",
         "Derive effort settings",
-        x,
-        y,
         inputs=[
             EXEC_IN,
             _pin("effort", "effort", "string"),
@@ -658,8 +713,6 @@ def _code_data_node(
     node_id: str,
     label: str,
     code_body: str,
-    x: int,
-    y: int,
     inputs: list[dict[str, Any]],
     output_type: str = "object",
 ) -> dict[str, Any]:
@@ -667,8 +720,6 @@ def _code_data_node(
         node_id,
         "code",
         label,
-        x,
-        y,
         inputs=[*inputs, _pin("permissions", "permissions", "string")],
         outputs=[
             _pin("output", "output", output_type),
@@ -683,13 +734,11 @@ def _code_data_node(
     )
 
 
-def _while_node(node_id: str, label: str, x: int, y: int) -> dict[str, Any]:
+def _while_node(node_id: str, label: str) -> dict[str, Any]:
     return _node(
         node_id,
         "while",
         label,
-        x,
-        y,
         inputs=[
             EXEC_IN,
             _pin("condition", "condition", "boolean"),
@@ -704,37 +753,11 @@ def _while_node(node_id: str, label: str, x: int, y: int) -> dict[str, Any]:
     )
 
 
-def _for_node(node_id: str, label: str, x: int, y: int) -> dict[str, Any]:
-    return _node(
-        node_id,
-        "for",
-        label,
-        x,
-        y,
-        inputs=[
-            EXEC_IN,
-            _pin("start", "start", "number"),
-            _pin("end", "end", "number"),
-            _pin("step", "step", "number"),
-        ],
-        outputs=[
-            _pin("loop", "loop", "execution"),
-            _pin("done", "done", "execution"),
-            _pin("i", "i", "number"),
-            _pin("index", "index", "number"),
-            _pin("total", "total", "number"),
-        ],
-        pin_defaults={"start": 0, "step": 1},
-    )
-
-
-def _system_datetime_node(node_id: str, x: int, y: int) -> dict[str, Any]:
+def _system_datetime_node(node_id: str) -> dict[str, Any]:
     return _node(
         node_id,
         "system_datetime",
         "Run timestamp",
-        x,
-        y,
         outputs=[
             _pin("iso", "iso", "string"),
             _pin("timezone", "timezone", "string"),
@@ -749,15 +772,11 @@ def _replace_node(
     label: str,
     pattern: str,
     replacement: str,
-    x: int,
-    y: int,
 ) -> dict[str, Any]:
     return _node(
         node_id,
         "replace",
         label,
-        x,
-        y,
         inputs=[
             _pin("text", "text", "string"),
             _pin("pattern", "pattern", "string"),
@@ -769,26 +788,22 @@ def _replace_node(
     )
 
 
-def _stringify(node_id: str, x: int, y: int) -> dict[str, Any]:
+def _stringify(node_id: str) -> dict[str, Any]:
     return _node(
         node_id,
         "stringify_json",
         "Stringify JSON",
-        x,
-        y,
         inputs=[_pin("value", "value", "any"), _pin("mode", "mode", "string")],
         outputs=[_pin("result", "result", "string")],
         pin_defaults={"mode": "beautify"},
     )
 
 
-def _template(node_id: str, template: str, x: int, y: int) -> dict[str, Any]:
+def _template(node_id: str, template: str) -> dict[str, Any]:
     return _node(
         node_id,
         "string_template",
         f"Path {template}",
-        x,
-        y,
         inputs=[_pin("template", "template", "string"), _pin("vars", "vars", "object")],
         outputs=[_pin("result", "result", "string")],
         pin_defaults={"template": template},
@@ -798,8 +813,6 @@ def _template(node_id: str, template: str, x: int, y: int) -> dict[str, Any]:
 def _llm_node(
     node_id: str,
     label: str,
-    x: int,
-    y: int,
     *,
     system: str,
     schema: dict[str, Any],
@@ -809,8 +822,6 @@ def _llm_node(
         node_id,
         "llm_call",
         label,
-        x,
-        y,
         inputs=[
             EXEC_IN,
             _pin("provider", "provider", "provider_text"),
@@ -835,13 +846,11 @@ def _llm_node(
     )
 
 
-def _agent_node(node_id: str, label: str, x: int, y: int, *, system: str) -> dict[str, Any]:
+def _agent_node(node_id: str, label: str, *, system: str) -> dict[str, Any]:
     return _node(
         node_id,
         "agent",
         label,
-        x,
-        y,
         inputs=[
             EXEC_IN,
             _pin("provider", "provider", "provider_text"),
@@ -888,16 +897,14 @@ def build_plan_flow() -> dict[str, Any]:
     flow = _base_flow("deep-plan", "deep-research-plan", "Research planning subflow.")
     flow["nodes"] = [
         _start_node(),
-        _settings_node("derive_settings", -640, -160),
-        _make_object("input_json", fields, -520, 120),
-        _stringify("prompt_json", -160, 120),
-        _get_node("get_provider", "provider", "", -160, -220),
-        _get_node("get_model", "model", "", -160, -120),
+        _settings_node("derive_settings"),
+        _make_object("input_json", fields),
+        _stringify("prompt_json"),
+        _get_node("get_provider", "provider", ""),
+        _get_node("get_model", "model", ""),
         _llm_node(
             "planner",
             "Plan research",
-            220,
-            0,
             system=(
                 "You are a planning analyst for a production research workflow. "
                 "Create a concise plan before any browsing. Respect the user's request, viewpoint, "
@@ -933,6 +940,16 @@ def build_plan_flow() -> dict[str, Any]:
         _edge("planner", "meta", "end", "meta"),
     ]
     _wire_start_fields(flow, "input_json", fields)
+    _apply_layout(
+        flow,
+        [
+            {"spine": ["start"]},
+            {"spine": ["derive_settings"], "below": ["input_json"]},
+            {"above": ["get_provider", "get_model"], "below": ["prompt_json"]},
+            {"spine": ["planner"]},
+            {"spine": ["end"]},
+        ],
+    )
     return flow
 
 
@@ -961,17 +978,15 @@ def build_investigate_flow() -> dict[str, Any]:
                 _pin("total_rounds", "total_rounds", "number"),
             ]
         ),
-        _settings_node("derive_settings", -640, -160),
-        _make_object("input_json", fields, -520, 120),
-        _stringify("prompt_json", -160, 120),
-        _get_node("get_provider", "provider", "", -160, -260),
-        _get_node("get_model", "model", "", -160, -160),
-        _get_node("get_max_iterations", "max_iterations", 6, -160, 40),
+        _settings_node("derive_settings"),
+        _make_object("input_json", fields),
+        _stringify("prompt_json"),
+        _get_node("get_provider", "provider", ""),
+        _get_node("get_model", "model", ""),
+        _get_node("get_max_iterations", "max_iterations", 6),
         _agent_node(
             "researcher",
             "Investigate with evidence tools",
-            220,
-            0,
             system=(
                 "You are the evidence-gathering agent in a controlled research workflow. "
                 "Use only the supplied read-only tools. For every source: search, fetch "
@@ -1022,11 +1037,21 @@ def build_investigate_flow() -> dict[str, Any]:
             _edge("start", "total_rounds", "input_json", "total_rounds"),
         ]
     )
+    _apply_layout(
+        flow,
+        [
+            {"spine": ["start"]},
+            {"spine": ["derive_settings"], "below": ["input_json"]},
+            {"above": ["get_provider", "get_model", "get_max_iterations"], "below": ["prompt_json"]},
+            {"spine": ["researcher"]},
+            {"spine": ["end"]},
+        ],
+    )
     return flow
 
 
-def _critic_call(node_id: str, label: str, x: int, y: int, system: str) -> dict[str, Any]:
-    return _llm_node(node_id, label, x, y, system=system, schema=REVIEW_SCHEMA, temperature=0.0)
+def _critic_call(node_id: str, label: str, system: str) -> dict[str, Any]:
+    return _llm_node(node_id, label, system=system, schema=REVIEW_SCHEMA, temperature=0.0)
 
 
 def build_review_flow() -> dict[str, Any]:
@@ -1050,17 +1075,15 @@ def build_review_flow() -> dict[str, Any]:
                 _pin("total_rounds", "total_rounds", "number"),
             ]
         ),
-        _settings_node("derive_settings", -700, -160),
-        _make_object("input_json", fields, -580, 200),
-        _stringify("prompt_json", -220, 200),
-        _get_node("get_provider", "provider", "", -220, -240),
-        _get_node("get_model", "model", "", -220, -140),
+        _settings_node("derive_settings"),
+        _make_object("input_json", fields),
+        _stringify("prompt_json"),
+        _get_node("get_provider", "provider", ""),
+        _get_node("get_model", "model", ""),
         _node(
             "review_parallel",
             "parallel",
             "Run three adversarial lenses",
-            80,
-            0,
             inputs=[EXEC_IN],
             outputs=[
                 _pin("then:0", "Evidence skeptic", "execution"),
@@ -1072,8 +1095,6 @@ def build_review_flow() -> dict[str, Any]:
         _critic_call(
             "evidence_skeptic",
             "Evidence skeptic",
-            420,
-            -220,
             (
                 "Attack source quality, missing fetches, weak citations, stale evidence, "
                 "and unsupported claims."
@@ -1082,8 +1103,6 @@ def build_review_flow() -> dict[str, Any]:
         _critic_call(
             "relevance_critic",
             "User relevance critic",
-            420,
-            40,
             (
                 "Judge what matters for the requested viewpoint and audience. Cut "
                 "interesting but irrelevant material."
@@ -1092,8 +1111,6 @@ def build_review_flow() -> dict[str, Any]:
         _critic_call(
             "gap_hunter",
             "Gap and novelty hunter",
-            420,
-            300,
             (
                 "Find blind spots, contrary evidence, missing comparisons, and "
                 "high-value follow-up searches."
@@ -1107,15 +1124,11 @@ def build_review_flow() -> dict[str, Any]:
                 ("gap_hunter", "gap_hunter", "object"),
                 ("source_payload", "source_payload", "object"),
             ],
-            780,
-            160,
         ),
-        _stringify("synthesis_prompt", 1080, 160),
+        _stringify("synthesis_prompt"),
         _llm_node(
             "review_synthesis",
             "Synthesize adversarial review",
-            1380,
-            0,
             system=(
                 "You are the review chair. Merge the three adversarial reviews into actionable "
                 "guidance. Explicitly list which insights are useful, which findings should be "
@@ -1181,6 +1194,20 @@ def build_review_flow() -> dict[str, Any]:
             _edge("start", "total_rounds", "input_json", "total_rounds"),
         ]
     )
+    _apply_layout(
+        flow,
+        [
+            {"spine": ["start"]},
+            {"spine": ["derive_settings"], "below": ["input_json"]},
+            {"above": ["get_provider", "get_model"], "below": ["prompt_json"]},
+            {"spine": ["review_parallel"]},
+            {"spine": ["evidence_skeptic", "relevance_critic", "gap_hunter"]},
+            {"below": ["review_bundle"]},
+            {"below": ["synthesis_prompt"]},
+            {"spine": ["review_synthesis"]},
+            {"spine": ["end"]},
+        ],
+    )
     return flow
 
 
@@ -1205,16 +1232,14 @@ def build_render_flow() -> dict[str, Any]:
                 _pin("review_rounds_completed", "review_rounds_completed", "number"),
             ]
         ),
-        _settings_node("derive_settings", -640, -160),
-        _make_object("input_json", fields, -520, 120),
-        _stringify("prompt_json", -160, 120),
-        _get_node("get_provider", "provider", "", -160, -220),
-        _get_node("get_model", "model", "", -160, -120),
+        _settings_node("derive_settings"),
+        _make_object("input_json", fields),
+        _stringify("prompt_json"),
+        _get_node("get_provider", "provider", ""),
+        _get_node("get_model", "model", ""),
         _llm_node(
             "writer",
             "Render report package",
-            220,
-            0,
             system=(
                 "You are the final research report writer. Produce two separate outputs: "
                 "a rigorous human-readable Markdown report, and machine-readable audit "
@@ -1247,8 +1272,6 @@ def build_render_flow() -> dict[str, Any]:
             "normalize_report_markdown",
             "Normalize user-facing report",
             NORMALIZE_REPORT_MARKDOWN_CODE,
-            620,
-            -160,
             [
                 _pin("report_markdown", "report_markdown", "string"),
                 _pin("source_ledger", "source_ledger", "array"),
@@ -1286,7 +1309,7 @@ def build_render_flow() -> dict[str, Any]:
         _edge("writer", "exec-out", "end", "exec-in", animated=True),
         _edge("writer", "meta", "end", "meta"),
     ]
-    for key, default in [
+    writer_output_keys = [
         ("report_markdown", ""),
         ("research_run_manifest", {}),
         ("source_ledger", []),
@@ -1296,9 +1319,10 @@ def build_render_flow() -> dict[str, Any]:
         ("limitations", []),
         ("warnings", []),
         ("export_status", {}),
-    ]:
+    ]
+    for key, default in writer_output_keys:
         getter_id = f"get_{key}"
-        flow["nodes"].append(_get_node(getter_id, key, default, 620, 180 + len(flow["nodes"]) * 36))
+        flow["nodes"].append(_get_node(getter_id, key, default))
         flow["edges"].append(_edge("writer", "data", getter_id, "object"))
         if key == "report_markdown":
             flow["edges"].append(_edge(getter_id, "value", "normalize_report_markdown", "report_markdown"))
@@ -1317,16 +1341,27 @@ def build_render_flow() -> dict[str, Any]:
             _edge("start", "review_rounds_completed", "input_json", "review_rounds_completed"),
         ]
     )
+    getter_ids = [f"get_{key}" for key, _default in writer_output_keys]
+    _apply_layout(
+        flow,
+        [
+            {"spine": ["start"]},
+            {"spine": ["derive_settings"], "below": ["input_json"]},
+            {"above": ["get_provider", "get_model"], "below": ["prompt_json"]},
+            {"spine": ["writer"]},
+            {"below": getter_ids[:5]},
+            {"above": ["normalize_report_markdown"], "below": getter_ids[5:]},
+            {"spine": ["end"]},
+        ],
+    )
     return flow
 
 
-def _subflow_node(node_id: str, label: str, flow_id: str, x: int, y: int) -> dict[str, Any]:
+def _subflow_node(node_id: str, label: str, flow_id: str) -> dict[str, Any]:
     return _node(
         node_id,
         "subflow",
         label,
-        x,
-        y,
         inputs=[
             EXEC_IN,
             _pin("inherit_context", "inherit_context", "boolean"),
@@ -1338,13 +1373,35 @@ def _subflow_node(node_id: str, label: str, flow_id: str, x: int, y: int) -> dic
     )
 
 
-def _write_node(node_id: str, node_type: str, label: str, x: int, y: int) -> dict[str, Any]:
+def _import_node(node_id: str, label: str, content_type: str) -> dict[str, Any]:
+    """Register an exported file as a run artifact (thin-client download path)."""
+    return _node(
+        node_id,
+        "import_workspace_file",
+        label,
+        inputs=[
+            EXEC_IN,
+            _pin("file_path", "file_path", "workspace_file"),
+            _pin("content_type", "content_type", "string"),
+        ],
+        outputs=[
+            EXEC_OUT,
+            _pin("artifact", "artifact", "artifact"),
+            _pin("artifact_ref", "artifact_ref", "artifact"),
+            _pin("artifact_id", "artifact_id", "string"),
+            _pin("content_type", "content_type", "string"),
+            _pin("size_bytes", "size_bytes", "number"),
+            _pin("source_path", "source_path", "workspace_file"),
+        ],
+        pin_defaults={"content_type": content_type},
+    )
+
+
+def _write_node(node_id: str, node_type: str, label: str) -> dict[str, Any]:
     return _node(
         node_id,
         node_type,
         label,
-        x,
-        y,
         inputs=[
             EXEC_IN,
             _pin("file_path", "file_path", "workspace_file"),
@@ -1411,128 +1468,104 @@ def build_root_flow() -> dict[str, Any]:
     )
     flow["nodes"] = [
         _start_node(),
-        _settings_node("derive_settings", -560, -160),
-        _get_node("get_max_review_rounds", "max_review_rounds", 2, -220, -340),
-        _get_node("get_output_prefix", "output_prefix", "reports/deep-standard-research", 3040, 360),
-        _get_node("get_report_title", "report_title", "Research Report", 3040, 500),
-        _system_datetime_node("run_timestamp", -560, 320),
-        _replace_node("timestamp_no_colons", "Sanitize timestamp colons", ":", "-", -240, 280),
-        _replace_node("timestamp_safe", "Sanitize timestamp decimals", ".", "-", 80, 280),
+        _settings_node("derive_settings"),
+        _get_node("get_max_review_rounds", "max_review_rounds", 2),
+        _get_node("get_output_prefix", "output_prefix", "reports/deep-standard-research"),
+        _get_node("get_report_title", "report_title", "Research Report"),
+        _system_datetime_node("run_timestamp"),
+        _replace_node("timestamp_no_colons", "Sanitize timestamp colons", ":", "-"),
+        _replace_node("timestamp_safe", "Sanitize timestamp decimals", ".", "-"),
         _set_var_node(
             "set_export_timestamp",
             "Persist export timestamp",
             "deep.export_timestamp",
-            -180,
-            40,
         ),
-        _make_object("plan_input", root_fields, -560, -260),
-        _subflow_node("plan", "Plan", "deep-plan", -180, -140),
-        _get_node("get_plan", "plan", {}, 160, -260),
+        _make_object("plan_input", root_fields),
+        _subflow_node("plan", "Plan", "deep-plan"),
+        _get_node("get_plan", "plan", {}),
         _get_var_node(
             "get_loop_state",
             "deep.loop_state",
             {"rounds_completed": 0, "continue_research": True},
-            160,
-            -20,
         ),
         _code_data_node(
             "loop_condition",
             "Should research continue?",
             RESEARCH_LOOP_CONDITION_CODE,
-            160,
-            120,
             [
                 _pin("loop_state", "loop_state", "object"),
                 _pin("max_review_rounds", "max_review_rounds", "number"),
             ],
         ),
-        _while_node("research_rounds", "Review-gated research rounds", 160, 260),
-        _get_var_node("get_prior_investigation", "deep.latest_investigation", {}, 520, -340),
-        _get_var_node("get_prior_review", "deep.latest_review", {}, 520, -220),
-        _make_object(
-            "investigate_input",
-            investigate_fields,
-            520,
-            -20,
-        ),
-        _subflow_node("investigate", "Investigate round", "deep-investigate", 900, -140),
-        _get_node("get_investigation", "investigation", {}, 1240, -300),
+        _while_node("research_rounds", "Review-gated research rounds"),
+        _get_var_node("get_prior_investigation", "deep.latest_investigation", {}),
+        _get_var_node("get_prior_review", "deep.latest_review", {}),
+        _make_object("investigate_input", investigate_fields),
+        _subflow_node("investigate", "Investigate round", "deep-investigate"),
+        _get_node("get_investigation", "investigation", {}),
         _set_var_node(
             "set_latest_investigation",
             "Persist latest investigation",
             "deep.latest_investigation",
-            1240,
-            -120,
         ),
-        _make_object(
-            "review_input",
-            review_fields,
-            1600,
-            -20,
-        ),
-        _subflow_node("review", "Adversarial review round", "deep-review", 1980, -140),
-        _get_node("get_review", "adversarial_review", {}, 2320, -300),
-        _set_var_node("set_latest_review", "Persist latest review", "deep.latest_review", 2320, -120),
+        _make_object("review_input", review_fields),
+        _subflow_node("review", "Adversarial review round", "deep-review"),
+        _get_node("get_review", "adversarial_review", {}),
+        _set_var_node("set_latest_review", "Persist latest review", "deep.latest_review"),
         _code_data_node(
             "next_loop_state",
             "Record reviewer decision",
             NEXT_LOOP_STATE_CODE,
-            2320,
-            40,
             [
                 _pin("review", "review", "object"),
                 _pin("round_index", "round_index", "number"),
             ],
         ),
-        _set_var_node("set_loop_state", "Persist loop state", "deep.loop_state", 2320, 200),
-        _get_var_node("get_final_investigation", "deep.latest_investigation", {}, 2660, -300),
-        _get_var_node("get_final_review", "deep.latest_review", {}, 2660, -180),
+        _set_var_node("set_loop_state", "Persist loop state", "deep.loop_state"),
+        _get_var_node("get_final_investigation", "deep.latest_investigation", {}),
+        _get_var_node("get_final_review", "deep.latest_review", {}),
         _get_var_node(
             "get_final_loop_state",
             "deep.loop_state",
             {"rounds_completed": 0, "continue_research": True},
-            2660,
-            -60,
         ),
-        _get_node("get_review_rounds_completed", "rounds_completed", 0, 2660, 80),
-        _make_object("render_input", render_fields, 2660, -20),
-        _subflow_node("render", "Render final report", "deep-render", 3040, -140),
-        _get_node("get_report_markdown", "report_markdown", "", 3380, -520),
-        _get_node("get_manifest", "research_run_manifest", {}, 3380, -400),
-        _get_node("get_source_ledger", "source_ledger", [], 3380, -280),
-        _get_node("get_claim_matrix", "claim_evidence_matrix", [], 3380, -160),
-        _get_node("get_iteration_log", "iteration_log", [], 3380, -40),
-        _get_node("get_warnings", "warnings", [], 3380, 80),
-        _get_node("get_model_export_status", "export_status", {}, 3380, 200),
-        _get_var_node("get_export_timestamp", "deep.export_timestamp", "", 3380, 300),
+        _get_node("get_review_rounds_completed", "rounds_completed", 0),
+        _make_object("render_input", render_fields),
+        _subflow_node("render", "Render final report", "deep-render"),
+        _get_node("get_report_markdown", "report_markdown", ""),
+        _get_node("get_manifest", "research_run_manifest", {}),
+        _get_node("get_source_ledger", "source_ledger", []),
+        _get_node("get_claim_matrix", "claim_evidence_matrix", []),
+        _get_node("get_iteration_log", "iteration_log", []),
+        _get_node("get_warnings", "warnings", []),
+        _get_node("get_model_export_status", "export_status", {}),
+        _get_var_node("get_export_timestamp", "deep.export_timestamp", ""),
         _make_object(
             "path_vars",
             [
                 ("output_prefix", "output_prefix", "string"),
                 ("timestamp", "timestamp", "string"),
             ],
-            3380,
-            380,
         ),
-        _template("path_md", "{{output_prefix}}-{{timestamp}}.md", 3700, -520),
-        _template("path_pdf", "{{output_prefix}}-{{timestamp}}.pdf", 3700, -400),
-        _template("path_docx", "{{output_prefix}}-{{timestamp}}.docx", 3700, -280),
-        _template("path_manifest", "{{output_prefix}}-{{timestamp}}.manifest.json", 3700, -160),
-        _template("path_sources", "{{output_prefix}}-{{timestamp}}.sources.json", 3700, -40),
-        _template("path_claims", "{{output_prefix}}-{{timestamp}}.claims.json", 3700, 80),
-        _template("path_iterations", "{{output_prefix}}-{{timestamp}}.iterations.json", 3700, 200),
-        _template("path_warnings", "{{output_prefix}}-{{timestamp}}.warnings.json", 3700, 320),
-        _stringify("sources_json", 3700, 460),
-        _stringify("claims_json", 3700, 580),
-        _stringify("iterations_json", 3700, 700),
-        _stringify("warnings_json", 3700, 820),
-        _write_node("write_md", "write_file", "Write Markdown", 4080, -520),
-        _write_node("write_pdf", "write_pdf", "Write PDF", 4360, -400),
-        _write_node("write_docx", "write_docx", "Write DOCX", 4640, -280),
-        _write_node("write_sources", "write_file", "Write source ledger", 4920, -40),
-        _write_node("write_claims", "write_file", "Write claim matrix", 5200, 80),
-        _write_node("write_iterations", "write_file", "Write iteration log", 5480, 200),
-        _write_node("write_warnings", "write_file", "Write warnings", 5760, 320),
+        _template("path_md", "{{output_prefix}}-{{timestamp}}.md"),
+        _template("path_pdf", "{{output_prefix}}-{{timestamp}}.pdf"),
+        _template("path_docx", "{{output_prefix}}-{{timestamp}}.docx"),
+        _template("path_manifest", "{{output_prefix}}-{{timestamp}}.manifest.json"),
+        _template("path_sources", "{{output_prefix}}-{{timestamp}}.sources.json"),
+        _template("path_claims", "{{output_prefix}}-{{timestamp}}.claims.json"),
+        _template("path_iterations", "{{output_prefix}}-{{timestamp}}.iterations.json"),
+        _template("path_warnings", "{{output_prefix}}-{{timestamp}}.warnings.json"),
+        _stringify("sources_json"),
+        _stringify("claims_json"),
+        _stringify("iterations_json"),
+        _stringify("warnings_json"),
+        _write_node("write_md", "write_file", "Write Markdown"),
+        _write_node("write_pdf", "write_pdf", "Write PDF"),
+        _write_node("write_docx", "write_docx", "Write DOCX"),
+        _write_node("write_sources", "write_file", "Write source ledger"),
+        _write_node("write_claims", "write_file", "Write claim matrix"),
+        _write_node("write_iterations", "write_file", "Write iteration log"),
+        _write_node("write_warnings", "write_file", "Write warnings"),
         _make_object(
             "post_export_manifest",
             [
@@ -1554,11 +1587,20 @@ def build_root_flow() -> dict[str, Any]:
                 ("warnings_path", "warnings_path", "workspace_file"),
                 ("model_export_status", "model_export_status", "object"),
             ],
-            6040,
-            -120,
         ),
-        _stringify("manifest_json", 6040, 120),
-        _write_node("write_manifest", "write_file", "Write manifest", 6320, -160),
+        _stringify("manifest_json"),
+        _write_node("write_manifest", "write_file", "Write manifest"),
+        # Register the human-readable exports as run artifacts so thin clients
+        # (assistant, Flow UI) can download them without workspace access
+        # (folded from the shipped JSON, which had drifted ahead of this
+        # generator — see pack_deep_research_bundle.py's module docstring).
+        _import_node("import_md", "Register .md artifact", "text/markdown"),
+        _import_node("import_pdf", "Register .pdf artifact", "application/pdf"),
+        _import_node(
+            "import_docx",
+            "Register .docx artifact",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
         _end_node(
             [
                 _pin("response", "response", "string"),
@@ -1577,10 +1619,12 @@ def build_root_flow() -> dict[str, Any]:
                 _pin("export_status", "export_status", "object"),
                 _pin("warnings", "warnings", "array"),
                 _pin("meta", "meta", "object"),
+                _pin("md_artifact_id", "md_artifact_id", "string"),
+                _pin("pdf_artifact_id", "pdf_artifact_id", "string"),
+                _pin("docx_artifact_id", "docx_artifact_id", "string"),
             ]
         ),
     ]
-    flow["nodes"][-1]["position"] = {"x": 6660, "y": 0}
     flow["edges"] = [
         _edge("start", "exec-out", "derive_settings", "exec-in", animated=True),
         _edge("derive_settings", "exec-out", "set_export_timestamp", "exec-in", animated=True),
@@ -1600,7 +1644,10 @@ def build_root_flow() -> dict[str, Any]:
         _edge("write_claims", "exec-out", "write_iterations", "exec-in", animated=True),
         _edge("write_iterations", "exec-out", "write_warnings", "exec-in", animated=True),
         _edge("write_warnings", "exec-out", "write_manifest", "exec-in", animated=True),
-        _edge("write_manifest", "exec-out", "end", "exec-in", animated=True),
+        _edge("write_manifest", "exec-out", "import_md", "exec-in", animated=True),
+        _edge("import_md", "exec-out", "import_pdf", "exec-in", animated=True),
+        _edge("import_pdf", "exec-out", "import_docx", "exec-in", animated=True),
+        _edge("import_docx", "exec-out", "end", "exec-in", animated=True),
         _edge("start", "effort", "derive_settings", "effort"),
         _edge("start", "provider", "derive_settings", "provider"),
         _edge("start", "model", "derive_settings", "model"),
@@ -1696,6 +1743,12 @@ def build_root_flow() -> dict[str, Any]:
         _edge("post_export_manifest", "result", "manifest_json", "value"),
         _edge("path_manifest", "result", "write_manifest", "file_path"),
         _edge("manifest_json", "result", "write_manifest", "content"),
+        _edge("write_md", "file_path", "import_md", "file_path"),
+        _edge("write_pdf", "file_path", "import_pdf", "file_path"),
+        _edge("write_docx", "file_path", "import_docx", "file_path"),
+        _edge("import_md", "artifact_id", "end", "md_artifact_id"),
+        _edge("import_pdf", "artifact_id", "end", "pdf_artifact_id"),
+        _edge("import_docx", "artifact_id", "end", "docx_artifact_id"),
         _edge("get_report_markdown", "value", "end", "response"),
         _edge("get_report_markdown", "value", "end", "report_markdown"),
         _edge("write_md", "file_path", "end", "md_path"),
@@ -1717,7 +1770,116 @@ def build_root_flow() -> dict[str, Any]:
     _wire_start_fields(flow, "investigate_input", investigate_fields)
     _wire_start_fields(flow, "review_input", review_fields)
     _wire_start_fields(flow, "render_input", render_fields)
+    _apply_layout(
+        flow,
+        [
+            # Stage: request intake + effort budget.
+            {"spine": ["start"], "below": ["run_timestamp"]},
+            {"spine": ["derive_settings"], "below": ["timestamp_no_colons", "timestamp_safe"]},
+            # Stage: plan.
+            {"above": ["plan_input"], "spine": ["set_export_timestamp"]},
+            {"spine": ["plan"]},
+            # Stage: review-gated research rounds (while loop).
+            {
+                "above": ["get_plan", "get_max_review_rounds"],
+                "spine": ["research_rounds"],
+                "below": ["get_loop_state", "loop_condition"],
+            },
+            {
+                "above": ["get_prior_investigation", "get_prior_review"],
+                "below": ["investigate_input"],
+            },
+            {"spine": ["investigate"]},
+            {"above": ["get_investigation"], "spine": ["set_latest_investigation"]},
+            {"below": ["review_input"]},
+            {"spine": ["review"]},
+            {"above": ["get_review"], "spine": ["set_latest_review"]},
+            {"spine": ["set_loop_state"], "below": ["next_loop_state"]},
+            # Stage: final render inputs.
+            {
+                "above": ["get_final_investigation", "get_final_review"],
+                "below": ["get_final_loop_state", "get_review_rounds_completed", "render_input"],
+            },
+            {"spine": ["render"]},
+            # Stage: render output fan-out (report body + audit payloads).
+            {
+                "above": ["get_report_markdown", "get_manifest", "get_report_title"],
+                "below": [
+                    "get_source_ledger",
+                    "get_claim_matrix",
+                    "get_iteration_log",
+                    "get_warnings",
+                    "get_model_export_status",
+                ],
+            },
+            # Stage: export path composition.
+            {
+                "above": ["get_output_prefix", "get_export_timestamp"],
+                "below": ["path_vars"],
+            },
+            # Stage: deterministic writers (one export lane per column:
+            # the path template above, serialized payload below, writer on the spine).
+            {"above": ["path_md"], "spine": ["write_md"]},
+            {"above": ["path_pdf"], "spine": ["write_pdf"]},
+            {"above": ["path_docx"], "spine": ["write_docx"]},
+            {"above": ["path_sources"], "spine": ["write_sources"], "below": ["sources_json"]},
+            {"above": ["path_claims"], "spine": ["write_claims"], "below": ["claims_json"]},
+            {"above": ["path_iterations"], "spine": ["write_iterations"], "below": ["iterations_json"]},
+            {"above": ["path_warnings"], "spine": ["write_warnings"], "below": ["warnings_json"]},
+            # Stage: manifest + artifact registration.
+            {
+                "above": ["path_manifest"],
+                "spine": ["write_manifest"],
+                "below": ["post_export_manifest", "manifest_json"],
+            },
+            {"spine": ["import_md"]},
+            {"spine": ["import_pdf"]},
+            {"spine": ["import_docx"]},
+            {"spine": ["end"]},
+        ],
+    )
     return flow
+
+
+def bundle_metadata() -> dict[str, Any]:
+    """One copy of the bundle metadata (pack_deep_research_bundle.py imports it)."""
+    return {
+        "family": "deep-research",
+        "purpose": "production research with adversarial review and document export",
+        "source_of_truth": {
+            "process": "VisualFlow",
+            "execution": "AbstractRuntime",
+            "lifecycle": "AbstractGateway catalog",
+            "routing": "AbstractCore capability defaults plus run overrides",
+        },
+        "control_policy": {
+            "user_budget_control": "effort",
+            "effort_values": ["quick", "standard", "thorough"],
+            "outer_loop": "review_gated_while_with_effort_budget",
+            "per_pass_agent_cap": "derived_settings.max_iterations",
+            "deadline_minutes": "derived_settings.deadline_minutes_prompt_guidance",
+            "max_sources": "derived_settings.max_sources_prompt_guidance",
+        },
+        "default_model_profile": {
+            "default": "Gateway/AbstractCore defaults when provider/model are blank",
+            "override_pins": ["provider", "model"],
+            "role_policy": "planner, researcher, critics, and writer use the same optional override",
+        },
+        "outputs": [
+            "markdown_report",
+            "pdf_report",
+            "docx_report",
+            "research_run_manifest_v1",
+            "research_source_ledger_v1",
+            "claim_evidence_matrix_v1",
+            "iteration_log_v1",
+        ],
+        "tool_policy": {
+            "research_agents": READ_ONLY_TOOLS,
+            "review_agents": [],
+            "export": "deterministic write_file/write_pdf/write_docx nodes",
+        },
+    }
 
 
 def write_json(path: Path, data: dict[str, Any]) -> None:
@@ -1744,47 +1906,11 @@ def main() -> int:
         root_flow_json=FLOWS_DIR / "deep-research.json",
         out_path=BUNDLE_PATH,
         bundle_id="deep-research",
-        bundle_version="0.1.6",
+        bundle_version="0.1.7",
         flows_dir=FLOWS_DIR,
         entrypoints=["deep-research"],
         default_entrypoint="deep-research",
-        metadata={
-            "family": "deep-research",
-            "purpose": "production research with adversarial review and document export",
-            "source_of_truth": {
-                "process": "VisualFlow",
-                "execution": "AbstractRuntime",
-                "lifecycle": "AbstractGateway catalog",
-                "routing": "AbstractCore capability defaults plus run overrides",
-            },
-            "control_policy": {
-                "user_budget_control": "effort",
-                "effort_values": ["quick", "standard", "thorough"],
-                "outer_loop": "review_gated_while_with_effort_budget",
-                "per_pass_agent_cap": "derived_settings.max_iterations",
-                "deadline_minutes": "derived_settings.deadline_minutes_prompt_guidance",
-                "max_sources": "derived_settings.max_sources_prompt_guidance",
-            },
-            "default_model_profile": {
-                "default": "Gateway/AbstractCore defaults when provider/model are blank",
-                "override_pins": ["provider", "model"],
-                "role_policy": "planner, researcher, critics, and writer use the same optional override",
-            },
-            "outputs": [
-                "markdown_report",
-                "pdf_report",
-                "docx_report",
-                "research_run_manifest_v1",
-                "research_source_ledger_v1",
-                "claim_evidence_matrix_v1",
-                "iteration_log_v1",
-            ],
-            "tool_policy": {
-                "research_agents": READ_ONLY_TOOLS,
-                "review_agents": [],
-                "export": "deterministic write_file/write_pdf/write_docx nodes",
-            },
-        },
+        metadata=bundle_metadata(),
     )
     print(f"Wrote {len(flows)} flows to {FLOWS_DIR}")
     print(f"Packed {BUNDLE_PATH}")

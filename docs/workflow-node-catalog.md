@@ -1020,6 +1020,18 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `content` string; `pages` number; `processed_pages` number; `metadata` object; `warnings` array; `truncated` boolean; `file_path` workspace_file; `content_type` string
 - Default config: none
 
+### files / Write Chart
+
+- Node type: `write_chart`
+- Document node: `{"id":"<unique_id>","type":"write_chart"}`
+- Utility: Render a STRUCTURED chart spec (pure data — never code) to a workspace-scoped PNG (+ a .pdf sibling) via the Runtime in-process matplotlib renderer. Spec kinds: layered (architecture boxes/arrows in columns) and line (trajectories). Same trust class and path containment as Write PDF — no shell, no tool approval. Render failures return ok:false + warnings (the flow continues) so callers keep honest text fallbacks.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file: Output PNG path (must end in .png); a .pdf sibling is written beside it.; `spec` object: Chart spec. layered: {kind:"layered", title, caption, layers:[{label, nodes:[{id,label}]}], edges:[{from,to,label?,style:"solid"|"dashed"}]}. line: {kind:"line", title, caption, x_label, y_label, y_min?, series:[{label, points:[[x,y],...]}]}. Oversized specs are refused with ok:false (hard resource caps).
+- Outputs: `exec-out` execution; `ok` boolean: True when the chart rendered and the PNG exists with real bytes.; `rendered` boolean; `file_path` workspace_file: Rendered PNG path (null when not rendered).; `pdf_path` string: PDF sibling path (null when unavailable).; `error` string: Specific failure reason when ok is false (invalid spec, matplotlib unavailable, render failed).; `warnings` array: #FALLBACK-labeled degradation notes.
+- Default config: none
+
 ### files / Write DOCX
 
 - Node type: `write_docx`

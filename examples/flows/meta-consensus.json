@@ -73,8 +73,8 @@
       "id": "answer_a",
       "type": "llm_call",
       "position": {
-        "x": -560,
-        "y": -160
+        "x": -500,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -171,8 +171,8 @@
       "id": "answer_b",
       "type": "llm_call",
       "position": {
-        "x": -220,
-        "y": -160
+        "x": -100,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -269,8 +269,8 @@
       "id": "pick_b",
       "type": "code",
       "position": {
-        "x": -560,
-        "y": 200
+        "x": -100,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -337,8 +337,8 @@
       "id": "reconcile_prompt",
       "type": "code",
       "position": {
-        "x": 60,
-        "y": 120
+        "x": 300,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -400,8 +400,8 @@
       "id": "reconcile",
       "type": "llm_call",
       "position": {
-        "x": 340,
-        "y": -160
+        "x": 300,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -498,8 +498,8 @@
       "id": "meta",
       "type": "code",
       "position": {
-        "x": 620,
-        "y": 120
+        "x": 700,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -556,8 +556,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 900,
-        "y": -160
+        "x": 700,
+        "y": 0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -798,6 +798,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-16T01:12:37.036164+00:00",
-  "updated_at": "2026-07-16T01:12:37.036164+00:00"
+  "created_at": "2026-07-20T13:28:57.764624+00:00",
+  "updated_at": "2026-07-20T13:28:57.764624+00:00"
 }

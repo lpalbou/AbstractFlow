@@ -1729,6 +1729,35 @@ const FILE_NODES: NodeTemplate[] = [
     category: 'files',
   },
   {
+    type: 'write_chart',
+    icon: '&#x1F4CA;', // Bar chart
+    label: 'Write Chart',
+    description:
+      'Render a STRUCTURED chart spec (pure data — never code) to a workspace-scoped PNG (+ a .pdf sibling) via the Runtime in-process matplotlib renderer. Spec kinds: layered (architecture boxes/arrows in columns) and line (trajectories). Same trust class and path containment as Write PDF — no shell, no tool approval. Render failures return ok:false + warnings (the flow continues) so callers keep honest text fallbacks.',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'file_path', label: 'file_path', type: 'workspace_file', description: 'Output PNG path (must end in .png); a .pdf sibling is written beside it.' },
+      {
+        id: 'spec',
+        label: 'spec',
+        type: 'object',
+        description:
+          'Chart spec. layered: {kind:"layered", title, caption, layers:[{label, nodes:[{id,label}]}], edges:[{from,to,label?,style:"solid"|"dashed"}]}. line: {kind:"line", title, caption, x_label, y_label, y_min?, series:[{label, points:[[x,y],...]}]}. Oversized specs are refused with ok:false (hard resource caps).',
+      },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'ok', label: 'ok', type: 'boolean', description: 'True when the chart rendered and the PNG exists with real bytes.' },
+      { id: 'rendered', label: 'rendered', type: 'boolean' },
+      { id: 'file_path', label: 'file_path', type: 'workspace_file', description: 'Rendered PNG path (null when not rendered).' },
+      { id: 'pdf_path', label: 'pdf_path', type: 'string', description: 'PDF sibling path (null when unavailable).' },
+      { id: 'error', label: 'error', type: 'string', description: 'Specific failure reason when ok is false (invalid spec, matplotlib unavailable, render failed).' },
+      { id: 'warnings', label: 'warnings', type: 'array', description: '#FALLBACK-labeled degradation notes.' },
+    ],
+    category: 'files',
+  },
+  {
     type: 'list_folder_files',
     icon: '&#x1F4C1;',
     label: 'List Folder Files',
@@ -2441,27 +2470,42 @@ export function mergePinDocsFromTemplate(
 ): FlowNodeData {
   const normalizeCodeNode = (data: FlowNodeData): FlowNodeData => {
     if (data.nodeType !== 'code') return data;
+    // PURE code nodes exist: generator-built flows (co-scientist, deep-research,
+    // meta-*) deliberately omit execution pins so the runtime compiler
+    // classifies the node as pure/lazily-evaluated data flow. Appending the
+    // template's exec pins here (a) rendered dead exec triangles the graph
+    // never fills, and (b) — the real hazard — persisted them on the next
+    // save, flipping the runtime classification to exec-unreachable so the
+    // node silently never ran. Template pins are only backfilled for the
+    // pin KIND the author used; execution pins are never invented.
+    const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+    const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+    const isPureCodeNode =
+      !existingInputs.some((pin) => pin.type === 'execution') &&
+      !existingOutputs.some((pin) => pin.type === 'execution');
     const templateInputsById = new Map(templateData.inputs.map((p) => [p.id, p] as const));
     const templateOutputsById = new Map(templateData.outputs.map((p) => [p.id, p] as const));
     const seenInputs = new Set<string>();
-    const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
     const inputs = existingInputs.map((pin) => {
       seenInputs.add(pin.id);
       const templatePin = templateInputsById.get(pin.id);
       return templatePin ? { ...pin, label: templatePin.label, type: templatePin.type, description: pin.description || templatePin.description } : pin;
     });
     for (const templatePin of templateData.inputs) {
-      if (!seenInputs.has(templatePin.id)) inputs.push(templatePin);
+      if (seenInputs.has(templatePin.id)) continue;
+      if (isPureCodeNode && templatePin.type === 'execution') continue;
+      inputs.push(templatePin);
     }
     const seen = new Set<string>();
-    const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
     const outputs = existingOutputs.map((pin) => {
       seen.add(pin.id);
       const templatePin = templateOutputsById.get(pin.id);
       return templatePin ? { ...pin, label: templatePin.label, type: templatePin.type, description: pin.description || templatePin.description } : pin;
     });
     for (const templatePin of templateData.outputs) {
-      if (!seen.has(templatePin.id)) outputs.push(templatePin);
+      if (seen.has(templatePin.id)) continue;
+      if (isPureCodeNode && templatePin.type === 'execution') continue;
+      outputs.push(templatePin);
     }
     const nextDefaults = { ...(data.pinDefaults || {}) };
     if (typeof nextDefaults.permissions !== 'string' || !nextDefaults.permissions.trim()) {

@@ -32,6 +32,7 @@ describe('catalog parity (backlog 0113)', () => {
       'read_pdf',
       'write_pdf',
       'write_docx',
+      'write_chart',
       'list_folder_files',
       'import_workspace_file',
       'read_artifact',

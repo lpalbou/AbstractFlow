@@ -66,8 +66,8 @@
       "id": "reset",
       "type": "code",
       "position": {
-        "x": -760,
-        "y": 200
+        "x": -700,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -114,7 +114,7 @@
       "id": "init_acc",
       "type": "set_var",
       "position": {
-        "x": -760,
+        "x": -700,
         "y": 0
       },
       "data": {
@@ -165,7 +165,7 @@
       "id": "each",
       "type": "loop",
       "position": {
-        "x": -420,
+        "x": -300,
         "y": 0
       },
       "data": {
@@ -218,8 +218,8 @@
       "id": "map_prompt",
       "type": "code",
       "position": {
-        "x": -80,
-        "y": -160
+        "x": 100,
+        "y": -660
       },
       "data": {
         "nodeType": "code",
@@ -281,8 +281,8 @@
       "id": "map_llm",
       "type": "llm_call",
       "position": {
-        "x": -80,
-        "y": 40
+        "x": 100,
+        "y": -400
       },
       "data": {
         "nodeType": "llm_call",
@@ -314,6 +314,11 @@
             "id": "prompt",
             "label": "prompt",
             "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
           },
           {
             "id": "temperature",
@@ -359,6 +364,7 @@
           }
         ],
         "pinDefaults": {
+          "tools": [],
           "system": "You process one item at a time following the given instruction. Answer concisely.",
           "temperature": 0.2
         }
@@ -373,8 +379,8 @@
       "id": "get_acc",
       "type": "get_var",
       "position": {
-        "x": 280,
-        "y": 200
+        "x": 500,
+        "y": -890
       },
       "data": {
         "nodeType": "get_var",
@@ -415,8 +421,8 @@
       "id": "append",
       "type": "code",
       "position": {
-        "x": 280,
-        "y": 40
+        "x": 500,
+        "y": -660
       },
       "data": {
         "nodeType": "code",
@@ -478,8 +484,8 @@
       "id": "set_acc",
       "type": "set_var",
       "position": {
-        "x": 620,
-        "y": 40
+        "x": 500,
+        "y": -400
       },
       "data": {
         "nodeType": "set_var",
@@ -529,8 +535,8 @@
       "id": "get_all",
       "type": "get_var",
       "position": {
-        "x": -80,
-        "y": 420
+        "x": -300,
+        "y": 380
       },
       "data": {
         "nodeType": "get_var",
@@ -571,8 +577,8 @@
       "id": "reduce_prompt",
       "type": "code",
       "position": {
-        "x": 280,
-        "y": 500
+        "x": 100,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -629,8 +635,8 @@
       "id": "reduce_llm",
       "type": "llm_call",
       "position": {
-        "x": 620,
-        "y": 420
+        "x": 100,
+        "y": 0
       },
       "data": {
         "nodeType": "llm_call",
@@ -662,6 +668,11 @@
             "id": "prompt",
             "label": "prompt",
             "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
           },
           {
             "id": "temperature",
@@ -707,6 +718,7 @@
           }
         ],
         "pinDefaults": {
+          "tools": [],
           "system": "You synthesize many per-item results into one coherent, well-structured output.",
           "temperature": 0.3
         }
@@ -721,8 +733,8 @@
       "id": "get_final",
       "type": "get_var",
       "position": {
-        "x": 620,
-        "y": 620
+        "x": 500,
+        "y": 380
       },
       "data": {
         "nodeType": "get_var",
@@ -763,8 +775,8 @@
       "id": "final",
       "type": "code",
       "position": {
-        "x": 960,
-        "y": 620
+        "x": 900,
+        "y": 380
       },
       "data": {
         "nodeType": "code",
@@ -817,7 +829,7 @@
       "type": "get",
       "position": {
         "x": 1300,
-        "y": 540
+        "y": 380
       },
       "data": {
         "nodeType": "get",
@@ -864,7 +876,7 @@
       "type": "get",
       "position": {
         "x": 1300,
-        "y": 660
+        "y": 610
       },
       "data": {
         "nodeType": "get",
@@ -911,7 +923,7 @@
       "type": "on_flow_end",
       "position": {
         "x": 1300,
-        "y": 420
+        "y": 0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -1184,6 +1196,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-14T11:43:31.646961+00:00",
-  "updated_at": "2026-07-14T11:43:31.646961+00:00"
+  "created_at": "2026-07-20T13:28:49.796525+00:00",
+  "updated_at": "2026-07-20T13:28:49.796525+00:00"
 }

@@ -1,0 +1,774 @@
+{
+  "id": "diagram-render",
+  "name": "diagram-render",
+  "description": "Dedicated professional-figure workflow: renders a structured diagram SPEC (layered architecture boxes/arrows, or line trajectories) into publication-quality PNG + PDF via the runtime's in-process write_chart node (write_pdf trust class — no shell, no approval prompt). The LLM authors only the spec (data), never code. Missing matplotlib / bad spec / render crash degrade honestly to rendered:false + #FALLBACK warning so callers keep a text fallback. Figures are registered as durable run artifacts.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Diagram spec",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "spec",
+            "label": "spec",
+            "type": "object"
+          },
+          {
+            "id": "out_dir",
+            "label": "out_dir",
+            "type": "string"
+          },
+          {
+            "id": "basename",
+            "label": "basename",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "out_dir": "reports/figures",
+          "basename": "figure"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prep",
+      "type": "code",
+      "position": {
+        "x": 360,
+        "y": 340
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Validate spec + compose figure path",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "spec",
+            "label": "spec",
+            "type": "object"
+          },
+          {
+            "id": "out_dir",
+            "label": "out_dir",
+            "type": "string"
+          },
+          {
+            "id": "basename",
+            "label": "basename",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "def _safe_name(t, extra):\n    out = \"\"\n    for ch in str(t or \"\"):\n        if (\"a\" <= ch <= \"z\") or (\"A\" <= ch <= \"Z\") or (\"0\" <= ch <= \"9\") or ch in extra:\n            out = out + ch\n        else:\n            out = out + \"-\"\n    return out\nbase = _safe_name(str(basename or \"figure\").strip().strip(\"/\"), \"-_.\") or \"figure\"\nif base.endswith(\".png\"):\n    base = base[:-4] or \"figure\"\nd_raw = _safe_name(str(out_dir or \"reports/figures\").strip().strip(\"/\"), \"-_./\")\nd_parts = []\nfor part in d_raw.split(\"/\"):\n    if part and part != \".\" and part != \"..\":\n        d_parts.append(part)\nd = \"/\".join(d_parts) or \"reports/figures\"\ns = spec if isinstance(spec, dict) else None\nkind = str((s or {}).get(\"kind\") or \"\")\nvalid = s is not None and kind in (\"layered\", \"line\")\nerror = \"\" if valid else (\"spec must be an object with kind layered|line, got kind=\" + kind)\nreturn {\n    \"valid\": valid,\n    \"error\": error,\n    \"spec\": s or {},\n    \"png_path\": d + \"/\" + base + \".png\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_valid",
+      "type": "if",
+      "position": {
+        "x": 360,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Spec valid?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "chart",
+      "type": "write_chart",
+      "position": {
+        "x": 720,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "write_chart",
+        "label": "Render chart (in-process)",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "spec",
+            "label": "spec",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "rendered",
+            "label": "rendered",
+            "type": "boolean"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "pdf_path",
+            "label": "pdf_path",
+            "type": "string"
+          },
+          {
+            "id": "error",
+            "label": "error",
+            "type": "string"
+          },
+          {
+            "id": "warnings",
+            "label": "warnings",
+            "type": "array"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final",
+      "type": "code",
+      "position": {
+        "x": 1080,
+        "y": 340
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold render outcome",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prep",
+            "label": "prep",
+            "type": "object"
+          },
+          {
+            "id": "chart_rendered",
+            "label": "chart_rendered",
+            "type": "boolean"
+          },
+          {
+            "id": "chart_png",
+            "label": "chart_png",
+            "type": "string"
+          },
+          {
+            "id": "chart_pdf",
+            "label": "chart_pdf",
+            "type": "string"
+          },
+          {
+            "id": "chart_error",
+            "label": "chart_error",
+            "type": "string"
+          },
+          {
+            "id": "chart_warnings",
+            "label": "chart_warnings",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "p = prep if isinstance(prep, dict) else {}\nok = bool(chart_rendered)\nout_warnings = []\nfor w in (chart_warnings or []):\n    out_warnings.append(str(w))\nspec_error = str(p.get(\"error\") or \"\").strip()\nif spec_error:\n    out_warnings.append(\"#FALLBACK: invalid diagram spec: \" + spec_error[:200])\nelif not ok:\n    head = str(chart_error or \"\").strip()\n    out_warnings.append(\"#FALLBACK: diagram render did not complete (\" + head[:300] + \") — the caller should keep its text fallback.\")\nreturn {\n    \"rendered\": ok,\n    \"png_path\": str(chart_png or \"\") if ok else \"\",\n    \"pdf_path\": str(chart_pdf or \"\") if ok else \"\",\n    \"warnings\": out_warnings,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_rendered",
+      "type": "if",
+      "position": {
+        "x": 1080,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Rendered?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "import_png",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 1440,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register PNG artifact",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "image/png"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "import_pdf",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 1800,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register PDF artifact",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "application/pdf"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 2160,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Figure",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "rendered",
+            "label": "rendered",
+            "type": "boolean"
+          },
+          {
+            "id": "png_path",
+            "label": "png_path",
+            "type": "string"
+          },
+          {
+            "id": "pdf_path",
+            "label": "pdf_path",
+            "type": "string"
+          },
+          {
+            "id": "warnings",
+            "label": "warnings",
+            "type": "array"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-if_valid-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "if_valid",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_valid-true-chart-exec-in",
+      "source": "if_valid",
+      "sourceHandle": "true",
+      "target": "chart",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_valid-false-end-exec-in",
+      "source": "if_valid",
+      "sourceHandle": "false",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-chart-exec-out-if_rendered-exec-in",
+      "source": "chart",
+      "sourceHandle": "exec-out",
+      "target": "if_rendered",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_rendered-true-import_png-exec-in",
+      "source": "if_rendered",
+      "sourceHandle": "true",
+      "target": "import_png",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_rendered-false-end-exec-in",
+      "source": "if_rendered",
+      "sourceHandle": "false",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-import_png-exec-out-import_pdf-exec-in",
+      "source": "import_png",
+      "sourceHandle": "exec-out",
+      "target": "import_pdf",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-import_pdf-exec-out-end-exec-in",
+      "source": "import_pdf",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-spec-prep-spec",
+      "source": "start",
+      "sourceHandle": "spec",
+      "target": "prep",
+      "targetHandle": "spec",
+      "animated": false
+    },
+    {
+      "id": "e-start-out_dir-prep-out_dir",
+      "source": "start",
+      "sourceHandle": "out_dir",
+      "target": "prep",
+      "targetHandle": "out_dir",
+      "animated": false
+    },
+    {
+      "id": "e-start-basename-prep-basename",
+      "source": "start",
+      "sourceHandle": "basename",
+      "target": "prep",
+      "targetHandle": "basename",
+      "animated": false
+    },
+    {
+      "id": "e-prep-valid-if_valid-condition",
+      "source": "prep",
+      "sourceHandle": "valid",
+      "target": "if_valid",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-prep-png_path-chart-file_path",
+      "source": "prep",
+      "sourceHandle": "png_path",
+      "target": "chart",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-prep-spec-chart-spec",
+      "source": "prep",
+      "sourceHandle": "spec",
+      "target": "chart",
+      "targetHandle": "spec",
+      "animated": false
+    },
+    {
+      "id": "e-prep-output-final-prep",
+      "source": "prep",
+      "sourceHandle": "output",
+      "target": "final",
+      "targetHandle": "prep",
+      "animated": false
+    },
+    {
+      "id": "e-chart-rendered-final-chart_rendered",
+      "source": "chart",
+      "sourceHandle": "rendered",
+      "target": "final",
+      "targetHandle": "chart_rendered",
+      "animated": false
+    },
+    {
+      "id": "e-chart-file_path-final-chart_png",
+      "source": "chart",
+      "sourceHandle": "file_path",
+      "target": "final",
+      "targetHandle": "chart_png",
+      "animated": false
+    },
+    {
+      "id": "e-chart-pdf_path-final-chart_pdf",
+      "source": "chart",
+      "sourceHandle": "pdf_path",
+      "target": "final",
+      "targetHandle": "chart_pdf",
+      "animated": false
+    },
+    {
+      "id": "e-chart-error-final-chart_error",
+      "source": "chart",
+      "sourceHandle": "error",
+      "target": "final",
+      "targetHandle": "chart_error",
+      "animated": false
+    },
+    {
+      "id": "e-chart-warnings-final-chart_warnings",
+      "source": "chart",
+      "sourceHandle": "warnings",
+      "target": "final",
+      "targetHandle": "chart_warnings",
+      "animated": false
+    },
+    {
+      "id": "e-final-rendered-if_rendered-condition",
+      "source": "final",
+      "sourceHandle": "rendered",
+      "target": "if_rendered",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-final-png_path-import_png-file_path",
+      "source": "final",
+      "sourceHandle": "png_path",
+      "target": "import_png",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-final-pdf_path-import_pdf-file_path",
+      "source": "final",
+      "sourceHandle": "pdf_path",
+      "target": "import_pdf",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-final-rendered-end-rendered",
+      "source": "final",
+      "sourceHandle": "rendered",
+      "target": "end",
+      "targetHandle": "rendered",
+      "animated": false
+    },
+    {
+      "id": "e-final-png_path-end-png_path",
+      "source": "final",
+      "sourceHandle": "png_path",
+      "target": "end",
+      "targetHandle": "png_path",
+      "animated": false
+    },
+    {
+      "id": "e-final-pdf_path-end-pdf_path",
+      "source": "final",
+      "sourceHandle": "pdf_path",
+      "target": "end",
+      "targetHandle": "pdf_path",
+      "animated": false
+    },
+    {
+      "id": "e-final-warnings-end-warnings",
+      "source": "final",
+      "sourceHandle": "warnings",
+      "target": "end",
+      "targetHandle": "warnings",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-20T16:46:02.731246+00:00",
+  "updated_at": "2026-07-20T16:46:02.731246+00:00"
+}

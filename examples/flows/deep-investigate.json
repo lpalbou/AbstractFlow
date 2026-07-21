@@ -8,8 +8,8 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -900,
-        "y": 0
+        "x": 0.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -90,8 +90,8 @@
       "id": "derive_settings",
       "type": "code",
       "position": {
-        "x": -640,
-        "y": -160
+        "x": 440.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "code",
@@ -163,8 +163,8 @@
       "id": "input_json",
       "type": "make_object",
       "position": {
-        "x": -520,
-        "y": 120
+        "x": 440.0,
+        "y": 274.0
       },
       "data": {
         "nodeType": "make_object",
@@ -246,8 +246,8 @@
       "id": "prompt_json",
       "type": "stringify_json",
       "position": {
-        "x": -160,
-        "y": 120
+        "x": 880.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "stringify_json",
@@ -287,8 +287,8 @@
       "id": "get_provider",
       "type": "get",
       "position": {
-        "x": -160,
-        "y": -260
+        "x": 880.0,
+        "y": -744.0
       },
       "data": {
         "nodeType": "get",
@@ -334,8 +334,8 @@
       "id": "get_model",
       "type": "get",
       "position": {
-        "x": -160,
-        "y": -160
+        "x": 880.0,
+        "y": -496.0
       },
       "data": {
         "nodeType": "get",
@@ -381,8 +381,8 @@
       "id": "get_max_iterations",
       "type": "get",
       "position": {
-        "x": -160,
-        "y": 40
+        "x": 880.0,
+        "y": -248.0
       },
       "data": {
         "nodeType": "get",
@@ -428,8 +428,8 @@
       "id": "researcher",
       "type": "agent",
       "position": {
-        "x": 220,
-        "y": 0
+        "x": 1320.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "agent",
@@ -707,8 +707,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 1800,
-        "y": 0
+        "x": 1760.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -973,6 +973,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-13T15:52:45.565779+00:00",
-  "updated_at": "2026-07-13T15:52:45.565779+00:00"
+  "created_at": "2026-07-20T13:28:25.592550+00:00",
+  "updated_at": "2026-07-20T13:28:25.592550+00:00"
 }

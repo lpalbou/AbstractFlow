@@ -1,11 +1,85 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-07-18
+- Updated: 2026-07-21
 - Planned: 0
-- Proposed: 41
-- Completed: 46
+- Proposed: 40
+- Completed: 51
 - Deprecated: 0
+
+## 2026-07-21 waits actionable + approval lifecycle (0138)
+Item 0138 (`abstractflow-0138`): COMPLETE across two slices. Slice 1 —
+reason-aware wait notifications (`classifyWait`: event/deadline parks no
+longer force-open the modal) + a toolbar "Waiting for you / Approval needed"
+badge. Slice 2 (operator-approved, one fable5 adversary) — Approve-All
+state chip + Revoke (with a sync-ref hardening fix so a wait right after
+Revoke can't still auto-resume), timeline auto-approved/approved markers
+(the silent bypass is now visible), and a subrun-attach tightening so
+concurrent agents can't cross-attach cycles. +24 tests total.
+
+## 2026-07-21 coding-agent verifier-death fail-soft (coding-agent@0.2.2)
+Operator order (laurent dm#96): all-gates-pass runs exited rc=1 when the LLM
+verifier died on infra — the exit code lied about a good artifact. A missing
+verdict is now the "cannot verify here" class → honest "delivered, not
+verifiable" terminal (delivered≠verified≠passed), never a fabricated pass.
+Fully live under the gateway runner; the `abstractcode exec` parent-resume
+half is filed to the code seat.
+
+## 2026-07-21 canvas undo/redo (0127)
+Item 0127 (`abstractflow-0127`): bounded (50) snapshot stack in the useFlow
+store — graph-mutating actions capture a pre-mutation baseline; undo/redo
+move between past/future with deep-clone-on-restore (no aliasing). Drag
+gestures and rapid same-node config edits coalesce into one step; a new edit
+forks the timeline; load/clear reset history. Ctrl/Cmd+Z / Shift+Ctrl/Cmd+Z
+/ Ctrl+Y + a toolbar Undo/Redo group. Closes the top self-contained trust
+gap (unrecoverable destructive edits). 10 store tests; 368 total green.
+
+## 2026-07-20 workflow-catalog adversary wave (0149)
+Item 0149 (`abstractflow-0149`): operator-mandated 4-adversary (fable5)
+sweep of every shipped workflow generator, gated by the new deterministic
+`scripts/audit_flow_graph.py` (dead exec/pure nodes, orphan edges, box
+overlaps; `--all` = the 21-flow bundled catalog). All 21 flows now audit
+clean. Real fixes beyond ~300 layout overlaps: basic-agent's dead
+`wait_until` (post_delay silently dropped) + unwired `memory` pin;
+deep-research generator drift BEHIND the shipped bundle (rebuild would have
+deleted the artifact-registration lane); coding-agent verifier fail-closed
+gap with explicit run_commands; adversarial-review merge fold crash/verdict
+upgrade on broken critic output; three generators that never packed their
+bundles; co-scientist citation-verification overclaims. Version bumps
+(sha-immutable): coding-agent@0.2.1, co-scientist@0.1.14,
+deep-research@0.1.7, basic-agent@0.0.2, structured-extract/adversarial-
+review/map-reduce/diagram-render/meta-*@0.1.1; gateway reloaded + catalog
+verified; gateway-side pins updated (19 gateway tests green).
+
+## 2026-07-20 diagram-render professional figures (0148)
+Item 0148 (`abstractflow-0148`): the NEW dedicated `diagram-render@0.1.0`
+workflow (structured spec -> fixed matplotlib script -> publication PNG+PDF;
+injection-proofed inputs; deterministic render gate; honest rendered:false
+degradation) + co-scientist@0.1.12 integration (LLM-designed architecture
+figure + deterministic 1200-anchored Elo chart; md embeds PNGs; PDF gains
+figures as appendix pages via pypdf merge; post-merge sha; timestamped
+basenames). One mandated adversarial reviewer; all P0/P1 folded;
+live-verified 15-page merged PDF.
+
+## 2026-07-19 co-scientist report quality wave (0147) + JsonViewer fork (0146)
+Item 0147 (`abstractflow-0147`): operator-directed self-review of the last two
+co-scientist reports against the Nature paper via two fable5 adversaries, then
+a two-cycle fix wave (`co-scientist@0.1.8`→`0.1.9`) live-verified on OVH
+gpt-oss-120b — hardened grounding + citation allowlist (killed fabricated
+citations), structured falsifiable protocols, novelty floor + diversity
+de-crowding, decoration sanitizer, honest Elo framing, Methodology +
+Elo-evolution figure + Limitations sections. A `0.1.10` degraded-path wave
+followed from the live 0.1.9 zero-source run: identical-title collapse
+(fold + final ranking), empty-allowlist citation BAN (parametric venue
+name-drops), ledger discipline via deep-investigate's adversarial_review
+channel, 1200-anchored Elo figure. A `0.1.11` wave closed the two-adversary
+before/after audit (verdict: genuinely better; every baseline P0 eliminated)
+by fixing their converged remaining defects: a deterministic citation
+VERIFICATION loop (re-fetch every ledger URL + title-check; wrong title↔id
+pairs barred from citation — caught 2 live), near-identical sibling collapse
++ visible sibling/de-crowded flags, falsification token scrub + form rules,
+evidence-verb honesty. Item 0146 (`abstractflow-0146`,
+proposed): JsonViewer fork deletion / one-source consolidation, scheduled.
 
 ## 2026-07-18 coding-agent deterministic verification gates
 Item 0145 (work id `abstractflow-0145`, first item under the ruled
