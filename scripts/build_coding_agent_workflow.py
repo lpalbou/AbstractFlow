@@ -31,7 +31,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.2.3.flow"
+BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.2.4.flow"
 
 AGENT_INTERFACE = "abstractcode.agent.v1"
 
@@ -238,6 +238,7 @@ VERIFIER_SCHEMA = {
     "required": [
         "builds", "build_error", "executes", "run_error", "matches", "mismatch",
         "all_passed", "failures", "environment_failures", "summary", "artifacts",
+        "feature_checks",
     ],
     "properties": {
         "builds": {"type": "boolean"},
@@ -260,6 +261,27 @@ VERIFIER_SCHEMA = {
         # so the final report can name where the artifact lives on every host
         # (operator incident 2026-07-16: "no link / path to test it").
         "artifacts": {"type": "array", "items": {"type": "string"}},
+        # R4 (memgraph forensics 2026-07-21, ARCHITECTURE.md §4/§5): schema-
+        # forced per-feature input-dependence enumeration. The old C3 prose
+        # produced no artifact, so the verifier sampled 1-2 salient features
+        # and silently skipped the rest (dead playback / missing ranking
+        # passed matches). REQUIRED here: coverage becomes visible in the
+        # verdict, and the merge fails any depends_on_input=false entry.
+        "feature_checks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["feature", "input", "expected_change", "evidence", "depends_on_input"],
+                "properties": {
+                    "feature": {"type": "string"},
+                    "input": {"type": "string"},
+                    "expected_change": {"type": "string"},
+                    "evidence": {"type": "string"},
+                    "depends_on_input": {"type": "boolean"},
+                },
+            },
+        },
     },
 }
 
@@ -600,6 +622,405 @@ return {
 }
 """.strip()
 
+# Compose the read_file call for SELFCHECK.md (G5 input). A missing file
+# returns an error string with success=false — gate5 treats that as the
+# advisory "unattested" case, never a failure.
+SELFCHECK_ARGS_CODE = """
+ws = str(workspace_root or "").strip()
+path = (ws.rstrip("/") + "/" + "SELFCHECK.md") if ws else "SELFCHECK.md"
+return {
+    "name": "read_file",
+    "arguments": {"file_path": path, "should_read_entire_file": True},
+    "call_id": "gate-selfcheck-read",
+}
+""".strip()
+
+# Compose the hash-recompute call for the files SELFCHECK.md attests
+# (R3, memgraph forensics 2026-07-21). Claimed paths are parsed from the
+# ARTIFACT-SHA256 lines, sanitized (single-quoted in the command; paths
+# carrying quote/control characters are skipped and will surface through
+# gate5 as unbound claims), and hashed workspace-relative via `cd <ws>` so
+# gate5 can compare shasum's output paths against the claims verbatim.
+# No claims (or no SELFCHECK) composes a harmless `true` no-op — the exec
+# spine stays linear and gate5 keys on the SELFCHECK content, not on this
+# call's output.
+SELFCHECK_HASH_ARGS_CODE = """
+content = str(selfcheck_content or "")
+have = bool(selfcheck_ok) and len(content.strip()) > 0 and not content.startswith("Error")
+ws = str(workspace_root or "").strip()
+bad_chars = "'" + '"' + "\\\\" + "\\n" + "\\r" + "`"
+paths = []
+if have:
+    for ln in content.split("\\n"):
+        s = ln.strip()
+        if not s.startswith("ARTIFACT-SHA256:"):
+            i = 0
+            while i < len(s) and s[i].isdigit():
+                i = i + 1
+            if i > 0 and i < len(s) and s[i] == ":":
+                s = s[i + 1:].lstrip()
+        if not s.startswith("ARTIFACT-SHA256:"):
+            continue
+        rest = s[len("ARTIFACT-SHA256:"):].strip()
+        bits = [b for b in rest.split(" ") if b]
+        if len(bits) < 2:
+            continue
+        p = " ".join(bits[:-1]).strip()
+        if p.startswith("./"):
+            p = p[2:]
+        if not p or p.startswith("/") or p.startswith("-"):
+            continue
+        bad = False
+        for c in p:
+            if c in bad_chars:
+                bad = True
+                break
+        if bad:
+            continue
+        if p.rsplit("/", 1)[-1].lower() == "selfcheck.md":
+            continue
+        if p not in paths:
+            paths.append(p)
+paths = paths[:16]
+if not paths:
+    return {
+        "name": "execute_command",
+        "arguments": {"command": "true"},
+        "call_id": "gate-selfcheck-hash-noop",
+    }
+quoted = []
+for p in paths:
+    quoted.append("'" + p + "'")
+prefix = ("cd '" + ws + "' && ") if ws else ""
+cmd = prefix + "shasum -a 256 -- " + " ".join(quoted)
+return {
+    "name": "execute_command",
+    "arguments": {"command": cmd},
+    "call_id": "gate-selfcheck-hash",
+}
+""".strip()
+
+# G5 HASH-BOUND SELFCHECK (R3, memgraph forensics 2026-07-21 — root-cause
+# classes 1+5, and the F2 intra-round tripwire): SELFCHECK.md must END with
+# `ARTIFACT-SHA256: <path> <sha256>` lines computed AFTER the final edit.
+# This gate recomputes the hashes against the delivered bytes:
+#   - SELFCHECK missing entirely      -> advisory WARNING (never a failure).
+#   - present but no binding lines    -> failures[] (unbound self-report).
+#   - hash mismatch                   -> failures[] naming the mechanism
+#     ("artifact modified after last self-verification") — the r3 timeline
+#     (SELFCHECK written 15:32, artifact rewritten 15:35) becomes a caught,
+#     repairable gate failure instead of a shipped stale all-green report.
+#   - host cannot hash (no shasum)    -> #FALLBACK warning, never a failure.
+# Recomputed hashes are parsed from the shasum output text regardless of the
+# call's success flag: shasum exits non-zero when ONE claimed file is missing
+# yet still prints hashes for the rest — parse-what-ran, warn only when
+# nothing parsed.
+GATE5_CODE = """
+content = str(selfcheck_content or "")
+have = bool(selfcheck_ok) and len(content.strip()) > 0 and not content.startswith("Error")
+failures = []
+warnings = []
+claims = []
+hexchars = "0123456789abcdef"
+if not have:
+    warnings.append("selfcheck: SELFCHECK.md not found in the workspace - the builder's self-verification is unattested (advisory only, not a failure)")
+else:
+    for ln in content.split("\\n"):
+        s = ln.strip()
+        if not s.startswith("ARTIFACT-SHA256:"):
+            i = 0
+            while i < len(s) and s[i].isdigit():
+                i = i + 1
+            if i > 0 and i < len(s) and s[i] == ":":
+                s = s[i + 1:].lstrip()
+        if not s.startswith("ARTIFACT-SHA256:"):
+            continue
+        rest = s[len("ARTIFACT-SHA256:"):].strip()
+        bits = [b for b in rest.split(" ") if b]
+        if len(bits) < 2:
+            failures.append("self-report unbound: malformed ARTIFACT-SHA256 line in SELFCHECK.md ('" + s[:120] + "') - required format: 'ARTIFACT-SHA256: <workspace-relative-path> <sha256>'")
+            continue
+        p = " ".join(bits[:-1]).strip()
+        if p.startswith("./"):
+            p = p[2:]
+        h = bits[-1].strip().lower()
+        ok_hex = len(h) == 64
+        if ok_hex:
+            for c in h:
+                if c not in hexchars:
+                    ok_hex = False
+                    break
+        if not ok_hex:
+            failures.append("self-report unbound: ARTIFACT-SHA256 line for '" + p[:120] + "' does not carry a valid sha256 (64 hex chars) - recompute it with: shasum -a 256 " + p[:120])
+            continue
+        if p.rsplit("/", 1)[-1].lower() == "selfcheck.md":
+            continue
+        claims.append([p, h])
+    if not claims and not failures:
+        failures.append("self-report unbound: SELFCHECK.md carries no ARTIFACT-SHA256 binding lines - after your FINAL edit, append one line per claimed file: 'ARTIFACT-SHA256: <workspace-relative-path> <sha256>' (compute with execute_command: shasum -a 256 <path>)")
+if claims:
+    recomputed = {}
+    # Shape-robust text extraction (live-found, first 0.2.4 gateway run):
+    # the approval-resume lane delivers call_tool results as the
+    # {mode, results:[{output:{stdout,...}}]} ENVELOPE while the direct
+    # lane delivers the output dict, and older shapes are plain strings.
+    # Fold stdout/stderr strings out of any of those (gate3's raw-unwrap
+    # pattern, generalized).
+    parts = []
+    stack = [hash_output]
+    guard = 0
+    while stack and guard < 64:
+        guard = guard + 1
+        x = stack.pop()
+        if x is None:
+            continue
+        if isinstance(x, str):
+            if x:
+                parts.append(x)
+        elif isinstance(x, dict):
+            # stdout/stderr direct, else the *_preview twins: the runtime
+            # COMPACTS persisted tool results (durable result_key copies keep
+            # only stdout_preview/stderr_preview — live-found, third 0.2.4
+            # gateway run). Hash listings are tiny (<=16 lines), so an
+            # untruncated preview is the full text; a truncated one surfaces
+            # through gate5 as an unbound claim rather than a silent pass.
+            got_out = False
+            for k in ["stdout", "stderr"]:
+                v = x.get(k)
+                if isinstance(v, str) and v:
+                    parts.append(v)
+                    got_out = True
+            if not got_out:
+                for k in ["stdout_preview", "stderr_preview"]:
+                    v = x.get(k)
+                    if isinstance(v, str) and v:
+                        parts.append(v)
+            for k in ["output", "results", "result", "payload"]:
+                v = x.get(k)
+                if isinstance(v, str):
+                    if k == "output" and v:
+                        parts.append(v)
+                elif v is not None:
+                    stack.append(v)
+        elif isinstance(x, list):
+            for v in x:
+                stack.append(v)
+    hash_text = "\\n".join(parts)
+    for ln in hash_text.split("\\n"):
+        s = ln.strip()
+        if not s:
+            continue
+        sp = s.find(" ")
+        if sp <= 0:
+            continue
+        h2 = s[:sp].strip().lower()
+        p2 = s[sp:].strip()
+        if p2.startswith("*"):
+            p2 = p2[1:]
+        if p2.startswith("./"):
+            p2 = p2[2:]
+        if len(h2) == 64:
+            recomputed[p2] = h2
+    if not recomputed:
+        warnings.append("selfcheck: could not recompute artifact hashes on this host (" + hash_text.strip()[:160] + ") - hash binding unchecked (#FALLBACK)" if hash_text.strip() else "selfcheck: could not recompute artifact hashes on this host (no output) - hash binding unchecked (#FALLBACK)")
+    else:
+        for pair in claims:
+            p = pair[0]
+            h = pair[1]
+            rh = recomputed.get(p)
+            if not rh:
+                failures.append("self-report unbound: SELFCHECK.md attests '" + p + "' but that file could not be hashed on this host (missing or unreadable) - the attestation does not bind to a delivered file")
+            elif rh != h:
+                failures.append("self-report stale: SELFCHECK.md attests different bytes than the delivered " + p + " - the artifact was modified after the last self-verification; re-verify and regenerate SELFCHECK.md (with fresh ARTIFACT-SHA256 lines) after your final edit")
+return {
+    "selfcheck_ok": len(failures) == 0,
+    "present": have,
+    "claims": len(claims),
+    "failures": failures,
+    "warnings": warnings,
+}
+""".strip()
+
+# G6 DOM ID CONTRACT (memgraph forensics 2026-07-21, root-cause class 4 —
+# the exact r3 defect): every element id the script references
+# (getElementById('x'), querySelector('#x'), $('#x'), ...) must exist in the
+# delivered markup. The r3 wreck was ONE dangling '#timeRange' selector after
+# a markup-side rename; across all 12 benchmark artifacts this check flags
+# exactly that one violation. Pure text scan, no browser, no LLM.
+# Design: the DEFINED-id collection deliberately over-collects (id=...
+# attributes anywhere including JS template strings, el.id assignments,
+# setAttribute('id', ...)) — extra defined ids only reduce sensitivity and
+# can never create a false dangling-ref report. The REFERENCE collection is
+# conservative: quoted '#ident' literals passed to a call (char before the
+# opening quote must be '(' or ','), hex-color-shaped tokens skipped.
+GATE_DOM_CODE = """
+g0 = gate0_out or {}
+web = bool(g0.get("web_class"))
+failures = []
+defined = set()
+refs = []
+if web:
+    idset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-$"
+    hexdigits = "0123456789abcdefABCDEF"
+    text = str(entry_content or "")
+    if bool(script_ok) and script_content:
+        text = text + "\\n" + str(script_content)
+    low = text.lower()
+    n = len(text)
+    # Defined ids: id=... (markup attributes, JS-built markup strings, and
+    # el.id = '...' assignments — '.' before is accepted as a definition).
+    pos = 0
+    while True:
+        i = low.find("id", pos)
+        if i < 0:
+            break
+        pos = i + 2
+        before = low[i - 1] if i > 0 else " "
+        if before.isalnum() or before in "-_":
+            continue
+        k = i + 2
+        while k < n and text[k] in " \\t":
+            k = k + 1
+        if k >= n or text[k] != "=":
+            continue
+        k = k + 1
+        while k < n and text[k] in " \\t":
+            k = k + 1
+        if k >= n:
+            break
+        q = text[k]
+        name = ""
+        if q == "\\"" or q == "'":
+            j = k + 1
+            while j < n and text[j] != q:
+                name = name + text[j]
+                j = j + 1
+        else:
+            j = k
+            while j < n and text[j] in idset:
+                name = name + text[j]
+                j = j + 1
+        name = name.strip()
+        if name:
+            ok_id = True
+            for c in name:
+                if c not in idset:
+                    ok_id = False
+                    break
+            if ok_id:
+                defined.add(name)
+    # Defined ids: setAttribute('id', 'x').
+    pos = 0
+    while True:
+        i = text.find("setAttribute", pos)
+        if i < 0:
+            break
+        pos = i + 12
+        k = i + 12
+        while k < n and text[k] in " \\t":
+            k = k + 1
+        if k >= n or text[k] != "(":
+            continue
+        k = k + 1
+        while k < n and text[k] in " \\t":
+            k = k + 1
+        if k + 3 < n and (text[k] == "'" or text[k] == "\\"") and text[k + 1:k + 3] == "id" and text[k + 3] == text[k]:
+            k = k + 4
+            while k < n and text[k] in " \\t,":
+                k = k + 1
+            if k < n and (text[k] == "'" or text[k] == "\\""):
+                q = text[k]
+                j = k + 1
+                name = ""
+                while j < n and text[j] != q:
+                    name = name + text[j]
+                    j = j + 1
+                if name:
+                    defined.add(name)
+    # Referenced ids, lane 1: getElementById('x') with a string literal.
+    pos = 0
+    while True:
+        i = text.find("getElementById", pos)
+        if i < 0:
+            break
+        pos = i + 14
+        k = i + 14
+        while k < n and text[k] in " \\t":
+            k = k + 1
+        if k >= n or text[k] != "(":
+            continue
+        k = k + 1
+        while k < n and text[k] in " \\t":
+            k = k + 1
+        if k >= n or (text[k] != "'" and text[k] != "\\""):
+            continue
+        q = text[k]
+        j = k + 1
+        name = ""
+        while j < n and text[j] != q:
+            name = name + text[j]
+            j = j + 1
+        if not name or j >= n:
+            continue
+        ok_id = True
+        for c in name:
+            if c not in idset:
+                ok_id = False
+                break
+        if ok_id and name not in refs:
+            refs.append(name)
+    # Referenced ids, lane 2: quoted '#ident' selector literals passed to a
+    # call (querySelector/querySelectorAll/$()/jQuery-likes). A complex
+    # selector's LEADING id ('#hud .score') still requires the id to exist.
+    pos = 0
+    while True:
+        i = text.find("#", pos)
+        if i < 0:
+            break
+        pos = i + 1
+        if i == 0 or i + 1 >= n:
+            continue
+        q = text[i - 1]
+        if q != "'" and q != "\\"":
+            continue
+        j = i - 2
+        while j >= 0 and text[j] in " \\t":
+            j = j - 1
+        if j < 0 or (text[j] != "(" and text[j] != ","):
+            continue
+        k = i + 1
+        name = ""
+        while k < n and text[k] in idset:
+            name = name + text[k]
+            k = k + 1
+        if not name or k >= n:
+            continue
+        nxt = text[k]
+        if nxt != q and nxt not in " >.[:,+~":
+            continue
+        is_hex = len(name) in (3, 4, 6, 8)
+        if is_hex:
+            for c in name:
+                if c not in hexdigits:
+                    is_hex = False
+                    break
+        if is_hex:
+            continue
+        if name not in refs:
+            refs.append(name)
+    for name in refs:
+        if len(failures) >= 8:
+            break
+        if name not in defined:
+            failures.append("dom-contract: the script references element id '#" + name + "' (getElementById/selector) but no element with id=\\"" + name + "\\" exists in the delivered markup - the reference resolves to null at runtime (a rename applied to one side of the markup<->script contract). Add the element id or update every reference")
+return {
+    "dom_ok": len(failures) == 0,
+    "failures": failures,
+    "referenced_ids": len(refs),
+    "defined_ids": len(defined),
+}
+""".strip()
+
 # Compose the browser_probe tool call for web entrypoints (code's registered
 # tool, agora c2769). require_nonblank stays false: canvas liveness is read
 # from diag by GATE3 itself — a blank canvas always FAILS (red-team fix
@@ -767,7 +1188,16 @@ DET_VERDICT_CODE = """
 g0 = gate0_out or {}
 g1 = gate1_out or {}
 g4 = gate4_out or {}
-failures = [str(f) for f in (g0.get("failures") or [])] + [str(f) for f in (g1.get("failures") or [])] + [str(f) for f in (g4.get("failures") or [])]
+g5 = gate5_out or {}
+gdom = gate_dom_out or {}
+failures = (
+    [str(f) for f in (g0.get("failures") or [])]
+    + [str(f) for f in (g1.get("failures") or [])]
+    + [str(f) for f in (g4.get("failures") or [])]
+    + [str(f) for f in (gdom.get("failures") or [])]
+    + [str(f) for f in (g5.get("failures") or [])]
+)
+warnings = [str(w) for w in (g5.get("warnings") or [])]
 failed = len(failures) > 0
 entry = str(g0.get("entrypoint") or "")
 arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])][:5]
@@ -781,6 +1211,7 @@ return {
         "all_passed": False,
         "failures": failures,
         "environment_failures": [],
+        "warnings": warnings,
         "summary": summary,
         "artifacts": arts if failed else [],
         "gate_source": "deterministic",
@@ -788,6 +1219,8 @@ return {
             "delivery_ok": bool(g0.get("delivery_ok")),
             "integration_ok": bool(g1.get("integration_ok")),
             "orphans_ok": bool(g4.get("orphans_ok", True)),
+            "dom_ok": bool(gdom.get("dom_ok", True)),
+            "selfcheck_bound": bool(g5.get("selfcheck_ok", True)),
             "web_class": bool(g0.get("web_class")),
             "entrypoint": entry,
             "files_count": len(g0.get("files") or []),
@@ -819,6 +1252,7 @@ v = verifier_data if isinstance(verifier_data, dict) else {}
 g0 = gate0_out or {}
 g1 = gate1_out or {}
 g3 = gate3_out or {}
+g5 = gate5_out or {}
 web = bool(g0.get("web_class"))
 # A verifier that RAN always returns the strict-schema keys (all fields are
 # required); a verdict carrying neither gate key is a verifier that DIED or
@@ -848,7 +1282,7 @@ if verdict_missing:
         "all_passed": False,
         "failures": [],
         "environment_failures": env_failures,
-        "warnings": [str(w) for w in (g3.get("warnings") or [])],
+        "warnings": [str(w) for w in (g3.get("warnings") or [])] + [str(w) for w in (g5.get("warnings") or [])],
         "build_error": "",
         "run_error": "",
         "mismatch": "",
@@ -876,7 +1310,30 @@ env_failures = v.get("environment_failures") or []
 if not isinstance(env_failures, list):
     env_failures = [str(env_failures)]
 env_failures = [str(f) for f in env_failures]
+# R4 fold (memgraph forensics 2026-07-21): the verifier's own per-feature
+# enumeration is BINDING — any entry it marked depends_on_input=false becomes
+# a failures[] line naming the mechanism and belts matches=false. A feature
+# that is present but vacuous can never ride a matches=true verdict. String
+# "false" coerces (tool-arg coercion class, 2026-02-20 note).
+fchecks = v.get("feature_checks") or []
+if not isinstance(fchecks, list):
+    fchecks = []
+for fc in fchecks:
+    if not isinstance(fc, dict):
+        continue
+    dep = fc.get("depends_on_input")
+    dep_false = (dep is False) or (str(dep).strip().lower() == "false")
+    if dep_false:
+        feat = str(fc.get("feature") or "unnamed feature").strip()
+        ev = str(fc.get("evidence") or fc.get("expected_change") or "").strip()
+        line = "matches: task-named feature '" + feat[:120] + "' does not depend on its input" + ((" - " + ev[:200]) if ev else "") + " - a feature that is present but vacuous is a FAILURE, not a pass"
+        if line not in failures:
+            failures.append(line)
+        matches = False
 warnings = [str(w) for w in (g3.get("warnings") or [])]
+for w in (g5.get("warnings") or []):
+    if str(w) not in warnings:
+        warnings.append(str(w))
 if web:
     # World-side truth: the probe decided executes; its environment failures
     # ride regardless of what the LLM reported.
@@ -904,6 +1361,7 @@ return {
     "mismatch": str(v.get("mismatch") or ""),
     "summary": str(v.get("summary") or ""),
     "artifacts": arts,
+    "feature_checks": fchecks,
     "gate_source": "verifier+deterministic+probe" if web else "verifier+deterministic",
     "probe": {"engine": str(g3.get("engine") or ""), "stage": str(g3.get("stage") or ""), "diag": g3.get("diag") or {}} if web else {},
     "deterministic": {
@@ -928,23 +1386,56 @@ passed = bool(state.get("all_passed"))
 fixable = state.get("failures") or []
 environmental = state.get("environment_failures") or []
 environment_blocked = completed > 0 and len(environmental) > 0 and len(fixable) == 0
+# R1 stall guard (memgraph forensics 2026-07-21): two consecutive identical
+# normalized failure sets = the loop is not converging; a third identical
+# round cannot help — with R2 the best snapshot is delivered instead of
+# burning it. next_state RESETS the counter when it escalates to the one
+# bounded rebuild (R5), so this guard only ends the run once that escape is
+# spent. Sibling of the environment-blocked early stop.
+same_sig = int(state.get("same_signature_count", 0) or 0)
+stalled = same_sig >= 2
 # Continue while the last round did NOT fully pass and we still have budget.
-condition = (not passed) and (not environment_blocked) and completed < max_rounds_value
+condition = (not passed) and (not environment_blocked) and (not stalled) and completed < max_rounds_value
 return {
     "condition": condition,
     "rounds_completed": completed,
     "max_rounds": max_rounds_value,
     "all_passed": passed,
+    "stalled": stalled,
 }
 """.strip()
 
-# Build the builder's reprompt from the request + the last verifier verdict.
+# Build the builder's prompt from the request + loop state. 0.2.4 (memgraph
+# forensics, ARCHITECTURE.md §5 R1/R5): the prompt now BRANCHES on
+# loop_state.mode —
+#   build   (round 0)          — full delivery+engineering rules + profiling.
+#   repair  (fixable failures) — mechanically DIFFERENT from a build round:
+#                                consumes last_verdict (artifact name, verbatim
+#                                error fields, probe diag), scopes the work to
+#                                grep-able tokens extracted from the failure
+#                                text, FORBIDS write_file rewrites, and carries
+#                                cross-round memory (last_attempt_summary).
+#   rebuild (one escalation)   — build branch + "do not reproduce the failed
+#                                design" (design-level failures only, R5).
+# C8's SELFCHECK instruction now demands ARTIFACT-SHA256 binding lines (R3):
+# the verify subflow's G5 recomputes them, so a post-verification rewrite is
+# a caught gate failure instead of a shipped stale all-green self-report.
 BUILDER_PROMPT_CODE = """
 req = str(request or "").strip()
 state = loop_state or {}
 completed = int(state.get("rounds_completed", 0) or 0)
-failures = state.get("failures") or []
+failures = [str(f) for f in (state.get("failures") or [])]
 ws = str(workspace_root or "").strip()
+verdict = state.get("last_verdict") or {}
+if not isinstance(verdict, dict):
+    verdict = {}
+mode = str(state.get("mode") or "")
+if not mode:
+    mode = "build" if completed == 0 else "repair"
+same = int(state.get("same_signature_count", 0) or 0)
+summary = str(state.get("last_attempt_summary") or "").strip()
+repair = completed > 0 and len(failures) > 0 and mode != "rebuild"
+rebuild = completed > 0 and mode == "rebuild"
 
 parts = []
 parts.append("# Coding task")
@@ -952,30 +1443,122 @@ parts.append(req)
 if ws:
     parts.append("")
     parts.append("Work inside the workspace root: " + ws)
-parts.append("")
-parts.append("Delivery rules (verified mechanically after every round):")
-parts.append("- Every produced file must live in the run workspace — never /tmp or another directory.")
-parts.append("- For small web builds (games, pages, demos): prefer ONE self-contained entrypoint (index.html with inline script/styles) unless the task explicitly requires multiple files.")
-parts.append("- If you do split files, the entrypoint must actually load every sibling (script src / link href) — an unreferenced file is a delivery failure, not a bonus.")
-# C1 (plan improving-code, 2026-07-21): codex-grade engineering rules. The
-# dead-temporal-ripple defect (0,0,0 samples across all three 0.2.2 runs)
-# came from code that ran WITHOUT error yet computed a constant — the class
-# these rules target. Phrased general-purpose (every coding task), not
-# graph-specific.
-parts.append("")
-parts.append("Engineering rules (a clean run is not enough — the output must be CORRECT):")
-parts.append("- Bound every traversal, recursion, and iteration with an explicit limit (max depth/hops, a per-step cap, a visited set) — an unbounded or accidentally-empty loop is a bug even when it does not crash.")
-parts.append("- Before writing logic over any data structure, VERIFY its actual shape and the DIRECTION of its references (which field points at which; source vs target; parent vs child) by inspecting a real sample — do not assume the direction from the name.")
-parts.append("- Same output for every input is BROKEN even without an error: if a feature is meant to react to its input, its result MUST change when the input changes. Never ship a function whose output is provably constant across the inputs it is supposed to respond to.")
-parts.append("- Self-probe before you finish: actually exercise the code on representative input (run it, or for a web build load it and observe) and confirm the task-named behavior is VISIBLE and VARIES — do not declare done on 'it compiles' or 'it loads'.")
-if completed > 0 and failures:
+if repair:
+    # R1 REPAIR REFLEX: anti-repeat block first when the same failure set
+    # already persisted through a previous attempt.
+    if same >= 1:
+        parts.append("")
+        parts.append("You (or a previous round) already attempted this exact failure set and it PERSISTED. The previous approach was: " + (summary if summary else "(no account of the previous attempt survived)"))
+        parts.append("Do something different in the same region; do not repeat the previous approach.")
+    arts = verdict.get("artifacts") or []
+    artifact = str(arts[0]).strip() if arts else ""
+    probe = verdict.get("probe") or {}
+    if not isinstance(probe, dict):
+        probe = {}
+    engine = str(probe.get("engine") or "")
+    diag = probe.get("diag") or {}
     parts.append("")
-    parts.append("# Previous attempt FAILED these checks — fix EXACTLY these, do not start over:")
+    parts.append("# REPAIR ROUND - the artifact already exists. Fix it IN PLACE; do not start over.")
+    if artifact:
+        line = "Artifact under repair: " + artifact
+        if engine:
+            line = line + " (world-side probe engine: " + engine + ")"
+        parts.append(line)
+    if diag:
+        parts.append("Probe diagnostics from the failing run: " + str(diag))
+    parts.append("")
+    parts.append("# Previous attempt FAILED these checks - fix EXACTLY these, do not start over:")
     for i, f in enumerate(failures, 1):
-        parts.append(str(i) + ". " + str(f))
+        parts.append(str(i) + ". " + f)
+    build_error = str(verdict.get("build_error") or "").strip()
+    run_error = str(verdict.get("run_error") or "").strip()
+    mismatch = str(verdict.get("mismatch") or "").strip()
+    if build_error:
+        parts.append("Build error (verbatim): " + build_error)
+    if run_error and run_error != "decided by browser probe":
+        parts.append("Run error (verbatim): " + run_error)
+    if mismatch:
+        parts.append("Mismatch (verbatim): " + mismatch)
+    # General-purpose region scoping: quoted strings + identifier-like tokens
+    # from the failure text, minus a small stopword list of gate/English
+    # vocabulary. Error text always carries identifiers - page errors,
+    # tracebacks and compiler errors alike - so the tokens point at the
+    # failing region for every artifact class. Noise is harmless: it only
+    # orders a search.
+    stop = {"the", "a", "an", "and", "or", "not", "of", "to", "in", "on", "at", "by", "for", "with", "from", "into", "is", "are", "was", "were", "be", "been", "being", "it", "its", "this", "that", "these", "those", "does", "do", "did", "done", "but", "as", "if", "then", "than", "when", "while", "no", "none", "null", "undefined", "cannot", "can", "could", "must", "never", "only", "error", "errors", "page", "console", "failed", "failure", "failures", "file", "files", "exist", "exists", "existing", "missing", "load", "loads", "loaded", "resource", "request", "requests", "web", "execute", "executes", "executed", "execution", "integration", "delivery", "orphan", "function", "functions", "declared", "referenced", "references", "reference", "workspace", "entrypoint", "code", "script", "markup", "element", "browser", "probe", "canvas", "render", "renders", "rendered", "round", "still", "blank", "under", "input", "drive", "samples", "sampled", "pixels", "area", "covers", "because", "which", "where", "your", "you", "set", "setting", "get", "getting", "properties", "property", "value", "values", "html", "htm", "http", "https", "line", "lines", "after", "before", "self", "report", "verification", "verified", "modified", "artifact", "artifacts", "delivered", "bytes", "different", "attests", "regenerate", "task", "named", "feature", "depend", "depends", "dom", "contract", "runtime", "resolves", "rename", "applied", "side", "add", "update", "intended", "gate", "gates", "check", "checks", "split", "brain", "sibling", "inline", "delete", "call", "every"}
+    tokens = []
+    sources = failures + [build_error, run_error, mismatch]
+    for src in sources:
+        text = str(src)
+        for q in ("'", "\\""):
+            pos = 0
+            while True:
+                i = text.find(q, pos)
+                if i < 0:
+                    break
+                j = text.find(q, i + 1)
+                if j < 0:
+                    break
+                tok = text[i + 1:j].strip()
+                pos = j + 1
+                if tok and len(tok) <= 60 and " " not in tok and "\\n" not in tok:
+                    if tok.lower() not in stop and tok not in tokens:
+                        tokens.append(tok)
+        k = 0
+        n = len(text)
+        while k < n:
+            c = text[k]
+            if c.isalpha() or c == "_" or c == "$":
+                t = c
+                k = k + 1
+                while k < n and (text[k].isalnum() or text[k] == "_" or text[k] == "$"):
+                    t = t + text[k]
+                    k = k + 1
+                if len(t) >= 3 and t.lower() not in stop and t not in tokens:
+                    tokens.append(t)
+            else:
+                k = k + 1
+    tokens = tokens[:12]
     parts.append("")
-    parts.append("Make the minimal changes that resolve the specific failures above, then stop.")
+    parts.append("Repair protocol (follow IN ORDER):")
+    parts.append("Step 1: read " + (artifact if artifact else "the failing artifact") + " with read_file before changing anything.")
+    if tokens:
+        parts.append("Step 2: search_files for these tokens from the failure text: " + ", ".join(tokens) + " - the failure lives where they are used.")
+    else:
+        parts.append("Step 2: search_files for the identifiers named in the failure text - the failure lives where they are used.")
+    parts.append("Step 3: make the SMALLEST edit_file change that fixes the named failure. Do NOT rewrite the file with write_file - a rewrite discards working code and re-rolls its bugs.")
+    parts.append("Step 4: re-run your self-probe and confirm THE NAMED FAILURE no longer reproduces, then stop.")
 else:
+    parts.append("")
+    parts.append("Delivery rules (verified mechanically after every round):")
+    parts.append("- Every produced file must live in the run workspace — never /tmp or another directory.")
+    parts.append("- For small web builds (games, pages, demos): prefer ONE self-contained entrypoint (index.html with inline script/styles) unless the task explicitly requires multiple files.")
+    parts.append("- If you do split files, the entrypoint must actually load every sibling (script src / link href) — an unreferenced file is a delivery failure, not a bonus.")
+    parts.append("- The hidden .cg_rounds/ directory is loop bookkeeping (round snapshots) — never modify it, reference it, or deliver anything from it.")
+    # C1 (plan improving-code, 2026-07-21): codex-grade engineering rules. The
+    # dead-temporal-ripple defect (0,0,0 samples across all three 0.2.2 runs)
+    # came from code that ran WITHOUT error yet computed a constant — the class
+    # these rules target. Phrased general-purpose (every coding task), not
+    # graph-specific.
+    parts.append("")
+    parts.append("Engineering rules (a clean run is not enough — the output must be CORRECT):")
+    parts.append("- Bound every traversal, recursion, and iteration with an explicit limit (max depth/hops, a per-step cap, a visited set) — an unbounded or accidentally-empty loop is a bug even when it does not crash.")
+    parts.append("- Before writing logic over any data structure, VERIFY its actual shape and the DIRECTION of its references (which field points at which; source vs target; parent vs child) by inspecting a real sample — do not assume the direction from the name.")
+    parts.append("- Same output for every input is BROKEN even without an error: if a feature is meant to react to its input, its result MUST change when the input changes. Never ship a function whose output is provably constant across the inputs it is supposed to respond to.")
+    parts.append("- Self-probe before you finish: actually exercise the code on representative input (run it, or for a web build load it and observe) and confirm the task-named behavior is VISIBLE and VARIES — do not declare done on 'it compiles' or 'it loads'.")
+    if rebuild:
+        # R5 escalation: exactly one rebuild, entered when repairs did not
+        # converge (same_signature_count >= 2) or the failure is design-level
+        # (matches-only gap). The failed design is named so it is not
+        # reproduced verbatim by a fresh agent with no memory.
+        parts.append("")
+        parts.append("# REBUILD ROUND (one-time escalation) - repairs did not converge; the previous DESIGN is the problem, not a single line.")
+        parts.append("The previous design failed for these reasons; do NOT reproduce the same design:")
+        for i, f in enumerate(failures, 1):
+            parts.append(str(i) + ". " + f)
+        if summary:
+            parts.append("The last attempt was: " + summary)
+        parts.append("Rebuild from a DIFFERENT design that avoids these failure mechanisms.")
     parts.append("")
     # C2 (plan improving-code, 2026-07-21): round-0 data profiling. Findings
     # ride as a source comment block so the verifier (and the next round) can
@@ -987,8 +1570,17 @@ else:
 # below the mechanical gates deliberately (a self-report is confabulation-
 # aware, not proof) — it makes the builder's own verification claims
 # auditable against the deterministic gates + probe.
+# R3 amendment (memgraph forensics): the self-report must BIND to the bytes
+# it verified via ARTIFACT-SHA256 lines — emitted in EVERY round, repair
+# included: a repair MUST touch SELFCHECK with fresh hashes or G5 fails the
+# round, resolving the old minimal-change-vs-regenerate-report tension
+# mechanically.
 parts.append("")
 parts.append("Before finishing, write a SELFCHECK.md in the workspace: for EACH behavior the task named, one line stating how you verified it and the CONCRETE evidence you observed (the command you ran and its output, or the on-screen result and how it VARIED with input) — not 'looks correct'. If you could not verify something, say so plainly. This file is evidence for an independent verifier, so claims without observed evidence are worse than an honest 'unverified'.")
+parts.append("MANDATORY HASH BINDING (a deterministic gate recomputes this): AFTER your FINAL edit, compute the sha256 of every file you claim (execute_command: shasum -a 256 <path>) and END SELFCHECK.md with one line per claimed file, exactly this format:")
+parts.append("ARTIFACT-SHA256: <workspace-relative-path> <sha256>")
+parts.append("Example: ARTIFACT-SHA256: index.html 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae")
+parts.append("If ANY byte of a claimed file changes after its hash line was computed, the round FAILS ('artifact modified after last self-verification'). So: once your self-probe passes, STOP — any further edit requires re-probing AND regenerating SELFCHECK.md with fresh hash lines.")
 return "\\n".join(parts)
 """.strip()
 
@@ -1050,12 +1642,13 @@ else:
 parts.append("")
 parts.append("## Gate 3 - MATCHES THE ASK")
 parts.append("Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').")
-# C3 (plan improving-code, 2026-07-21): non-vacuity. The dead-ripple defect
-# passed every structural check — a feature was PRESENT and ran cleanly yet
-# its output never varied. Structure-present is not behavior-correct: the
-# verifier must confirm each task-named feature's output DEPENDS on its
-# input, and treat a provably-constant output as a MATCH FAILURE.
-parts.append("NON-VACUITY (required): for each behavior the task names, confirm its output actually DEPENDS on its input — that the feature reacts, not merely exists. Read SELFCHECK.md if present for the builder's claimed evidence, but do not trust it: check the code path yourself (does the output derive from the input, or is it hard-coded / a constant / an always-empty result?). If a task-named feature's output is provably constant or always-empty across the inputs it is supposed to respond to, that is matches=false with a failures[] line NAMING the mechanism (e.g. 'ripple effect computes the same 0 for every cell because it never reads neighbor state'). A feature that is present but vacuous is a FAILURE, not a pass.")
+# R4 (memgraph forensics 2026-07-21, replaces the 0.2.3 C3 prose): forced
+# per-feature enumeration. The C3 paragraph produced no artifact, so the
+# verifier sampled 1-2 salient features and set matches=true — dead playback
+# and a missing ranking passed invisibly (F4). The schema now REQUIRES a
+# feature_checks[] entry per task-named behavior and the merge fails any
+# depends_on_input=false entry, so coverage is auditable in the verdict.
+parts.append("FEATURE ENUMERATION (required — the response schema enforces it): Step 1: extract EVERY user-observable behavior the task names, each as a verbatim quote from the task text. Step 2: for EACH one, emit a feature_checks[] entry: feature (the verbatim quote), input (the concrete input/interaction that should drive it), expected_change (the observable output that must change), evidence (what you actually inspected that proves the output DERIVES from the input), depends_on_input (true/false). For web artifacts the evidence must name the FULL chain — event listener -> state mutation -> render read; 'a handler exists' is NOT evidence. Read SELFCHECK.md if present for the builder's claimed evidence, but do not trust it: check the code path yourself (does the output derive from the input, or is it hard-coded / a constant / an always-empty result?). depends_on_input means 'this feature is ALIVE, not vacuous' — for STATIC features the task names with no interaction of their own (a visible label, fixed text, layout), the check is correct PRESENCE: set depends_on_input=true when the static feature is correctly present, and say so in the evidence. Reserve depends_on_input=false STRICTLY for defects: a feature whose output SHOULD respond to its input but is provably constant / always-empty / disconnected, or a named feature that is missing outright. If ANY feature is vacuous, set its depends_on_input=false AND matches=false with a failures[] line NAMING the mechanism (e.g. 'ripple effect computes the same 0 for every cell because it never reads neighbor state'). A feature that is present but vacuous is a FAILURE, not a pass. Do not skip features: one entry per named behavior — the merge fails any depends_on_input=false entry.")
 parts.append("")
 parts.append("## Verdict")
 parts.append("Set all_passed=true ONLY if builds AND executes AND matches are all true AND environment_failures is empty. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.")
@@ -1078,15 +1671,33 @@ return "\\n".join(parts)
 # never a fixable failure (nothing failed); the final report's terminal
 # workspace listing supplies the delivered/artifact evidence this run-level
 # fold cannot see.
+# 0.2.4 additions (memgraph forensics, ARCHITECTURE.md §5):
+#   R1 — attempt_history / failure_signature (normalized per-line, digits
+#        stripped, compared as SETS so gate-vocabulary shifts and round
+#        numbers in failure wording do not defeat repetition detection) /
+#        same_signature_count / last_attempt_summary (the builder's own
+#        account, previously DISCARDED — the only way round N+2 can know what
+#        round N+1 already tried).
+#   R2 — gate_score ordered tuple (all_passed, builds+executes+matches count,
+#        delivery_ok) tracked as best_round/best_score/best_snapshot/
+#        best_verdict, monotone max; a failed snapshot degrades to a
+#        #FALLBACK warning and never blocks the round or claims a snapshot
+#        that does not exist.
+#   R5 — mode economics: build -> repair -> ONE rebuild (entered on
+#        same_signature_count >= 2, resetting the counter so the stall guard
+#        fires only once the escape is spent, or on a matches-only gap =
+#        design-level failure) -> stop.
 NEXT_STATE_CODE = """
 verdict = verifier if isinstance(verifier, dict) else {}
-next_round = int(round_index or 0) + 1
+prev = prev_state if isinstance(prev_state, dict) else {}
+rnd = int(round_index or 0)
+next_round = rnd + 1
 verdict_missing = ("builds" not in verdict) and ("all_passed" not in verdict)
 if verdict_missing:
     meta = verify_meta if isinstance(verify_meta, dict) else {}
     err = str(meta.get("error") or "the verification subflow returned no verdict")
     env_line = "verification unavailable: the verification subflow failed before returning a verdict: " + err[:300]
-    synth = {
+    verdict = {
         "builds": False,
         "executes": False,
         "matches": False,
@@ -1098,20 +1709,15 @@ if verdict_missing:
         "verifier_died": True,
         "gate_source": "none (verification subflow failed)",
     }
-    return {
-        "rounds_completed": next_round,
-        "all_passed": False,
-        "failures": [],
-        "environment_failures": [env_line],
-        "last_verdict": synth,
-    }
 all_passed = bool(verdict.get("all_passed"))
 failures = verdict.get("failures") or []
 if not isinstance(failures, list):
     failures = [str(failures)]
+failures = [str(f) for f in failures]
 env_failures = verdict.get("environment_failures") or []
 if not isinstance(env_failures, list):
     env_failures = [str(env_failures)]
+env_failures = [str(f) for f in env_failures]
 # Belt: if the verdict claims pass but a gate is false, do not trust the pass.
 if all_passed and not (verdict.get("builds") and verdict.get("executes") and verdict.get("matches")):
     all_passed = False
@@ -1119,12 +1725,182 @@ if all_passed and not (verdict.get("builds") and verdict.get("executes") and ver
 if all_passed and env_failures:
     all_passed = False
     failures = failures + ["verifier marked all_passed despite environment_failures"]
+# R1: normalized failure signature (per-line lowercase, digits stripped,
+# compared as a SET — tolerates vocabulary shifts and round counters).
+norm = []
+for f in failures:
+    s = ""
+    for c in str(f).strip().lower():
+        if c not in "0123456789":
+            s = s + c
+    norm.append(s)
+sig = "|".join(sorted(set(norm)))
+prev_sig = str(prev.get("failure_signature") or "")
+same = int(prev.get("same_signature_count", 0) or 0)
+if sig and prev_sig and sig == prev_sig:
+    same = same + 1
+else:
+    same = 0
+# R1: the builder's own account of what it did (truncated ~800 chars); an
+# empty report keeps the previous summary rather than erasing the memory.
+summary_txt = str(builder_report or "").strip()
+if len(summary_txt) > 800:
+    summary_txt = summary_txt[:800] + "..."
+if not summary_txt:
+    summary_txt = str(prev.get("last_attempt_summary") or "")
+# R2: gate score + best-round tracking (monotone max; ties keep the earlier
+# round — first-best wins).
+det = verdict.get("deterministic") or {}
+if not isinstance(det, dict):
+    det = {}
+gate_count = 0
+if verdict.get("builds"):
+    gate_count = gate_count + 1
+if verdict.get("executes"):
+    gate_count = gate_count + 1
+if verdict.get("matches"):
+    gate_count = gate_count + 1
+gate_score = [1 if all_passed else 0, gate_count, 1 if det.get("delivery_ok") else 0]
+warnings_state = [str(w) for w in (prev.get("warnings") or [])]
+best_score = prev.get("best_score")
+best_round = prev.get("best_round")
+best_snapshot = str(prev.get("best_snapshot") or "")
+best_verdict = prev.get("best_verdict") or {}
+if bool(snapshot_ok):
+    better = True
+    if isinstance(best_score, list) and len(best_score) == 3:
+        cur = (gate_score[0], gate_score[1], gate_score[2])
+        old = (int(best_score[0] or 0), int(best_score[1] or 0), int(best_score[2] or 0))
+        better = cur > old
+    if better:
+        best_score = gate_score
+        best_round = rnd
+        best_snapshot = ".cg_rounds/round_" + str(rnd)
+        best_verdict = verdict
+else:
+    w = "snapshot: round " + str(rnd) + " snapshot failed - best-artifact restore cannot cover this round (#FALLBACK: delivery falls back to the last write for it)"
+    if w not in warnings_state:
+        warnings_state.append(w)
+# R1: attempt history (bounded by max_rounds).
+history = prev.get("attempt_history") or []
+if not isinstance(history, list):
+    history = []
+history = history + [{"round": rnd, "failures": failures, "gate_score": gate_score}]
+# R5: mode economics.
+rebuilds_used = int(prev.get("rebuilds_used", 0) or 0)
+repair_attempts = int(prev.get("repair_attempts", 0) or 0)
+if str(prev.get("mode") or "") == "repair":
+    repair_attempts = repair_attempts + 1
+matches_gap = bool(verdict.get("builds")) and bool(verdict.get("executes")) and not bool(verdict.get("matches")) and len(env_failures) == 0
+next_mode = "repair"
+if (not all_passed) and len(failures) > 0 and (same >= 2 or matches_gap) and rebuilds_used == 0:
+    next_mode = "rebuild"
+    rebuilds_used = 1
+    same = 0
 return {
     "rounds_completed": next_round,
     "all_passed": all_passed,
-    "failures": [str(f) for f in failures],
-    "environment_failures": [str(f) for f in env_failures],
+    "failures": failures,
+    "environment_failures": env_failures,
     "last_verdict": verdict,
+    "attempt_history": history,
+    "failure_signature": sig,
+    "same_signature_count": same,
+    "last_attempt_summary": summary_txt,
+    "mode": next_mode,
+    "rebuilds_used": rebuilds_used,
+    "repair_attempts": repair_attempts,
+    "best_round": best_round,
+    "best_score": best_score,
+    "best_snapshot": best_snapshot,
+    "best_verdict": best_verdict,
+    "warnings": warnings_state,
+}
+""".strip()
+
+# R2 snapshot (memgraph forensics, ARCHITECTURE.md §2): copy the workspace
+# into the hidden .cg_rounds/round_<N> directory right after the round's
+# verify, so the verdict just produced describes exactly the snapshotted
+# bytes. .cg_rounds is a dot-directory: G0's listing and the final delivery
+# listing both run with include_hidden:false, so snapshots are invisible to
+# every gate. Exclusion is by name inside the copy loop (never recurse into
+# .cg_rounds). A copy failure exits 1 -> call success=false -> next_state
+# degrades it to a #FALLBACK warning; the round itself never fails on it.
+SNAPSHOT_ARGS_CODE = """
+ws = str(workspace_root or "").strip()
+rnd = int(round_index or 0)
+snap = ".cg_rounds/round_" + str(rnd)
+prefix = ("cd '" + ws + "' && ") if ws else ""
+cmd = (
+    prefix
+    + "mkdir -p '" + snap + "' && for f in * .[!.]* ..?*; do "
+    + "if [ -e \\"$f\\" ] && [ \\"$f\\" != \\".cg_rounds\\" ]; then cp -R \\"$f\\" '" + snap + "/' || exit 1; fi; done"
+)
+return {
+    "name": "execute_command",
+    "arguments": {"command": cmd},
+    "call_id": "cg-snapshot-round-" + str(rnd),
+}
+""".strip()
+
+# R5 budget shaping (pure): repair rounds are targeted minimal edits and get
+# a smaller agent budget (12 iterations); build and the one escalation
+# rebuild keep the full 30. mode falls back honestly when the state predates
+# the key (round 0 = build, later = repair).
+ROUND_MODE_PINS_CODE = """
+state = loop_state or {}
+completed = int(state.get("rounds_completed", 0) or 0)
+mode = str(state.get("mode") or "")
+if not mode:
+    mode = "build" if completed == 0 else "repair"
+iters = 30
+if mode == "repair":
+    iters = 12
+return {"mode": mode, "max_iterations": iters}
+""".strip()
+
+# R2 restore decision (pure): compare the FINAL round's gate score against
+# the best snapshotted round's; when the last write is strictly worse than a
+# snapshotted earlier round, compose the copy-back command. Guards: never on
+# all_passed (final == best by construction: a passing round exits the loop
+# immediately), never without a recorded snapshot, and the snapshot path must
+# live under .cg_rounds/ (the only path next_state ever mints).
+RESTORE_DECIDE_CODE = """
+state = loop_state or {}
+ws = str(workspace_root or "").strip()
+passed = bool(state.get("all_passed"))
+best_score = state.get("best_score")
+best_snapshot = str(state.get("best_snapshot") or "")
+best_round = state.get("best_round")
+history = state.get("attempt_history") or []
+final_score = None
+if isinstance(history, list) and len(history) > 0:
+    last = history[-1]
+    if isinstance(last, dict):
+        final_score = last.get("gate_score")
+restore = False
+if (not passed) and best_snapshot.startswith(".cg_rounds/") and isinstance(best_score, list) and len(best_score) == 3:
+    f0 = 0
+    f1 = 0
+    f2 = 0
+    if isinstance(final_score, list) and len(final_score) == 3:
+        f0 = int(final_score[0] or 0)
+        f1 = int(final_score[1] or 0)
+        f2 = int(final_score[2] or 0)
+    best = (int(best_score[0] or 0), int(best_score[1] or 0), int(best_score[2] or 0))
+    restore = best > (f0, f1, f2)
+prefix = ("cd '" + ws + "' && ") if ws else ""
+cmd = prefix + "cp -R '" + best_snapshot + "/.' ."
+return {
+    "restore": restore,
+    "tool_call": {
+        "name": "execute_command",
+        "arguments": {"command": cmd},
+        "call_id": "cg-restore-best-round",
+    },
+    "restored_round": best_round,
+    "best_score": best_score,
+    "final_score": final_score,
 }
 """.strip()
 
@@ -1155,13 +1931,30 @@ return {
 #               executor OR a verifier that died — the same "cannot verify
 #               here" class). success=true, passed stays false.
 #   STOPPED   — fixable gate failures remain (or nothing was delivered).
+# R2 addition (memgraph forensics): when the terminal workspace was RESTORED
+# from the best round's snapshot, the report says so up front and reports the
+# DELIVERED round's verdict (best_verdict), with the final round's verdict as
+# a discarded appendix — the report must describe the bytes the user gets.
 FINAL_REPORT_CODE = """
 state = loop_state or {}
 verdict = state.get("last_verdict") or {}
+if not isinstance(verdict, dict):
+    verdict = {}
+restore = restore_out if isinstance(restore_out, dict) else {}
+restored = bool(restore.get("restore"))
+final_round_verdict = verdict
+if restored:
+    bv = state.get("best_verdict") or {}
+    if isinstance(bv, dict) and len(bv) > 0:
+        verdict = bv
 rounds = int(state.get("rounds_completed", 0) or 0)
 passed = bool(state.get("all_passed"))
-fixable = [str(f) for f in (state.get("failures") or [])]
-env_failures = [str(f) for f in (state.get("environment_failures") or [])]
+if restored:
+    fixable = [str(f) for f in (verdict.get("failures") or [])]
+    env_failures = [str(f) for f in (verdict.get("environment_failures") or [])]
+else:
+    fixable = [str(f) for f in (state.get("failures") or [])]
+    env_failures = [str(f) for f in (state.get("environment_failures") or [])]
 verifier_died = bool(verdict.get("verifier_died"))
 # Terminal delivery ground truth: parse the final listing the way G0 does.
 text = str(final_listing or "")
@@ -1192,8 +1985,16 @@ elif unverified_only:
 else:
     lines.append("Status: STOPPED with open gate failures")
 lines.append("Rounds used: " + str(rounds))
+if restored:
+    lines.append("")
+    lines.append("Delivered artifact: RESTORED from the round " + str(restore.get("restored_round")) + " snapshot (best gate score " + str(restore.get("best_score")) + " vs final round " + str(restore.get("final_score")) + ") — the final round's changes regressed the artifact and were discarded (best-verified delivery, not last-write).")
+    if restore_ok is not True:
+        lines.append("#FALLBACK: the restore command did not confirm success — the workspace may still hold the final round's bytes; treat the delivered files with suspicion.")
 lines.append("")
-lines.append("Gate verdict (last round):")
+if restored:
+    lines.append("Gate verdict (delivered round " + str(restore.get("restored_round")) + "):")
+else:
+    lines.append("Gate verdict (last round):")
 lines.append("- builds: " + str(bool(verdict.get("builds"))))
 lines.append("- executes: " + str(bool(verdict.get("executes"))))
 lines.append("- matches: " + str(bool(verdict.get("matches"))))
@@ -1215,6 +2016,9 @@ else:
     lines.append("")
     lines.append("Artifacts: none observed (#FALLBACK: report cannot name the produced file paths)")
 warnings = [str(w) for w in (verdict.get("warnings") or [])]
+for w in (state.get("warnings") or []):
+    if str(w) not in warnings:
+        warnings.append(str(w))
 if warnings:
     lines.append("")
     lines.append("Advisory (did not fail the run):")
@@ -1231,6 +2035,12 @@ if not passed:
         lines.append("Not verifiable in this environment (missing executor or dead verifier — not a code defect; the loop stops instead of burning repair rounds):")
         for f in env_failures:
             lines.append("- " + f)
+if restored:
+    lines.append("")
+    lines.append("Final round verdict (discarded after restore):")
+    lines.append("- builds/executes/matches: " + str(bool(final_round_verdict.get("builds"))) + "/" + str(bool(final_round_verdict.get("executes"))) + "/" + str(bool(final_round_verdict.get("matches"))))
+    for f in [str(x) for x in (final_round_verdict.get("failures") or [])][:6]:
+        lines.append("- " + f)
 if verdict.get("summary"):
     lines.append("")
     lines.append("Summary: " + str(verdict.get("summary")))
@@ -1239,6 +2049,7 @@ return {
     "passed": passed,
     "delivered": delivered,
     "success": success,
+    "restored": restored,
     "rounds_used": rounds,
     "gate_verdict": verdict,
     "artifacts": arts,
@@ -1311,29 +2122,49 @@ def build_verifier_subflow() -> dict[str, Any]:
                     _pin("entry_content", "entry_content", "any"),
                     _pin("script_content", "script_content", "any"),
                     _pin("script_ok", "script_ok", "boolean")]),
-        _code_node("det", "Deterministic verdict", DET_VERDICT_CODE, -100, 400,
+        # --- G5 (R3): hash-bound SELFCHECK; G6: DOM id contract (0.2.4) ---
+        _code_node("selfcheck_args", "Compose SELFCHECK read", SELFCHECK_ARGS_CODE, -100, 400,
+                   [_pin("workspace_root", "workspace_root", "string")]),
+        _call_tool("selfcheck_read", "G5: read SELFCHECK.md", ["read_file"], -480, 0),
+        _code_node("selfcheck_hash_args", "Compose hash recompute", SELFCHECK_HASH_ARGS_CODE, 280, 400,
+                   [_pin("selfcheck_content", "selfcheck_content", "any"),
+                    _pin("selfcheck_ok", "selfcheck_ok", "boolean"),
+                    _pin("workspace_root", "workspace_root", "string")]),
+        _call_tool("selfcheck_hash_call", "G5: recompute hashes", ["execute_command"], -100, 0),
+        _code_node("gate5", "G5: SELFCHECK hash binding", GATE5_CODE, -100, 700,
+                   [_pin("selfcheck_content", "selfcheck_content", "any"),
+                    _pin("selfcheck_ok", "selfcheck_ok", "boolean"),
+                    _pin("hash_output", "hash_output", "any")]),
+        _code_node("gate_dom", "G6: DOM id contract", GATE_DOM_CODE, 280, 700,
+                   [_pin("gate0_out", "gate0_out", "object"),
+                    _pin("entry_content", "entry_content", "any"),
+                    _pin("script_content", "script_content", "any"),
+                    _pin("script_ok", "script_ok", "boolean")]),
+        _code_node("det", "Deterministic verdict", DET_VERDICT_CODE, 660, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("gate1_out", "gate1_out", "object"),
-                    _pin("gate4_out", "gate4_out", "object")]),
-        _if("if_det", "Deterministic gates failed?", -480, 0),
-        _set_var("set_verdict_det", "Record deterministic verdict", "vg.verdict", -100, -220),
+                    _pin("gate4_out", "gate4_out", "object"),
+                    _pin("gate5_out", "gate5_out", "object"),
+                    _pin("gate_dom_out", "gate_dom_out", "object")]),
+        _if("if_det", "Deterministic gates failed?", 280, 0),
+        _set_var("set_verdict_det", "Record deterministic verdict", "vg.verdict", 660, -220),
         # --- G3 (web): world-side execution via browser_probe ---
-        _if("if_web", "Web entrypoint?", -100, 0),
-        _code_node("probe_args", "Compose probe call", PROBE_ARGS_CODE, 280, 400,
+        _if("if_web", "Web entrypoint?", 660, 0),
+        _code_node("probe_args", "Compose probe call", PROBE_ARGS_CODE, 1040, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("workspace_root", "workspace_root", "string")]),
-        _call_tool("probe_call", "G3: browser probe", ["browser_probe"], 280, 0),
-        _code_node("gate3", "G3: read probe result", GATE3_CODE, 660, 400,
+        _call_tool("probe_call", "G3: browser probe", ["browser_probe"], 1040, 0),
+        _code_node("gate3", "G3: read probe result", GATE3_CODE, 1420, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("probe_raw", "probe_raw", "object"),
                     _pin("round_index", "round_index", "number")]),
-        _if("if_probe", "Probe found errors?", 660, 0),
-        _code_node("probe_verdict", "Probe-failure verdict", PROBE_VERDICT_CODE, 1040, 400,
+        _if("if_probe", "Probe found errors?", 1420, 0),
+        _code_node("probe_verdict", "Probe-failure verdict", PROBE_VERDICT_CODE, 1800, 400,
                    [_pin("gate0_out", "gate0_out", "object"),
                     _pin("gate3_out", "gate3_out", "object")]),
-        _set_var("set_verdict_probe", "Record probe verdict", "vg.verdict", 1040, -220),
+        _set_var("set_verdict_probe", "Record probe verdict", "vg.verdict", 1800, -220),
         # --- LLM verifier: builds / matches (executes only for non-web) ---
-        _code_node("verifier_prompt", "Compose verifier task", VERIFIER_PROMPT_CODE, 1040, 700,
+        _code_node("verifier_prompt", "Compose verifier task", VERIFIER_PROMPT_CODE, 1800, 700,
                    [_pin("request", "request", "string"),
                     _pin("workspace_root", "workspace_root", "string"),
                     _pin("build_command", "build_command", "string"),
@@ -1341,20 +2172,24 @@ def build_verifier_subflow() -> dict[str, Any]:
                     _pin("gate0_out", "gate0_out", "object"),
                     _pin("gate3_out", "gate3_out", "object")],
                    output_type="string"),
-        _agent_node("verifier", "Independent verifier", 1040, 0,
+        _agent_node("verifier", "Independent verifier", 1800, 0,
                     # max_output_tokens bounds the verdict call (agent precision 4,
                     # c2847: review was the one unbounded call type in their lane) —
                     # the verdict is compact JSON; tool-loop turns are unaffected.
+                    # R4 raise (2000->4000 tokens, 12->16 iterations): forced
+                    # per-feature enumeration costs tokens; the old caps would
+                    # silently truncate exactly the multi-feature tasks that
+                    # need it.
                     extra_inputs=[_pin("max_output_tokens", "max_output_tokens", "number")],
                     pin_defaults={
                         "system": "You are a rigorous, independent code verifier. You never edit code. You run commands and inspect structure, then report a strict structured verdict. A gate is only PASS if you actually observed success; when a command fails, capture the real error text. A gate you could not execute is a FAIL with the reason recorded — never a pass.",
                         "tools": VERIFIER_TOOLS,
-                        "max_iterations": 12,
+                        "max_iterations": 16,
                         "temperature": 0.0,
                         "resp_schema": VERIFIER_SCHEMA,
-                        "max_output_tokens": 2000,
+                        "max_output_tokens": 4000,
                     }),
-        _code_node("merge", "Merge verdict", MERGE_VERDICT_CODE, 1420, 400,
+        _code_node("merge", "Merge verdict", MERGE_VERDICT_CODE, 2180, 400,
                    [_pin("verifier_data", "verifier_data", "object"),
                     # Death detection inputs: the agent node's success pin goes
                     # false (and data stays empty) when the verifier subrun DIED
@@ -1364,19 +2199,23 @@ def build_verifier_subflow() -> dict[str, Any]:
                     _pin("verifier_response", "verifier_response", "string"),
                     _pin("gate0_out", "gate0_out", "object"),
                     _pin("gate1_out", "gate1_out", "object"),
-                    _pin("gate3_out", "gate3_out", "object")]),
-        _set_var("set_verdict_llm", "Record merged verdict", "vg.verdict", 1420, 0),
+                    _pin("gate3_out", "gate3_out", "object"),
+                    _pin("gate5_out", "gate5_out", "object")]),
+        _set_var("set_verdict_llm", "Record merged verdict", "vg.verdict", 2180, 0),
         # --- shared tail ---
-        _get_var("read_verdict", "vg.verdict", {}, 1800, 400),
-        _node("end", "on_flow_end", "Verdict", 1800, 0,
+        _get_var("read_verdict", "vg.verdict", {}, 2560, 400),
+        _node("end", "on_flow_end", "Verdict", 2560, 0,
               inputs=[EXEC_IN, _pin("verdict", "verdict", "object")]),
     ]
     flow["edges"] = [
-        # exec spine
+        # exec spine (0.2.4: SELFCHECK read + hash recompute ride the spine
+        # between script_read and if_det so G5 folds into `det` with G0/G1/G4)
         _edge("start", "exec-out", "list_call", "exec-in", animated=True),
         _edge("list_call", "exec-out", "entry_read", "exec-in", animated=True),
         _edge("entry_read", "exec-out", "script_read", "exec-in", animated=True),
-        _edge("script_read", "exec-out", "if_det", "exec-in", animated=True),
+        _edge("script_read", "exec-out", "selfcheck_read", "exec-in", animated=True),
+        _edge("selfcheck_read", "exec-out", "selfcheck_hash_call", "exec-in", animated=True),
+        _edge("selfcheck_hash_call", "exec-out", "if_det", "exec-in", animated=True),
         _edge("if_det", "true", "set_verdict_det", "exec-in", animated=True),
         _edge("set_verdict_det", "exec-out", "end", "exec-in", animated=True),
         _edge("if_det", "false", "if_web", "exec-in", animated=True),
@@ -1410,9 +2249,26 @@ def build_verifier_subflow() -> dict[str, Any]:
         _edge("entry_read", "result", "gate4", "entry_content"),
         _edge("script_read", "result", "gate4", "script_content"),
         _edge("script_read", "success", "gate4", "script_ok"),
+        # G5 data (hash-bound SELFCHECK)
+        _edge("start", "workspace_root", "selfcheck_args", "workspace_root"),
+        _edge("selfcheck_args", "output", "selfcheck_read", "tool_call"),
+        _edge("selfcheck_read", "result", "selfcheck_hash_args", "selfcheck_content"),
+        _edge("selfcheck_read", "success", "selfcheck_hash_args", "selfcheck_ok"),
+        _edge("start", "workspace_root", "selfcheck_hash_args", "workspace_root"),
+        _edge("selfcheck_hash_args", "output", "selfcheck_hash_call", "tool_call"),
+        _edge("selfcheck_read", "result", "gate5", "selfcheck_content"),
+        _edge("selfcheck_read", "success", "gate5", "selfcheck_ok"),
+        _edge("selfcheck_hash_call", "result", "gate5", "hash_output"),
+        # G6 data (DOM id contract — pure scan over the reads already paid for)
+        _edge("gate0", "output", "gate_dom", "gate0_out"),
+        _edge("entry_read", "result", "gate_dom", "entry_content"),
+        _edge("script_read", "result", "gate_dom", "script_content"),
+        _edge("script_read", "success", "gate_dom", "script_ok"),
         _edge("gate0", "output", "det", "gate0_out"),
         _edge("gate1", "output", "det", "gate1_out"),
         _edge("gate4", "output", "det", "gate4_out"),
+        _edge("gate5", "output", "det", "gate5_out"),
+        _edge("gate_dom", "output", "det", "gate_dom_out"),
         # branch conditions + fail-fast verdicts (code-node dict keys as
         # source handles — the deep-research idiom the validator exempts)
         _edge("det", "failed", "if_det", "condition"),
@@ -1445,6 +2301,8 @@ def build_verifier_subflow() -> dict[str, Any]:
         _edge("gate0", "output", "merge", "gate0_out"),
         _edge("gate1", "output", "merge", "gate1_out"),
         _edge("gate3", "output", "merge", "gate3_out"),
+        # G5 advisory warnings ride the merged verdict on the pass path too.
+        _edge("gate5", "output", "merge", "gate5_out"),
         _edge("merge", "output", "set_verdict_llm", "value"),
         # shared tail: the var is the merge point
         _edge("read_verdict", "value", "end", "verdict"),
@@ -1474,8 +2332,10 @@ def build_root_flow() -> dict[str, Any]:
                        _pin("max_rounds", "max_rounds", "number"),
                        _pin("provider", "provider", "provider_text"),
                        _pin("model", "model", "model")],
+              # max_rounds 3->4 (R5): repairs run at max_iterations=12, so a
+              # fourth round fits roughly the old token budget.
               pin_defaults={"request": "", "workspace_root": "",
-                            "build_command": "", "run_command": "", "max_rounds": 3}),
+                            "build_command": "", "run_command": "", "max_rounds": 4}),
         # Loop state var (rounds_completed / all_passed / failures / last_verdict).
         _get_var("get_loop_state", "cg.loop_state",
                  {"rounds_completed": 0, "all_passed": False, "failures": []}, -1500, 420),
@@ -1491,6 +2351,11 @@ def build_root_flow() -> dict[str, Any]:
                     _pin("workspace_root", "workspace_root", "string"),
                     _pin("loop_state", "loop_state", "object")],
                    output_type="string"),
+        # R5: mode-shaped agent budget (build/rebuild=30, repair=12), wired
+        # into builder.max_iterations from a code output; the pin default
+        # stays as the unconnected fallback.
+        _code_node("round_mode_pins", "Round mode -> budget", ROUND_MODE_PINS_CODE, -360, -300,
+                   [_pin("loop_state", "loop_state", "object")]),
         _agent_node("builder", "Builder agent", -740, 0,
                     extra_inputs=[_pin("workspace_root", "workspace_root", "string")],
                     pin_defaults={
@@ -1506,6 +2371,13 @@ def build_root_flow() -> dict[str, Any]:
                       ("provider", "provider_text"), ("model", "model")], -360, 420),
         _subflow_node("verify", "Run gates", "coding-verify-gates", -360, 0),
         _get("get_verdict", "verdict", {}, 20, 420),
+        # R2: snapshot the just-verified workspace bytes into the hidden
+        # .cg_rounds/round_<N> before the state write — the verdict and the
+        # snapshot describe the same bytes.
+        _code_node("snapshot_args", "Compose snapshot copy", SNAPSHOT_ARGS_CODE, 20, -300,
+                   [_pin("workspace_root", "workspace_root", "string"),
+                    _pin("round_index", "round_index", "number")]),
+        _call_tool("snapshot_call", "Snapshot round", ["execute_command"], 20, 0),
         _code_node("next_state", "Record verdict", NEXT_STATE_CODE, 400, 420,
                    [_pin("verifier", "verifier", "object"),
                     # Death-detection input: on a dead gates run the subflow's
@@ -1513,9 +2385,25 @@ def build_root_flow() -> dict[str, Any]:
                     # `child_output` key carries {success: false, error} —
                     # the honest cause for the environment fold.
                     _pin("verify_meta", "verify_meta", "object"),
-                    _pin("round_index", "round_index", "number")]),
-        _set_var("set_state", "Persist loop state", "cg.loop_state", 20, 0),
+                    _pin("round_index", "round_index", "number"),
+                    # R1: the builder's own account of the round (previously
+                    # DISCARDED — builder.response had no outgoing edge).
+                    _pin("builder_report", "builder_report", "string"),
+                    # R1/R2/R5: the previous round's state (volatile get_var
+                    # read BEFORE set_state persists the new value).
+                    _pin("prev_state", "prev_state", "object"),
+                    _pin("snapshot_ok", "snapshot_ok", "boolean")]),
+        _set_var("set_state", "Persist loop state", "cg.loop_state", 400, 0),
         # --- after loop (report band) ---
+        # R2 restore: when the final round's gate score is strictly worse than
+        # the best snapshotted round's, copy the best snapshot back over the
+        # workspace BEFORE the terminal listing, so delivery and the report
+        # describe the restored bytes.
+        _code_node("restore_decide", "Best-over-final decision", RESTORE_DECIDE_CODE, -2640, 900,
+                   [_pin("loop_state", "loop_state", "object"),
+                    _pin("workspace_root", "workspace_root", "string")]),
+        _if("if_restore", "Restore best snapshot?", -2260, 620),
+        _call_tool("restore_call", "Restore best round", ["execute_command"], -2260, 900),
         # Terminal delivery listing: verifier-independent ground truth for the
         # report's delivered/artifact claims (list_files is read-only safe).
         _code_node("final_args", "Compose final listing call", FINAL_LISTING_ARGS_CODE, -1880, 900,
@@ -1526,7 +2414,9 @@ def build_root_flow() -> dict[str, Any]:
         _code_node("final_report", "Assemble result", FINAL_REPORT_CODE, -1120, 900,
                    [_pin("loop_state", "loop_state", "object"),
                     _pin("final_listing", "final_listing", "any"),
-                    _pin("final_listing_ok", "final_listing_ok", "boolean")]),
+                    _pin("final_listing_ok", "final_listing_ok", "boolean"),
+                    _pin("restore_out", "restore_out", "object"),
+                    _pin("restore_ok", "restore_ok", "boolean")]),
         _get("get_report_md", "report_markdown", "", -740, 900),
         _get("get_passed", "passed", False, -360, 900),
         _get("get_rounds", "rounds_used", 0, 20, 900),
@@ -1552,12 +2442,18 @@ def build_root_flow() -> dict[str, Any]:
                       _pin("artifacts", "artifacts", "array")]),
     ]
     flow["edges"] = [
-        # exec spine
+        # exec spine (loop body 0.2.4: verify -> snapshot -> state write; the
+        # after-loop lane routes through the R2 restore decision, multi-entry
+        # on final_list — exec edges only, data pins stay single-source)
         _edge("start", "exec-out", "rounds", "exec-in", animated=True),
         _edge("rounds", "loop", "builder", "exec-in", animated=True),
         _edge("builder", "exec-out", "verify", "exec-in", animated=True),
-        _edge("verify", "exec-out", "set_state", "exec-in", animated=True),
-        _edge("rounds", "done", "final_list", "exec-in", animated=True),
+        _edge("verify", "exec-out", "snapshot_call", "exec-in", animated=True),
+        _edge("snapshot_call", "exec-out", "set_state", "exec-in", animated=True),
+        _edge("rounds", "done", "if_restore", "exec-in", animated=True),
+        _edge("if_restore", "true", "restore_call", "exec-in", animated=True),
+        _edge("restore_call", "exec-out", "final_list", "exec-in", animated=True),
+        _edge("if_restore", "false", "final_list", "exec-in", animated=True),
         _edge("final_list", "exec-out", "end", "exec-in", animated=True),
         # loop condition (re-evaluated each iteration from the var)
         _edge("get_loop_state", "value", "loop_condition", "loop_state"),
@@ -1565,11 +2461,13 @@ def build_root_flow() -> dict[str, Any]:
         # boolean SUB-KEY of the code node's dict (deep-research idiom); a whole
         # dict on while.condition is always truthy -> infinite loop.
         _edge("loop_condition", "condition", "rounds", "condition"),
-        # builder prompt
+        # builder prompt + R5 mode-shaped budget
         _edge("get_state_body", "value", "builder_prompt", "loop_state"),
         _edge("start", "request", "builder_prompt", "request"),
         _edge("start", "workspace_root", "builder_prompt", "workspace_root"),
         _edge("builder_prompt", "output", "builder", "prompt"),
+        _edge("get_state_body", "value", "round_mode_pins", "loop_state"),
+        _edge("round_mode_pins", "max_iterations", "builder", "max_iterations"),
         _edge("start", "provider", "builder", "provider"),
         _edge("start", "model", "builder", "model"),
         _edge("start", "workspace_root", "builder", "workspace_root"),
@@ -1595,13 +2493,33 @@ def build_root_flow() -> dict[str, Any]:
         # runtime-set value with result.get("child_output") = None.
         _edge("verify", "child_output", "next_state", "verify_meta"),
         _edge("rounds", "index", "next_state", "round_index"),
+        # R1: the builder's own account of the round (was discarded entirely).
+        _edge("builder", "response", "next_state", "builder_report"),
+        # R1/R2/R5: previous state read via the volatile get_var — evaluated
+        # at set_state time, BEFORE the new value is written.
+        _edge("get_state_body", "value", "next_state", "prev_state"),
+        # R2: snapshot success/failure (failure degrades to a warning).
+        _edge("snapshot_call", "success", "next_state", "snapshot_ok"),
+        _edge("start", "workspace_root", "snapshot_args", "workspace_root"),
+        _edge("rounds", "index", "snapshot_args", "round_index"),
+        _edge("snapshot_args", "output", "snapshot_call", "tool_call"),
         _edge("next_state", "output", "set_state", "value"),
+        # R2 restore lane (after the loop, before the terminal listing)
+        _edge("get_final_state", "value", "restore_decide", "loop_state"),
+        _edge("start", "workspace_root", "restore_decide", "workspace_root"),
+        _edge("restore_decide", "restore", "if_restore", "condition"),
+        _edge("restore_decide", "tool_call", "restore_call", "tool_call"),
         # final report
         _edge("start", "workspace_root", "final_args", "workspace_root"),
         _edge("final_args", "output", "final_list", "tool_call"),
         _edge("final_list", "result", "final_report", "final_listing"),
         _edge("final_list", "success", "final_report", "final_listing_ok"),
         _edge("get_final_state", "value", "final_report", "loop_state"),
+        _edge("restore_decide", "output", "final_report", "restore_out"),
+        # On the no-restore branch restore_call never executes and its success
+        # pin reads None — final_report treats anything but True as
+        # "unconfirmed" only when a restore was actually requested.
+        _edge("restore_call", "success", "final_report", "restore_ok"),
         _edge("final_report", "output", "get_report_md", "object"),
         _edge("final_report", "output", "get_passed", "object"),
         _edge("final_report", "output", "get_rounds", "object"),
@@ -1805,7 +2723,23 @@ def main() -> int:
         # input; provably-constant ⇒ matches:false naming the mechanism),
         # C8 SELFCHECK.md evidence file. Prompt-only; 0.2.2 stays in the
         # catalog for 1:1 A/B (dm#101 rule).
-        bundle_version="0.2.3",
+        # 0.2.4 = process wave (operator order 2026-07-21, laurent dm#122;
+        # forensics ARCHITECTURE.md §5). 0.2.3's semantics WORKED (ripple
+        # alive); the new failure was PROCESS — a verified-green artifact
+        # existed, a post-verification rewrite broke one DOM id contract, and
+        # delivery took the last write over a stale all-green SELFCHECK.
+        # R1 repair reflex (builder.response→next_state edge, last_verdict
+        # scoping, failure-signature stall guard); R2 best-artifact
+        # .cg_rounds snapshot/restore (dot-dir invisible to G0/final_list);
+        # R3 hash-bound SELFCHECK gate G5 (post-verify edit = caught, next
+        # round told); R4 schema-forced per-feature feature_checks[] +
+        # merge belt; R5 mode-driven budget (build→repair→one rebuild);
+        # + deterministic DOM-contract gate G6 (JS-referenced ids must exist
+        # in markup — flags exactly the broken r3 run). Gates issue
+        # execute_command via call_tool (snapshot/restore/hash) — same
+        # approve posture the builder/verifier already need; graceful
+        # #FALLBACK degradation, never a round failure.
+        bundle_version="0.2.4",
         flows_dir=FLOWS_DIR,
         entrypoints=["coding-agent", "coder"],
         default_entrypoint="coding-agent",

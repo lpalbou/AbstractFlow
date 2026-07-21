@@ -32,14 +32,16 @@ note(`workspace: ${WS}`);
 const start = await j(`${GATEWAY}/api/gateway/runs/start`, {
   method: 'POST', headers: H,
   body: JSON.stringify({
-    bundle_id: 'coding-agent', bundle_version: '0.1.0', flow_id: 'coding-agent',
+    bundle_id: 'coding-agent', bundle_version: process.env.CODING_VERSION || '0.2.4', flow_id: 'coding-agent',
     input_data: {
       request: REQUEST,
       workspace_root: WS,
       workspace_access_mode: 'all_except_ignored',
-      build_command: 'python3 -m py_compile solution.py',
-      run_command: 'python3 solution.py',
+      build_command: process.env.CODING_BUILD ?? 'python3 -m py_compile solution.py',
+      run_command: process.env.CODING_RUN ?? 'python3 solution.py',
       max_rounds: MAX_ROUNDS,
+      ...(process.env.CODING_PROVIDER ? { provider: process.env.CODING_PROVIDER } : {}),
+      ...(process.env.CODING_MODEL ? { model: process.env.CODING_MODEL } : {}),
     },
   }),
 });

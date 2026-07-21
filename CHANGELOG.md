@@ -8,6 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- 2026-07-21 `coding-agent@0.2.4` — process wave (operator order, laurent
+  dm#122 via the code seat; byte-proven forensics: 0.2.3's semantics WORKED —
+  the ripple was alive — but a verified-green artifact existed mid-run, a
+  post-verification rewrite broke one DOM id contract, and delivery took the
+  last write over a stale all-green SELFCHECK). Six changes, one build
+  (fable5 implementer + independent re-verification, 150/150 gate smoke,
+  audit clean on all three flows): (R1) repair reflex — the builder's own
+  report now feeds `next_state` (was discarded), repair rounds get
+  `last_verdict` scoping (named artifact, verbatim failure lines, extracted
+  code tokens) with an ordered read→search→smallest-edit→re-probe protocol
+  and "do NOT rewrite with write_file"; a failure-signature stall guard
+  stops the loop after 2 identical failure sets and an anti-repeat block
+  names the previous attempt. (R2) best-artifact delivery — per-round
+  workspace snapshots under `.cg_rounds/` (dot-dir invisible to G0 and the
+  final listing), monotone gate-score tracking, and a restore lane that
+  puts the BEST round back when the final round regressed; the report
+  leads with "RESTORED from round K" and appends the discarded final
+  verdict. (R3) hash-bound SELFCHECK gate G5 — the builder must end
+  SELFCHECK.md with `ARTIFACT-SHA256:` lines; the verify subflow recomputes
+  hashes host-side and a stale/malformed/unbound self-report is a
+  deterministic failure naming the mechanism. (R4) verifier schema now
+  REQUIRES per-feature `feature_checks[]` (feature, input, expected_change,
+  evidence, depends_on_input); the merge belts any `depends_on_input=false`
+  into `matches=false` + a failure line. (R5) mode-driven budget —
+  build→repair→ONE rebuild escalation with per-mode builder iteration caps
+  (30/12/30) and `max_rounds` default 3→4. Plus (G6) a deterministic
+  DOM-contract gate: JS-referenced element ids must exist in markup
+  (flags exactly the r3 dangling `#timeRange`); zero new tool calls. The
+  three new gate-side `execute_command` calls (snapshot/restore/hash)
+  ride the same approval posture the builder already needs and degrade to
+  `#FALLBACK` warnings, never round failures. Three live gateway runs then
+  hardened the gates against the REAL tool-output shapes the unit smoke
+  never saw (fixture-double lesson): G5 claim parsing strips `read_file`'s
+  `N: ` line-number decoration; hash recompute reads dict-shaped
+  `execute_command` output, the approval-resume results envelope, AND the
+  runtime's COMPACTED durable copies (stdout dropped, `stdout_preview`
+  kept); R4's prompt now defines `depends_on_input` as ALIVENESS so a
+  correctly-present static feature ("a visible label") is true — run 2's
+  verifier had belted a healthy artifact to matches=false on that reading.
+  157/157 gate smoke; run 3 ended at the honest "DELIVERED — NOT
+  VERIFIABLE HERE" terminal (browser_probe unmounted on the gateway host),
+  all four feature_checks true, one round, `success: true`.
 - 2026-07-21 `coding-agent@0.2.3` — semantic prompt wave (operator order,
   laurent dm#111-112; plan/improving-code.md C1/C2/C3/C8) targeting the
   dead-temporal-ripple defect (code that ran cleanly yet computed a constant

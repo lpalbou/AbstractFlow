@@ -48,8 +48,13 @@ ARTIFACTS: tuple[tuple[str, str], ...] = (
     # silently dropped) and the root's memory pin was declared but unwired.
     # Both artifacts move to one version; bundle versions are immutable by
     # sha, so the content change forces the bump.
-    ("basic-agent.flow", "0.0.2"),
-    ("basic-agent@0.0.2.flow", "0.0.2"),
+    # 0.0.3 = 2026-07-21: dropped the on_flow_start provider/model pinDefaults
+    # (lmstudio / qwen/qwen3-next-80b — the model no longer exists in LM
+    # Studio, so every run without explicit overrides failed). Absent pins
+    # mean "resolve at runtime": run _runtime > gateway defaults >
+    # AbstractCore config defaults.
+    ("basic-agent.flow", "0.0.3"),
+    ("basic-agent@0.0.3.flow", "0.0.3"),
 )
 
 

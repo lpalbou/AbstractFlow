@@ -18,12 +18,24 @@ proving the redesign's fail-fast behavior (agora c2725/c2735/c2736 co-spec):
                          verdict: environment failure, EMPTY fixable
                          failures, verifier_died flag — never a fabricated
                          pass, never a fabricated gate failure.
+  F. stale SELFCHECK  -> G5 hash binding (0.2.4 R3): an ARTIFACT-SHA256 line
+                         that no longer matches the delivered bytes fails
+                         deterministically ("modified after last
+                         self-verification"); a matching hash sails through.
+  G. dangling DOM id  -> G6 DOM contract (0.2.4): a JS-referenced element id
+                         missing from the markup fails deterministically
+                         (the memgraph r3 '#timeRange' class).
 
 Plus direct unit checks of the GATE3/MERGE fold semantics (fail-closed
 no-executor -> environment_failures; probe overrides the LLM's executes for
 web artifacts; round-0 blank canvas stays advisory), the verifier/verify-
-subflow death folds (MERGE / NEXT_STATE), the environment early-stop, and
-the FINAL_REPORT delivered-not-verifiable terminal state.
+subflow death folds (MERGE / NEXT_STATE), the environment early-stop, the
+FINAL_REPORT delivered-not-verifiable terminal state, and the 0.2.4 wave
+(memgraph forensics R1-R5 + DOM gate): GATE5/GATE_DOM semantics, the
+BUILDER_PROMPT repair/rebuild branches, the same-signature stall guard,
+NEXT_STATE attempt memory + best-round tracking + mode economics,
+ROUND_MODE_PINS budget shaping, RESTORE_DECIDE best-over-final delivery,
+MERGE feature_checks folding, and the restore-aware FINAL_REPORT.
 
 Run: python3 scripts/coding_agent_v2_gates_smoke.py
 """
@@ -66,6 +78,8 @@ def run_flow(
     *,
     round_index: int = 0,
     agent_outcome: Any = None,
+    selfcheck_content: Any = None,
+    shasum_output: str = "",
 ) -> Dict[str, Any]:
     """Execute the verify subflow with stubbed tools; return (verdict, journal).
 
@@ -89,7 +103,16 @@ def run_flow(
 
     def read_file(**kwargs: Any) -> str:
         journal.append("read_file")
+        path = str(kwargs.get("file_path") or "")
+        if path.rsplit("/", 1)[-1] == "SELFCHECK.md":
+            if selfcheck_content is None:
+                return "Error: File not found: SELFCHECK.md"
+            return str(selfcheck_content)
         return entry_content
+
+    def execute_command(**kwargs: Any) -> str:
+        journal.append("execute_command")
+        return shasum_output
 
     def browser_probe(**kwargs: Any) -> Any:
         journal.append("browser_probe")
@@ -112,7 +135,7 @@ def run_flow(
         ledger_store=InMemoryLedgerStore(),
         effect_handlers={
             EffectType.TOOL_CALLS: make_tool_calls_handler(
-                tools=MappingToolExecutor.from_tools([list_files, read_file, browser_probe])
+                tools=MappingToolExecutor.from_tools([list_files, read_file, browser_probe, execute_command])
             ),
             EffectType.START_SUBWORKFLOW: start_sub,
             EffectType.LLM_CALL: fail_agent,
@@ -222,6 +245,46 @@ def main() -> int:
     check("E artifacts still named", bool(v.get("artifacts")), str(v.get("artifacts")))
     check("E structured post-pass never ran", "AGENT_INVOKED" not in v["_journal"], str(v["_journal"]))
 
+    print("scenario F: stale SELFCHECK hash (G5, 0.2.4 R3) -> deterministic fail naming the mechanism")
+    aa = "a" * 64
+    bb = "b" * 64
+    selfcheck_stale = "# SELFCHECK\nPlayback verified: visibleNodes grew 1364 -> 35.\nARTIFACT-SHA256: index.html " + aa
+    v = run_flow(listing, html_ok_e, probe_ok, selfcheck_content=selfcheck_stale, shasum_output=bb + "  index.html")
+    check("F stale selfcheck fails the round", v.get("all_passed") is False)
+    check("F failure names the mechanism",
+          any("self-report stale" in str(f) and "modified after the last self-verification" in str(f) for f in v.get("failures", [])),
+          str(v.get("failures")))
+    check("F gate_source deterministic (fail-fast)", v.get("gate_source") == "deterministic", str(v.get("gate_source")))
+    check("F probe never ran", "browser_probe" not in v["_journal"])
+    check("F verifier never ran", "AGENT_INVOKED" not in v["_journal"])
+    # Matching hash: G5 quiet, the round proceeds to probe + verifier lane
+    # (dead-agent outcome reused so no real LLM is needed).
+    v = run_flow(listing, html_ok_e, probe_ok, selfcheck_content=selfcheck_stale, shasum_output=aa + "  index.html", agent_outcome=dead)
+    check("F matching hash sails through G5 (no self-report failure)",
+          not any("self-report" in str(f) for f in v.get("failures", [])), str(v.get("failures")))
+    check("F hash recompute actually ran", "execute_command" in v["_journal"], str(v["_journal"]))
+
+    print("scenario G: dangling DOM id (G6, 0.2.4) -> deterministic fail (the memgraph r3 '#timeRange' class)")
+    html_dom = (
+        "<html><body>"
+        "<input id=\"timeStart\" type=\"range\"><input id=\"timeEnd\" type=\"range\">"
+        "<canvas id=\"cv\"></canvas>"
+        "<script src=\"game.js\"></script>"
+        "<script>document.getElementById('timeRange').oninput = 1; "
+        "var el = document.querySelector('#cv'); var c = grad('#e8e8e8');</script>"
+        "</body></html>"
+    )
+    v = run_flow(listing, html_dom, {})
+    check("G verdict fails", v.get("all_passed") is False)
+    check("G dangling '#timeRange' named",
+          any("dom-contract" in str(f) and "timeRange" in str(f) for f in v.get("failures", [])), str(v.get("failures")))
+    check("G defined ids not flagged",
+          not any("timeStart" in str(f) or "timeEnd" in str(f) for f in v.get("failures", [])), str(v.get("failures")))
+    check("G resolved ref + hex color stay quiet",
+          not any("'#cv'" in str(f) or "e8e8e8" in str(f) for f in v.get("failures", [])), str(v.get("failures")))
+    check("G probe never ran", "browser_probe" not in v["_journal"])
+    check("G verifier never ran", "AGENT_INVOKED" not in v["_journal"])
+
     print("unit: GATE1 red-team false-positive classes stay quiet")
     gate1 = code_body("GATE1_CODE")
     g0 = {"web_class": True, "entrypoint": "index.html",
@@ -323,19 +386,19 @@ def main() -> int:
     g3_env = {"web": True, "ran": True, "stage": "no-executor", "executes_web": False,
               "environment_failures": ["no browser executor available on this host to run index.html: no engine"], "warnings": []}
     r = run_code(merge, {"verifier_data": v_llm_optimist, "verifier_ok": True, "verifier_response": "",
-                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_env})
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_env, "gate5_out": {}})
     check("merge: LLM executes=true overridden by probe", r["executes"] is False and r["all_passed"] is False, str(r))
     check("merge: env failures ride", bool(r["environment_failures"]))
     g3_ok = {"web": True, "ran": True, "stage": "run", "executes_web": True, "environment_failures": [], "warnings": []}
     v_llm_pessimist = dict(v_llm_optimist, executes=False, run_error="decided by browser probe")
     r = run_code(merge, {"verifier_data": v_llm_pessimist, "verifier_ok": True, "verifier_response": "",
-                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok})
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
     check("merge: probe pass + builds/matches pass -> all_passed", r["all_passed"] is True, str(r))
 
     print("unit: MERGE verifier-death fold (2026-07-20 class)")
     r = run_code(merge, {"verifier_data": None, "verifier_ok": False,
                          "verifier_response": "The agent stopped because the model provider failed (HTTP 500).",
-                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok})
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
     check("merge death: never a pass", r["all_passed"] is False, str(r))
     check("merge death: verifier_died + delivered flags", r.get("verifier_died") is True and r.get("delivered") is True, str(r))
     check("merge death: no fabricated fixable failures", r["failures"] == [], str(r["failures"]))
@@ -345,25 +408,27 @@ def main() -> int:
     check("merge death: probe executes result stands", r["executes"] is True, str(r))
     # Death + env-blocked probe: both env classes ride, executes stays false.
     r = run_code(merge, {"verifier_data": {}, "verifier_ok": False, "verifier_response": "",
-                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_env})
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_env, "gate5_out": {}})
     check("merge death+no-executor: both env failures ride", len(r["environment_failures"]) >= 2 and r["executes"] is False, str(r))
     # Guard: a REPORTED failure (verdict present) must NOT trip the death fold.
     v_reported = {"builds": False, "build_error": "SyntaxError", "executes": True, "matches": True,
                   "all_passed": False, "failures": ["build: SyntaxError in game.js"], "environment_failures": [],
                   "summary": "build failed", "artifacts": ["index.html"]}
     r = run_code(merge, {"verifier_data": v_reported, "verifier_ok": True, "verifier_response": "",
-                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok})
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
     check("merge: reported failure keeps the reprompt lane", r["failures"] == ["build: SyntaxError in game.js"] and not r.get("verifier_died"), str(r))
 
     print("unit: NEXT_STATE verify-subflow-death fold")
     next_state = code_body("NEXT_STATE_CODE")
-    r = run_code(next_state, {"verifier": {}, "verify_meta": {"success": False, "error": "Effect failed after 3 attempts: API error: 'NoneType' object has no attribute 'prompt_tokens'"}, "round_index": 0})
+    r = run_code(next_state, {"verifier": {}, "verify_meta": {"success": False, "error": "Effect failed after 3 attempts: API error: 'NoneType' object has no attribute 'prompt_tokens'"}, "round_index": 0,
+                              "builder_report": "", "prev_state": {}, "snapshot_ok": True})
     check("next_state death: env failure carries the error", any("NoneType" in str(f) for f in r["environment_failures"]), str(r))
     check("next_state death: no fabricated fixable failures", r["failures"] == [] and r["all_passed"] is False, str(r))
     check("next_state death: synthetic verdict flagged", r["last_verdict"].get("verifier_died") is True, str(r["last_verdict"]))
     r = run_code(next_state, {"verifier": {"all_passed": False, "builds": False, "executes": False, "matches": False,
                                            "failures": ["fix me"], "environment_failures": []},
-                              "verify_meta": {"verdict": {}}, "round_index": 0})
+                              "verify_meta": {"verdict": {}}, "round_index": 0,
+                              "builder_report": "", "prev_state": {}, "snapshot_ok": True})
     check("next_state: real verdict keeps the reprompt lane", r["failures"] == ["fix me"] and not r["last_verdict"].get("verifier_died"), str(r))
 
     print("unit: LOOP_CONDITION stops early on environment-only failures")
@@ -392,7 +457,7 @@ def main() -> int:
                          "deterministic": {"delivery_ok": True, "integration_ok": True},
                          "summary": "delivered, verification incomplete"},
     }
-    r = run_code(final_report, {"loop_state": death_state, "final_listing": listing_txt, "final_listing_ok": True})
+    r = run_code(final_report, {"loop_state": death_state, "final_listing": listing_txt, "final_listing_ok": True, "restore_out": {}, "restore_ok": None})
     check("report: DELIVERED status, not failed", "DELIVERED" in r["report_markdown"].split("\n")[2], r["report_markdown"].split("\n")[2])
     check("report: success reflects delivered, passed stays strict", r["success"] is True and r["passed"] is False and r["delivered"] is True, str({k: r[k] for k in ("success", "passed", "delivered")}))
     check("report: artifacts named from terminal listing", "index.html" in r["artifacts"], str(r["artifacts"]))
@@ -405,12 +470,12 @@ def main() -> int:
                          "failures": ["execute(web): page error in index.html: ReferenceError: x"],
                          "artifacts": ["index.html"], "deterministic": {"delivery_ok": True}},
     }
-    r = run_code(final_report, {"loop_state": fail_state, "final_listing": listing_txt, "final_listing_ok": True})
+    r = run_code(final_report, {"loop_state": fail_state, "final_listing": listing_txt, "final_listing_ok": True, "restore_out": {}, "restore_ok": None})
     check("report: genuine gate failure stays STOPPED / success=false", r["success"] is False and "STOPPED" in r["report_markdown"], r["report_markdown"].split("\n")[2])
     pass_state = {"rounds_completed": 1, "all_passed": True, "failures": [], "environment_failures": [],
                   "last_verdict": {"all_passed": True, "builds": True, "executes": True, "matches": True,
                                    "failures": [], "artifacts": ["index.html"]}}
-    r = run_code(final_report, {"loop_state": pass_state, "final_listing": listing_txt, "final_listing_ok": True})
+    r = run_code(final_report, {"loop_state": pass_state, "final_listing": listing_txt, "final_listing_ok": True, "restore_out": {}, "restore_ok": None})
     check("report: pass stays PASSED / success=true", r["success"] is True and r["passed"] is True and "PASSED" in r["report_markdown"], r["report_markdown"].split("\n")[2])
     # Env-blocked (missing executor) with delivered artifact: same honest class.
     env_state = {
@@ -419,12 +484,319 @@ def main() -> int:
         "last_verdict": {"all_passed": False, "builds": True, "executes": False, "matches": True, "failures": [],
                          "artifacts": ["index.html"], "deterministic": {"delivery_ok": True}},
     }
-    r = run_code(final_report, {"loop_state": env_state, "final_listing": listing_txt, "final_listing_ok": True})
+    r = run_code(final_report, {"loop_state": env_state, "final_listing": listing_txt, "final_listing_ok": True, "restore_out": {}, "restore_ok": None})
     check("report: env-blocked delivered run reads DELIVERED / success=true", r["success"] is True and "DELIVERED" in r["report_markdown"], r["report_markdown"].split("\n")[2])
     # Nothing delivered + dead verifier: never claim delivered.
     r = run_code(final_report, {"loop_state": death_state | {"last_verdict": {"verifier_died": True, "all_passed": False, "failures": [], "artifacts": [], "deterministic": {}}},
-                                "final_listing": "Entries in '/ws' matching '*' (hidden entries excluded):", "final_listing_ok": True})
+                                "final_listing": "Entries in '/ws' matching '*' (hidden entries excluded):", "final_listing_ok": True,
+                                "restore_out": {}, "restore_ok": None})
     check("report: empty workspace + dead verifier is NOT delivered", r["delivered"] is False and r["success"] is False, str(r))
+
+    # ------------------------------------------------------------------
+    # 0.2.4 wave (memgraph forensics R1-R5 + DOM gate)
+    # ------------------------------------------------------------------
+    aa = "a" * 64
+    bb = "b" * 64
+
+    print("unit: GATE5 hash-binding semantics (R3)")
+    gate5 = code_body("GATE5_CODE")
+    r = run_code(gate5, {"selfcheck_content": "Error: File not found: SELFCHECK.md", "selfcheck_ok": False, "hash_output": ""})
+    check("G5 missing selfcheck -> advisory warning only", r["selfcheck_ok"] and not r["failures"] and any("unattested" in str(w) for w in r["warnings"]), str(r))
+    r = run_code(gate5, {"selfcheck_content": "# SELFCHECK\nAll verified by probe.", "selfcheck_ok": True, "hash_output": ""})
+    check("G5 present-but-unbound -> failure", not r["selfcheck_ok"] and any("no ARTIFACT-SHA256" in str(f) for f in r["failures"]), str(r))
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True, "hash_output": aa + "  index.html"})
+    check("G5 matching hash passes", r["selfcheck_ok"] and not r["failures"] and r["claims"] == 1, str(r))
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: ./index.html " + aa.upper(), "selfcheck_ok": True, "hash_output": aa + " *./index.html"})
+    check("G5 tolerant of ./ prefix, case, and shasum '*' mode marker", r["selfcheck_ok"] and not r["failures"], str(r))
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True, "hash_output": bb + "  index.html"})
+    check("G5 mismatch -> stale failure naming the mechanism", not r["selfcheck_ok"] and any("modified after the last self-verification" in str(f) for f in r["failures"]), str(r))
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: gone.html " + aa, "selfcheck_ok": True, "hash_output": aa + "  index.html"})
+    check("G5 unhashable claimed file -> unbound failure", not r["selfcheck_ok"] and any("gone.html" in str(f) and "could not be hashed" in str(f) for f in r["failures"]), str(r))
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True, "hash_output": "sh: shasum: command not found"})
+    check("G5 host cannot hash -> #FALLBACK warning, never a failure", r["selfcheck_ok"] and any("#FALLBACK" in str(w) for w in r["warnings"]), str(r))
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html deadbeef", "selfcheck_ok": True, "hash_output": ""})
+    check("G5 malformed hash line -> unbound failure", not r["selfcheck_ok"] and any("valid sha256" in str(f) for f in r["failures"]), str(r))
+    # Live-found (first 0.2.4 gateway run): read_file DECORATES content with
+    # "N: " line-number prefixes — the claims must still parse through them.
+    decorated = "File: /ws/SELFCHECK.md (3 lines)\n 1: ok\n 2: ARTIFACT-SHA256: index.html " + aa + "\n 3: end"
+    r = run_code(gate5, {"selfcheck_content": decorated, "selfcheck_ok": True, "hash_output": aa + "  index.html"})
+    check("G5 parses claims through read_file line-number decoration", r["selfcheck_ok"] and r["claims"] == 1 and not r["failures"], str(r))
+    # Live-found: execute_command returns a DICT ({stdout,...}), not a string —
+    # recomputed hashes must come from stdout, and str(dict) must never match.
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True,
+                         "hash_output": {"success": True, "stdout": aa + "  index.html", "stderr": "", "return_code": 0}})
+    check("G5 reads recomputed hashes from dict-shaped execute_command output", r["selfcheck_ok"] and not r["failures"], str(r))
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True,
+                         "hash_output": {"success": True, "stdout": bb + "  index.html", "stderr": "", "return_code": 0}})
+    check("G5 dict-shaped mismatch -> stale failure", not r["selfcheck_ok"] and any("modified after" in str(f) for f in r["failures"]), str(r))
+    # Live-found (second 0.2.4 gateway run): the tool-APPROVAL resume lane
+    # stores the raw {mode, results:[{output:{stdout}}]} envelope in the
+    # result_key (the compiler's call_tool pin mapping does not re-run for
+    # resumed effects) — the fold must dig hashes out of that shape too.
+    envelope = {"mode": "executed", "results": [{"call_id": "gate-selfcheck-hash", "name": "execute_command",
+                                                 "success": True,
+                                                 "output": {"success": True, "stdout": aa + "  index.html\n", "stderr": "", "return_code": 0}}]}
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True, "hash_output": envelope})
+    check("G5 reads hashes from the approval-resume results envelope", r["selfcheck_ok"] and not r["failures"], str(r))
+    # Live-found (third 0.2.4 gateway run): the DURABLE result_key copy is
+    # COMPACTED by the runtime — stdout is dropped, only stdout_preview
+    # survives. The fold must fall back to the preview twins.
+    compacted = {"mode": "executed", "results": [{"call_id": "gate-selfcheck-hash", "name": "execute_command",
+                                                  "success": True,
+                                                  "output": {"success": True, "return_code": 0,
+                                                             "stdout_preview": aa + "  index.html\n", "stderr_preview": "",
+                                                             "stdout_truncated": False, "stderr_truncated": False,
+                                                             "rendered": "Command executed"}}]}
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True, "hash_output": compacted})
+    check("G5 falls back to stdout_preview on compacted durable results", r["selfcheck_ok"] and not r["failures"], str(r))
+
+    print("unit: SELFCHECK_HASH_ARGS recompute composition (R3)")
+    hash_args = code_body("SELFCHECK_HASH_ARGS_CODE")
+    r = run_code(hash_args, {"selfcheck_content": "x\nARTIFACT-SHA256: index.html " + aa + "\nARTIFACT-SHA256: ./game.js " + bb,
+                             "selfcheck_ok": True, "workspace_root": "/ws"})
+    cmd = r["arguments"]["command"]
+    check("hash recompute lists claimed files workspace-relative", "shasum -a 256 -- 'index.html' 'game.js'" in cmd and cmd.startswith("cd '/ws'"), cmd)
+    r = run_code(hash_args, {"selfcheck_content": "no binding lines here", "selfcheck_ok": True, "workspace_root": "/ws"})
+    check("no claims -> harmless no-op command", r["arguments"]["command"] == "true", str(r))
+
+    print("unit: GATE_DOM contract semantics (memgraph r3: markup rename, dangling JS refs)")
+    gate_dom = code_body("GATE_DOM_CODE")
+    g0w_dom = {"web_class": True, "entrypoint": "index.html", "files": ["index.html"], "delivery_ok": True}
+    r3_like = (
+        "<html><body>"
+        "<input id=\"timeStart\"><input id=\"timeEnd\"><button id=\"play\">Play</button>"
+        "<script>$('#timeRange').oninput = 1; $('#timeRange').value = 0; "
+        "document.getElementById('play').onclick = 1; setTime();</script>"
+        "</body></html>"
+    )
+    r = run_code(gate_dom, {"gate0_out": g0w_dom, "entry_content": r3_like, "script_content": "", "script_ok": False})
+    check("dom: dangling #timeRange flagged once, resolved #play quiet",
+          not r["dom_ok"] and len(r["failures"]) == 1 and "timeRange" in str(r["failures"][0]), str(r["failures"]))
+    dyn = (
+        "<html><body><div id=\"root\"></div><script>"
+        "var el = document.createElement('input'); el.id = 'speed'; "
+        "el.setAttribute('id', 'speed2'); "
+        "document.querySelector('#speed').oninput = 1; document.getElementById('speed2').oninput = 1; "
+        "root.innerHTML = '<canvas id=\"stage\"></canvas>'; document.querySelector('#stage');"
+        "</script></body></html>"
+    )
+    r = run_code(gate_dom, {"gate0_out": g0w_dom, "entry_content": dyn, "script_content": "", "script_ok": False})
+    check("dom: dynamically created ids (el.id / setAttribute / template markup) stay quiet", r["dom_ok"], str(r["failures"]))
+    colors = "<html><body><canvas id=\"cv\"></canvas><script>ctx.fillStyle = '#fff'; grad('#e8e8e8'); document.querySelector('#cv .layer');</script></body></html>"
+    r = run_code(gate_dom, {"gate0_out": g0w_dom, "entry_content": colors, "script_content": "", "script_ok": False})
+    check("dom: hex colors quiet, complex-selector leading id resolves", r["dom_ok"], str(r["failures"]))
+    missing_complex = "<html><body><div id=\"a\"></div><script>document.querySelector('#hud .score');</script></body></html>"
+    r = run_code(gate_dom, {"gate0_out": g0w_dom, "entry_content": missing_complex, "script_content": "", "script_ok": False})
+    check("dom: complex selector with missing leading id flagged", not r["dom_ok"] and any("hud" in str(f) for f in r["failures"]), str(r["failures"]))
+    split_dom = "<html><body><script src='game.js'></script></body></html>"
+    split_js = "document.getElementById('board').width = 100;"
+    r = run_code(gate_dom, {"gate0_out": g0w_dom, "entry_content": split_dom, "script_content": split_js, "script_ok": True})
+    check("dom: cross-file ref against entry markup checked", not r["dom_ok"] and any("board" in str(f) for f in r["failures"]), str(r["failures"]))
+    r = run_code(gate_dom, {"gate0_out": {"web_class": False}, "entry_content": "document.getElementById('x')", "script_content": "", "script_ok": False})
+    check("dom: non-web skips the gate", r["dom_ok"], str(r["failures"]))
+
+    print("unit: BUILDER_PROMPT repair branch (R1) — scoped, minimal, memory-carrying")
+    builder_prompt = code_body("BUILDER_PROMPT_CODE")
+    r3_failure = "execute(web): page error in memory_graph.html: Cannot set properties of null (setting 'oninput')"
+    repair_state = {
+        "rounds_completed": 1, "all_passed": False, "mode": "repair",
+        "failures": [r3_failure],
+        "same_signature_count": 0,
+        "last_attempt_summary": "",
+        "last_verdict": {"artifacts": ["memory_graph.html"], "build_error": "", "run_error": "decided by browser probe",
+                         "mismatch": "", "probe": {"engine": "python-playwright", "diag": {"has_canvas": True}}},
+    }
+    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": repair_state})
+    check("repair prompt names the artifact", "Artifact under repair: memory_graph.html" in p, p[:600])
+    check("repair prompt carries grep tokens (quoted 'oninput' + memory_graph)", "oninput" in p and "memory_graph" in p and "search_files" in p, p)
+    check("repair prompt forbids write_file rewrites", "Do NOT rewrite the file with write_file" in p, p)
+    check("repair prompt orders read -> search -> minimal edit -> re-probe",
+          p.find("Step 1: read") < p.find("Step 2: search_files") < p.find("Step 3:") < p.find("Step 4: re-run"), p)
+    check("repair prompt drops the build-round profiling/rules blocks", "PROFILE the inputs" not in p and "Engineering rules" not in p, p)
+    check("repair prompt keeps the hash-binding requirement (R3)", "ARTIFACT-SHA256:" in p, p)
+    check("repair prompt has no anti-repeat block on a first attempt", "already attempted" not in p, p)
+    check("probe-sentinel run_error not echoed", "decided by browser probe" not in p, p)
+    repair_state2 = dict(repair_state, same_signature_count=1, last_attempt_summary="Rewrote the whole init IIFE and renamed the slider ids.")
+    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": repair_state2})
+    check("repeated failure prepends the anti-repeat block",
+          "already attempted this exact failure set" in p and "Rewrote the whole init IIFE" in p and "Do something different" in p, p)
+    rebuild_state = dict(repair_state, mode="rebuild", last_attempt_summary="patched the handler twice")
+    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": rebuild_state})
+    check("rebuild round keeps build rules + forbids reproducing the design",
+          "REBUILD ROUND" in p and "do NOT reproduce the same design" in p and "Delivery rules" in p and "PROFILE the inputs" in p, p)
+    p = run_code(builder_prompt, {"request": "Build a game", "workspace_root": "/ws", "loop_state": {}})
+    check("round 0 keeps profiling + gains the hash binding", "PROFILE the inputs" in p and "ARTIFACT-SHA256:" in p and ".cg_rounds" in p, p)
+
+    print("unit: LOOP_CONDITION stall guard (R1)")
+    r = run_code(loop, {"loop_state": {"rounds_completed": 2, "all_passed": False, "failures": ["f"], "environment_failures": [], "same_signature_count": 2}, "max_rounds": 4})
+    check("two identical signatures -> stop", r["condition"] is False and r["stalled"] is True, str(r))
+    r = run_code(loop, {"loop_state": {"rounds_completed": 2, "all_passed": False, "failures": ["f"], "environment_failures": [], "same_signature_count": 1}, "max_rounds": 4})
+    check("one repeat -> keep going", r["condition"] is True, str(r))
+
+    print("unit: NEXT_STATE attempt memory (R1) + best tracking (R2) + mode economics (R5)")
+    v_fail = {"all_passed": False, "builds": True, "executes": False, "matches": True,
+              "failures": ["execute(web): page error in index.html: X is not defined"],
+              "environment_failures": [], "artifacts": ["index.html"],
+              "deterministic": {"delivery_ok": True}}
+    s1 = run_code(next_state, {"verifier": v_fail, "verify_meta": {}, "round_index": 0,
+                               "builder_report": "I built index.html with a canvas render loop and bound the slider. " * 20,
+                               "prev_state": {}, "snapshot_ok": True})
+    check("state: attempt_history appended", len(s1["attempt_history"]) == 1 and s1["attempt_history"][0]["round"] == 0, str(s1.get("attempt_history")))
+    check("state: gate_score = [passed, gates, delivery]", s1["attempt_history"][0]["gate_score"] == [0, 2, 1], str(s1["attempt_history"]))
+    check("state: builder report captured + truncated <= ~800", 0 < len(s1["last_attempt_summary"]) <= 803, str(len(s1["last_attempt_summary"])))
+    check("state: first failure -> signature recorded, count 0", bool(s1["failure_signature"]) and s1["same_signature_count"] == 0, str(s1["failure_signature"]))
+    check("state: best snapshot recorded (R2)", s1["best_snapshot"] == ".cg_rounds/round_0" and s1["best_score"] == [0, 2, 1] and s1["best_round"] == 0, str(s1))
+    check("state: mode -> repair", s1["mode"] == "repair", str(s1.get("mode")))
+    # Digit-only drift (gate3's "still blank on round N" wording) must still
+    # count as the SAME failure set; genuinely different wording resets.
+    blank2 = dict(v_fail, failures=["execute(web): the canvas renders blank - still blank on round 2; draw the game state"])
+    blank3 = dict(v_fail, failures=["execute(web): the canvas renders blank - still blank on round 3; draw the game state"])
+    sb = run_code(next_state, {"verifier": blank2, "verify_meta": {}, "round_index": 0,
+                               "builder_report": "r0", "prev_state": {}, "snapshot_ok": True})
+    sb = run_code(next_state, {"verifier": blank3, "verify_meta": {}, "round_index": 1,
+                               "builder_report": "r1", "prev_state": sb, "snapshot_ok": True})
+    check("state: digit-only wording drift still counts as the same signature", sb["same_signature_count"] == 1, str(sb["same_signature_count"]))
+    s2 = run_code(next_state, {"verifier": dict(v_fail, failures=["integration: entrypoint references 'missing.js' which does not exist"]),
+                               "verify_meta": {}, "round_index": 1,
+                               "builder_report": "tried a null guard", "prev_state": s1, "snapshot_ok": True})
+    check("state: a different failure set resets the counter", s2["same_signature_count"] == 0, str(s2["same_signature_count"]))
+    s2 = run_code(next_state, {"verifier": v_fail, "verify_meta": {}, "round_index": 1,
+                               "builder_report": "tried again", "prev_state": s1, "snapshot_ok": True})
+    check("state: identical failures increment same_signature_count", s2["same_signature_count"] == 1, str(s2["same_signature_count"]))
+    s3 = run_code(next_state, {"verifier": v_fail, "verify_meta": {}, "round_index": 2,
+                               "builder_report": "tried once more", "prev_state": s2, "snapshot_ok": True})
+    check("state: second repeat escalates to the one rebuild (R5) + resets the counter",
+          s3["mode"] == "rebuild" and s3["rebuilds_used"] == 1 and s3["same_signature_count"] == 0, str(s3))
+    s4 = run_code(next_state, {"verifier": v_fail, "verify_meta": {}, "round_index": 3,
+                               "builder_report": "rebuilt", "prev_state": s3, "snapshot_ok": True})
+    s5 = run_code(next_state, {"verifier": v_fail, "verify_meta": {}, "round_index": 4,
+                               "builder_report": "rebuilt again", "prev_state": s4, "snapshot_ok": True})
+    check("state: rebuild is once-only; the stall guard takes over",
+          s4["mode"] == "repair" and s5["mode"] == "repair" and s5["rebuilds_used"] == 1 and s5["same_signature_count"] == 2, str(s5))
+    v_gap = {"all_passed": False, "builds": True, "executes": True, "matches": False,
+             "failures": ["matches: task-named feature 'ripple' does not depend on its input"],
+             "environment_failures": [], "artifacts": ["index.html"], "deterministic": {"delivery_ok": True}}
+    r = run_code(next_state, {"verifier": v_gap, "verify_meta": {}, "round_index": 1,
+                              "builder_report": "did things", "prev_state": s1, "snapshot_ok": True})
+    check("state: matches-only gap escalates to rebuild (design-level)", r["mode"] == "rebuild" and r["rebuilds_used"] == 1, str(r))
+    v_better = {"all_passed": False, "builds": True, "executes": True, "matches": False, "failures": ["matches: gap"],
+                "environment_failures": [], "deterministic": {"delivery_ok": True}}
+    ra = run_code(next_state, {"verifier": v_better, "verify_meta": {}, "round_index": 0, "builder_report": "r0", "prev_state": {}, "snapshot_ok": True})
+    v_worse = {"all_passed": False, "builds": False, "executes": False, "matches": False, "failures": ["execute(web): boom"],
+               "environment_failures": [], "deterministic": {"delivery_ok": True}}
+    rb = run_code(next_state, {"verifier": v_worse, "verify_meta": {}, "round_index": 1, "builder_report": "r1", "prev_state": ra, "snapshot_ok": True})
+    check("best is monotone: a regressed round keeps the earlier best (R2)",
+          rb["best_round"] == 0 and rb["best_score"] == [0, 2, 1] and rb["best_snapshot"] == ".cg_rounds/round_0", str(rb))
+    rc = run_code(next_state, {"verifier": v_worse, "verify_meta": {}, "round_index": 1, "builder_report": "r1", "prev_state": ra, "snapshot_ok": False})
+    check("snapshot failure degrades to a #FALLBACK warning, never fails the round",
+          rc["best_round"] == 0 and any("#FALLBACK" in str(w) for w in rc["warnings"]) and rc["failures"] == ["execute(web): boom"], str(rc))
+    rd = run_code(next_state, {"verifier": {}, "verify_meta": {"success": False, "error": "boom"}, "round_index": 0,
+                               "builder_report": "", "prev_state": {}, "snapshot_ok": True})
+    check("dead verify subflow still records history + zero score",
+          rd["attempt_history"][0]["gate_score"] == [0, 0, 0] and rd["last_verdict"].get("verifier_died") is True, str(rd))
+
+    print("unit: ROUND_MODE_PINS budget shaping (R5)")
+    rmp = code_body("ROUND_MODE_PINS_CODE")
+    r = run_code(rmp, {"loop_state": {}})
+    check("round 0 -> build @ 30 iterations", r["mode"] == "build" and r["max_iterations"] == 30, str(r))
+    r = run_code(rmp, {"loop_state": {"rounds_completed": 1, "mode": "repair"}})
+    check("repair -> 12 iterations", r["max_iterations"] == 12, str(r))
+    r = run_code(rmp, {"loop_state": {"rounds_completed": 2, "mode": "rebuild"}})
+    check("rebuild -> 30 iterations", r["max_iterations"] == 30, str(r))
+    r = run_code(rmp, {"loop_state": {"rounds_completed": 1}})
+    check("missing mode after round 0 defaults to repair", r["mode"] == "repair" and r["max_iterations"] == 12, str(r))
+
+    print("unit: SNAPSHOT_ARGS exclusion-safe copy (R2)")
+    snap_args = code_body("SNAPSHOT_ARGS_CODE")
+    r = run_code(snap_args, {"workspace_root": "/ws", "round_index": 2})
+    cmd = r["arguments"]["command"]
+    check("snapshot targets .cg_rounds/round_2 inside the workspace", "mkdir -p '.cg_rounds/round_2'" in cmd and cmd.startswith("cd '/ws'"), cmd)
+    check("snapshot excludes .cg_rounds itself", '!= ".cg_rounds"' in cmd, cmd)
+
+    print("unit: RESTORE_DECIDE best-over-final delivery (R2)")
+    restore_decide = code_body("RESTORE_DECIDE_CODE")
+    regressed = {"all_passed": False, "best_score": [0, 3, 1], "best_round": 1, "best_snapshot": ".cg_rounds/round_1",
+                 "attempt_history": [{"round": 0, "gate_score": [0, 1, 1]}, {"round": 1, "gate_score": [0, 3, 1]}, {"round": 2, "gate_score": [0, 1, 1]}]}
+    r = run_code(restore_decide, {"loop_state": regressed, "workspace_root": "/ws"})
+    check("final < best -> restore", r["restore"] is True and r["restored_round"] == 1, str(r))
+    check("restore command copies the best snapshot back", ".cg_rounds/round_1/." in r["tool_call"]["arguments"]["command"] and "cp -R" in r["tool_call"]["arguments"]["command"], str(r["tool_call"]))
+    final_best = dict(regressed, attempt_history=[{"round": 2, "gate_score": [0, 3, 1]}])
+    r = run_code(restore_decide, {"loop_state": final_best, "workspace_root": "/ws"})
+    check("final == best -> no restore", r["restore"] is False, str(r))
+    r = run_code(restore_decide, {"loop_state": dict(regressed, all_passed=True), "workspace_root": "/ws"})
+    check("all_passed -> never restore", r["restore"] is False, str(r))
+    r = run_code(restore_decide, {"loop_state": dict(regressed, best_snapshot=""), "workspace_root": "/ws"})
+    check("no snapshot -> no restore", r["restore"] is False, str(r))
+
+    print("unit: VERIFIER_PROMPT static-feature semantics (R4, live-found)")
+    # Live-found (first 0.2.4 gateway run): the verifier marked a CORRECTLY
+    # PRESENT static feature ('a number input (with a visible label)') as
+    # depends_on_input=false because the enumeration protocol read as
+    # "static => no input-dependence" — and the merge belted a healthy
+    # artifact to matches=false. The prompt must define depends_on_input as
+    # aliveness (defects only), with static presence counting as true.
+    vp = code_body("VERIFIER_PROMPT_CODE")
+    vout = run_code(vp, {"request": "make a page", "gate0_out": g0_web, "gate3_out": g3_ok,
+                         "build_command": "", "run_command": "", "workspace_root": "/ws"})
+    check("verifier prompt defines static-presence as depends_on_input=true",
+          "STATIC features" in vout and "set depends_on_input=true when the static feature is correctly present" in vout, vout[:200])
+    check("verifier prompt reserves depends_on_input=false for defects",
+          "Reserve depends_on_input=false STRICTLY for defects" in vout, vout[:200])
+
+    print("unit: MERGE schema-forced feature_checks fold (R4)")
+    v_feature = {"builds": True, "executes": False, "matches": True, "failures": [], "environment_failures": [],
+                 "artifacts": ["index.html"], "summary": "ok",
+                 "feature_checks": [
+                     {"feature": "timeline playback", "input": "click Play", "expected_change": "visibleNodes grows", "evidence": "handler exists", "depends_on_input": False},
+                     {"feature": "search ranking", "input": "type a title", "expected_change": "top-3 order", "evidence": "score fn reads query terms", "depends_on_input": True},
+                 ]}
+    r = run_code(merge, {"verifier_data": v_feature, "verifier_ok": True, "verifier_response": "",
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
+    check("depends_on_input=false -> matches belted false + failure naming the feature",
+          r["matches"] is False and r["all_passed"] is False and any("timeline playback" in str(f) and "does not depend on its input" in str(f) for f in r["failures"]), str(r))
+    check("feature_checks carried in the verdict for audit", isinstance(r.get("feature_checks"), list) and len(r["feature_checks"]) == 2, str(r.get("feature_checks")))
+    v_feature_ok = dict(v_feature, feature_checks=[{"feature": "search", "input": "q", "expected_change": "results", "evidence": "chain traced", "depends_on_input": True}])
+    r = run_code(merge, {"verifier_data": v_feature_ok, "verifier_ok": True, "verifier_response": "",
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
+    check("all-true feature checks leave the verdict alone", r["matches"] is True and r["all_passed"] is True, str(r))
+    v_feature_str = dict(v_feature, feature_checks=[{"feature": "playback", "input": "Play", "expected_change": "growth", "evidence": "", "depends_on_input": "false"}])
+    r = run_code(merge, {"verifier_data": v_feature_str, "verifier_ok": True, "verifier_response": "",
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
+    check("string 'false' coerces (tool-arg coercion class)", r["matches"] is False, str(r))
+    r = run_code(merge, {"verifier_data": v_feature_ok, "verifier_ok": True, "verifier_response": "",
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok,
+                         "gate5_out": {"warnings": ["selfcheck: SELFCHECK.md not found in the workspace - advisory"]}})
+    check("G5 advisory warnings ride the merged verdict", any("selfcheck" in str(w) for w in r["warnings"]), str(r["warnings"]))
+
+    print("unit: FINAL_REPORT restoration reporting (R2)")
+    restored_state = {
+        "rounds_completed": 3, "all_passed": False,
+        "failures": ["execute(web): page error in index.html: Cannot set properties of null (setting 'oninput')"],
+        "environment_failures": [],
+        "warnings": [],
+        "best_verdict": {"all_passed": False, "builds": True, "executes": True, "matches": False,
+                         "failures": ["matches: search ranking unverified"], "environment_failures": [],
+                         "artifacts": ["index.html"], "deterministic": {"delivery_ok": True}, "summary": "best round"},
+        "last_verdict": {"all_passed": False, "builds": False, "executes": False, "matches": False,
+                         "failures": ["execute(web): page error in index.html: Cannot set properties of null (setting 'oninput')"],
+                         "artifacts": ["index.html"], "deterministic": {"delivery_ok": True}},
+    }
+    restore_info = {"restore": True, "restored_round": 1, "best_score": [0, 2, 1], "final_score": [0, 0, 1]}
+    r = run_code(final_report, {"loop_state": restored_state, "final_listing": listing_txt, "final_listing_ok": True,
+                                "restore_out": restore_info, "restore_ok": True})
+    check("report: names the restoration + delivered round",
+          "RESTORED from the round 1 snapshot" in r["report_markdown"] and "Gate verdict (delivered round 1):" in r["report_markdown"], r["report_markdown"])
+    check("report: delivered round's verdict reported, final round appended",
+          r["gate_verdict"]["executes"] is True and "Final round verdict (discarded after restore)" in r["report_markdown"], r["report_markdown"])
+    check("report: open failures are the delivered round's", r["open_failures"] == ["matches: search ranking unverified"], str(r["open_failures"]))
+    check("report: restored flag surfaced", r["restored"] is True and r["success"] is False, str({k: r[k] for k in ("restored", "success", "passed")}))
+    r = run_code(final_report, {"loop_state": restored_state, "final_listing": listing_txt, "final_listing_ok": True,
+                                "restore_out": restore_info, "restore_ok": False})
+    check("report: unconfirmed restore carries #FALLBACK", "#FALLBACK: the restore command did not confirm success" in r["report_markdown"], r["report_markdown"])
+    snapshot_warn_state = dict(pass_state, warnings=["snapshot: round 0 snapshot failed - best-artifact restore cannot cover this round (#FALLBACK: delivery falls back to the last write for it)"])
+    r = run_code(final_report, {"loop_state": snapshot_warn_state, "final_listing": listing_txt, "final_listing_ok": True,
+                                "restore_out": {}, "restore_ok": None})
+    check("report: state-level snapshot warnings surface as advisory", "snapshot: round 0 snapshot failed" in r["report_markdown"], r["report_markdown"])
 
     print(f"\nALL {len(CHECKS)} CHECKS PASSED")
     return 0

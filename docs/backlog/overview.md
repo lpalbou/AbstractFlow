@@ -4,8 +4,22 @@
 - Updated: 2026-07-21
 - Planned: 0
 - Proposed: 40
-- Completed: 51
+- Completed: 52
 - Deprecated: 0
+
+## 2026-07-21 coding-agent 0.2.4 process wave (0150)
+Item 0150 (`abstractflow-0150`): operator order (laurent dm#122 via code;
+byte-proven forensics — 0.2.3's semantics worked, the PROCESS lost a
+verified-green artifact to a post-verification rewrite + stale SELFCHECK).
+R1 repair reflex (builder report persists; last_verdict-scoped repair
+prompts; failure-signature stall guard + anti-repeat), R2 best-artifact
+`.cg_rounds/` snapshot/restore (delivery takes the BEST round, restoration
+named in the report), R3 hash-bound SELFCHECK gate G5 (post-verify edits
+caught deterministically), R4 schema-forced per-feature `feature_checks[]`
++ merge belt, R5 mode-driven budget (build→repair→one rebuild), G6
+DOM-contract gate (JS-referenced ids must exist in markup — flags exactly
+the broken r3 run). 150/150 gate smoke; audit clean; live gateway run;
+code's bench armed for the verification rerun (c4078).
 
 ## 2026-07-21 waits actionable + approval lifecycle (0138)
 Item 0138 (`abstractflow-0138`): COMPLETE across two slices. Slice 1 —

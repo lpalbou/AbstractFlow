@@ -64,14 +64,14 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // 0.2.0 = deterministic-gates redesign (R-Type post-mortem): delivery +
     // integration gates before the LLM, browser_probe execution gate for web
     // entrypoints (fail-closed), environment-vs-fixable failure split.
-    bundleVersion: '0.2.3',
-    bundleRef: 'coding-agent@0.2.3',
+    bundleVersion: '0.2.4',
+    bundleRef: 'coding-agent@0.2.4',
   },
   coder: {
     flowId: 'coder',
     bundleId: 'coding-agent',
-    bundleVersion: '0.2.3',
-    bundleRef: 'coding-agent@0.2.3',
+    bundleVersion: '0.2.4',
+    bundleRef: 'coding-agent@0.2.4',
   },
   'co-scientist': {
     flowId: 'co-scientist',

@@ -619,10 +619,383 @@
       "outputs": []
     },
     {
-      "id": "det",
+      "id": "selfcheck_args",
       "type": "code",
       "position": {
         "x": -100,
+        "y": 400
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose SELFCHECK read",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws = str(workspace_root or \"\").strip()\npath = (ws.rstrip(\"/\") + \"/\" + \"SELFCHECK.md\") if ws else \"SELFCHECK.md\"\nreturn {\n    \"name\": \"read_file\",\n    \"arguments\": {\"file_path\": path, \"should_read_entire_file\": True},\n    \"call_id\": \"gate-selfcheck-read\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "selfcheck_read",
+      "type": "call_tool",
+      "position": {
+        "x": -480,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "G5: read SELFCHECK.md",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "read_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "selfcheck_hash_args",
+      "type": "code",
+      "position": {
+        "x": 280,
+        "y": 400
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose hash recompute",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "selfcheck_content",
+            "label": "selfcheck_content",
+            "type": "any"
+          },
+          {
+            "id": "selfcheck_ok",
+            "label": "selfcheck_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "content = str(selfcheck_content or \"\")\nhave = bool(selfcheck_ok) and len(content.strip()) > 0 and not content.startswith(\"Error\")\nws = str(workspace_root or \"\").strip()\nbad_chars = \"'\" + '\"' + \"\\\\\" + \"\\n\" + \"\\r\" + \"`\"\npaths = []\nif have:\n    for ln in content.split(\"\\n\"):\n        s = ln.strip()\n        if not s.startswith(\"ARTIFACT-SHA256:\"):\n            i = 0\n            while i < len(s) and s[i].isdigit():\n                i = i + 1\n            if i > 0 and i < len(s) and s[i] == \":\":\n                s = s[i + 1:].lstrip()\n        if not s.startswith(\"ARTIFACT-SHA256:\"):\n            continue\n        rest = s[len(\"ARTIFACT-SHA256:\"):].strip()\n        bits = [b for b in rest.split(\" \") if b]\n        if len(bits) < 2:\n            continue\n        p = \" \".join(bits[:-1]).strip()\n        if p.startswith(\"./\"):\n            p = p[2:]\n        if not p or p.startswith(\"/\") or p.startswith(\"-\"):\n            continue\n        bad = False\n        for c in p:\n            if c in bad_chars:\n                bad = True\n                break\n        if bad:\n            continue\n        if p.rsplit(\"/\", 1)[-1].lower() == \"selfcheck.md\":\n            continue\n        if p not in paths:\n            paths.append(p)\npaths = paths[:16]\nif not paths:\n    return {\n        \"name\": \"execute_command\",\n        \"arguments\": {\"command\": \"true\"},\n        \"call_id\": \"gate-selfcheck-hash-noop\",\n    }\nquoted = []\nfor p in paths:\n    quoted.append(\"'\" + p + \"'\")\nprefix = (\"cd '\" + ws + \"' && \") if ws else \"\"\ncmd = prefix + \"shasum -a 256 -- \" + \" \".join(quoted)\nreturn {\n    \"name\": \"execute_command\",\n    \"arguments\": {\"command\": cmd},\n    \"call_id\": \"gate-selfcheck-hash\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "selfcheck_hash_call",
+      "type": "call_tool",
+      "position": {
+        "x": -100,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "G5: recompute hashes",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate5",
+      "type": "code",
+      "position": {
+        "x": -100,
+        "y": 700
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "G5: SELFCHECK hash binding",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "selfcheck_content",
+            "label": "selfcheck_content",
+            "type": "any"
+          },
+          {
+            "id": "selfcheck_ok",
+            "label": "selfcheck_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "hash_output",
+            "label": "hash_output",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "content = str(selfcheck_content or \"\")\nhave = bool(selfcheck_ok) and len(content.strip()) > 0 and not content.startswith(\"Error\")\nfailures = []\nwarnings = []\nclaims = []\nhexchars = \"0123456789abcdef\"\nif not have:\n    warnings.append(\"selfcheck: SELFCHECK.md not found in the workspace - the builder's self-verification is unattested (advisory only, not a failure)\")\nelse:\n    for ln in content.split(\"\\n\"):\n        s = ln.strip()\n        if not s.startswith(\"ARTIFACT-SHA256:\"):\n            i = 0\n            while i < len(s) and s[i].isdigit():\n                i = i + 1\n            if i > 0 and i < len(s) and s[i] == \":\":\n                s = s[i + 1:].lstrip()\n        if not s.startswith(\"ARTIFACT-SHA256:\"):\n            continue\n        rest = s[len(\"ARTIFACT-SHA256:\"):].strip()\n        bits = [b for b in rest.split(\" \") if b]\n        if len(bits) < 2:\n            failures.append(\"self-report unbound: malformed ARTIFACT-SHA256 line in SELFCHECK.md ('\" + s[:120] + \"') - required format: 'ARTIFACT-SHA256: <workspace-relative-path> <sha256>'\")\n            continue\n        p = \" \".join(bits[:-1]).strip()\n        if p.startswith(\"./\"):\n            p = p[2:]\n        h = bits[-1].strip().lower()\n        ok_hex = len(h) == 64\n        if ok_hex:\n            for c in h:\n                if c not in hexchars:\n                    ok_hex = False\n                    break\n        if not ok_hex:\n            failures.append(\"self-report unbound: ARTIFACT-SHA256 line for '\" + p[:120] + \"' does not carry a valid sha256 (64 hex chars) - recompute it with: shasum -a 256 \" + p[:120])\n            continue\n        if p.rsplit(\"/\", 1)[-1].lower() == \"selfcheck.md\":\n            continue\n        claims.append([p, h])\n    if not claims and not failures:\n        failures.append(\"self-report unbound: SELFCHECK.md carries no ARTIFACT-SHA256 binding lines - after your FINAL edit, append one line per claimed file: 'ARTIFACT-SHA256: <workspace-relative-path> <sha256>' (compute with execute_command: shasum -a 256 <path>)\")\nif claims:\n    recomputed = {}\n    # Shape-robust text extraction (live-found, first 0.2.4 gateway run):\n    # the approval-resume lane delivers call_tool results as the\n    # {mode, results:[{output:{stdout,...}}]} ENVELOPE while the direct\n    # lane delivers the output dict, and older shapes are plain strings.\n    # Fold stdout/stderr strings out of any of those (gate3's raw-unwrap\n    # pattern, generalized).\n    parts = []\n    stack = [hash_output]\n    guard = 0\n    while stack and guard < 64:\n        guard = guard + 1\n        x = stack.pop()\n        if x is None:\n            continue\n        if isinstance(x, str):\n            if x:\n                parts.append(x)\n        elif isinstance(x, dict):\n            # stdout/stderr direct, else the *_preview twins: the runtime\n            # COMPACTS persisted tool results (durable result_key copies keep\n            # only stdout_preview/stderr_preview — live-found, third 0.2.4\n            # gateway run). Hash listings are tiny (<=16 lines), so an\n            # untruncated preview is the full text; a truncated one surfaces\n            # through gate5 as an unbound claim rather than a silent pass.\n            got_out = False\n            for k in [\"stdout\", \"stderr\"]:\n                v = x.get(k)\n                if isinstance(v, str) and v:\n                    parts.append(v)\n                    got_out = True\n            if not got_out:\n                for k in [\"stdout_preview\", \"stderr_preview\"]:\n                    v = x.get(k)\n                    if isinstance(v, str) and v:\n                        parts.append(v)\n            for k in [\"output\", \"results\", \"result\", \"payload\"]:\n                v = x.get(k)\n                if isinstance(v, str):\n                    if k == \"output\" and v:\n                        parts.append(v)\n                elif v is not None:\n                    stack.append(v)\n        elif isinstance(x, list):\n            for v in x:\n                stack.append(v)\n    hash_text = \"\\n\".join(parts)\n    for ln in hash_text.split(\"\\n\"):\n        s = ln.strip()\n        if not s:\n            continue\n        sp = s.find(\" \")\n        if sp <= 0:\n            continue\n        h2 = s[:sp].strip().lower()\n        p2 = s[sp:].strip()\n        if p2.startswith(\"*\"):\n            p2 = p2[1:]\n        if p2.startswith(\"./\"):\n            p2 = p2[2:]\n        if len(h2) == 64:\n            recomputed[p2] = h2\n    if not recomputed:\n        warnings.append(\"selfcheck: could not recompute artifact hashes on this host (\" + hash_text.strip()[:160] + \") - hash binding unchecked (#FALLBACK)\" if hash_text.strip() else \"selfcheck: could not recompute artifact hashes on this host (no output) - hash binding unchecked (#FALLBACK)\")\n    else:\n        for pair in claims:\n            p = pair[0]\n            h = pair[1]\n            rh = recomputed.get(p)\n            if not rh:\n                failures.append(\"self-report unbound: SELFCHECK.md attests '\" + p + \"' but that file could not be hashed on this host (missing or unreadable) - the attestation does not bind to a delivered file\")\n            elif rh != h:\n                failures.append(\"self-report stale: SELFCHECK.md attests different bytes than the delivered \" + p + \" - the artifact was modified after the last self-verification; re-verify and regenerate SELFCHECK.md (with fresh ARTIFACT-SHA256 lines) after your final edit\")\nreturn {\n    \"selfcheck_ok\": len(failures) == 0,\n    \"present\": have,\n    \"claims\": len(claims),\n    \"failures\": failures,\n    \"warnings\": warnings,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_dom",
+      "type": "code",
+      "position": {
+        "x": 280,
+        "y": 700
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "G6: DOM id contract",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "entry_content",
+            "label": "entry_content",
+            "type": "any"
+          },
+          {
+            "id": "script_content",
+            "label": "script_content",
+            "type": "any"
+          },
+          {
+            "id": "script_ok",
+            "label": "script_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g0 = gate0_out or {}\nweb = bool(g0.get(\"web_class\"))\nfailures = []\ndefined = set()\nrefs = []\nif web:\n    idset = \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-$\"\n    hexdigits = \"0123456789abcdefABCDEF\"\n    text = str(entry_content or \"\")\n    if bool(script_ok) and script_content:\n        text = text + \"\\n\" + str(script_content)\n    low = text.lower()\n    n = len(text)\n    # Defined ids: id=... (markup attributes, JS-built markup strings, and\n    # el.id = '...' assignments — '.' before is accepted as a definition).\n    pos = 0\n    while True:\n        i = low.find(\"id\", pos)\n        if i < 0:\n            break\n        pos = i + 2\n        before = low[i - 1] if i > 0 else \" \"\n        if before.isalnum() or before in \"-_\":\n            continue\n        k = i + 2\n        while k < n and text[k] in \" \\t\":\n            k = k + 1\n        if k >= n or text[k] != \"=\":\n            continue\n        k = k + 1\n        while k < n and text[k] in \" \\t\":\n            k = k + 1\n        if k >= n:\n            break\n        q = text[k]\n        name = \"\"\n        if q == \"\\\"\" or q == \"'\":\n            j = k + 1\n            while j < n and text[j] != q:\n                name = name + text[j]\n                j = j + 1\n        else:\n            j = k\n            while j < n and text[j] in idset:\n                name = name + text[j]\n                j = j + 1\n        name = name.strip()\n        if name:\n            ok_id = True\n            for c in name:\n                if c not in idset:\n                    ok_id = False\n                    break\n            if ok_id:\n                defined.add(name)\n    # Defined ids: setAttribute('id', 'x').\n    pos = 0\n    while True:\n        i = text.find(\"setAttribute\", pos)\n        if i < 0:\n            break\n        pos = i + 12\n        k = i + 12\n        while k < n and text[k] in \" \\t\":\n            k = k + 1\n        if k >= n or text[k] != \"(\":\n            continue\n        k = k + 1\n        while k < n and text[k] in \" \\t\":\n            k = k + 1\n        if k + 3 < n and (text[k] == \"'\" or text[k] == \"\\\"\") and text[k + 1:k + 3] == \"id\" and text[k + 3] == text[k]:\n            k = k + 4\n            while k < n and text[k] in \" \\t,\":\n                k = k + 1\n            if k < n and (text[k] == \"'\" or text[k] == \"\\\"\"):\n                q = text[k]\n                j = k + 1\n                name = \"\"\n                while j < n and text[j] != q:\n                    name = name + text[j]\n                    j = j + 1\n                if name:\n                    defined.add(name)\n    # Referenced ids, lane 1: getElementById('x') with a string literal.\n    pos = 0\n    while True:\n        i = text.find(\"getElementById\", pos)\n        if i < 0:\n            break\n        pos = i + 14\n        k = i + 14\n        while k < n and text[k] in \" \\t\":\n            k = k + 1\n        if k >= n or text[k] != \"(\":\n            continue\n        k = k + 1\n        while k < n and text[k] in \" \\t\":\n            k = k + 1\n        if k >= n or (text[k] != \"'\" and text[k] != \"\\\"\"):\n            continue\n        q = text[k]\n        j = k + 1\n        name = \"\"\n        while j < n and text[j] != q:\n            name = name + text[j]\n            j = j + 1\n        if not name or j >= n:\n            continue\n        ok_id = True\n        for c in name:\n            if c not in idset:\n                ok_id = False\n                break\n        if ok_id and name not in refs:\n            refs.append(name)\n    # Referenced ids, lane 2: quoted '#ident' selector literals passed to a\n    # call (querySelector/querySelectorAll/$()/jQuery-likes). A complex\n    # selector's LEADING id ('#hud .score') still requires the id to exist.\n    pos = 0\n    while True:\n        i = text.find(\"#\", pos)\n        if i < 0:\n            break\n        pos = i + 1\n        if i == 0 or i + 1 >= n:\n            continue\n        q = text[i - 1]\n        if q != \"'\" and q != \"\\\"\":\n            continue\n        j = i - 2\n        while j >= 0 and text[j] in \" \\t\":\n            j = j - 1\n        if j < 0 or (text[j] != \"(\" and text[j] != \",\"):\n            continue\n        k = i + 1\n        name = \"\"\n        while k < n and text[k] in idset:\n            name = name + text[k]\n            k = k + 1\n        if not name or k >= n:\n            continue\n        nxt = text[k]\n        if nxt != q and nxt not in \" >.[:,+~\":\n            continue\n        is_hex = len(name) in (3, 4, 6, 8)\n        if is_hex:\n            for c in name:\n                if c not in hexdigits:\n                    is_hex = False\n                    break\n        if is_hex:\n            continue\n        if name not in refs:\n            refs.append(name)\n    for name in refs:\n        if len(failures) >= 8:\n            break\n        if name not in defined:\n            failures.append(\"dom-contract: the script references element id '#\" + name + \"' (getElementById/selector) but no element with id=\\\"\" + name + \"\\\" exists in the delivered markup - the reference resolves to null at runtime (a rename applied to one side of the markup<->script contract). Add the element id or update every reference\")\nreturn {\n    \"dom_ok\": len(failures) == 0,\n    \"failures\": failures,\n    \"referenced_ids\": len(refs),\n    \"defined_ids\": len(defined),\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "det",
+      "type": "code",
+      "position": {
+        "x": 660,
         "y": 400
       },
       "data": {
@@ -644,6 +1017,16 @@
           {
             "id": "gate4_out",
             "label": "gate4_out",
+            "type": "object"
+          },
+          {
+            "id": "gate5_out",
+            "label": "gate5_out",
+            "type": "object"
+          },
+          {
+            "id": "gate_dom_out",
+            "label": "gate_dom_out",
             "type": "object"
           },
           {
@@ -673,7 +1056,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "g0 = gate0_out or {}\ng1 = gate1_out or {}\ng4 = gate4_out or {}\nfailures = [str(f) for f in (g0.get(\"failures\") or [])] + [str(f) for f in (g1.get(\"failures\") or [])] + [str(f) for f in (g4.get(\"failures\") or [])]\nfailed = len(failures) > 0\nentry = str(g0.get(\"entrypoint\") or \"\")\narts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\nsummary = \"deterministic gates failed before verification: \" + \"; \".join(failures)[:400] if failed else \"deterministic gates passed\"\nreturn {\n    \"failed\": failed,\n    \"verdict\": {\n        \"builds\": False,\n        \"executes\": False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": failures,\n        \"environment_failures\": [],\n        \"summary\": summary,\n        \"artifacts\": arts if failed else [],\n        \"gate_source\": \"deterministic\",\n        \"deterministic\": {\n            \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n            \"integration_ok\": bool(g1.get(\"integration_ok\")),\n            \"orphans_ok\": bool(g4.get(\"orphans_ok\", True)),\n            \"web_class\": bool(g0.get(\"web_class\")),\n            \"entrypoint\": entry,\n            \"files_count\": len(g0.get(\"files\") or []),\n        },\n    },\n}"
+        "codeBody": "g0 = gate0_out or {}\ng1 = gate1_out or {}\ng4 = gate4_out or {}\ng5 = gate5_out or {}\ngdom = gate_dom_out or {}\nfailures = (\n    [str(f) for f in (g0.get(\"failures\") or [])]\n    + [str(f) for f in (g1.get(\"failures\") or [])]\n    + [str(f) for f in (g4.get(\"failures\") or [])]\n    + [str(f) for f in (gdom.get(\"failures\") or [])]\n    + [str(f) for f in (g5.get(\"failures\") or [])]\n)\nwarnings = [str(w) for w in (g5.get(\"warnings\") or [])]\nfailed = len(failures) > 0\nentry = str(g0.get(\"entrypoint\") or \"\")\narts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\nsummary = \"deterministic gates failed before verification: \" + \"; \".join(failures)[:400] if failed else \"deterministic gates passed\"\nreturn {\n    \"failed\": failed,\n    \"verdict\": {\n        \"builds\": False,\n        \"executes\": False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": failures,\n        \"environment_failures\": [],\n        \"warnings\": warnings,\n        \"summary\": summary,\n        \"artifacts\": arts if failed else [],\n        \"gate_source\": \"deterministic\",\n        \"deterministic\": {\n            \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n            \"integration_ok\": bool(g1.get(\"integration_ok\")),\n            \"orphans_ok\": bool(g4.get(\"orphans_ok\", True)),\n            \"dom_ok\": bool(gdom.get(\"dom_ok\", True)),\n            \"selfcheck_bound\": bool(g5.get(\"selfcheck_ok\", True)),\n            \"web_class\": bool(g0.get(\"web_class\")),\n            \"entrypoint\": entry,\n            \"files_count\": len(g0.get(\"files\") or []),\n        },\n    },\n}"
       },
       "label": null,
       "icon": null,
@@ -685,7 +1068,7 @@
       "id": "if_det",
       "type": "if",
       "position": {
-        "x": -480,
+        "x": 280,
         "y": 0
       },
       "data": {
@@ -728,7 +1111,7 @@
       "id": "set_verdict_det",
       "type": "set_var",
       "position": {
-        "x": -100,
+        "x": 660,
         "y": -220
       },
       "data": {
@@ -779,7 +1162,7 @@
       "id": "if_web",
       "type": "if",
       "position": {
-        "x": -100,
+        "x": 660,
         "y": 0
       },
       "data": {
@@ -822,7 +1205,7 @@
       "id": "probe_args",
       "type": "code",
       "position": {
-        "x": 280,
+        "x": 1040,
         "y": 400
       },
       "data": {
@@ -880,7 +1263,7 @@
       "id": "probe_call",
       "type": "call_tool",
       "position": {
-        "x": 280,
+        "x": 1040,
         "y": 0
       },
       "data": {
@@ -943,7 +1326,7 @@
       "id": "gate3",
       "type": "code",
       "position": {
-        "x": 660,
+        "x": 1420,
         "y": 400
       },
       "data": {
@@ -1006,7 +1389,7 @@
       "id": "if_probe",
       "type": "if",
       "position": {
-        "x": 660,
+        "x": 1420,
         "y": 0
       },
       "data": {
@@ -1049,7 +1432,7 @@
       "id": "probe_verdict",
       "type": "code",
       "position": {
-        "x": 1040,
+        "x": 1800,
         "y": 400
       },
       "data": {
@@ -1107,7 +1490,7 @@
       "id": "set_verdict_probe",
       "type": "set_var",
       "position": {
-        "x": 1040,
+        "x": 1800,
         "y": -220
       },
       "data": {
@@ -1158,7 +1541,7 @@
       "id": "verifier_prompt",
       "type": "code",
       "position": {
-        "x": 1040,
+        "x": 1800,
         "y": 700
       },
       "data": {
@@ -1224,7 +1607,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nbuild_cmd = str(build_command or \"\").strip()\nrun_cmd = str(run_command or \"\").strip()\ng0 = gate0_out or {}\ng3 = gate3_out or {}\nfiles = [str(f) for f in (g0.get(\"files\") or [])]\nweb = bool(g0.get(\"web_class\"))\nentry = str(g0.get(\"entrypoint\") or \"\")\n\nparts = []\nparts.append(\"You are an INDEPENDENT code verifier. Do NOT edit any code. Run the checks and report a structured verdict.\")\nparts.append(\"\")\nparts.append(\"## The task the code was meant to satisfy\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"## Ground truth already verified mechanically (do not re-derive)\")\nparts.append(\"Delivered files (\" + str(len(files)) + \"): \" + \", \".join(files[:40]))\nif web:\n    parts.append(\"Artifact class: web. Entrypoint: \" + entry + \". Reference integrity already checked.\")\n    if bool(g3.get(\"ran\")):\n        diag = g3.get(\"diag\") or {}\n        probe_line = \"A browser probe already EXECUTED the entrypoint world-side (engine: \" + str(g3.get(\"engine\") or \"?\") + \"; loaded ok: \" + str(bool(g3.get(\"probe_ok\"))) + \"; canvas present: \" + str(bool(diag.get(\"has_canvas\"))) + \"; non-blank samples: \" + str(diag.get(\"non_blank_samples\")) + \"). Its result decides the executes gate and will override whatever you report there. Do not try to execute the page yourself.\"\n        parts.append(probe_line)\nelse:\n    parts.append(\"Artifact class: non-web (no .html entrypoint detected).\")\n# Agent-lane discipline line (c2847 precision 1): judgments must anchor on\n# the gate outputs above, or the LLM re-derives executes-shaped opinions.\nparts.append(\"Be strict: only count claims supported by the gate outputs above and by what your own tool calls actually observed.\")\nparts.append(\"\")\nparts.append(\"## Gate 1 - BUILDS\")\nif build_cmd:\n    parts.append(\"Run this build command with execute_command and record whether it succeeds: \" + build_cmd)\nelse:\n    parts.append(\"Run the appropriate build/compile/syntax-check command with execute_command for the delivered files listed above. For interpreted languages with no build step, treat import/syntax check as the build (e.g. python -m py_compile). For plain static web files with no build step, builds=true.\")\nparts.append(\"On failure, capture the exact error output in build_error.\")\nparts.append(\"\")\nparts.append(\"## Gate 2 - EXECUTES\")\nif web:\n    parts.append(\"Already executed world-side by the browser probe (see ground truth above): set executes=false with run_error='decided by browser probe' — the merge substitutes the probe's result. Do NOT attempt to run browser code with execute_command.\")\nelse:\n    if run_cmd:\n        parts.append(\"Run this command with execute_command and record whether it runs without error: \" + run_cmd)\n    else:\n        parts.append(\"Run the program (or its tests / a smoke invocation) with execute_command and capture any traceback/runtime error in run_error.\")\n    # Fail-closed applies to BOTH non-web branches: an explicit run_command\n    # that cannot run on this host is exactly the missing-executor class.\n    parts.append(\"FAIL CLOSED: a gate you could not actually execute is NOT a pass. If no executor exists for the artifact class on this host, set executes=false AND add one line to environment_failures[] naming the missing executor. NEVER claim executes=true because a file merely exists or 'loads'.\")\n    parts.append(\"environment_failures[] is ONLY for missing executors/runtimes on this host — real crashes, tracebacks and errors from code you DID run go in failures[].\")\nparts.append(\"\")\nparts.append(\"## Gate 3 - MATCHES THE ASK\")\nparts.append(\"Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').\")\n# C3 (plan improving-code, 2026-07-21): non-vacuity. The dead-ripple defect\n# passed every structural check — a feature was PRESENT and ran cleanly yet\n# its output never varied. Structure-present is not behavior-correct: the\n# verifier must confirm each task-named feature's output DEPENDS on its\n# input, and treat a provably-constant output as a MATCH FAILURE.\nparts.append(\"NON-VACUITY (required): for each behavior the task names, confirm its output actually DEPENDS on its input — that the feature reacts, not merely exists. Read SELFCHECK.md if present for the builder's claimed evidence, but do not trust it: check the code path yourself (does the output derive from the input, or is it hard-coded / a constant / an always-empty result?). If a task-named feature's output is provably constant or always-empty across the inputs it is supposed to respond to, that is matches=false with a failures[] line NAMING the mechanism (e.g. 'ripple effect computes the same 0 for every cell because it never reads neighbor state'). A feature that is present but vacuous is a FAILURE, not a pass.\")\nparts.append(\"\")\nparts.append(\"## Verdict\")\nparts.append(\"Set all_passed=true ONLY if builds AND executes AND matches are all true AND environment_failures is empty. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.\")\nparts.append(\"In artifacts[], list the produced file paths you actually observed, WORKSPACE-RELATIVE like ./pong.html — use an absolute path only for a file outside the workspace root. Entrypoint first (the file a user opens/runs). Never list files you did not see.\")\nreturn \"\\n\".join(parts)"
+        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nbuild_cmd = str(build_command or \"\").strip()\nrun_cmd = str(run_command or \"\").strip()\ng0 = gate0_out or {}\ng3 = gate3_out or {}\nfiles = [str(f) for f in (g0.get(\"files\") or [])]\nweb = bool(g0.get(\"web_class\"))\nentry = str(g0.get(\"entrypoint\") or \"\")\n\nparts = []\nparts.append(\"You are an INDEPENDENT code verifier. Do NOT edit any code. Run the checks and report a structured verdict.\")\nparts.append(\"\")\nparts.append(\"## The task the code was meant to satisfy\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"## Ground truth already verified mechanically (do not re-derive)\")\nparts.append(\"Delivered files (\" + str(len(files)) + \"): \" + \", \".join(files[:40]))\nif web:\n    parts.append(\"Artifact class: web. Entrypoint: \" + entry + \". Reference integrity already checked.\")\n    if bool(g3.get(\"ran\")):\n        diag = g3.get(\"diag\") or {}\n        probe_line = \"A browser probe already EXECUTED the entrypoint world-side (engine: \" + str(g3.get(\"engine\") or \"?\") + \"; loaded ok: \" + str(bool(g3.get(\"probe_ok\"))) + \"; canvas present: \" + str(bool(diag.get(\"has_canvas\"))) + \"; non-blank samples: \" + str(diag.get(\"non_blank_samples\")) + \"). Its result decides the executes gate and will override whatever you report there. Do not try to execute the page yourself.\"\n        parts.append(probe_line)\nelse:\n    parts.append(\"Artifact class: non-web (no .html entrypoint detected).\")\n# Agent-lane discipline line (c2847 precision 1): judgments must anchor on\n# the gate outputs above, or the LLM re-derives executes-shaped opinions.\nparts.append(\"Be strict: only count claims supported by the gate outputs above and by what your own tool calls actually observed.\")\nparts.append(\"\")\nparts.append(\"## Gate 1 - BUILDS\")\nif build_cmd:\n    parts.append(\"Run this build command with execute_command and record whether it succeeds: \" + build_cmd)\nelse:\n    parts.append(\"Run the appropriate build/compile/syntax-check command with execute_command for the delivered files listed above. For interpreted languages with no build step, treat import/syntax check as the build (e.g. python -m py_compile). For plain static web files with no build step, builds=true.\")\nparts.append(\"On failure, capture the exact error output in build_error.\")\nparts.append(\"\")\nparts.append(\"## Gate 2 - EXECUTES\")\nif web:\n    parts.append(\"Already executed world-side by the browser probe (see ground truth above): set executes=false with run_error='decided by browser probe' — the merge substitutes the probe's result. Do NOT attempt to run browser code with execute_command.\")\nelse:\n    if run_cmd:\n        parts.append(\"Run this command with execute_command and record whether it runs without error: \" + run_cmd)\n    else:\n        parts.append(\"Run the program (or its tests / a smoke invocation) with execute_command and capture any traceback/runtime error in run_error.\")\n    # Fail-closed applies to BOTH non-web branches: an explicit run_command\n    # that cannot run on this host is exactly the missing-executor class.\n    parts.append(\"FAIL CLOSED: a gate you could not actually execute is NOT a pass. If no executor exists for the artifact class on this host, set executes=false AND add one line to environment_failures[] naming the missing executor. NEVER claim executes=true because a file merely exists or 'loads'.\")\n    parts.append(\"environment_failures[] is ONLY for missing executors/runtimes on this host — real crashes, tracebacks and errors from code you DID run go in failures[].\")\nparts.append(\"\")\nparts.append(\"## Gate 3 - MATCHES THE ASK\")\nparts.append(\"Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').\")\n# R4 (memgraph forensics 2026-07-21, replaces the 0.2.3 C3 prose): forced\n# per-feature enumeration. The C3 paragraph produced no artifact, so the\n# verifier sampled 1-2 salient features and set matches=true — dead playback\n# and a missing ranking passed invisibly (F4). The schema now REQUIRES a\n# feature_checks[] entry per task-named behavior and the merge fails any\n# depends_on_input=false entry, so coverage is auditable in the verdict.\nparts.append(\"FEATURE ENUMERATION (required — the response schema enforces it): Step 1: extract EVERY user-observable behavior the task names, each as a verbatim quote from the task text. Step 2: for EACH one, emit a feature_checks[] entry: feature (the verbatim quote), input (the concrete input/interaction that should drive it), expected_change (the observable output that must change), evidence (what you actually inspected that proves the output DERIVES from the input), depends_on_input (true/false). For web artifacts the evidence must name the FULL chain — event listener -> state mutation -> render read; 'a handler exists' is NOT evidence. Read SELFCHECK.md if present for the builder's claimed evidence, but do not trust it: check the code path yourself (does the output derive from the input, or is it hard-coded / a constant / an always-empty result?). depends_on_input means 'this feature is ALIVE, not vacuous' — for STATIC features the task names with no interaction of their own (a visible label, fixed text, layout), the check is correct PRESENCE: set depends_on_input=true when the static feature is correctly present, and say so in the evidence. Reserve depends_on_input=false STRICTLY for defects: a feature whose output SHOULD respond to its input but is provably constant / always-empty / disconnected, or a named feature that is missing outright. If ANY feature is vacuous, set its depends_on_input=false AND matches=false with a failures[] line NAMING the mechanism (e.g. 'ripple effect computes the same 0 for every cell because it never reads neighbor state'). A feature that is present but vacuous is a FAILURE, not a pass. Do not skip features: one entry per named behavior — the merge fails any depends_on_input=false entry.\")\nparts.append(\"\")\nparts.append(\"## Verdict\")\nparts.append(\"Set all_passed=true ONLY if builds AND executes AND matches are all true AND environment_failures is empty. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.\")\nparts.append(\"In artifacts[], list the produced file paths you actually observed, WORKSPACE-RELATIVE like ./pong.html — use an absolute path only for a file outside the workspace root. Entrypoint first (the file a user opens/runs). Never list files you did not see.\")\nreturn \"\\n\".join(parts)"
       },
       "label": null,
       "icon": null,
@@ -1236,7 +1619,7 @@
       "id": "verifier",
       "type": "agent",
       "position": {
-        "x": 1040,
+        "x": 1800,
         "y": 0
       },
       "data": {
@@ -1336,7 +1719,7 @@
             "analyze_code",
             "execute_command"
           ],
-          "max_iterations": 12,
+          "max_iterations": 16,
           "temperature": 0.0,
           "resp_schema": {
             "type": "object",
@@ -1352,7 +1735,8 @@
               "failures",
               "environment_failures",
               "summary",
-              "artifacts"
+              "artifacts",
+              "feature_checks"
             ],
             "properties": {
               "builds": {
@@ -1396,10 +1780,41 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "feature_checks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "feature",
+                    "input",
+                    "expected_change",
+                    "evidence",
+                    "depends_on_input"
+                  ],
+                  "properties": {
+                    "feature": {
+                      "type": "string"
+                    },
+                    "input": {
+                      "type": "string"
+                    },
+                    "expected_change": {
+                      "type": "string"
+                    },
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "depends_on_input": {
+                      "type": "boolean"
+                    }
+                  }
+                }
               }
             }
           },
-          "max_output_tokens": 2000
+          "max_output_tokens": 4000
         }
       },
       "label": null,
@@ -1412,7 +1827,7 @@
       "id": "merge",
       "type": "code",
       "position": {
-        "x": 1420,
+        "x": 2180,
         "y": 400
       },
       "data": {
@@ -1452,6 +1867,11 @@
             "type": "object"
           },
           {
+            "id": "gate5_out",
+            "label": "gate5_out",
+            "type": "object"
+          },
+          {
             "id": "permissions",
             "label": "permissions",
             "type": "string"
@@ -1478,7 +1898,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "v = verifier_data if isinstance(verifier_data, dict) else {}\ng0 = gate0_out or {}\ng1 = gate1_out or {}\ng3 = gate3_out or {}\nweb = bool(g0.get(\"web_class\"))\n# A verifier that RAN always returns the strict-schema keys (all fields are\n# required); a verdict carrying neither gate key is a verifier that DIED or\n# returned nothing parseable — \"delivered, not verifiable\", never \"failed\".\nverdict_missing = (\"builds\" not in v) and (\"all_passed\" not in v)\nif verdict_missing:\n    env_failures = [str(f) for f in (g3.get(\"environment_failures\") or [])]\n    note = str(verifier_response or \"\").strip()\n    if verifier_ok is False:\n        cause = \"the verifier agent failed before returning a verdict\"\n    else:\n        cause = \"the verifier returned no parseable verdict\"\n    passed_gates = \"delivery, integration\"\n    if web and bool(g3.get(\"executes_web\")):\n        passed_gates = passed_gates + \", browser probe\"\n    env_failures.append(\n        \"verification unavailable: \" + cause\n        + ((\": \" + note[:240]) if note else \"\")\n        + \" — deterministic gates (\" + passed_gates + \") passed; the artifact is delivered but could not be independently verified here\"\n    )\n    entry = str(g0.get(\"entrypoint\") or \"\")\n    arts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\n    return {\n        \"builds\": False,\n        \"executes\": bool(g3.get(\"executes_web\")) if web else False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": [],\n        \"environment_failures\": env_failures,\n        \"warnings\": [str(w) for w in (g3.get(\"warnings\") or [])],\n        \"build_error\": \"\",\n        \"run_error\": \"\",\n        \"mismatch\": \"\",\n        \"summary\": \"delivered, verification incomplete: the deterministic gates passed but the LLM verifier died before reporting\",\n        \"artifacts\": arts,\n        \"verifier_died\": True,\n        \"delivered\": bool(g0.get(\"delivery_ok\")),\n        \"gate_source\": (\"deterministic+probe\" if web else \"deterministic\") + \" (verifier unavailable)\",\n        \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}} if web else {},\n        \"deterministic\": {\n            \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n            \"integration_ok\": bool(g1.get(\"integration_ok\")),\n            \"web_class\": web,\n            \"entrypoint\": entry,\n            \"files_count\": len(g0.get(\"files\") or []),\n        },\n    }\nbuilds = bool(v.get(\"builds\"))\nmatches = bool(v.get(\"matches\"))\nfailures = v.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nfailures = [str(f) for f in failures]\nenv_failures = v.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\nenv_failures = [str(f) for f in env_failures]\nwarnings = [str(w) for w in (g3.get(\"warnings\") or [])]\nif web:\n    # World-side truth: the probe decided executes; its environment failures\n    # ride regardless of what the LLM reported.\n    executes = bool(g3.get(\"executes_web\"))\n    for f in (g3.get(\"environment_failures\") or []):\n        if str(f) not in env_failures:\n            env_failures.append(str(f))\nelse:\n    executes = bool(v.get(\"executes\"))\nall_passed = builds and executes and matches and len(env_failures) == 0\narts = [str(a).strip() for a in (v.get(\"artifacts\") or []) if str(a).strip()]\nif not arts:\n    entry = str(g0.get(\"entrypoint\") or \"\")\n    arts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\nreturn {\n    \"builds\": builds,\n    \"executes\": executes,\n    \"matches\": matches,\n    \"all_passed\": all_passed,\n    \"failures\": failures,\n    \"environment_failures\": env_failures,\n    \"warnings\": warnings,\n    \"build_error\": str(v.get(\"build_error\") or \"\"),\n    \"run_error\": str(v.get(\"run_error\") or \"\"),\n    \"mismatch\": str(v.get(\"mismatch\") or \"\"),\n    \"summary\": str(v.get(\"summary\") or \"\"),\n    \"artifacts\": arts,\n    \"gate_source\": \"verifier+deterministic+probe\" if web else \"verifier+deterministic\",\n    \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}} if web else {},\n    \"deterministic\": {\n        \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n        \"integration_ok\": bool(g1.get(\"integration_ok\")),\n        \"web_class\": web,\n        \"entrypoint\": str(g0.get(\"entrypoint\") or \"\"),\n        \"files_count\": len(g0.get(\"files\") or []),\n    },\n}"
+        "codeBody": "v = verifier_data if isinstance(verifier_data, dict) else {}\ng0 = gate0_out or {}\ng1 = gate1_out or {}\ng3 = gate3_out or {}\ng5 = gate5_out or {}\nweb = bool(g0.get(\"web_class\"))\n# A verifier that RAN always returns the strict-schema keys (all fields are\n# required); a verdict carrying neither gate key is a verifier that DIED or\n# returned nothing parseable — \"delivered, not verifiable\", never \"failed\".\nverdict_missing = (\"builds\" not in v) and (\"all_passed\" not in v)\nif verdict_missing:\n    env_failures = [str(f) for f in (g3.get(\"environment_failures\") or [])]\n    note = str(verifier_response or \"\").strip()\n    if verifier_ok is False:\n        cause = \"the verifier agent failed before returning a verdict\"\n    else:\n        cause = \"the verifier returned no parseable verdict\"\n    passed_gates = \"delivery, integration\"\n    if web and bool(g3.get(\"executes_web\")):\n        passed_gates = passed_gates + \", browser probe\"\n    env_failures.append(\n        \"verification unavailable: \" + cause\n        + ((\": \" + note[:240]) if note else \"\")\n        + \" — deterministic gates (\" + passed_gates + \") passed; the artifact is delivered but could not be independently verified here\"\n    )\n    entry = str(g0.get(\"entrypoint\") or \"\")\n    arts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\n    return {\n        \"builds\": False,\n        \"executes\": bool(g3.get(\"executes_web\")) if web else False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": [],\n        \"environment_failures\": env_failures,\n        \"warnings\": [str(w) for w in (g3.get(\"warnings\") or [])] + [str(w) for w in (g5.get(\"warnings\") or [])],\n        \"build_error\": \"\",\n        \"run_error\": \"\",\n        \"mismatch\": \"\",\n        \"summary\": \"delivered, verification incomplete: the deterministic gates passed but the LLM verifier died before reporting\",\n        \"artifacts\": arts,\n        \"verifier_died\": True,\n        \"delivered\": bool(g0.get(\"delivery_ok\")),\n        \"gate_source\": (\"deterministic+probe\" if web else \"deterministic\") + \" (verifier unavailable)\",\n        \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}} if web else {},\n        \"deterministic\": {\n            \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n            \"integration_ok\": bool(g1.get(\"integration_ok\")),\n            \"web_class\": web,\n            \"entrypoint\": entry,\n            \"files_count\": len(g0.get(\"files\") or []),\n        },\n    }\nbuilds = bool(v.get(\"builds\"))\nmatches = bool(v.get(\"matches\"))\nfailures = v.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nfailures = [str(f) for f in failures]\nenv_failures = v.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\nenv_failures = [str(f) for f in env_failures]\n# R4 fold (memgraph forensics 2026-07-21): the verifier's own per-feature\n# enumeration is BINDING — any entry it marked depends_on_input=false becomes\n# a failures[] line naming the mechanism and belts matches=false. A feature\n# that is present but vacuous can never ride a matches=true verdict. String\n# \"false\" coerces (tool-arg coercion class, 2026-02-20 note).\nfchecks = v.get(\"feature_checks\") or []\nif not isinstance(fchecks, list):\n    fchecks = []\nfor fc in fchecks:\n    if not isinstance(fc, dict):\n        continue\n    dep = fc.get(\"depends_on_input\")\n    dep_false = (dep is False) or (str(dep).strip().lower() == \"false\")\n    if dep_false:\n        feat = str(fc.get(\"feature\") or \"unnamed feature\").strip()\n        ev = str(fc.get(\"evidence\") or fc.get(\"expected_change\") or \"\").strip()\n        line = \"matches: task-named feature '\" + feat[:120] + \"' does not depend on its input\" + ((\" - \" + ev[:200]) if ev else \"\") + \" - a feature that is present but vacuous is a FAILURE, not a pass\"\n        if line not in failures:\n            failures.append(line)\n        matches = False\nwarnings = [str(w) for w in (g3.get(\"warnings\") or [])]\nfor w in (g5.get(\"warnings\") or []):\n    if str(w) not in warnings:\n        warnings.append(str(w))\nif web:\n    # World-side truth: the probe decided executes; its environment failures\n    # ride regardless of what the LLM reported.\n    executes = bool(g3.get(\"executes_web\"))\n    for f in (g3.get(\"environment_failures\") or []):\n        if str(f) not in env_failures:\n            env_failures.append(str(f))\nelse:\n    executes = bool(v.get(\"executes\"))\nall_passed = builds and executes and matches and len(env_failures) == 0\narts = [str(a).strip() for a in (v.get(\"artifacts\") or []) if str(a).strip()]\nif not arts:\n    entry = str(g0.get(\"entrypoint\") or \"\")\n    arts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\nreturn {\n    \"builds\": builds,\n    \"executes\": executes,\n    \"matches\": matches,\n    \"all_passed\": all_passed,\n    \"failures\": failures,\n    \"environment_failures\": env_failures,\n    \"warnings\": warnings,\n    \"build_error\": str(v.get(\"build_error\") or \"\"),\n    \"run_error\": str(v.get(\"run_error\") or \"\"),\n    \"mismatch\": str(v.get(\"mismatch\") or \"\"),\n    \"summary\": str(v.get(\"summary\") or \"\"),\n    \"artifacts\": arts,\n    \"feature_checks\": fchecks,\n    \"gate_source\": \"verifier+deterministic+probe\" if web else \"verifier+deterministic\",\n    \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}} if web else {},\n    \"deterministic\": {\n        \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n        \"integration_ok\": bool(g1.get(\"integration_ok\")),\n        \"web_class\": web,\n        \"entrypoint\": str(g0.get(\"entrypoint\") or \"\"),\n        \"files_count\": len(g0.get(\"files\") or []),\n    },\n}"
       },
       "label": null,
       "icon": null,
@@ -1490,7 +1910,7 @@
       "id": "set_verdict_llm",
       "type": "set_var",
       "position": {
-        "x": 1420,
+        "x": 2180,
         "y": 0
       },
       "data": {
@@ -1541,7 +1961,7 @@
       "id": "read_verdict",
       "type": "get_var",
       "position": {
-        "x": 1800,
+        "x": 2560,
         "y": 400
       },
       "data": {
@@ -1583,7 +2003,7 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 1800,
+        "x": 2560,
         "y": 0
       },
       "data": {
@@ -1638,8 +2058,24 @@
       "animated": true
     },
     {
-      "id": "e-script_read-exec-out-if_det-exec-in",
+      "id": "e-script_read-exec-out-selfcheck_read-exec-in",
       "source": "script_read",
+      "sourceHandle": "exec-out",
+      "target": "selfcheck_read",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-selfcheck_read-exec-out-selfcheck_hash_call-exec-in",
+      "source": "selfcheck_read",
+      "sourceHandle": "exec-out",
+      "target": "selfcheck_hash_call",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-selfcheck_hash_call-exec-out-if_det-exec-in",
+      "source": "selfcheck_hash_call",
       "sourceHandle": "exec-out",
       "target": "if_det",
       "targetHandle": "exec-in",
@@ -1870,6 +2306,110 @@
       "animated": false
     },
     {
+      "id": "e-start-workspace_root-selfcheck_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "selfcheck_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_args-output-selfcheck_read-tool_call",
+      "source": "selfcheck_args",
+      "sourceHandle": "output",
+      "target": "selfcheck_read",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_read-result-selfcheck_hash_args-selfcheck_content",
+      "source": "selfcheck_read",
+      "sourceHandle": "result",
+      "target": "selfcheck_hash_args",
+      "targetHandle": "selfcheck_content",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_read-success-selfcheck_hash_args-selfcheck_ok",
+      "source": "selfcheck_read",
+      "sourceHandle": "success",
+      "target": "selfcheck_hash_args",
+      "targetHandle": "selfcheck_ok",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-selfcheck_hash_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "selfcheck_hash_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_hash_args-output-selfcheck_hash_call-tool_call",
+      "source": "selfcheck_hash_args",
+      "sourceHandle": "output",
+      "target": "selfcheck_hash_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_read-result-gate5-selfcheck_content",
+      "source": "selfcheck_read",
+      "sourceHandle": "result",
+      "target": "gate5",
+      "targetHandle": "selfcheck_content",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_read-success-gate5-selfcheck_ok",
+      "source": "selfcheck_read",
+      "sourceHandle": "success",
+      "target": "gate5",
+      "targetHandle": "selfcheck_ok",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_hash_call-result-gate5-hash_output",
+      "source": "selfcheck_hash_call",
+      "sourceHandle": "result",
+      "target": "gate5",
+      "targetHandle": "hash_output",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-gate_dom-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "gate_dom",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-entry_read-result-gate_dom-entry_content",
+      "source": "entry_read",
+      "sourceHandle": "result",
+      "target": "gate_dom",
+      "targetHandle": "entry_content",
+      "animated": false
+    },
+    {
+      "id": "e-script_read-result-gate_dom-script_content",
+      "source": "script_read",
+      "sourceHandle": "result",
+      "target": "gate_dom",
+      "targetHandle": "script_content",
+      "animated": false
+    },
+    {
+      "id": "e-script_read-success-gate_dom-script_ok",
+      "source": "script_read",
+      "sourceHandle": "success",
+      "target": "gate_dom",
+      "targetHandle": "script_ok",
+      "animated": false
+    },
+    {
       "id": "e-gate0-output-det-gate0_out",
       "source": "gate0",
       "sourceHandle": "output",
@@ -1891,6 +2431,22 @@
       "sourceHandle": "output",
       "target": "det",
       "targetHandle": "gate4_out",
+      "animated": false
+    },
+    {
+      "id": "e-gate5-output-det-gate5_out",
+      "source": "gate5",
+      "sourceHandle": "output",
+      "target": "det",
+      "targetHandle": "gate5_out",
+      "animated": false
+    },
+    {
+      "id": "e-gate_dom-output-det-gate_dom_out",
+      "source": "gate_dom",
+      "sourceHandle": "output",
+      "target": "det",
+      "targetHandle": "gate_dom_out",
       "animated": false
     },
     {
@@ -2118,6 +2674,14 @@
       "animated": false
     },
     {
+      "id": "e-gate5-output-merge-gate5_out",
+      "source": "gate5",
+      "sourceHandle": "output",
+      "target": "merge",
+      "targetHandle": "gate5_out",
+      "animated": false
+    },
+    {
       "id": "e-merge-output-set_verdict_llm-value",
       "source": "merge",
       "sourceHandle": "output",
@@ -2135,6 +2699,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-21T12:26:23.599298+00:00",
-  "updated_at": "2026-07-21T12:26:23.599298+00:00"
+  "created_at": "2026-07-21T18:44:24.042925+00:00",
+  "updated_at": "2026-07-21T18:44:24.042925+00:00"
 }
