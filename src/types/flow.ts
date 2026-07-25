@@ -189,6 +189,28 @@ export type NodeType =
   | 'write_pdf'
   | 'write_docx'
   | 'write_chart'
+  // Deterministic camera nodes (fixed-verb tool_invoke: no agent, no approval;
+  // the tool verb is baked into the node type at compile time, never a pin)
+  | 'camera_open'
+  | 'camera_capture_photo'
+  | 'camera_capture_video'
+  | 'camera_analyze_media'
+  | 'camera_close'
+  // Entity mind nodes (first-class MEMORY_*/DIARY_* effects; handlers exist
+  // only on a stamped ENTITY runtime — the channel carries authorship)
+  | 'memory_recall'
+  | 'memory_commit'
+  | 'memory_form'
+  | 'memory_adjust'
+  | 'memory_appraise'
+  | 'diary_write'
+  | 'diary_read'
+  | 'memory_consolidate'
+  | 'memory_probe'
+  | 'life_query'
+  | 'memory_tend'
+  | 'entity_tools_query'
+  | 'entity_tools_execute'
   | 'read_artifact'
   | 'list_folder_files'
   | 'import_workspace_file'

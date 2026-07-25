@@ -302,6 +302,258 @@ def import_workspace_file_node(node_id, label, x, y, *, content_type=None):
                 pin_defaults=pin_defaults)
 
 
+# --- Entity mind nodes (the entity "brain" lane, backlog 0153) --------------
+# First-class MEMORY_*/DIARY_* effect nodes. Handlers resolve ONLY on an
+# entity runtime (gateway door stamp routing / open_entity_runtime); the
+# channel carries authorship — no node takes an "entity" pin by design.
+
+
+def memory_recall_node(node_id, label, x, y, *, pin_defaults=None):
+    """Passive/deliberate reconstruction: one bounded recall (pure read)."""
+    return node(node_id, "memory_recall", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("cue_text", "cue_text", "string"),
+                        pin("scopes", "scopes", "array"),
+                        pin("view", "view", "string"),
+                        pin("effort", "effort", "string"),
+                        pin("budget", "budget", "object"),
+                        pin("participants", "participants", "array"),
+                        pin("anchor_record_ids", "anchor_record_ids", "array"),
+                        pin("turn_id", "turn_id", "string")],
+                outputs=[EXEC_OUT,
+                         pin("handles", "handles", "array"),
+                         pin("trace_id", "trace_id", "string"),
+                         pin("as_of_seq", "as_of_seq", "number"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def memory_commit_node(node_id, label, x, y, *, pin_defaults=None):
+    """The involuntary trail: commit the selection actually used (the ONLY strengthening path)."""
+    return node(node_id, "memory_commit", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("trace_id", "trace_id", "string"),
+                        pin("used_record_ids", "used_record_ids", "array"),
+                        pin("prompt_token_estimate", "prompt_token_estimate", "number")],
+                outputs=[EXEC_OUT,
+                         pin("committed", "committed", "number"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def memory_form_node(node_id, label, x, y, *, pin_defaults=None):
+    """Formation: land typed records (episode/summary/lesson/...) in the graph."""
+    return node(node_id, "memory_form", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("records", "records", "array"),
+                        pin("scope", "scope", "string"),
+                        pin("turn_id", "turn_id", "string"),
+                        pin("idempotency_key", "idempotency_key", "string")],
+                outputs=[EXEC_OUT,
+                         pin("record_ids", "record_ids", "array"),
+                         pin("formed", "formed", "number"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def memory_adjust_node(node_id, label, x, y, *, pin_defaults=None):
+    """Deliberate salience act: reinforce / attenuate / refocus / close
+    (reason + turn_id mandatory). ttl_activity (NOT ttl) + scope were
+    MISSING here (cleanup adversary P0-1.1, 2026-07-25) — recreating the
+    exact starvation the executor comment memorializes: an adjust node
+    built from this helper could never bound a refocus."""
+    return node(node_id, "memory_adjust", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("op", "op", "string"),
+                        pin("record_id", "record_id", "string"),
+                        pin("reason", "reason", "string"),
+                        pin("weight", "weight", "number"),
+                        pin("ttl_activity", "ttl_activity", "number"),
+                        pin("scope", "scope", "string"),
+                        pin("turn_id", "turn_id", "string")],
+                outputs=[EXEC_OUT,
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def memory_appraise_node(node_id, label, x, y, *, pin_defaults=None):
+    """Feelings: elected valence toward a target (routine band ±1..3, clamped loudly)."""
+    return node(node_id, "memory_appraise", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("op", "op", "string"),
+                        pin("target_id", "target_id", "string"),
+                        pin("sign", "sign", "number"),
+                        pin("magnitude", "magnitude", "number"),
+                        pin("reason", "reason", "string"),
+                        pin("scope", "scope", "string"),
+                        pin("turn_id", "turn_id", "string")],
+                outputs=[EXEC_OUT,
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def diary_write_node(node_id, label, x, y, *, pin_defaults=None):
+    """The book: append one entity-elected entry (sole-author chain + projection).
+
+    digest_method (optional, runtime c5271): WRITER-declared mechanical
+    authorship — set it ONLY on machine-worded writes (deterministic close
+    notes); entity-elected words must never carry it."""
+    return node(node_id, "diary_write", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("text", "text", "string"),
+                        pin("gist", "gist", "string"),
+                        pin("kind", "kind", "string"),
+                        pin("visibility", "visibility", "string"),
+                        pin("anchor_graph_ids", "anchor_graph_ids", "array"),
+                        pin("turn_id", "turn_id", "string"),
+                        pin("digest_method", "digest_method", "string")],
+                outputs=[EXEC_OUT,
+                         pin("entry_id", "entry_id", "string"),
+                         pin("projected_record_id", "projected_record_id", "string"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def diary_read_node(node_id, label, x, y, *, pin_defaults=None):
+    """Read one diary entry by id (re-entry key + birth trail included)."""
+    return node(node_id, "diary_read", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("entry_id", "entry_id", "string"),
+                        pin("reason", "reason", "string")],
+                outputs=[EXEC_OUT,
+                         pin("text", "text", "string"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def memory_consolidate_node(node_id, label, x, y, *, pin_defaults=None):
+    """The night: ONE engine sleep_pass (resolution, maintenance, world
+    models, mining, identity review, dream). Honest non-runs return
+    {ran: false, reason} (lease-held / operator-paused)."""
+    return node(node_id, "memory_consolidate", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("scopes", "scopes", "array"),
+                        pin("include_dream", "include_dream", "boolean"),
+                        pin("include_identity", "include_identity", "boolean"),
+                        pin("report_only", "report_only", "boolean"),
+                        pin("max_candidates", "max_candidates", "number"),
+                        pin("scan_limit", "scan_limit", "number")],
+                outputs=[EXEC_OUT,
+                         pin("ran", "ran", "boolean"),
+                         pin("reason", "reason", "string"),
+                         pin("dream_record_id", "dream_record_id", "string"),
+                         pin("maintenance_candidates", "maintenance_candidates", "array"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def memory_probe_node(node_id, label, x, y, *, pin_defaults=None):
+    """Deliberate reach (active reconstruction): probe / expand / familiarity.
+    reason is MANDATORY on probe+expand (deliberate acts are audited)."""
+    return node(node_id, "memory_probe", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("op", "op", "string"),
+                        pin("cue", "cue", "string"),
+                        pin("record_ids", "record_ids", "array"),
+                        pin("reason", "reason", "string"),
+                        pin("effort", "effort", "string")],
+                outputs=[EXEC_OUT,
+                         pin("hits", "hits", "array"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def memory_tend_node(node_id, label, x, y, *, pin_defaults=None):
+    """Tending elections: the ONE route shared with the chat driver
+    (memory's ```tend grammar — pin/silence/refocus/heal_scar/break_bond/
+    revisit/dispose). body = the fence body VERBATIM (grammar stays
+    engine-owned); refusals return as DATA, never fail the effect.
+    Empty body fails loudly — gate dispatch on has_tend.
+
+    channel (runtime tend.py 2026-07-25): the door-verified reflection
+    channel — tending REFUSES without it (the privileged default was
+    removed, memory's P0-1 fix). On the door lane the gate injects it from
+    the verified stamp; a home-direct flow states 'entity-reflection' where
+    it is true by construction (own time is the entity's own reflection)."""
+    return node(node_id, "memory_tend", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("body", "body", "string"),
+                        pin("scope", "scope", "string"),
+                        pin("channel", "channel", "string")],
+                outputs=[EXEC_OUT,
+                         pin("applied", "applied", "array"),
+                         pin("refused", "refused", "array"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def life_query_node(node_id, label, x, y, *, pin_defaults=None):
+    """Life reads: alive_drives / cognition_health / entity_card (pure)."""
+    return node(node_id, "life_query", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("op", "op", "string"),
+                        pin("k", "k", "number"),
+                        pin("as_of", "as_of", "number")],
+                outputs=[EXEC_OUT,
+                         pin("items", "items", "array"),
+                         pin("result", "result", "object"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def entity_tools_query_node(node_id, label, x, y, *, pin_defaults=None):
+    """The phase's tool grant resolves (pure read): tool_policy.yaml when the
+    operator wrote one, the RULED per-phase defaults otherwise. Outputs the
+    granted names (`tools` — taught in the shelf prompt) and the native
+    declaration specs (the llm tools pin). The grant is the ONE authority —
+    execution re-resolves it server-side; this node can never widen it
+    (operator find 2026-07-25: the flow lane served zero tools). Pins mirror
+    runtime identity/tool_effects.py ENTITY_TOOLS_QUERY exactly."""
+    return node(node_id, "entity_tools_query", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("phase", "phase", "string")],
+                outputs=[EXEC_OUT,
+                         pin("tools", "tools", "array"),
+                         pin("specs", "specs", "array"),
+                         pin("notes", "notes", "array"),
+                         pin("source", "source", "string"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
+def entity_tools_execute_node(node_id, label, x, y, *, pin_defaults=None):
+    """ONE batch of native tool calls executes under the grant (runtime
+    re-resolves the grant at execution — 'refuse at execution regardless';
+    tier gating stays runtime-owned; rounds live in the FLOW graph).
+    Refusals return as marker lines (`markers`, shown to the mind verbatim);
+    `tools_ran` carries the host-authored unique names for the tool gauge
+    (never parsed from prose). Pins mirror runtime identity/tool_effects.py
+    ENTITY_TOOLS_EXECUTE exactly."""
+    return node(node_id, "entity_tools_execute", label, x, y,
+                inputs=[EXEC_IN,
+                        pin("tool_calls", "tool_calls", "array"),
+                        pin("phase", "phase", "string"),
+                        pin("max_calls", "max_calls", "number")],
+                outputs=[EXEC_OUT,
+                         pin("results_message", "results_message", "string"),
+                         pin("tools_ran", "tools_ran", "array"),
+                         pin("results", "results", "array"),
+                         pin("markers", "markers", "array"),
+                         pin("notices", "notices", "array"),
+                         pin("success", "success", "boolean")],
+                pin_defaults=pin_defaults)
+
+
 def write_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -321,6 +573,11 @@ def validate_edges(flow: dict[str, Any]) -> list[str]:
     # pins — this is the deep-research idiom (e.g. loop_condition.condition ->
     # while.condition). So any source handle on a code node is legal.
     code_ids = {n["id"] for n in flow["nodes"] if (n["data"].get("nodeType") == "code")}
+    # A `subflow` node's `child_output` handle is RUNTIME-PROVIDED (carries the
+    # child run's whole output map; {success:false, error} when the child run
+    # DIES while the mapped `output` pin reads None) — the coding-agent
+    # verifier-death idiom. Legal despite not being a declared pin.
+    subflow_ids = {n["id"] for n in flow["nodes"] if (n["data"].get("nodeType") == "subflow")}
     problems: list[str] = []
     for e in flow["edges"]:
         if e["source"] not in ids:
@@ -329,7 +586,9 @@ def validate_edges(flow: dict[str, Any]) -> list[str]:
         if e["target"] not in ids:
             problems.append(f"{e['id']}: unknown target {e['target']}")
             continue
-        if e["source"] not in code_ids and e["sourceHandle"] not in pinmap[e["source"]]["out"]:
+        if (e["source"] not in code_ids
+                and not (e["source"] in subflow_ids and e["sourceHandle"] == "child_output")
+                and e["sourceHandle"] not in pinmap[e["source"]]["out"]):
             problems.append(f"{e['id']}: no out-pin {e['source']}.{e['sourceHandle']}")
         if e["targetHandle"] not in pinmap[e["target"]]["in"]:
             problems.append(f"{e['id']}: no in-pin {e['target']}.{e['targetHandle']}")

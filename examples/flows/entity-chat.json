@@ -1,0 +1,828 @@
+{
+  "id": "entity-chat",
+  "name": "Entity Chat (one visit moment)",
+  "description": "The chat-client door to an entity: each prompt is one visit moment (recall -> the lived turn -> elections -> deposits) answered back. Run it on an entity runtime (the gateway door or open_entity_runtime); on a plain runtime the memory effects refuse loudly.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 80,
+        "y": 260
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Prompt arrives",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "participants",
+            "label": "participants",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "participants": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "ctx_var",
+      "type": "get_var",
+      "position": {
+        "x": 200,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get context",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "context",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "chat_state",
+      "type": "code",
+      "position": {
+        "x": 360,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Session state (durable history fold)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Session continuity for chat clients: when the host seeds durable session\n# history (use_session_history -> context.messages), fold the recent turns\n# into the session log so the shelf's THIS-SESSION block carries the live\n# conversation — without this every chat prompt was an amnesiac turn and\n# only graph recall bridged prompts (adversary F6).\nstate = _input.get(\"state\")\nif not isinstance(state, dict):\n    state = {}\nstate = dict(state)\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nif not log:\n    ctx = _input.get(\"context\")\n    if not isinstance(ctx, dict):\n        ctx = {}\n    msgs = ctx.get(\"messages\")\n    if not isinstance(msgs, list):\n        msgs = []\n    pending_user = \"\"\n    folded = []\n    for m in msgs[-24:]:\n        if not isinstance(m, dict):\n            continue\n        role = str(m.get(\"role\") or \"\")\n        content = str(m.get(\"content\") or \"\")\n        if role == \"user\":\n            pending_user = content\n        elif role == \"assistant\" and pending_user:\n            folded.append({\"stimulus\": pending_user, \"reply\": content})\n            pending_user = \"\"\n    if folded:\n        log = folded[-12:]\n        state[\"turn_log\"] = log\nreturn {\"state\": state}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "visit_in",
+      "type": "make_object",
+      "position": {
+        "x": 620,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the visit",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "participants",
+            "label": "participants",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "visit",
+      "type": "subflow",
+      "position": {
+        "x": 620,
+        "y": 260
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "VISIT — a conversational moment",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-visit"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "reply_out",
+      "type": "get",
+      "position": {
+        "x": 920,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get reply",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "reply",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "chat_tools_out",
+      "type": "get",
+      "position": {
+        "x": 920,
+        "y": 500
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get tools_ran",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "tools_ran",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "chat_rounds_out",
+      "type": "get",
+      "position": {
+        "x": 920,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get tool_rounds",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "tool_rounds",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "visit_guard",
+      "type": "code",
+      "position": {
+        "x": 920,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "The moment must have lived",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "child",
+            "label": "child",
+            "type": "object"
+          },
+          {
+            "id": "fallback",
+            "label": "fallback",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "fallback": ""
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "degraded_fold",
+      "type": "code",
+      "position": {
+        "x": 1160,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Degradation is visible (D3)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "visit_out",
+            "label": "visit_out",
+            "type": "object"
+          },
+          {
+            "id": "guard_died",
+            "label": "guard_died",
+            "type": "number"
+          },
+          {
+            "id": "guard_error",
+            "label": "guard_error",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# D3 (wave-3 adversary B): the API surface must distinguish \"the entity said\n# nothing\" from \"the turn died\". Two independent degradation signals fold:\n# the visit's own marker (the turn died inside a lived visit — visit output\n# carries degraded/moment_error) and the visit child dying outright (the\n# guard fired; visit output may be absent entirely).\nvout = _input.get(\"visit_out\")\nif not isinstance(vout, dict):\n    vout = {}\ngd = _input.get(\"guard_died\")\nvd = vout.get(\"degraded\")\ndegraded = 1 if (gd == 1 or vd == 1) else 0\nerr = str(_input.get(\"guard_error\") or \"\") or str(vout.get(\"moment_error\") or \"\")\nreturn {\"degraded\": degraded, \"moment_error\": err}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 920,
+        "y": 380
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Answered",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "string"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "degraded",
+            "label": "degraded",
+            "type": "number"
+          },
+          {
+            "id": "moment_error",
+            "label": "moment_error",
+            "type": "string"
+          },
+          {
+            "id": "tools_ran",
+            "label": "tools_ran",
+            "type": "array"
+          },
+          {
+            "id": "tool_rounds",
+            "label": "tool_rounds",
+            "type": "number"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-visit-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "visit",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-visit-exec-out-visit_guard-exec-in",
+      "source": "visit",
+      "sourceHandle": "exec-out",
+      "target": "visit_guard",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-visit_guard-exec-out-end-exec-in",
+      "source": "visit_guard",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-state-chat_state-state",
+      "source": "start",
+      "sourceHandle": "state",
+      "target": "chat_state",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-ctx_var-value-chat_state-context",
+      "source": "ctx_var",
+      "sourceHandle": "value",
+      "target": "chat_state",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-visit_in-message",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "visit_in",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "e-chat_state-state-visit_in-state",
+      "source": "chat_state",
+      "sourceHandle": "state",
+      "target": "visit_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-system-visit_in-system",
+      "source": "start",
+      "sourceHandle": "system",
+      "target": "visit_in",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-visit_in-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "visit_in",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-visit_in-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "visit_in",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-participants-visit_in-participants",
+      "source": "start",
+      "sourceHandle": "participants",
+      "target": "visit_in",
+      "targetHandle": "participants",
+      "animated": false
+    },
+    {
+      "id": "e-visit_in-result-visit-input",
+      "source": "visit_in",
+      "sourceHandle": "result",
+      "target": "visit",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-visit-output-reply_out-object",
+      "source": "visit",
+      "sourceHandle": "output",
+      "target": "reply_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-reply_out-value-visit_guard-value",
+      "source": "reply_out",
+      "sourceHandle": "value",
+      "target": "visit_guard",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-visit-child_output-visit_guard-child",
+      "source": "visit",
+      "sourceHandle": "child_output",
+      "target": "visit_guard",
+      "targetHandle": "child",
+      "animated": false
+    },
+    {
+      "id": "e-visit_guard-value-end-answer",
+      "source": "visit_guard",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "answer",
+      "animated": false
+    },
+    {
+      "id": "e-visit_guard-value-end-response",
+      "source": "visit_guard",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-visit-output-degraded_fold-visit_out",
+      "source": "visit",
+      "sourceHandle": "output",
+      "target": "degraded_fold",
+      "targetHandle": "visit_out",
+      "animated": false
+    },
+    {
+      "id": "e-visit_guard-died-degraded_fold-guard_died",
+      "source": "visit_guard",
+      "sourceHandle": "died",
+      "target": "degraded_fold",
+      "targetHandle": "guard_died",
+      "animated": false
+    },
+    {
+      "id": "e-visit_guard-error-degraded_fold-guard_error",
+      "source": "visit_guard",
+      "sourceHandle": "error",
+      "target": "degraded_fold",
+      "targetHandle": "guard_error",
+      "animated": false
+    },
+    {
+      "id": "e-degraded_fold-degraded-end-degraded",
+      "source": "degraded_fold",
+      "sourceHandle": "degraded",
+      "target": "end",
+      "targetHandle": "degraded",
+      "animated": false
+    },
+    {
+      "id": "e-degraded_fold-moment_error-end-moment_error",
+      "source": "degraded_fold",
+      "sourceHandle": "moment_error",
+      "target": "end",
+      "targetHandle": "moment_error",
+      "animated": false
+    },
+    {
+      "id": "e-visit-output-chat_tools_out-object",
+      "source": "visit",
+      "sourceHandle": "output",
+      "target": "chat_tools_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-chat_tools_out-value-end-tools_ran",
+      "source": "chat_tools_out",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "tools_ran",
+      "animated": false
+    },
+    {
+      "id": "e-visit-output-chat_rounds_out-object",
+      "source": "visit",
+      "sourceHandle": "output",
+      "target": "chat_rounds_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-chat_rounds_out-value-end-tool_rounds",
+      "source": "chat_rounds_out",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "tool_rounds",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-25T06:34:59.960682+00:00",
+  "updated_at": "2026-07-25T06:34:59.960682+00:00"
+}

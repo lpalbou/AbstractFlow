@@ -1,0 +1,1454 @@
+{
+  "id": "entity-tool-rounds",
+  "name": "Entity — Tool Rounds (the mind acts)",
+  "description": "The acting half of a lived moment: the mind may call its granted tools (declared natively); each batch runs under the grant; results return before the answer; the final round must answer in words. Bounded (max_rounds, default 3).",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "The moment may act",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "turn_id",
+            "label": "turn_id",
+            "type": "string"
+          },
+          {
+            "id": "phase",
+            "label": "phase",
+            "type": "string"
+          },
+          {
+            "id": "specs",
+            "label": "specs",
+            "type": "array"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "turn_budget",
+            "label": "turn_budget",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "specs": [],
+          "max_rounds": 3,
+          "turn_budget": 20
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "init",
+      "type": "code",
+      "position": {
+        "x": 360,
+        "y": 140
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "The rounds begin",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "turn_budget",
+            "label": "turn_budget",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# The loop-carried state of one lived moment's tool rounds.\nprompt = str(_input.get(\"prompt\") or \"\")\nmr = _input.get(\"max_rounds\")\ntry:\n    max_rounds = int(mr)\nexcept Exception:\n    max_rounds = 3\n# Floor 2 (fix adversary P3-1): max_rounds=1 would DECLARE tools the mind\n# can never run (the only call is the final, tool-free one) — a lie to the\n# mind. A truly tool-free turn is empty specs, never a 1-round budget.\nif max_rounds < 2:\n    max_rounds = 2\nif max_rounds > 5:\n    max_rounds = 5\n# THE TURN BUDGET (ruled 2026-07-11, runtime c5319): 20 calls per TURN\n# shared across ALL rounds, threaded by the caller — rounds bound\n# round-trips, never work. 20 here MIRRORS runtime's\n# MAX_TOOL_BLOCKS_PER_TURN (code nodes cannot import); the runtime clamp\n# means a stale mirror can only under-spend, never over-spend.\ntb = _input.get(\"turn_budget\")\ntry:\n    turn_budget = int(tb)\nexcept Exception:\n    turn_budget = 20\nif turn_budget < 1:\n    turn_budget = 1\nif turn_budget > 20:\n    turn_budget = 20\nreturn {\"state\": {\"prompt\": prompt, \"rounds_used\": 0, \"ran\": [], \"words\": [],\n                  \"calls_used\": 0, \"done\": False, \"reply\": \"\"},\n        \"max_rounds\": max_rounds, \"turn_budget\": turn_budget}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "seed",
+      "type": "set_var",
+      "position": {
+        "x": 360,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Seed the rounds state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "tr_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cur",
+      "type": "get_var",
+      "position": {
+        "x": 620,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get tr_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "tr_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cond",
+      "type": "code",
+      "position": {
+        "x": 620,
+        "y": 180
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Words yet?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Keep looping while the moment has not resolved into words.\ns = _input.get(\"state\")\nif not isinstance(s, dict):\n    s = {}\nreturn {\"go\": (not bool(s.get(\"done\")))}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "rounds",
+      "type": "while",
+      "position": {
+        "x": 620,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "TOOL ROUNDS",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "view",
+      "type": "code",
+      "position": {
+        "x": 880,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "What this round sees",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "specs",
+            "label": "specs",
+            "type": "array"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "turn_budget",
+            "label": "turn_budget",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# What THIS round sees: the folded prompt, and the tools it may still call.\n# The final allowed call declares NO tools — the moment must end in words\n# (the speak-now precedent: markers are not a reply, and neither is an\n# endless chain of lookups). The batch cap threads the REMAINING turn\n# budget (ruled semantics, runtime c5319): a spent budget declares nothing.\ns = _input.get(\"state\")\nif not isinstance(s, dict):\n    s = {}\nspecs = _input.get(\"specs\")\nif not isinstance(specs, list):\n    specs = []\nmr = _input.get(\"max_rounds\")\ntry:\n    max_rounds = int(mr)\nexcept Exception:\n    max_rounds = 3\ntb = _input.get(\"turn_budget\")\ntry:\n    turn_budget = int(tb)\nexcept Exception:\n    turn_budget = 20\nused = int(s.get(\"rounds_used\") or 0)\ncalls_used = int(s.get(\"calls_used\") or 0)\nremaining = turn_budget - calls_used\nif remaining < 0:\n    remaining = 0\nbatch_cap = remaining if remaining < 6 else 6\nfinal = (used >= (max_rounds - 1)) or (remaining <= 0)\nreturn {\"prompt\": str(s.get(\"prompt\") or \"\"),\n        \"tools\": ([] if final else specs),\n        \"is_final\": final,\n        \"batch_cap\": batch_cap}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "act",
+      "type": "llm_call",
+      "position": {
+        "x": 880,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "The mind acts",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          },
+          {
+            "id": "turn_id",
+            "label": "turn_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "temperature": 0.7
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "route",
+      "type": "code",
+      "position": {
+        "x": 1140,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Act or resolve?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "turn_budget",
+            "label": "turn_budget",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Route the round: act (tool calls came back, rounds remain, budget\n# remains) or resolve. The budget check mirrors the view's declaration\n# gate — a spent budget can never execute (ruled turn budget, c5319).\ncalls = _input.get(\"tool_calls\")\nif not isinstance(calls, list):\n    calls = []\ns = _input.get(\"state\")\nif not isinstance(s, dict):\n    s = {}\nmr = _input.get(\"max_rounds\")\ntry:\n    max_rounds = int(mr)\nexcept Exception:\n    max_rounds = 3\ntb = _input.get(\"turn_budget\")\ntry:\n    turn_budget = int(tb)\nexcept Exception:\n    turn_budget = 20\nused = int(s.get(\"rounds_used\") or 0)\ncalls_used = int(s.get(\"calls_used\") or 0)\nact = (len(calls) > 0) and (used < (max_rounds - 1)) and (turn_budget - calls_used > 0)\nreturn {\"act\": act}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_act",
+      "type": "if",
+      "position": {
+        "x": 1140,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "tools called?",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "run_tools",
+      "type": "entity_tools_execute",
+      "position": {
+        "x": 1400,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "entity_tools_execute",
+        "label": "The granted tools run",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          },
+          {
+            "id": "phase",
+            "label": "phase",
+            "type": "string"
+          },
+          {
+            "id": "max_calls",
+            "label": "max_calls",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results_message",
+            "label": "results_message",
+            "type": "string"
+          },
+          {
+            "id": "tools_ran",
+            "label": "tools_ran",
+            "type": "array"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          },
+          {
+            "id": "markers",
+            "label": "markers",
+            "type": "array"
+          },
+          {
+            "id": "notices",
+            "label": "notices",
+            "type": "array"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold_tools",
+      "type": "code",
+      "position": {
+        "x": 1660,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Results return to the mind",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "results_message",
+            "label": "results_message",
+            "type": "string"
+          },
+          {
+            "id": "markers",
+            "label": "markers",
+            "type": "array"
+          },
+          {
+            "id": "ran",
+            "label": "ran",
+            "type": "array"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Fold one executed batch back into the moment: the results ride the prompt\n# (TOOL RESULTS are prompt-ephemeral — the episode keeps the words, the\n# ledger keeps the acts), the ran names accumulate for the honest gauge.\n# Refusal MARKERS (ungranted names) are shown to the mind verbatim — the\n# grant's \"no\" is information, never silence.\ns = _input.get(\"state\")\nif not isinstance(s, dict):\n    s = {}\nresults_message = str(_input.get(\"results_message\") or \"\")\nmarkers = _input.get(\"markers\")\nif not isinstance(markers, list):\n    markers = []\nran = _input.get(\"ran\")\nif not isinstance(ran, list):\n    ran = []\n# The mind's OWN mid-round words are kept (fix adversary P1-1: dropping\n# them lost real prose and mid-round elections — the chat driver keeps\n# marked content in the conversation; parity restored here).\ncontent = str(_input.get(\"content\") or \"\").strip()\nmr = _input.get(\"max_rounds\")\ntry:\n    max_rounds = int(mr)\nexcept Exception:\n    max_rounds = 3\nused = int(s.get(\"rounds_used\") or 0)\nbody_parts = []\nif results_message:\n    body_parts.append(results_message)\nfor m in markers:\n    body_parts.append(str(m))\nbody = \"\\n\".join(body_parts) if body_parts else \"(no results returned)\"\n# Labeled per-round cap (fix adversary P2-1: read_file can return 512KB per\n# call — uncapped folds blow small contexts and die into the guard path).\n# The ledger keeps the verbatim result; only the PROMPT copy narrows.\nif len(body) > 24000:\n    body = (body[:24000] +\n            \"\\n#TRUNCATION [results capped at 24000 chars for the prompt — \"\n            \"the full results rest in your home's own ledger]\")\nprompt = str(s.get(\"prompt\") or \"\")\nif content:\n    prompt = (prompt + \"\\n\\nYOUR WORDS (round \" + str(used + 1) +\n              \", kept as part of this moment):\\n\" + content)\n# The FINAL round declares no tools — say so honestly instead of inviting a\n# lookup that cannot run (fix adversary P1-2's contributing wording).\nnext_is_final = (used + 1) >= (max_rounds - 1)\nif next_is_final:\n    closing = (\"\\n\\nNo more lookups are possible this moment — use what you \"\n               \"have and answer in words now.\")\nelse:\n    closing = (\"\\n\\nUse these results. If the moment needs one more lookup, \"\n               \"call a tool; otherwise answer in words now.\")\nprompt = (prompt + \"\\n\\nTOOL RESULTS (round \" + str(used + 1) + \"):\\n\" +\n          body + closing)\nprev = s.get(\"ran\")\nif not isinstance(prev, list):\n    prev = []\nmerged = []\nfor n in prev:\n    merged.append(n)\nfor n in ran:\n    nm = str(n)\n    if nm not in merged:\n        merged.append(nm)\nwords = s.get(\"words\")\nif not isinstance(words, list):\n    words = []\nnew_words = []\nfor w in words:\n    new_words.append(w)\nif content:\n    new_words.append(content)\n# The turn budget spends by EXECUTED calls (results rows, one per\n# election — never the deduped names): ruled 20/turn, threaded per round.\nresults_rows = _input.get(\"results\")\nexecuted_n = len(results_rows) if isinstance(results_rows, list) else 0\ncalls_used = int(s.get(\"calls_used\") or 0) + executed_n\nreturn {\"state\": {\"prompt\": prompt, \"rounds_used\": used + 1, \"ran\": merged,\n                  \"words\": new_words, \"calls_used\": calls_used,\n                  \"done\": False, \"reply\": \"\"}}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "keep_tools",
+      "type": "set_var",
+      "position": {
+        "x": 1660,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Carry the acted round",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "tr_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold_final",
+      "type": "code",
+      "position": {
+        "x": 1400,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "The moment resolves in words",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "reply",
+            "label": "reply",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# The moment resolved into words: keep the reply, close the loop.\ns = _input.get(\"state\")\nif not isinstance(s, dict):\n    s = {}\nreply = str(_input.get(\"reply\") or \"\")\nprev = s.get(\"ran\")\nif not isinstance(prev, list):\n    prev = []\nwords = s.get(\"words\")\nif not isinstance(words, list):\n    words = []\nreturn {\"state\": {\"prompt\": str(s.get(\"prompt\") or \"\"),\n                  \"rounds_used\": int(s.get(\"rounds_used\") or 0),\n                  \"ran\": prev, \"words\": words,\n                  \"calls_used\": int(s.get(\"calls_used\") or 0),\n                  \"done\": True, \"reply\": reply}}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "keep_final",
+      "type": "set_var",
+      "position": {
+        "x": 1660,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Carry the words",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "tr_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "result",
+      "type": "code",
+      "position": {
+        "x": 880,
+        "y": 560
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "The rounds report",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# The subflow's honest output: the final words + the host-authored gauge\n# (tools_ran comes from executed batches only — never parsed from prose).\n# prior_words carries the mind's own mid-round prose so the turn's election\n# parse and episode see the WHOLE lived moment (fix adversary P1-1); silent\n# marks a moment that ended without words (fix adversary P1-2 — the visit\n# layer surfaces it as degraded, never a quiet empty answer).\ns = _input.get(\"state\")\nif not isinstance(s, dict):\n    s = {}\nran = s.get(\"ran\")\nif not isinstance(ran, list):\n    ran = []\nwords = s.get(\"words\")\nif not isinstance(words, list):\n    words = []\nreply = str(s.get(\"reply\") or \"\")\nsilent = 1 if (bool(s.get(\"done\")) and not reply.strip()) else 0\nreturn {\"reply\": reply, \"tools_ran\": ran,\n        \"rounds_used\": int(s.get(\"rounds_used\") or 0),\n        \"prior_words\": \"\\n\".join(words), \"silent\": silent}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 620,
+        "y": 560
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Acted and answered",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "reply",
+            "label": "reply",
+            "type": "string"
+          },
+          {
+            "id": "tools_ran",
+            "label": "tools_ran",
+            "type": "array"
+          },
+          {
+            "id": "rounds_used",
+            "label": "rounds_used",
+            "type": "number"
+          },
+          {
+            "id": "prior_words",
+            "label": "prior_words",
+            "type": "string"
+          },
+          {
+            "id": "silent",
+            "label": "silent",
+            "type": "number"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-seed-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "seed",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-seed-exec-out-rounds-exec-in",
+      "source": "seed",
+      "sourceHandle": "exec-out",
+      "target": "rounds",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-rounds-loop-act-exec-in",
+      "source": "rounds",
+      "sourceHandle": "loop",
+      "target": "act",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-act-exec-out-if_act-exec-in",
+      "source": "act",
+      "sourceHandle": "exec-out",
+      "target": "if_act",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_act-true-run_tools-exec-in",
+      "source": "if_act",
+      "sourceHandle": "true",
+      "target": "run_tools",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-run_tools-exec-out-keep_tools-exec-in",
+      "source": "run_tools",
+      "sourceHandle": "exec-out",
+      "target": "keep_tools",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_act-false-keep_final-exec-in",
+      "source": "if_act",
+      "sourceHandle": "false",
+      "target": "keep_final",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-rounds-done-end-exec-in",
+      "source": "rounds",
+      "sourceHandle": "done",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-init-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "init",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_rounds-init-max_rounds",
+      "source": "start",
+      "sourceHandle": "max_rounds",
+      "target": "init",
+      "targetHandle": "max_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-start-turn_budget-init-turn_budget",
+      "source": "start",
+      "sourceHandle": "turn_budget",
+      "target": "init",
+      "targetHandle": "turn_budget",
+      "animated": false
+    },
+    {
+      "id": "e-init-state-seed-value",
+      "source": "init",
+      "sourceHandle": "state",
+      "target": "seed",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-cur-value-cond-state",
+      "source": "cur",
+      "sourceHandle": "value",
+      "target": "cond",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-cond-go-rounds-condition",
+      "source": "cond",
+      "sourceHandle": "go",
+      "target": "rounds",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-cur-value-view-state",
+      "source": "cur",
+      "sourceHandle": "value",
+      "target": "view",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-specs-view-specs",
+      "source": "start",
+      "sourceHandle": "specs",
+      "target": "view",
+      "targetHandle": "specs",
+      "animated": false
+    },
+    {
+      "id": "e-init-max_rounds-view-max_rounds",
+      "source": "init",
+      "sourceHandle": "max_rounds",
+      "target": "view",
+      "targetHandle": "max_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-init-turn_budget-view-turn_budget",
+      "source": "init",
+      "sourceHandle": "turn_budget",
+      "target": "view",
+      "targetHandle": "turn_budget",
+      "animated": false
+    },
+    {
+      "id": "e-view-prompt-act-prompt",
+      "source": "view",
+      "sourceHandle": "prompt",
+      "target": "act",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-view-tools-act-tools",
+      "source": "view",
+      "sourceHandle": "tools",
+      "target": "act",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "e-start-system-act-system",
+      "source": "start",
+      "sourceHandle": "system",
+      "target": "act",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "e-start-turn_id-act-turn_id",
+      "source": "start",
+      "sourceHandle": "turn_id",
+      "target": "act",
+      "targetHandle": "turn_id",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-act-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "act",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-act-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "act",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-act-tool_calls-route-tool_calls",
+      "source": "act",
+      "sourceHandle": "tool_calls",
+      "target": "route",
+      "targetHandle": "tool_calls",
+      "animated": false
+    },
+    {
+      "id": "e-cur-value-route-state",
+      "source": "cur",
+      "sourceHandle": "value",
+      "target": "route",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-init-max_rounds-route-max_rounds",
+      "source": "init",
+      "sourceHandle": "max_rounds",
+      "target": "route",
+      "targetHandle": "max_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-init-turn_budget-route-turn_budget",
+      "source": "init",
+      "sourceHandle": "turn_budget",
+      "target": "route",
+      "targetHandle": "turn_budget",
+      "animated": false
+    },
+    {
+      "id": "e-route-act-if_act-condition",
+      "source": "route",
+      "sourceHandle": "act",
+      "target": "if_act",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-act-tool_calls-run_tools-tool_calls",
+      "source": "act",
+      "sourceHandle": "tool_calls",
+      "target": "run_tools",
+      "targetHandle": "tool_calls",
+      "animated": false
+    },
+    {
+      "id": "e-start-phase-run_tools-phase",
+      "source": "start",
+      "sourceHandle": "phase",
+      "target": "run_tools",
+      "targetHandle": "phase",
+      "animated": false
+    },
+    {
+      "id": "e-view-batch_cap-run_tools-max_calls",
+      "source": "view",
+      "sourceHandle": "batch_cap",
+      "target": "run_tools",
+      "targetHandle": "max_calls",
+      "animated": false
+    },
+    {
+      "id": "e-cur-value-fold_tools-state",
+      "source": "cur",
+      "sourceHandle": "value",
+      "target": "fold_tools",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-run_tools-results_message-fold_tools-results_message",
+      "source": "run_tools",
+      "sourceHandle": "results_message",
+      "target": "fold_tools",
+      "targetHandle": "results_message",
+      "animated": false
+    },
+    {
+      "id": "e-run_tools-markers-fold_tools-markers",
+      "source": "run_tools",
+      "sourceHandle": "markers",
+      "target": "fold_tools",
+      "targetHandle": "markers",
+      "animated": false
+    },
+    {
+      "id": "e-run_tools-tools_ran-fold_tools-ran",
+      "source": "run_tools",
+      "sourceHandle": "tools_ran",
+      "target": "fold_tools",
+      "targetHandle": "ran",
+      "animated": false
+    },
+    {
+      "id": "e-run_tools-results-fold_tools-results",
+      "source": "run_tools",
+      "sourceHandle": "results",
+      "target": "fold_tools",
+      "targetHandle": "results",
+      "animated": false
+    },
+    {
+      "id": "e-act-response-fold_tools-content",
+      "source": "act",
+      "sourceHandle": "response",
+      "target": "fold_tools",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "e-init-max_rounds-fold_tools-max_rounds",
+      "source": "init",
+      "sourceHandle": "max_rounds",
+      "target": "fold_tools",
+      "targetHandle": "max_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-fold_tools-state-keep_tools-value",
+      "source": "fold_tools",
+      "sourceHandle": "state",
+      "target": "keep_tools",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-cur-value-fold_final-state",
+      "source": "cur",
+      "sourceHandle": "value",
+      "target": "fold_final",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-act-response-fold_final-reply",
+      "source": "act",
+      "sourceHandle": "response",
+      "target": "fold_final",
+      "targetHandle": "reply",
+      "animated": false
+    },
+    {
+      "id": "e-fold_final-state-keep_final-value",
+      "source": "fold_final",
+      "sourceHandle": "state",
+      "target": "keep_final",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-cur-value-result-state",
+      "source": "cur",
+      "sourceHandle": "value",
+      "target": "result",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-result-reply-end-reply",
+      "source": "result",
+      "sourceHandle": "reply",
+      "target": "end",
+      "targetHandle": "reply",
+      "animated": false
+    },
+    {
+      "id": "e-result-tools_ran-end-tools_ran",
+      "source": "result",
+      "sourceHandle": "tools_ran",
+      "target": "end",
+      "targetHandle": "tools_ran",
+      "animated": false
+    },
+    {
+      "id": "e-result-rounds_used-end-rounds_used",
+      "source": "result",
+      "sourceHandle": "rounds_used",
+      "target": "end",
+      "targetHandle": "rounds_used",
+      "animated": false
+    },
+    {
+      "id": "e-result-prior_words-end-prior_words",
+      "source": "result",
+      "sourceHandle": "prior_words",
+      "target": "end",
+      "targetHandle": "prior_words",
+      "animated": false
+    },
+    {
+      "id": "e-result-silent-end-silent",
+      "source": "result",
+      "sourceHandle": "silent",
+      "target": "end",
+      "targetHandle": "silent",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-25T06:34:59.960492+00:00",
+  "updated_at": "2026-07-25T06:34:59.960492+00:00"
+}

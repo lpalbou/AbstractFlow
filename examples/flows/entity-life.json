@@ -1,0 +1,4643 @@
+{
+  "id": "entity-life",
+  "name": "Entity Life (master)",
+  "description": "The entity's life loop: THE DAY GATE decides what this moment calls for (stop > close-the-visit > visit > work > granted personal > sleep > park), the phase subflow lives it, and life returns to the gate. Every memory act resolves to the entity's own home (channel authority). Steer with durable events (visit/goodbye/task/grant_personal/stop) on the life mailbox; pause/resume/cancel are run-level verbs.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 80,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Life begins",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "max_days",
+            "label": "max_days",
+            "type": "number"
+          },
+          {
+            "id": "mailbox",
+            "label": "mailbox",
+            "type": "string"
+          },
+          {
+            "id": "participants",
+            "label": "participants",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "max_days": 30,
+          "mailbox": "entity-life",
+          "participants": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "seed",
+      "type": "code",
+      "position": {
+        "x": 380,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Seed: the first visit",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# A life usually begins because someone spoke: seed the mailbox with the\n# start prompt as the first visit event. inbox_seq is the seed's high-water:\n# the gateway's durable-append counter (events_inbox_seq) continues FROM it —\n# without this the first real steer event reused seq 1 and was skipped\n# forever (adversary P0: seed seq collision).\nprompt = str(_input.get(\"prompt\") or \"\").strip()\nenvs = []\nseq_high = 0\nif prompt:\n    envs = [{\"seq\": 1, \"payload\": {\"kind\": \"visit\", \"message\": prompt}}]\n    seq_high = 1\nreturn {\"inbox\": envs, \"inbox_seq\": seq_high,\n        \"state\": {\"inbox_cursor\": 0, \"days_lived\": 0, \"slept_after_day\": 1}}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_mailbox",
+      "type": "set_var",
+      "position": {
+        "x": 380,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Declare the mailbox",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "events_mailbox"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_inbox",
+      "type": "set_var",
+      "position": {
+        "x": 620,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "The durable inbox",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "events_inbox"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_inbox_seq",
+      "type": "set_var",
+      "position": {
+        "x": 620,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Continue the seq from the seed",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "events_inbox_seq"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_state",
+      "type": "set_var",
+      "position": {
+        "x": 860,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Life state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "life",
+      "type": "while",
+      "position": {
+        "x": 1120,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "While the entity lives",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_for_alive",
+      "type": "get_var",
+      "position": {
+        "x": 880,
+        "y": 800
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "alive",
+      "type": "code",
+      "position": {
+        "x": 1120,
+        "y": 800
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Still alive?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "max_days",
+            "label": "max_days",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: code nodes are volatile (re-evaluated per data pull), so\n# inputs must NEVER be mutated in place — copy before writing.\nstate = dict(state)\nstop = state.get(\"stop_requested\")\nif not isinstance(stop, int):\n    stop = 0\ndays = state.get(\"days_lived\")\nif not isinstance(days, int):\n    days = 0\nmax_days = _input.get(\"max_days\")\nif not isinstance(max_days, int) or max_days < 1:\n    max_days = 30\nkeep = 1\nif stop == 1:\n    keep = 0\nif days >= max_days:\n    keep = 0\nreturn {\"condition\": keep}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_for_gate",
+      "type": "get_var",
+      "position": {
+        "x": 1180,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "inbox_for_gate",
+      "type": "get_var",
+      "position": {
+        "x": 1180,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get events_inbox",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "events_inbox",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_in",
+      "type": "make_object",
+      "position": {
+        "x": 1420,
+        "y": 140
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Gate consult",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "inbox",
+            "label": "inbox",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate",
+      "type": "subflow",
+      "position": {
+        "x": 1420,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "THE DAY GATE",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-day-gate"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "g_phase",
+      "type": "get",
+      "position": {
+        "x": 1720,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get phase",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "phase",
+          "default": "park"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "g_msg",
+      "type": "get",
+      "position": {
+        "x": 1720,
+        "y": 360
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get visitor_message",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "visitor_message",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "g_task",
+      "type": "get",
+      "position": {
+        "x": 1720,
+        "y": 680
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get task",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "task",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "g_state",
+      "type": "get",
+      "position": {
+        "x": 1720,
+        "y": 840
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_gate_state",
+      "type": "set_var",
+      "position": {
+        "x": 1980,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fold gate state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_phase",
+      "type": "set_var",
+      "position": {
+        "x": 2240,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "This moment's phase",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "current_phase"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "route",
+      "type": "code",
+      "position": {
+        "x": 2240,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Which phase?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "phase",
+            "label": "phase",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Route the gate's decision (switch by phase string).\nphase = str(_input.get(\"phase\") or \"park\")\nreturn {\n    \"is_stop\": 1 if phase == \"stop\" else 0,\n    \"is_visit\": 1 if phase == \"visit\" else 0,\n    \"is_work\": 1 if phase == \"work\" else 0,\n    \"is_personal\": 1 if phase == \"personal\" else 0,\n    \"is_sleep\": 1 if phase == \"sleep\" else 0,\n    \"is_close\": 1 if phase == \"close_visit\" else 0,\n    \"phase\": phase,\n}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "beacon",
+      "type": "emit_event",
+      "position": {
+        "x": 2240,
+        "y": 700
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Beacon: entity.phase",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "name": "entity.phase",
+          "scope": "session"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "beacon_payload",
+      "type": "make_object",
+      "position": {
+        "x": 2000,
+        "y": 700
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Beacon payload",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "phase",
+            "label": "phase",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_stop",
+      "type": "if",
+      "position": {
+        "x": 2500,
+        "y": -60
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "stop?",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_close",
+      "type": "if",
+      "position": {
+        "x": 2500,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "close the visit?",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_visit",
+      "type": "if",
+      "position": {
+        "x": 2500,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "visit?",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_work",
+      "type": "if",
+      "position": {
+        "x": 2500,
+        "y": 520
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "work?",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_personal",
+      "type": "if",
+      "position": {
+        "x": 2500,
+        "y": 720
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "personal?",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_sleep",
+      "type": "if",
+      "position": {
+        "x": 2500,
+        "y": 920
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "sleep?",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cstate",
+      "type": "get_var",
+      "position": {
+        "x": 2780,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "closev_in",
+      "type": "make_object",
+      "position": {
+        "x": 3020,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the session close",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "phase": "visit",
+          "reason": "the visitor left"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "close_visit",
+      "type": "subflow",
+      "position": {
+        "x": 3020,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "CLOSE — the visit session",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-session-close"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "closev_state_out",
+      "type": "get",
+      "position": {
+        "x": 3320,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_after_close",
+      "type": "set_var",
+      "position": {
+        "x": 3580,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fold closed state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "vstate",
+      "type": "get_var",
+      "position": {
+        "x": 2780,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "visit_in",
+      "type": "make_object",
+      "position": {
+        "x": 3020,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the visit",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "participants",
+            "label": "participants",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "visit",
+      "type": "subflow",
+      "position": {
+        "x": 3020,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "VISIT — a conversational moment",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-visit"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "visit_state_out",
+      "type": "get",
+      "position": {
+        "x": 3320,
+        "y": 400
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_after_visit",
+      "type": "set_var",
+      "position": {
+        "x": 3580,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fold visit state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "wstate",
+      "type": "get_var",
+      "position": {
+        "x": 2780,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "work_in",
+      "type": "make_object",
+      "position": {
+        "x": 3020,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the work",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "work",
+      "type": "subflow",
+      "position": {
+        "x": 3020,
+        "y": 780
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "WORK — the task",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-work"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "work_state_out",
+      "type": "get",
+      "position": {
+        "x": 3320,
+        "y": 700
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_after_work",
+      "type": "set_var",
+      "position": {
+        "x": 3580,
+        "y": 780
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fold work state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pstate",
+      "type": "get_var",
+      "position": {
+        "x": 2780,
+        "y": 920
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "personal_in",
+      "type": "make_object",
+      "position": {
+        "x": 3020,
+        "y": 920
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose own time",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "personal",
+      "type": "subflow",
+      "position": {
+        "x": 3020,
+        "y": 1080
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "PERSONAL — own time",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-personal"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "personal_state_out",
+      "type": "get",
+      "position": {
+        "x": 3320,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_after_personal",
+      "type": "set_var",
+      "position": {
+        "x": 3580,
+        "y": 1080
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fold own-time state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sstate",
+      "type": "get_var",
+      "position": {
+        "x": 2780,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sleep_in",
+      "type": "make_object",
+      "position": {
+        "x": 3020,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the night",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sleep",
+      "type": "subflow",
+      "position": {
+        "x": 3020,
+        "y": 1380
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "SLEEP — consolidation",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-sleep"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sleep_state_out",
+      "type": "get",
+      "position": {
+        "x": 3320,
+        "y": 1300
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_after_sleep",
+      "type": "set_var",
+      "position": {
+        "x": 3580,
+        "y": 1380
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fold night state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "mbx",
+      "type": "get_var",
+      "position": {
+        "x": 2780,
+        "y": 1520
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get events_mailbox",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "events_mailbox",
+          "default": "entity-life"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "wake_key",
+      "type": "concat",
+      "position": {
+        "x": 3020,
+        "y": 1520
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Wake key",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "a": "evt:global:global:"
+        },
+        "concatConfig": {
+          "separator": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "park",
+      "type": "wait_event",
+      "position": {
+        "x": 3280,
+        "y": 1520
+      },
+      "data": {
+        "nodeType": "wait_event",
+        "label": "Park (nothing calls; heartbeat re-gate)",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event_key",
+            "label": "event_key",
+            "type": "string"
+          },
+          {
+            "id": "timeout_s",
+            "label": "timeout_s",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event_data",
+            "label": "event_data",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "timeout_s": 900
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "guard_close_visit",
+      "type": "code",
+      "position": {
+        "x": 3460,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "close guard",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "child",
+            "label": "child",
+            "type": "object"
+          },
+          {
+            "id": "fallback",
+            "label": "fallback",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "fallback": ""
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "guard_visit",
+      "type": "code",
+      "position": {
+        "x": 3460,
+        "y": 400
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "visit guard",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "child",
+            "label": "child",
+            "type": "object"
+          },
+          {
+            "id": "fallback",
+            "label": "fallback",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "fallback": ""
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "guard_work",
+      "type": "code",
+      "position": {
+        "x": 3460,
+        "y": 700
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "work guard",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "child",
+            "label": "child",
+            "type": "object"
+          },
+          {
+            "id": "fallback",
+            "label": "fallback",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "fallback": ""
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "guard_personal",
+      "type": "code",
+      "position": {
+        "x": 3460,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "personal guard",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "child",
+            "label": "child",
+            "type": "object"
+          },
+          {
+            "id": "fallback",
+            "label": "fallback",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "fallback": ""
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "guard_sleep",
+      "type": "code",
+      "position": {
+        "x": 3460,
+        "y": 1300
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "sleep guard",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "child",
+            "label": "child",
+            "type": "object"
+          },
+          {
+            "id": "fallback",
+            "label": "fallback",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "fallback": ""
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fb_close_visit",
+      "type": "get_var",
+      "position": {
+        "x": 3320,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fb_visit",
+      "type": "get_var",
+      "position": {
+        "x": 3320,
+        "y": 340
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fb_work",
+      "type": "get_var",
+      "position": {
+        "x": 3320,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fb_personal",
+      "type": "get_var",
+      "position": {
+        "x": 3320,
+        "y": 940
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fb_sleep",
+      "type": "get_var",
+      "position": {
+        "x": 3320,
+        "y": 1240
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_for_dayend",
+      "type": "get_var",
+      "position": {
+        "x": 3840,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "phase_for_dayend",
+      "type": "get_var",
+      "position": {
+        "x": 3840,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get current_phase",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "current_phase",
+          "default": "park"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "day_end",
+      "type": "code",
+      "position": {
+        "x": 4100,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "The day ends",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "phase",
+            "label": "phase",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# A phase completed: mark the day lived + clear what it consumed.\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: code nodes are volatile (re-evaluated per data pull), so\n# inputs must NEVER be mutated in place — copy before writing.\nstate = dict(state)\nphase = str(_input.get(\"phase\") or \"\")\ndays = state.get(\"days_lived\")\nif not isinstance(days, int):\n    days = 0\nif phase in (\"visit\", \"work\", \"personal\"):\n    state[\"days_lived\"] = days + 1\n    state[\"slept_after_day\"] = 0\nif phase == \"work\":\n    state[\"pending_task\"] = \"\"\nif phase == \"sleep\":\n    state[\"slept_after_day\"] = 1\nif phase in (\"work\", \"personal\", \"close_visit\"):\n    # Session state is SESSION-scoped: a work/personal day closes its own\n    # session inside the phase subflow, so the log/counters reset here —\n    # a stale task_done stole the next task's whole budget, and a stale\n    # turn_log wrote the WORK task into the PERSONAL close's diary note\n    # (adversary P1, probe-confirmed).\n    state[\"turn_log\"] = []\n    state[\"turn_count\"] = 0\n    state[\"task_done\"] = 0\nif phase == \"close_visit\":\n    state[\"visit_session_open\"] = 0\nreturn {\"state\": state}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "sv_day_end",
+      "type": "set_var",
+      "position": {
+        "x": 4380,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fold the day",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_final",
+      "type": "get_var",
+      "position": {
+        "x": 1120,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get life_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "life_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final_in",
+      "type": "make_object",
+      "position": {
+        "x": 1380,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the final close",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "phase": "life",
+          "reason": "the life loop ended"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final_close",
+      "type": "subflow",
+      "position": {
+        "x": 1640,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Life pauses (final diary)",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-session-close"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final_state_out",
+      "type": "get",
+      "position": {
+        "x": 1940,
+        "y": 1120
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 2220,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Life parked",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-sv_mailbox-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "sv_mailbox",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_mailbox-exec-out-sv_inbox-exec-in",
+      "source": "sv_mailbox",
+      "sourceHandle": "exec-out",
+      "target": "sv_inbox",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_inbox-exec-out-sv_inbox_seq-exec-in",
+      "source": "sv_inbox",
+      "sourceHandle": "exec-out",
+      "target": "sv_inbox_seq",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_inbox_seq-exec-out-sv_state-exec-in",
+      "source": "sv_inbox_seq",
+      "sourceHandle": "exec-out",
+      "target": "sv_state",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_state-exec-out-life-exec-in",
+      "source": "sv_state",
+      "sourceHandle": "exec-out",
+      "target": "life",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-life-loop-gate-exec-in",
+      "source": "life",
+      "sourceHandle": "loop",
+      "target": "gate",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate-exec-out-sv_gate_state-exec-in",
+      "source": "gate",
+      "sourceHandle": "exec-out",
+      "target": "sv_gate_state",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_gate_state-exec-out-sv_phase-exec-in",
+      "source": "sv_gate_state",
+      "sourceHandle": "exec-out",
+      "target": "sv_phase",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_phase-exec-out-beacon-exec-in",
+      "source": "sv_phase",
+      "sourceHandle": "exec-out",
+      "target": "beacon",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-beacon-exec-out-if_stop-exec-in",
+      "source": "beacon",
+      "sourceHandle": "exec-out",
+      "target": "if_stop",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_stop-true-sv_day_end-exec-in",
+      "source": "if_stop",
+      "sourceHandle": "true",
+      "target": "sv_day_end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_stop-false-if_close-exec-in",
+      "source": "if_stop",
+      "sourceHandle": "false",
+      "target": "if_close",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_close-true-close_visit-exec-in",
+      "source": "if_close",
+      "sourceHandle": "true",
+      "target": "close_visit",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_close-false-if_visit-exec-in",
+      "source": "if_close",
+      "sourceHandle": "false",
+      "target": "if_visit",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_visit-true-visit-exec-in",
+      "source": "if_visit",
+      "sourceHandle": "true",
+      "target": "visit",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_visit-false-if_work-exec-in",
+      "source": "if_visit",
+      "sourceHandle": "false",
+      "target": "if_work",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_work-true-work-exec-in",
+      "source": "if_work",
+      "sourceHandle": "true",
+      "target": "work",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_work-false-if_personal-exec-in",
+      "source": "if_work",
+      "sourceHandle": "false",
+      "target": "if_personal",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_personal-true-personal-exec-in",
+      "source": "if_personal",
+      "sourceHandle": "true",
+      "target": "personal",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_personal-false-if_sleep-exec-in",
+      "source": "if_personal",
+      "sourceHandle": "false",
+      "target": "if_sleep",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_sleep-true-sleep-exec-in",
+      "source": "if_sleep",
+      "sourceHandle": "true",
+      "target": "sleep",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_sleep-false-park-exec-in",
+      "source": "if_sleep",
+      "sourceHandle": "false",
+      "target": "park",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-close_visit-exec-out-guard_close_visit-exec-in",
+      "source": "close_visit",
+      "sourceHandle": "exec-out",
+      "target": "guard_close_visit",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-guard_close_visit-exec-out-sv_after_close-exec-in",
+      "source": "guard_close_visit",
+      "sourceHandle": "exec-out",
+      "target": "sv_after_close",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-visit-exec-out-guard_visit-exec-in",
+      "source": "visit",
+      "sourceHandle": "exec-out",
+      "target": "guard_visit",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-guard_visit-exec-out-sv_after_visit-exec-in",
+      "source": "guard_visit",
+      "sourceHandle": "exec-out",
+      "target": "sv_after_visit",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-work-exec-out-guard_work-exec-in",
+      "source": "work",
+      "sourceHandle": "exec-out",
+      "target": "guard_work",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-guard_work-exec-out-sv_after_work-exec-in",
+      "source": "guard_work",
+      "sourceHandle": "exec-out",
+      "target": "sv_after_work",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-personal-exec-out-guard_personal-exec-in",
+      "source": "personal",
+      "sourceHandle": "exec-out",
+      "target": "guard_personal",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-guard_personal-exec-out-sv_after_personal-exec-in",
+      "source": "guard_personal",
+      "sourceHandle": "exec-out",
+      "target": "sv_after_personal",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sleep-exec-out-guard_sleep-exec-in",
+      "source": "sleep",
+      "sourceHandle": "exec-out",
+      "target": "guard_sleep",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-guard_sleep-exec-out-sv_after_sleep-exec-in",
+      "source": "guard_sleep",
+      "sourceHandle": "exec-out",
+      "target": "sv_after_sleep",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_after_close-exec-out-sv_day_end-exec-in",
+      "source": "sv_after_close",
+      "sourceHandle": "exec-out",
+      "target": "sv_day_end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_after_visit-exec-out-sv_day_end-exec-in",
+      "source": "sv_after_visit",
+      "sourceHandle": "exec-out",
+      "target": "sv_day_end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_after_work-exec-out-sv_day_end-exec-in",
+      "source": "sv_after_work",
+      "sourceHandle": "exec-out",
+      "target": "sv_day_end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_after_personal-exec-out-sv_day_end-exec-in",
+      "source": "sv_after_personal",
+      "sourceHandle": "exec-out",
+      "target": "sv_day_end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-sv_after_sleep-exec-out-sv_day_end-exec-in",
+      "source": "sv_after_sleep",
+      "sourceHandle": "exec-out",
+      "target": "sv_day_end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-park-exec-out-sv_day_end-exec-in",
+      "source": "park",
+      "sourceHandle": "exec-out",
+      "target": "sv_day_end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-life-done-final_close-exec-in",
+      "source": "life",
+      "sourceHandle": "done",
+      "target": "final_close",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-final_close-exec-out-end-exec-in",
+      "source": "final_close",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-seed-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "seed",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-mailbox-sv_mailbox-value",
+      "source": "start",
+      "sourceHandle": "mailbox",
+      "target": "sv_mailbox",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-seed-inbox-sv_inbox-value",
+      "source": "seed",
+      "sourceHandle": "inbox",
+      "target": "sv_inbox",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-seed-inbox_seq-sv_inbox_seq-value",
+      "source": "seed",
+      "sourceHandle": "inbox_seq",
+      "target": "sv_inbox_seq",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-seed-state-sv_state-value",
+      "source": "seed",
+      "sourceHandle": "state",
+      "target": "sv_state",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-state_for_alive-value-alive-state",
+      "source": "state_for_alive",
+      "sourceHandle": "value",
+      "target": "alive",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_days-alive-max_days",
+      "source": "start",
+      "sourceHandle": "max_days",
+      "target": "alive",
+      "targetHandle": "max_days",
+      "animated": false
+    },
+    {
+      "id": "e-alive-condition-life-condition",
+      "source": "alive",
+      "sourceHandle": "condition",
+      "target": "life",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-state_for_gate-value-gate_in-state",
+      "source": "state_for_gate",
+      "sourceHandle": "value",
+      "target": "gate_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-inbox_for_gate-value-gate_in-inbox",
+      "source": "inbox_for_gate",
+      "sourceHandle": "value",
+      "target": "gate_in",
+      "targetHandle": "inbox",
+      "animated": false
+    },
+    {
+      "id": "e-gate_in-result-gate-input",
+      "source": "gate_in",
+      "sourceHandle": "result",
+      "target": "gate",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-gate-output-g_phase-object",
+      "source": "gate",
+      "sourceHandle": "output",
+      "target": "g_phase",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-gate-output-g_msg-object",
+      "source": "gate",
+      "sourceHandle": "output",
+      "target": "g_msg",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-gate-output-g_task-object",
+      "source": "gate",
+      "sourceHandle": "output",
+      "target": "g_task",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-gate-output-g_state-object",
+      "source": "gate",
+      "sourceHandle": "output",
+      "target": "g_state",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-g_state-value-sv_gate_state-value",
+      "source": "g_state",
+      "sourceHandle": "value",
+      "target": "sv_gate_state",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-g_phase-value-sv_phase-value",
+      "source": "g_phase",
+      "sourceHandle": "value",
+      "target": "sv_phase",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-g_phase-value-route-phase",
+      "source": "g_phase",
+      "sourceHandle": "value",
+      "target": "route",
+      "targetHandle": "phase",
+      "animated": false
+    },
+    {
+      "id": "e-g_phase-value-beacon_payload-phase",
+      "source": "g_phase",
+      "sourceHandle": "value",
+      "target": "beacon_payload",
+      "targetHandle": "phase",
+      "animated": false
+    },
+    {
+      "id": "e-beacon_payload-result-beacon-payload",
+      "source": "beacon_payload",
+      "sourceHandle": "result",
+      "target": "beacon",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "e-route-is_stop-if_stop-condition",
+      "source": "route",
+      "sourceHandle": "is_stop",
+      "target": "if_stop",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-route-is_close-if_close-condition",
+      "source": "route",
+      "sourceHandle": "is_close",
+      "target": "if_close",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-route-is_visit-if_visit-condition",
+      "source": "route",
+      "sourceHandle": "is_visit",
+      "target": "if_visit",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-route-is_work-if_work-condition",
+      "source": "route",
+      "sourceHandle": "is_work",
+      "target": "if_work",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-route-is_personal-if_personal-condition",
+      "source": "route",
+      "sourceHandle": "is_personal",
+      "target": "if_personal",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-route-is_sleep-if_sleep-condition",
+      "source": "route",
+      "sourceHandle": "is_sleep",
+      "target": "if_sleep",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-cstate-value-closev_in-state",
+      "source": "cstate",
+      "sourceHandle": "value",
+      "target": "closev_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-closev_in-result-close_visit-input",
+      "source": "closev_in",
+      "sourceHandle": "result",
+      "target": "close_visit",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-close_visit-output-closev_state_out-object",
+      "source": "close_visit",
+      "sourceHandle": "output",
+      "target": "closev_state_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-closev_state_out-value-guard_close_visit-value",
+      "source": "closev_state_out",
+      "sourceHandle": "value",
+      "target": "guard_close_visit",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-close_visit-child_output-guard_close_visit-child",
+      "source": "close_visit",
+      "sourceHandle": "child_output",
+      "target": "guard_close_visit",
+      "targetHandle": "child",
+      "animated": false
+    },
+    {
+      "id": "e-fb_close_visit-value-guard_close_visit-fallback",
+      "source": "fb_close_visit",
+      "sourceHandle": "value",
+      "target": "guard_close_visit",
+      "targetHandle": "fallback",
+      "animated": false
+    },
+    {
+      "id": "e-guard_close_visit-value-sv_after_close-value",
+      "source": "guard_close_visit",
+      "sourceHandle": "value",
+      "target": "sv_after_close",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-g_msg-value-visit_in-message",
+      "source": "g_msg",
+      "sourceHandle": "value",
+      "target": "visit_in",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "e-vstate-value-visit_in-state",
+      "source": "vstate",
+      "sourceHandle": "value",
+      "target": "visit_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-system-visit_in-system",
+      "source": "start",
+      "sourceHandle": "system",
+      "target": "visit_in",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-visit_in-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "visit_in",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-visit_in-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "visit_in",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-participants-visit_in-participants",
+      "source": "start",
+      "sourceHandle": "participants",
+      "target": "visit_in",
+      "targetHandle": "participants",
+      "animated": false
+    },
+    {
+      "id": "e-visit_in-result-visit-input",
+      "source": "visit_in",
+      "sourceHandle": "result",
+      "target": "visit",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-visit-output-visit_state_out-object",
+      "source": "visit",
+      "sourceHandle": "output",
+      "target": "visit_state_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-visit_state_out-value-guard_visit-value",
+      "source": "visit_state_out",
+      "sourceHandle": "value",
+      "target": "guard_visit",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-visit-child_output-guard_visit-child",
+      "source": "visit",
+      "sourceHandle": "child_output",
+      "target": "guard_visit",
+      "targetHandle": "child",
+      "animated": false
+    },
+    {
+      "id": "e-fb_visit-value-guard_visit-fallback",
+      "source": "fb_visit",
+      "sourceHandle": "value",
+      "target": "guard_visit",
+      "targetHandle": "fallback",
+      "animated": false
+    },
+    {
+      "id": "e-guard_visit-value-sv_after_visit-value",
+      "source": "guard_visit",
+      "sourceHandle": "value",
+      "target": "sv_after_visit",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-g_task-value-work_in-task",
+      "source": "g_task",
+      "sourceHandle": "value",
+      "target": "work_in",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "e-wstate-value-work_in-state",
+      "source": "wstate",
+      "sourceHandle": "value",
+      "target": "work_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-system-work_in-system",
+      "source": "start",
+      "sourceHandle": "system",
+      "target": "work_in",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-work_in-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "work_in",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-work_in-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "work_in",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-work_in-result-work-input",
+      "source": "work_in",
+      "sourceHandle": "result",
+      "target": "work",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-work-output-work_state_out-object",
+      "source": "work",
+      "sourceHandle": "output",
+      "target": "work_state_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-work_state_out-value-guard_work-value",
+      "source": "work_state_out",
+      "sourceHandle": "value",
+      "target": "guard_work",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-work-child_output-guard_work-child",
+      "source": "work",
+      "sourceHandle": "child_output",
+      "target": "guard_work",
+      "targetHandle": "child",
+      "animated": false
+    },
+    {
+      "id": "e-fb_work-value-guard_work-fallback",
+      "source": "fb_work",
+      "sourceHandle": "value",
+      "target": "guard_work",
+      "targetHandle": "fallback",
+      "animated": false
+    },
+    {
+      "id": "e-guard_work-value-sv_after_work-value",
+      "source": "guard_work",
+      "sourceHandle": "value",
+      "target": "sv_after_work",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-pstate-value-personal_in-state",
+      "source": "pstate",
+      "sourceHandle": "value",
+      "target": "personal_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-system-personal_in-system",
+      "source": "start",
+      "sourceHandle": "system",
+      "target": "personal_in",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-personal_in-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "personal_in",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-personal_in-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "personal_in",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-personal_in-result-personal-input",
+      "source": "personal_in",
+      "sourceHandle": "result",
+      "target": "personal",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-personal-output-personal_state_out-object",
+      "source": "personal",
+      "sourceHandle": "output",
+      "target": "personal_state_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-personal_state_out-value-guard_personal-value",
+      "source": "personal_state_out",
+      "sourceHandle": "value",
+      "target": "guard_personal",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-personal-child_output-guard_personal-child",
+      "source": "personal",
+      "sourceHandle": "child_output",
+      "target": "guard_personal",
+      "targetHandle": "child",
+      "animated": false
+    },
+    {
+      "id": "e-fb_personal-value-guard_personal-fallback",
+      "source": "fb_personal",
+      "sourceHandle": "value",
+      "target": "guard_personal",
+      "targetHandle": "fallback",
+      "animated": false
+    },
+    {
+      "id": "e-guard_personal-value-sv_after_personal-value",
+      "source": "guard_personal",
+      "sourceHandle": "value",
+      "target": "sv_after_personal",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-sstate-value-sleep_in-state",
+      "source": "sstate",
+      "sourceHandle": "value",
+      "target": "sleep_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-sleep_in-result-sleep-input",
+      "source": "sleep_in",
+      "sourceHandle": "result",
+      "target": "sleep",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-sleep-output-sleep_state_out-object",
+      "source": "sleep",
+      "sourceHandle": "output",
+      "target": "sleep_state_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-sleep_state_out-value-guard_sleep-value",
+      "source": "sleep_state_out",
+      "sourceHandle": "value",
+      "target": "guard_sleep",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-sleep-child_output-guard_sleep-child",
+      "source": "sleep",
+      "sourceHandle": "child_output",
+      "target": "guard_sleep",
+      "targetHandle": "child",
+      "animated": false
+    },
+    {
+      "id": "e-fb_sleep-value-guard_sleep-fallback",
+      "source": "fb_sleep",
+      "sourceHandle": "value",
+      "target": "guard_sleep",
+      "targetHandle": "fallback",
+      "animated": false
+    },
+    {
+      "id": "e-guard_sleep-value-sv_after_sleep-value",
+      "source": "guard_sleep",
+      "sourceHandle": "value",
+      "target": "sv_after_sleep",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-mbx-value-wake_key-b",
+      "source": "mbx",
+      "sourceHandle": "value",
+      "target": "wake_key",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "e-wake_key-result-park-event_key",
+      "source": "wake_key",
+      "sourceHandle": "result",
+      "target": "park",
+      "targetHandle": "event_key",
+      "animated": false
+    },
+    {
+      "id": "e-state_for_dayend-value-day_end-state",
+      "source": "state_for_dayend",
+      "sourceHandle": "value",
+      "target": "day_end",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-phase_for_dayend-value-day_end-phase",
+      "source": "phase_for_dayend",
+      "sourceHandle": "value",
+      "target": "day_end",
+      "targetHandle": "phase",
+      "animated": false
+    },
+    {
+      "id": "e-day_end-state-sv_day_end-value",
+      "source": "day_end",
+      "sourceHandle": "state",
+      "target": "sv_day_end",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-state_final-value-final_in-state",
+      "source": "state_final",
+      "sourceHandle": "value",
+      "target": "final_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-final_in-result-final_close-input",
+      "source": "final_in",
+      "sourceHandle": "result",
+      "target": "final_close",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-final_close-output-final_state_out-object",
+      "source": "final_close",
+      "sourceHandle": "output",
+      "target": "final_state_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final_state_out-value-end-state",
+      "source": "final_state_out",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "state",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-25T06:34:59.958596+00:00",
+  "updated_at": "2026-07-25T06:34:59.958596+00:00"
+}

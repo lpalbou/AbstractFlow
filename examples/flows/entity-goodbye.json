@@ -1,0 +1,573 @@
+{
+  "id": "entity-goodbye",
+  "name": "Entity Goodbye (close the conversation)",
+  "description": "The chat-client goodbye: fold the durable session history into the turn log, then run the session close (summary + the deterministic diary note). Summon it with the SAME session_id as the conversation, use_session_history=true.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 80,
+        "y": 260
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "The visitor leaves",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "reason",
+            "label": "reason",
+            "type": "string"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "reason": "the visitor left",
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "ctx_var",
+      "type": "get_var",
+      "position": {
+        "x": 200,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get context",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "context",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "chat_state",
+      "type": "code",
+      "position": {
+        "x": 400,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Session history folds",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Session continuity for chat clients: when the host seeds durable session\n# history (use_session_history -> context.messages), fold the recent turns\n# into the session log so the shelf's THIS-SESSION block carries the live\n# conversation — without this every chat prompt was an amnesiac turn and\n# only graph recall bridged prompts (adversary F6).\nstate = _input.get(\"state\")\nif not isinstance(state, dict):\n    state = {}\nstate = dict(state)\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nif not log:\n    ctx = _input.get(\"context\")\n    if not isinstance(ctx, dict):\n        ctx = {}\n    msgs = ctx.get(\"messages\")\n    if not isinstance(msgs, list):\n        msgs = []\n    pending_user = \"\"\n    folded = []\n    for m in msgs[-24:]:\n        if not isinstance(m, dict):\n            continue\n        role = str(m.get(\"role\") or \"\")\n        content = str(m.get(\"content\") or \"\")\n        if role == \"user\":\n            pending_user = content\n        elif role == \"assistant\" and pending_user:\n            folded.append({\"stimulus\": pending_user, \"reply\": content})\n            pending_user = \"\"\n    if folded:\n        log = folded[-12:]\n        state[\"turn_log\"] = log\nreturn {\"state\": state}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "close_in",
+      "type": "make_object",
+      "position": {
+        "x": 640,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the close",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "reason",
+            "label": "reason",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "phase": "visit"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "close",
+      "type": "subflow",
+      "position": {
+        "x": 640,
+        "y": 260
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "CLOSE — summary + diary note",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-session-close"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "turns_out",
+      "type": "get",
+      "position": {
+        "x": 940,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get turns",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "turns",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "entry_out",
+      "type": "get",
+      "position": {
+        "x": 940,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get diary_entry_id",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "diary_entry_id",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "close_word",
+      "type": "code",
+      "position": {
+        "x": 940,
+        "y": 460
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "The close reports",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "turns",
+            "label": "turns",
+            "type": "number"
+          },
+          {
+            "id": "reason",
+            "label": "reason",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# The close reports itself in one honest line (agent.v1 answer surface).\nturns = _input.get(\"turns\")\ntry:\n    n = int(turns)\nexcept Exception:\n    n = 0\nreason = str(_input.get(\"reason\") or \"the visitor left\")\nif n > 0:\n    word = (\"The session closed (\" + reason + \"): \" + str(n) +\n            \" turn(s) summarized, and the diary received its note.\")\nelse:\n    word = (\"The session closed (\" + reason + \"): no turns had been lived \"\n            \"in it — an honest empty close, nothing invented.\")\nreturn {\"answer\": word}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 940,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Closed",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "string"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "turns",
+            "label": "turns",
+            "type": "number"
+          },
+          {
+            "id": "diary_entry_id",
+            "label": "diary_entry_id",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-close-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "close",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-close-exec-out-end-exec-in",
+      "source": "close",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-state-chat_state-state",
+      "source": "start",
+      "sourceHandle": "state",
+      "target": "chat_state",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-ctx_var-value-chat_state-context",
+      "source": "ctx_var",
+      "sourceHandle": "value",
+      "target": "chat_state",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "e-chat_state-state-close_in-state",
+      "source": "chat_state",
+      "sourceHandle": "state",
+      "target": "close_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-reason-close_in-reason",
+      "source": "start",
+      "sourceHandle": "reason",
+      "target": "close_in",
+      "targetHandle": "reason",
+      "animated": false
+    },
+    {
+      "id": "e-close_in-result-close-input",
+      "source": "close_in",
+      "sourceHandle": "result",
+      "target": "close",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-close-output-turns_out-object",
+      "source": "close",
+      "sourceHandle": "output",
+      "target": "turns_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-close-output-entry_out-object",
+      "source": "close",
+      "sourceHandle": "output",
+      "target": "entry_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-turns_out-value-close_word-turns",
+      "source": "turns_out",
+      "sourceHandle": "value",
+      "target": "close_word",
+      "targetHandle": "turns",
+      "animated": false
+    },
+    {
+      "id": "e-start-reason-close_word-reason",
+      "source": "start",
+      "sourceHandle": "reason",
+      "target": "close_word",
+      "targetHandle": "reason",
+      "animated": false
+    },
+    {
+      "id": "e-close_word-answer-end-answer",
+      "source": "close_word",
+      "sourceHandle": "answer",
+      "target": "end",
+      "targetHandle": "answer",
+      "animated": false
+    },
+    {
+      "id": "e-close_word-answer-end-response",
+      "source": "close_word",
+      "sourceHandle": "answer",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-turns_out-value-end-turns",
+      "source": "turns_out",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "turns",
+      "animated": false
+    },
+    {
+      "id": "e-entry_out-value-end-diary_entry_id",
+      "source": "entry_out",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "diary_entry_id",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-25T06:34:59.960773+00:00",
+  "updated_at": "2026-07-25T06:34:59.960773+00:00"
+}

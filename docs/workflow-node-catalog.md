@@ -812,6 +812,162 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `result` string
 - Default config: none
 
+### entity / Diary Read
+
+- Node type: `diary_read`
+- Document node: `{"id":"<unique_id>","type":"diary_read"}`
+- Utility: Read one diary entry by id from the entity's book (with its re-entry key + birth trail). Reads are visible acts on the entity's home channel.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `entry_id` string: The diary entry id (diary_...).; `reason` string: Why this read (auditable).
+- Outputs: `exec-out` execution; `text` string: The entry prose.; `result` object: Full entry: kind, written_at, re_entry key, birth trail.; `success` boolean
+- Default config: none
+
+### entity / Diary Write
+
+- Node type: `diary_write`
+- Document node: `{"id":"<unique_id>","type":"diary_write"}`
+- Utility: Append one entry to the entity's book (the elected, conscious history — sole-author, hash-chained, never purged). visibility 'self' projects an act-frame digest into the graph; 'private' stays chain-only. turn_id REQUIRED.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `text` string: Full first-person prose, verbatim (never truncated).; `gist` string: Entity-authored one-line digest for the projection.; `kind` string: 'note' | 'idea' | 'reflection' | 'commitment' | 'question' | 'problem' ...; `visibility` string: 'self' (default) or 'private' (chain only, words never leave the book).; `anchor_graph_ids` array: Graph ids attended at write time (written_amid edges).; `turn_id` string: REQUIRED: derives the replay-safe entry id.; `digest_method` string: Writer-declared MECHANICAL authorship (e.g. 'mechanical-flow-v1') — set ONLY on machine-worded writes; entity-elected words never carry it.
+- Outputs: `exec-out` execution; `entry_id` string; `projected_record_id` string: Graph projection id (visibility=self only).; `result` object; `success` boolean
+- Default config: none
+
+### entity / Entity Tools (execute batch)
+
+- Node type: `entity_tools_execute`
+- Document node: `{"id":"<unique_id>","type":"entity_tools_execute"}`
+- Utility: ONE batch of native tool calls executes under the grant (re-resolved at execution — a caller-carried list can never widen it; tier gating stays runtime-owned). Rounds live in the FLOW graph: loop llm → this node → fold results, bounded. Refusals return as marker lines shown to the mind verbatim; tools_ran carries the host-authored unique names for honest gauges (never parsed from prose). Home-only (channel authority).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `tool_calls` array: The model reply's native tool_calls list (wire shape).; `phase` string: visit | work | personal | sleep (required).; `max_calls` number: Batch cap (default 6, hard-capped runtime-side).
+- Outputs: `exec-out` execution; `results_message` string: The TOOL RESULTS text to fold back into the prompt.; `tools_ran` array: Unique tool names actually executed (the honest gauge).; `results` array: Per-election rows (name + result) — the ruled turn budget spends by counting these.; `markers` array: Refusal marker lines (ungranted names) — show them to the mind.; `notices` array: Execution notices.; `success` boolean
+- Default config: none
+
+### entity / Entity Tools (grant)
+
+- Node type: `entity_tools_query`
+- Document node: `{"id":"<unique_id>","type":"entity_tools_query"}`
+- Utility: The phase's tool grant resolves (pure read): tool_policy.yaml when the operator wrote one, the RULED per-phase defaults otherwise. Outputs the granted names (teach them in the prompt) and the native declaration specs (wire them to the llm tools pin). The grant is the ONE authority — execution re-resolves it server-side, so this node can never widen access. Home-only (channel authority).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `phase` string: visit | work | personal | sleep (required).
+- Outputs: `exec-out` execution; `tools` array: Granted tool names.; `specs` array: Native declaration payloads for the llm tools pin.; `notes` array: Grant resolution notes (legacy spellings, dropped names).; `source` string: 'policy-file' (tool_policy.yaml) or 'default' (the ruled defaults).; `success` boolean
+- Default config: none
+
+### entity / Life Query
+
+- Node type: `life_query`
+- Document node: `{"id":"<unique_id>","type":"life_query"}`
+- Utility: Pure life reads: op=alive_drives (what is alive — open questions/interests/problems; the day-open cue), cognition_health (drive ratios), entity_card (the identity view, as_of-anchored). Being described deposits nothing.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `op` string: 'alive_drives' | 'cognition_health' | 'entity_card'.; `k` number: Top-k drives (default 5).; `as_of` number: Historical anchor (entity_card).
+- Outputs: `exec-out` execution; `items` array: Drive items (alive_drives).; `result` object; `success` boolean
+- Default config: none
+
+### entity / Memory Adjust
+
+- Node type: `memory_adjust`
+- Document node: `{"id":"<unique_id>","type":"memory_adjust"}`
+- Utility: Deliberate salience act on one record: reinforce / attenuate / refocus / close. Reason + turn_id are REQUIRED (deliberate acts are audited; replays stay idempotent).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `op` string: 'reinforce' | 'attenuate' | 'refocus' | 'close'.; `record_id` string: Target record (not needed for refocus).; `reason` string: REQUIRED: why this deliberate act.; `weight` number: Salience weight (1-25).; `ttl_activity` number: Bounds a refocus (ttl_activity, NOT ttl — the misnamed pin silently inverted a bounded refocus into never-expires).; `scope` string: Scope name.; `turn_id` string: REQUIRED: replay idempotency.
+- Outputs: `exec-out` execution; `result` object; `success` boolean
+- Default config: none
+
+### entity / Memory Appraise
+
+- Node type: `memory_appraise`
+- Document node: `{"id":"<unique_id>","type":"memory_appraise"}`
+- Utility: Elected feeling toward a target (person:/tool:/idea:/record id): signed valence, routine band ±1..3, clamped loudly. Also heals scars / breaks bonds (marker lifecycle). Reason + turn_id REQUIRED.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `op` string: 'appraise' (default) | 'heal_scar' | 'break_bond' | gradation reads.; `target_id` string: Namespace-prefixed target ('person:laurent', 'idea:...', or a record id).; `sign` number: +1 or -1.; `magnitude` number: Routine band 1..3 (higher needs the entity-reflection/operator channel).; `reason` string: REQUIRED: why it felt this way.; `turn_id` string: REQUIRED for op=appraise.; `scope` string: Scope name (the shipped turn pins scope='self' — feelings are identity-plane).
+- Outputs: `exec-out` execution; `result` object; `success` boolean
+- Default config: none
+
+### entity / Memory Commit
+
+- Node type: `memory_commit`
+- Document node: `{"id":"<unique_id>","type":"memory_commit"}`
+- Utility: Deposit the involuntary usage trail: commit which recalled memories the turn ACTUALLY used. The ONLY strengthening path (selected + co-use pair trails). Empty selection = honest no-op.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `trace_id` string: From Memory Recall.; `used_record_ids` array: The record ids the turn actually used.; `prompt_token_estimate` number
+- Outputs: `exec-out` execution; `committed` number; `result` object; `success` boolean
+- Default config: none
+
+### entity / Memory Consolidate (sleep)
+
+- Node type: `memory_consolidate`
+- Document node: `{"id":"<unique_id>","type":"memory_consolidate"}`
+- Utility: The night: ONE engine sleep pass — dream-resolution, maintenance, world models, lesson mining, identity review, one dream (sleep proposes; waking evidence disposes). Honest non-runs return ran=false + reason (another writer holds the home; operator pause). report_only is a pure read.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `scopes` array: Scope ladder (default: self/diary/life).; `include_dream` boolean: One novel dream per night (default true).; `include_identity` boolean: Nightly identity review (default true; a short maintenance nap must not touch the self).; `report_only` boolean: Pure read — no writes (legal under a freeze).; `max_candidates` number; `scan_limit` number: Cap on records scanned by the pass.
+- Outputs: `exec-out` execution; `ran` boolean: False = honest non-run (see reason).; `reason` string; `dream_record_id` string: The night's dream, when one formed.; `maintenance_candidates` array; `result` object; `success` boolean
+- Default config: none
+
+### entity / Memory Form
+
+- Node type: `memory_form`
+- Document node: `{"id":"<unique_id>","type":"memory_form"}`
+- Utility: Land typed records in the entity's graph (episode/summary/lesson/interest/world-model...). Verbatim text goes to the artifact store; the graph keeps the digest. turn_id is REQUIRED (replay-safe idempotency).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `records` array: Record dicts: {kind, title, digest, keywords?, edges?, verbatim?, attributes?...}.; `scope` string: Scope name (e.g. 'self' | 'life' | session scope; default: the run's scope).; `turn_id` string: REQUIRED: derives the content-aware idempotency key.; `idempotency_key` string: Optional explicit key (wins over the derived one).
+- Outputs: `exec-out` execution; `record_ids` array: Graph ids of the formed records.; `formed` number; `result` object; `success` boolean
+- Default config: none
+
+### entity / Memory Probe (deliberate reach)
+
+- Node type: `memory_probe`
+- Document node: `{"id":"<unique_id>","type":"memory_probe"}`
+- Utility: Active reconstruction: the entity goes looking. op=probe (cue + MANDATORY reason), expand (from record_ids), familiarity (the anti-fabrication reflex: density only, no content). Pure reads, shelf-race-exempt; strengthening still only happens at Memory Commit.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `op` string: 'probe' | 'expand' | 'familiarity'.; `cue` string: The deliberate cue (probe/familiarity).; `record_ids` array: Roots for expand.; `reason` string: MANDATORY on probe+expand (deliberate acts are audited).; `effort` string: 'quick' | 'standard' | 'deep'.
+- Outputs: `exec-out` execution; `hits` array; `result` object; `success` boolean
+- Default config: none
+
+### entity / Memory Recall
+
+- Node type: `memory_recall`
+- Document node: `{"id":"<unique_id>","type":"memory_recall"}`
+- Utility: Reconstruct the entity's working memory for a cue (passive recall). PURE READ — nothing strengthens until Memory Commit. Identity is present by right (self seats); cue-free reads are legal only as self-core reads.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `cue_text` string: The stimulus cue (what arrived). Keep it SHORT — long cues dilute the reach.; `scopes` array: Scope ladder, e.g. ["self","diary","life"] (default: the run's session scope).; `view` string: 'working_set' (default) or 'shelf'.; `effort` string: Budget preset: 'light' | 'standard' | 'deep' (ignored when budget is wired).; `budget` object: Explicit RecallBudget fields (self_fraction, shelf size, token budget...).; `participants` array: Who is present (person:/entity: ids) — drives shared-context scoring.; `anchor_record_ids` array: Deliberate reach: recall around these records.; `turn_id` string: Turn correlation id (derives the replay-safe trace id).
+- Outputs: `exec-out` execution; `handles` array: Admitted memory handles (working_set view): record ids + digests + admission labels.; `trace_id` string: Wire into Memory Commit after the turn uses the memories.; `as_of_seq` number: Journal high-water mark of this reconstruction.; `result` object; `success` boolean
+- Default config: none
+
+### entity / Memory Tend (elections)
+
+- Node type: `memory_tend`
+- Document node: `{"id":"<unique_id>","type":"memory_tend"}`
+- Utility: The ONE tend-election route shared with the chat driver: the body carries a ```tend fence VERBATIM (verbs pin/silence/refocus/heal_scar/break_bond/revisit/dispose — grammar and vocabulary stay engine-owned, one line one act, reason mandatory, ≤5 per block). Dream disposal rides dispose confirm|reject. Refusals return as DATA (shown to the author unedited); a refused election never fails the effect. Home-only (channel authority).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `body` string: The tend fence body, verbatim (empty body fails loudly — gate dispatch on has_tend).; `scope` string: Scope name (default 'life').; `channel` string: The door-verified reflection channel — tending REFUSES without it (the privileged default was removed). Own-time = 'entity-reflection' by construction; the door re-verifies against the stamp.
+- Outputs: `exec-out` execution; `applied` array: Elections applied.; `refused` array: Refusals — data, never a failure.; `result` object; `success` boolean
+- Default config: none
+
 ### events / Emit Event
 
 - Node type: `emit_event`
@@ -1387,6 +1543,66 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Authorable config: input defaults with `pin_defaults`
 - Inputs: `a` number; `b` number
 - Outputs: `result` number
+- Default config: none
+
+### media / Analyze Media
+
+- Node type: `camera_analyze_media`
+- Document node: `{"id":"<unique_id>","type":"camera_analyze_media"}`
+- Utility: Deterministically analyze an image/video with the vision capability (no agent, no approval). Wire a captured path in; get a text description out.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` string: Path to the media to analyze (wire from Capture Photo/Video's path).; `question` string: Optional question to focus the analysis.
+- Outputs: `exec-out` execution; `analysis` string: The vision model's description/answer.; `result` any; `success` boolean
+- Default config: none
+
+### media / Capture Photo
+
+- Node type: `camera_capture_photo`
+- Document node: `{"id":"<unique_id>","type":"camera_capture_photo"}`
+- Utility: Deterministically take one photo now (no agent, no approval) and wait for the file. Returns the file path + a media ref wireable into Analyze Media or an LLM/Agent node.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `camera` string: Device uid from Camera Open.; `timeout_s` number: Max seconds to wait for the file (default 30).
+- Outputs: `exec-out` execution; `path` string: Captured image path (null on an honest deferred/on-device note).; `media` array: Media refs for downstream analysis.; `result` any; `success` boolean
+- Default config: none
+
+### media / Capture Video
+
+- Node type: `camera_capture_video`
+- Document node: `{"id":"<unique_id>","type":"camera_capture_video"}`
+- Utility: Deterministically record a video clip (0.5-600s, no agent, no approval) and wait for the file.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `camera` string: Device uid from Camera Open.; `duration_s` number: Clip length in seconds (default 5).; `timeout_s` number: Max seconds to wait for the file.
+- Outputs: `exec-out` execution; `path` string: Clip path (may be null when the body keeps the movie on its own storage).; `media` array: Media refs for downstream analysis.; `result` any; `success` boolean
+- Default config: none
+
+### media / Camera Close
+
+- Node type: `camera_close`
+- Document node: `{"id":"<unique_id>","type":"camera_close"}`
+- Utility: Deterministically turn the camera off and release the device (no agent, no approval).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `camera` string: Device uid from Camera Open (empty = active camera).
+- Outputs: `exec-out` execution; `result` any; `success` boolean
+- Default config: none
+
+### media / Camera Open
+
+- Node type: `camera_open`
+- Document node: `{"id":"<unique_id>","type":"camera_open"}`
+- Utility: Deterministically turn a camera on (no agent, no approval). Returns the device uid all other camera nodes use.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `camera_id` string: Discovery id from Camera List (empty = default device).
+- Outputs: `exec-out` execution; `camera` string: Device uid for downstream camera nodes.; `result` any; `success` boolean
 - Default config: none
 
 ### media / Edit Image

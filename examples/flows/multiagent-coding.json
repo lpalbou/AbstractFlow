@@ -1,0 +1,6167 @@
+{
+  "id": "multiagent-coding",
+  "name": "Multi-agent coding workflow",
+  "description": "Scouts (code+web) -> planner -> plan gate -> backlog -> git branch -> [build -> lint -> selfcheck -> verify -> doc -> PR -> review gate]xN -> merge. Deterministic git/lint/PR/merge; two user gates (gating_mode=auto skips both; auto mode needs input_data._runtime.tool_policy auto-approving execute_command or an approving driver, else tool approvals park the run).",
+  "interfaces": [
+    "abstractcode.coding.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -2300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Coding request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "max_plan_revisions",
+            "label": "max_plan_revisions",
+            "type": "number"
+          },
+          {
+            "id": "max_fix_cycles",
+            "label": "max_fix_cycles",
+            "type": "number"
+          },
+          {
+            "id": "max_review_rounds",
+            "label": "max_review_rounds",
+            "type": "number"
+          },
+          {
+            "id": "skills",
+            "label": "skills",
+            "type": "array"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "build_command",
+            "label": "build_command",
+            "type": "string"
+          },
+          {
+            "id": "run_command",
+            "label": "run_command",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "gating_mode": "wait",
+          "max_plan_revisions": 3,
+          "max_fix_cycles": 3,
+          "max_review_rounds": 2,
+          "skills": [
+            "coredoc"
+          ],
+          "browser_probe_available": false,
+          "build_command": "",
+          "run_command": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_skills_res",
+      "type": "get_var",
+      "position": {
+        "x": -2300,
+        "y": -540
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get _runtime.skills_resolution",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "_runtime.skills_resolution",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "preflight",
+      "type": "code",
+      "position": {
+        "x": -1940,
+        "y": -540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Preflight posture",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "skills",
+            "label": "skills",
+            "type": "array"
+          },
+          {
+            "id": "skills_resolution",
+            "label": "skills_resolution",
+            "type": "object"
+          },
+          {
+            "id": "max_review_rounds",
+            "label": "max_review_rounds",
+            "type": "number"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\ngating = str(gating_mode or \"wait\").strip().lower()\nif gating not in (\"wait\", \"auto\"):\n    gating = \"wait\"\n# skills_resolution arrives from a get_var(\"_runtime.skills_resolution\")\n# node - the value the GATEWAY wrote after resolving input_data.skills -\n# never from a caller-attested input pin (adversary F2: the pin always read\n# {} and emitted false degrade advisories while the doc agent genuinely\n# held the skill teaching).\nsk = skills_resolution if isinstance(skills_resolution, dict) else {}\nactive = sk.get(\"active\") if isinstance(sk.get(\"active\"), list) else []\nactive = [str(x) for x in active]\nneed = skills if isinstance(skills, list) else []\nneed = [str(x) for x in need]\nmissing = []\nfor s in need:\n    if s not in active:\n        missing.append(s)\nskills_degraded = len(missing) > 0\nprobe_ok = bool(browser_probe_available)\nwarnings = []\nif skills_degraded:\n    warnings.append(\"preflight: skills not active on this host: \" + \", \".join(missing) + \" - doc step runs on prompt guidance alone (#FALLBACK)\")\nif not probe_ok:\n    warnings.append(\"preflight: browser_probe not mounted - verify certifies STATIC gates only; the human gate is the runtime/playability oracle (#FALLBACK)\")\nfailures = []\nif not req:\n    failures.append(\"preflight: empty request\")\nif not ws:\n    failures.append(\"preflight: no workspace_root (this workflow writes files + runs git; it needs an explicit workspace)\")\nok = len(failures) == 0\nstate = {\n    \"gating_mode\": gating,\n    \"accepted\": False, \"approved\": False, \"merged\": False,\n    \"user_stopped\": False, \"last_gate2\": \"\",\n    \"plan_revisions\": 0, \"fix_cycles\": 0, \"review_rounds\": 0,\n    \"max_review_rounds\": int(max_review_rounds or 2),\n    \"same_signature_count\": 0, \"failure_signature\": \"\",\n    \"plan_feedback\": \"\", \"build_feedback\": \"\", \"rescout\": False,\n    \"skills_degraded\": skills_degraded, \"probe_ok\": probe_ok,\n    \"warnings\": warnings, \"scout_context\": \"\",\n    \"plan\": {}, \"title\": \"\", \"branch\": \"\", \"branch_slug\": \"\",\n    \"all_passed\": False, \"stopped_reason\": \"\", \"pr_path\": \"\",\n}\nreturn {\"preflight_ok\": ok, \"failures\": failures, \"state\": state}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state0",
+      "type": "set_var",
+      "position": {
+        "x": -1940,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Seed state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_preflight",
+      "type": "if",
+      "position": {
+        "x": -1580,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Preflight ok?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pre_report",
+      "type": "code",
+      "position": {
+        "x": -1580,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Preflight report",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "failures",
+            "label": "failures",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "fails = failures if isinstance(failures, list) else []\nlines = [\"# Multi-agent coding workflow: preflight failed\", \"\"]\nfor f in fails:\n    lines.append(\"- \" + str(f))\n# short token for the stopped_reason pin; the full document rides `report`\nreturn {\"report\": \"\\n\".join(lines), \"reason\": \"preflight-failed\"}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end_pre",
+      "type": "on_flow_end",
+      "position": {
+        "x": -1580,
+        "y": 260
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Refused (preflight)",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_p",
+      "type": "get_var",
+      "position": {
+        "x": -1220,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get mw.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "plan_cond",
+      "type": "code",
+      "position": {
+        "x": -1220,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Plan again?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "max_plan_revisions",
+            "label": "max_plan_revisions",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\naccepted = bool(s.get(\"accepted\"))\nrevs = int(s.get(\"plan_revisions\", 0) or 0)\nmaxrev = int(max_plan_revisions or 3)\nwait_mode = str(s.get(\"gating_mode\") or \"wait\") == \"wait\"\n# scouts run on the first pass and again only on an explicit \"research\"\n# choice; cached scout context feeds plain plan revisions for free\nneed_scout = (not str(s.get(\"scout_context\") or \"\").strip()) or bool(s.get(\"rescout\"))\nreturn {\"condition\": (not accepted) and (revs < maxrev), \"wait_mode\": wait_mode,\n        \"need_scout\": need_scout}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "plan_while",
+      "type": "while",
+      "position": {
+        "x": -1220,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "Plan loop",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_scout",
+      "type": "if",
+      "position": {
+        "x": -1220,
+        "y": -440
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Need scouting?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scout_code_prompt",
+      "type": "code",
+      "position": {
+        "x": -860,
+        "y": -440
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Scout(code) prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\ns = loop_state if isinstance(loop_state, dict) else {}\nfb = str(s.get(\"plan_feedback\") or \"\").strip()\nextra = (\"\\n\\nThe previous plan was sent back. Reviewer comments to address:\\n\" + fb) if fb else \"\"\np = (\"You are the CODE+DOCS scout. Request:\\n\" + req +\n     \"\\n\\nMine ONLY the existing workspace: list folders, read/skim code and docs, search for prior art. \"\n     \"Do NOT use the internet. Do NOT write anything. Return a compact findings list - for each: \"\n     \"source path, the concrete fact, and why it matters for this request. If the workspace is empty, say so plainly.\" + extra)\nreturn {\"prompt\": p}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scout_code",
+      "type": "agent",
+      "position": {
+        "x": -860,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Scout: code+docs",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [
+            "read_file",
+            "list_files",
+            "search_files",
+            "skim_files",
+            "skim_folders",
+            "analyze_code"
+          ],
+          "max_iterations": 12,
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scout_web_prompt",
+      "type": "code",
+      "position": {
+        "x": -500,
+        "y": -440
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Scout(web) prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\ns = loop_state if isinstance(loop_state, dict) else {}\nfb = str(s.get(\"plan_feedback\") or \"\").strip()\nextra = (\"\\n\\nThe previous plan was sent back. Reviewer comments to address:\\n\" + fb) if fb else \"\"\np = (\"You are the INTERNET scout. Request:\\n\" + req +\n     \"\\n\\nMine ONLY the internet (web_search, fetch_url, skim). Do NOT read or write the workspace. \"\n     \"Return a compact findings list - for each: source URL, the concrete claim, and why it matters. \"\n     \"Prefer primary/reference sources over blogspam.\" + extra)\nreturn {\"prompt\": p}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scout_web",
+      "type": "agent",
+      "position": {
+        "x": -500,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Scout: internet",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [
+            "web_search",
+            "fetch_url",
+            "skim_websearch",
+            "skim_url"
+          ],
+          "max_iterations": 12,
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scout_merge",
+      "type": "code",
+      "position": {
+        "x": -140,
+        "y": -440
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge scout context",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "code_findings",
+            "label": "code_findings",
+            "type": "string"
+          },
+          {
+            "id": "web_findings",
+            "label": "web_findings",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "c = str(code_findings or \"\").strip()\nw = str(web_findings or \"\").strip()\nparts = []\nparts.append(\"## Code + documentation findings\\n\" + (c if c else \"(scout returned nothing) #FALLBACK\"))\nparts.append(\"## Internet findings\\n\" + (w if w else \"(scout returned nothing) #FALLBACK\"))\nblob = \"\\n\\n\".join(parts)\nif len(blob) > 12000:\n    blob = blob[:12000] + \"\\n\\n[...scout context truncated at 12000 chars #TRUNCATION]\"\ns = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\ns2[\"scout_context\"] = blob\nreturn {\"state\": s2}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_scout",
+      "type": "set_var",
+      "position": {
+        "x": -140,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Cache scout context",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "planner_prompt",
+      "type": "code",
+      "position": {
+        "x": 220,
+        "y": -440
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Planner prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\ns = loop_state if isinstance(loop_state, dict) else {}\nctx = str(s.get(\"scout_context\") or \"\").strip()\nfb = str(s.get(\"plan_feedback\") or \"\").strip()\nextra = (\"\\n\\nThe reviewer sent the previous plan back with these comments; address every one:\\n\" + fb) if fb else \"\"\np = (\"You are the PLANNER. Do not write code; produce the plan only.\\n\\nRequest:\\n\" + req +\n     \"\\n\\nEngineered context from the two scouts (code + internet):\\n\" + ctx +\n     \"\\n\\nReturn JSON with: title (AT MOST 3 words, branch-name friendly), goal (one paragraph), \"\n     \"steps (ordered, concrete), files (paths you expect to create or change), risks (list).\" + extra)\nschema = {\n    \"type\": \"object\",\n    \"properties\": {\n        \"title\": {\"type\": \"string\"},\n        \"goal\": {\"type\": \"string\"},\n        \"steps\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}},\n        \"files\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}},\n        \"risks\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}},\n    },\n    \"required\": [\"title\", \"goal\", \"steps\"],\n}\nreturn {\"prompt\": p, \"schema\": schema}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "planner",
+      "type": "agent",
+      "position": {
+        "x": 220,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Planner",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "max_iterations": 6,
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_g1",
+      "type": "if",
+      "position": {
+        "x": 580,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Wait mode?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate1_prompt",
+      "type": "code",
+      "position": {
+        "x": 580,
+        "y": -440
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Gate-1 prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "planner_data",
+            "label": "planner_data",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "pd = planner_data if isinstance(planner_data, dict) else {}\ntitle = str(pd.get(\"title\") or \"\").strip()\ngoal = str(pd.get(\"goal\") or \"\").strip()\nsteps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\nlines = [\"PLAN for your approval.\", \"\", \"Title: \" + (title or \"(untitled)\"), \"\", goal, \"\", \"Steps:\"]\ni = 1\nfor st in steps:\n    lines.append(str(i) + \". \" + str(st))\n    i = i + 1\nlines.append(\"\")\nlines.append(\"Reply 'approve' to build, 'research: <what to dig deeper>' to re-scout, or anything else as revision comments for the planner.\")\nreturn {\"prompt\": \"\\n\".join(lines), \"choices\": [\"approve\", \"revise\", \"research\"]}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate1",
+      "type": "ask_user",
+      "position": {
+        "x": 940,
+        "y": -320
+      },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "GATE 1: approve plan?",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "Approve the plan?"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate1_parse",
+      "type": "code",
+      "position": {
+        "x": 1300,
+        "y": -440
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Parse gate-1",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "planner_data",
+            "label": "planner_data",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\nresp = str(response or \"\").strip()\nlow = resp.lower()\npd = planner_data if isinstance(planner_data, dict) else {}\nif low.startswith(\"approve\") or low in (\"yes\", \"ok\", \"lgtm\"):\n    s2[\"accepted\"] = True\n    s2[\"plan\"] = pd\n    s2[\"title\"] = str(pd.get(\"title\") or \"\").strip()\n    s2[\"plan_feedback\"] = \"\"\n    s2[\"rescout\"] = False\nelse:\n    s2[\"accepted\"] = False\n    s2[\"plan_revisions\"] = int(s.get(\"plan_revisions\", 0) or 0) + 1\n    s2[\"plan_feedback\"] = resp if resp else \"(reviewer gave no comment; produce a better, more concrete plan)\"\n    # re-scout is the human's EXPLICIT choice (\"research: ...\"), never a tax\n    # on every plan revision (design A-R5; both cycle-3 adversaries flagged\n    # the unconditional re-scout as a 2-subrun tax per comment).\n    s2[\"rescout\"] = low.startswith(\"research\")\nreturn {\"state\": s2}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_plan",
+      "type": "set_var",
+      "position": {
+        "x": 1300,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record decision",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate1_auto",
+      "type": "code",
+      "position": {
+        "x": 940,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Auto-accept plan",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "planner_data",
+            "label": "planner_data",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\npd = planner_data if isinstance(planner_data, dict) else {}\ntitle = str(pd.get(\"title\") or \"\").strip()\nsteps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\nif title and steps:\n    s2[\"accepted\"] = True\n    s2[\"plan\"] = pd\n    s2[\"title\"] = title\n    s2[\"plan_feedback\"] = \"\"\n    s2[\"rescout\"] = False\nelse:\n    s2[\"accepted\"] = False\n    s2[\"plan_revisions\"] = int(s.get(\"plan_revisions\", 0) or 0) + 1\n    s2[\"plan_feedback\"] = \"(planner returned no structured plan - emit valid JSON with title, goal and steps)\"\n    s2[\"rescout\"] = False\nreturn {\"state\": s2}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_plan_auto",
+      "type": "set_var",
+      "position": {
+        "x": 1300,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record auto-accept",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "plan_done_check",
+      "type": "code",
+      "position": {
+        "x": -860,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Plan accepted?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\nreturn {\"accepted\": bool(s.get(\"accepted\"))}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_accepted",
+      "type": "if",
+      "position": {
+        "x": -860,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Accepted?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "backlog_fields",
+      "type": "code",
+      "position": {
+        "x": -500,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Backlog item fields",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\npd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\ntitle = str(pd.get(\"title\") or s.get(\"title\") or \"task\").strip().lower()\nslug = \"\"\nprev_dash = False\nfor ch in title:\n    if (\"a\" <= ch <= \"z\") or (\"0\" <= ch <= \"9\"):\n        slug = slug + ch\n        prev_dash = False\n    elif not prev_dash and slug:\n        slug = slug + \"-\"\n        prev_dash = True\nslug = slug.strip(\"-\")[:40]\nif not slug:\n    slug = \"task\"\ngoal = str(pd.get(\"goal\") or \"\").strip()\nsteps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\nfiles = pd.get(\"files\") if isinstance(pd.get(\"files\"), list) else []\nrisks = pd.get(\"risks\") if isinstance(pd.get(\"risks\"), list) else []\ndef bullets(xs):\n    out = \"\"\n    for x in xs:\n        out = out + \"- \" + str(x) + \"\\n\"\n    return out if out else \"- (none)\\n\"\nbody = (\"# \" + slug + \"\\n\\n- Status: planned\\n- Source: multi-agent coding workflow\\n\\n## Goal\\n\" +\n        (goal if goal else \"(none)\") + \"\\n\\n## Steps\\n\" + bullets(steps) +\n        \"\\n## Files\\n\" + bullets(files) + \"\\n## Risks\\n\" + bullets(risks))\nreturn {\"slug\": slug, \"file_path\": \"docs/backlog/planned/\" + slug + \".md\", \"content\": body}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "backlog_write",
+      "type": "write_file",
+      "position": {
+        "x": -500,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "write_file",
+        "label": "Write planned item",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "git_args",
+      "type": "code",
+      "position": {
+        "x": -140,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose git branch",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "branch_slug",
+            "label": "branch_slug",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "slug = str(branch_slug or \"task\")\nws = str(workspace_root or \"\").strip()\nws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\nparent = ws.rstrip(\"/\").rsplit(\"/\", 1)[0] if \"/\" in ws.rstrip(\"/\") else \"/\"\nparent_q = parent.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n# Branch FIRST, baseline-commit SECOND: the baseline (which sweeps any\n# uncommitted user work via add -A) lands on the WORK branch, never on the\n# user's current branch (adversary F7 - pointing the workflow at an existing\n# repo with uncommitted changes must not mutate their branch). A brand-new\n# init has no commits, so checkout -b works there too.\ncmd = (\n    \"export GIT_CEILING_DIRECTORIES='\" + parent_q + \"'; cd '\" + ws_q + \"' && \"\n    \"top=$(git rev-parse --show-toplevel 2>/dev/null || echo NONE); \"\n    \"if [ \\\"$top\\\" != \\\"$(pwd)\\\" ]; then git init -b main >/dev/null 2>&1 || git init >/dev/null 2>&1; fi; \"\n    \"git checkout -b '\" + slug + \"' 2>/dev/null || git checkout '\" + slug + \"' 2>/dev/null || true; \"\n    \"git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n    \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'baseline: pre-build workspace' >/dev/null 2>&1 || true; \"\n    \"git rev-parse --abbrev-ref HEAD\"\n)\nreturn {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-branch\"}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "git_call",
+      "type": "call_tool",
+      "position": {
+        "x": -140,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Git init+branch",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "git_fold",
+      "type": "code",
+      "position": {
+        "x": 220,
+        "y": 100
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Record branch",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "git_raw",
+            "label": "git_raw",
+            "type": "object"
+          },
+          {
+            "id": "slug",
+            "label": "slug",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "def text_of(raw):\n    parts = []\n    stack = [raw]\n    depth = 0\n    while stack and depth < 400:\n        depth = depth + 1\n        cur = stack.pop()\n        if isinstance(cur, str):\n            if cur:\n                parts.append(cur)\n            continue\n        if isinstance(cur, dict):\n            for k in (\"stdout\", \"stderr\", \"stdout_preview\", \"stderr_preview\"):\n                v = cur.get(k)\n                if isinstance(v, str) and v:\n                    parts.append(v)\n            for k in (\"output\", \"result\", \"results\", \"payload\"):\n                if k in cur:\n                    stack.append(cur.get(k))\n            continue\n        if isinstance(cur, list):\n            for item in cur:\n                stack.append(item)\n    return \"\\n\".join(parts)\n\ns = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\ntxt = text_of(git_raw).strip()\nbranch = txt.split(\"\\n\")[-1].strip() if txt else \"\"\ns2[\"branch\"] = branch if branch else str(s.get(\"branch_slug\") or \"work\")\ns2[\"branch_slug\"] = str(slug or s.get(\"branch_slug\") or \"\")\nreturn {\"state\": s2}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_git",
+      "type": "set_var",
+      "position": {
+        "x": 220,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record branch state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_b",
+      "type": "get_var",
+      "position": {
+        "x": 580,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get mw.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "build_cond",
+      "type": "code",
+      "position": {
+        "x": 580,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Build again?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "max_fix_cycles",
+            "label": "max_fix_cycles",
+            "type": "number"
+          },
+          {
+            "id": "max_review_rounds",
+            "label": "max_review_rounds",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\napproved = bool(s.get(\"approved\"))\nstopped = bool(s.get(\"user_stopped\"))\nenv_blocked = bool(s.get(\"environment_blocked\"))\nfix = int(s.get(\"fix_cycles\", 0) or 0)\nrev = int(s.get(\"review_rounds\", 0) or 0)\nmaxfix = int(max_fix_cycles or 3)\nmaxrev = int(max_review_rounds or 2)\nstalled = int(s.get(\"same_signature_count\", 0) or 0) >= 2\n# In wait mode, fix-exhaustion/stall never exits directly: the loop body\n# routes those cases to gate-2 as an ESCALATION (human comments reset the\n# fix budget; \"stop\" sets user_stopped) - design G4's second half. Auto\n# mode exits on budgets as before. environment_blocked exits IMMEDIATELY in\n# both modes: no builder edit can install a missing executor (fail-soft,\n# coding-agent 0.2.2 precedent).\ncont = ((not approved) and (not stopped) and (not env_blocked)\n        and (not stalled) and (fix < maxfix) and (rev <= maxrev))\nreturn {\"condition\": cont}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "build_while",
+      "type": "while",
+      "position": {
+        "x": 580,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "Build loop",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "builder_prompt",
+      "type": "code",
+      "position": {
+        "x": 940,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Builder prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\ns = loop_state if isinstance(loop_state, dict) else {}\npd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\ngoal = str(pd.get(\"goal\") or \"\").strip()\nsteps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\nplan_txt = goal\ni = 1\nfor st in steps:\n    plan_txt = plan_txt + \"\\n\" + str(i) + \". \" + str(st)\n    i = i + 1\nbf = str(s.get(\"build_feedback\") or \"\").strip()\nfix = int(s.get(\"fix_cycles\", 0) or 0)\nlast = str(s.get(\"last_attempt_summary\") or \"\").strip()\nif fix == 0 and not bf:\n    p = (\"You are the BUILDER. You are on a dedicated git branch; implement this plan fully.\\n\\nRequest:\\n\" + req +\n         \"\\n\\nPlan:\\n\" + plan_txt +\n         \"\\n\\nEngineering rules: bound every loop and traversal; before writing logic over data, read a sample and verify its shape; \"\n         \"prefer small verifiable functions; start EVERY source file with a 1-2 line header comment stating its purpose; \"\n         \"self-probe your artifact before finishing (open it, run it, or trace the entry path). \"\n         \"When done, write SELFCHECK.md: list each artifact with one line of evidence it works, and AFTER YOUR FINAL EDIT add one \"\n         \"'ARTIFACT-SHA256: <path> <sha>' line per artifact (compute with: shasum -a 256 <path>).\")\nelse:\n    p = (\"You are the BUILDER in REPAIR mode on the existing branch. Fix ONLY what the failures below name. \"\n         \"Read before editing; make the smallest change that fixes the named defect; do NOT rewrite whole files with write_file; re-probe after fixing.\\n\\n\"\n         \"Failures to fix:\\n\" + (bf if bf else \"(none recorded - re-verify your artifacts)\") +\n         (\"\\n\\nWhat you reported doing last cycle (do not repeat a failed approach unchanged):\\n\" + last if last else \"\") +\n         \"\\n\\nAfter your FINAL edit, refresh SELFCHECK.md evidence and its ARTIFACT-SHA256 lines.\")\nreturn {\"prompt\": p}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "builder",
+      "type": "agent",
+      "position": {
+        "x": 940,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Builder",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files",
+            "analyze_code",
+            "execute_command"
+          ],
+          "max_iterations": 40,
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "lint_args",
+      "type": "code",
+      "position": {
+        "x": 1300,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose lint+format",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws = str(workspace_root or \"\").strip()\nws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\ncmd = (\"cd '\" + ws_q + \"' && \"\n       \"(command -v ruff >/dev/null 2>&1 && ruff check --fix . 2>&1 | tail -5 || true); \"\n       \"(command -v prettier >/dev/null 2>&1 && prettier --write . 2>&1 | tail -5 || true); \"\n       \"echo LINT_DONE\")\nreturn {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"lint-format\"}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "lint_call",
+      "type": "call_tool",
+      "position": {
+        "x": 1300,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Lint + format (fix)",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "lint_parse",
+      "type": "code",
+      "position": {
+        "x": 1660,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Parse lint residuals",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "lint_raw",
+            "label": "lint_raw",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "def text_of(raw):\n    parts = []\n    stack = [raw]\n    depth = 0\n    while stack and depth < 400:\n        depth = depth + 1\n        cur = stack.pop()\n        if isinstance(cur, str):\n            if cur:\n                parts.append(cur)\n            continue\n        if isinstance(cur, dict):\n            for k in (\"stdout\", \"stderr\", \"stdout_preview\", \"stderr_preview\"):\n                v = cur.get(k)\n                if isinstance(v, str) and v:\n                    parts.append(v)\n            for k in (\"output\", \"result\", \"results\", \"payload\"):\n                if k in cur:\n                    stack.append(cur.get(k))\n            continue\n        if isinstance(cur, list):\n            for item in cur:\n                stack.append(item)\n    return \"\\n\".join(parts)\n\ntext = text_of(lint_raw)\ndef has_line_col(t):\n    # ruff diagnostic grammar: <path>:<line>:<col>: <CODE> <msg>\n    # (no all()/any() in the sandbox builtins - manual digit scan)\n    i = t.find(\":\")\n    while i >= 0:\n        j = t.find(\":\", i + 1)\n        if j > i + 1:\n            seg = t[i+1:j]\n            digits = len(seg) > 0\n            for c in seg:\n                if not (\"0\" <= c <= \"9\"):\n                    digits = False\n                    break\n            if digits:\n                return True\n        i = t.find(\":\", i + 1)\n    return False\ndef is_diag(t):\n    low = t.lower()\n    # summary/success lines are never residuals (\"Found N errors (N fixed,\n    # 0 remaining).\", \"All checks passed!\")\n    if \"fixed\" in low and \"remaining\" in low:\n        return False\n    if \"all checks passed\" in low or \"0 error\" in low or \"no error\" in low:\n        return False\n    # syntax-error class tokens are real even without a location\n    if \"syntaxerror\" in low or \"parse error\" in low or \"failed to parse\" in low:\n        return True\n    # prettier failure lines: \"[error] path: ...\"\n    if low.startswith(\"[error]\"):\n        return True\n    # ruff residual diagnostics carry path:line:col (an error-named PATH is\n    # still a real diagnostic; the false-positive class was summary lines\n    # and bare touched-file echoes, both excluded above)\n    if has_line_col(t):\n        return True\n    return False\nresiduals = []\nfor ln in text.split(\"\\n\"):\n    t = ln.strip()\n    if t and is_diag(t):\n        residuals.append(t[:200])\nreturn {\"residuals\": residuals[:20]}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "selfcheck_args",
+      "type": "code",
+      "position": {
+        "x": 1660,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose SELFCHECK refresh",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws = str(workspace_root or \"\").strip()\nws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n# Formatter may have rewritten bytes AFTER the builder hashed them; refresh the\n# ARTIFACT-SHA256 lines deterministically so G5 binds to the shipped bytes\n# (cycle-2 FATAL: formatter-breaks-G5).\n# Space-safe path handling: iterate whole lines and strip the trailing hash\n# field, never `for f in $(awk '{print $2}')` - word-splitting silently\n# DELETED the binding line for any path with a space (adversary F5: the\n# refresh destroyed what the mounted G5 gate deliberately parses).\ncmd = (\"cd '\" + ws_q + \"' && if [ -f SELFCHECK.md ]; then \"\n       \"grep '^ARTIFACT-SHA256:' SELFCHECK.md > .sc_lines.tmp 2>/dev/null || true; \"\n       \"grep -v '^ARTIFACT-SHA256:' SELFCHECK.md > SELFCHECK.md.tmp 2>/dev/null || true; \"\n       \"while IFS= read -r line; do \"\n       \"rest=${line#ARTIFACT-SHA256: }; f=${rest% *}; \"\n       \"if [ -f \\\"$f\\\" ]; then echo \\\"ARTIFACT-SHA256: $f $(shasum -a 256 \\\"$f\\\" | awk '{print $1}')\\\" >> SELFCHECK.md.tmp; fi; \"\n       \"done < .sc_lines.tmp; rm -f .sc_lines.tmp; \"\n       \"mv SELFCHECK.md.tmp SELFCHECK.md; echo REFRESHED; else echo NO_SELFCHECK; fi\")\nreturn {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"selfcheck-refresh\"}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "selfcheck_call",
+      "type": "call_tool",
+      "position": {
+        "x": 1660,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Refresh SELFCHECK hashes",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "commit_args",
+      "type": "code",
+      "position": {
+        "x": 2020,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose commit",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws = str(workspace_root or \"\").strip()\nws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\ncmd = (\"cd '\" + ws_q + \"' && git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n       \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'build cycle' >/dev/null 2>&1 || true; echo COMMITTED\")\nreturn {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-commit\"}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "commit_call",
+      "type": "call_tool",
+      "position": {
+        "x": 2020,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Commit cycle",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify_input",
+      "type": "code",
+      "position": {
+        "x": 2380,
+        "y": 380
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Verify input",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "build_command",
+            "label": "build_command",
+            "type": "string"
+          },
+          {
+            "id": "run_command",
+            "label": "run_command",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\nreturn {\"input\": {\n    \"request\": str(request or \"\"),\n    \"workspace_root\": str(workspace_root or \"\"),\n    \"build_command\": str(build_command or \"\"),\n    \"run_command\": str(run_command or \"\"),\n    \"round_index\": int(s.get(\"fix_cycles\", 0) or 0),\n    \"provider\": provider,\n    \"model\": model,\n}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify",
+      "type": "subflow",
+      "position": {
+        "x": 2380,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Test: mounted gates",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "multiagent-verify-gates"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_verdict",
+      "type": "get",
+      "position": {
+        "x": 2740,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get verdict",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "verdict",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "next_state",
+      "type": "code",
+      "position": {
+        "x": 2740,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold verdict",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "verify_verdict",
+            "label": "verify_verdict",
+            "type": "object"
+          },
+          {
+            "id": "verify_meta",
+            "label": "verify_meta",
+            "type": "object"
+          },
+          {
+            "id": "builder_response",
+            "label": "builder_response",
+            "type": "string"
+          },
+          {
+            "id": "lint_out",
+            "label": "lint_out",
+            "type": "array"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\nv = verify_verdict if isinstance(verify_verdict, dict) else {}\nall_passed = bool(v.get(\"all_passed\"))\nfails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\nfails = [str(x) for x in fails]\n# Verifier DEATH is not \"no failures\": when the verify child run dies, the\n# mapped output is None -> verdict {} with no all_passed key, and an empty\n# failure list would blind the stall guard (empty signature never latches)\n# while the report claims \"budgets exhausted\" with nothing to show\n# (adversary finding: delivered != failed must survive verifier death).\nmeta = verify_meta if isinstance(verify_meta, dict) else {}\nif \"all_passed\" not in v:\n    all_passed = False\n    err = str(meta.get(\"error\") or \"verify child run died or returned no verdict\")\n    fails.append(\"verify: verdict missing - \" + err[:160] + \" (#FALLBACK)\")\n# ENVIRONMENT failures are not fixable by the builder (missing executors,\n# unavailable command execution): burning fix cycles on them is waste and the\n# terminal lies (\"budgets exhausted\"). coding-agent 0.2.2 precedent: fail-soft\n# to \"delivered, not verifiable\". Primary lane: the verify verdict's own\n# environment_failures list; belt: executor/environment phrasing that the\n# verify occasionally emits inside `failures` (live 2026-07-23: \"missing\n# Python executor\" arrived there).\nenv_fails = v.get(\"environment_failures\") if isinstance(v.get(\"environment_failures\"), list) else []\nenv_fails = [str(x) for x in env_fails]\nmoved = []\nfor f in fails:\n    low = str(f).lower()\n    if (\"missing\" in low and \"executor\" in low) or (\"execution not available\" in low) or (\"not available in this environment\" in low):\n        moved.append(f)\nfor f in moved:\n    fails.remove(f)\n    env_fails.append(f)\nlint_res = lint_out if isinstance(lint_out, list) else []\nfor x in lint_res:\n    fails.append(\"lint: \" + str(x))\nif lint_res:\n    all_passed = False\n# normalized failure signature: drop volatile evidence tail (first \" - \"),\n# lowercase, strip STANDALONE digit runs (digits fused to identifiers kept -\n# level2.js stays distinct from level3.js).\nident = \"abcdefghijklmnopqrstuvwxyz_.\"\nnorm = []\nfor f in fails:\n    t = str(f).strip().lower()\n    d = t.find(\" - \")\n    if d >= 0:\n        t = t[:d]\n    out = \"\"\n    i = 0\n    n = len(t)\n    while i < n:\n        ch = t[i]\n        if \"0\" <= ch <= \"9\":\n            j = i\n            while j < n and \"0\" <= t[j] <= \"9\":\n                j = j + 1\n            before = t[i-1] if i > 0 else \"\"\n            after = t[j] if j < n else \"\"\n            if (before in ident) or (after in ident):\n                out = out + t[i:j]\n            i = j\n        else:\n            out = out + ch\n            i = i + 1\n    norm.append(out.strip())\nsig = \"|\".join(sorted(set(norm)))\nprev_sig = str(s.get(\"failure_signature\") or \"\")\nsame = int(s.get(\"same_signature_count\", 0) or 0)\nif sig and prev_sig and sig == prev_sig:\n    same = same + 1\nelse:\n    same = 0\ns2[\"failure_signature\"] = sig\ns2[\"same_signature_count\"] = same\ns2[\"fix_cycles\"] = int(s.get(\"fix_cycles\", 0) or 0) + 1\ns2[\"build_feedback\"] = \"\\n\".join(fails)\ns2[\"all_passed\"] = all_passed\ns2[\"last_verdict\"] = {\"all_passed\": all_passed, \"failures\": fails[:30],\n                      \"environment_failures\": env_fails[:15]}\n# environment-blocked: nothing fixable remains and the environment cannot\n# verify - stop the loop honestly instead of burning the remaining budget\nif env_fails and not fails and not all_passed:\n    s2[\"environment_blocked\"] = True\n# attempt memory: the repair prompt cites what the builder SAID it did last\n# cycle, so a repair round argues against the actual prior approach instead\n# of rediscovering it (coding-agent R1 lesson: discarding builder.response\n# loses the only record of the attempt).\nbr = str(builder_response or \"\").strip()\nif br:\n    s2[\"last_attempt_summary\"] = br[-800:]\n# auto mode: green means approved (no human gate by explicit operator choice)\nif all_passed and str(s.get(\"gating_mode\") or \"wait\") == \"auto\":\n    s2[\"approved\"] = True\nreturn {\"state\": s2}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_build",
+      "type": "set_var",
+      "position": {
+        "x": 2740,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record build state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_tail",
+      "type": "get_var",
+      "position": {
+        "x": 3100,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get mw.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "tail_check",
+      "type": "code",
+      "position": {
+        "x": 3100,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Green / escalate?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "max_fix_cycles",
+            "label": "max_fix_cycles",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ngreen = bool(s.get(\"all_passed\"))\nwait_mode = str(s.get(\"gating_mode\") or \"wait\") == \"wait\"\nenv_blocked = bool(s.get(\"environment_blocked\"))\nfix = int(s.get(\"fix_cycles\", 0) or 0)\nmaxfix = int(max_fix_cycles or 3)\nstalled = int(s.get(\"same_signature_count\", 0) or 0) >= 2\n# G4 second half: in WAIT mode a stuck build (budget exhausted or stalled,\n# still red) escalates to the human gate instead of dying silently - the\n# reviewer's comments reset the fix budget; \"stop\" ends the run. Auto mode\n# never escalates (budgets exit the loop). environment_blocked never\n# escalates: no reviewer comment installs a missing executor.\nescalate = wait_mode and (not green) and (not env_blocked) and (stalled or fix >= maxfix)\n# in auto mode the fold already approved on green; the tail (doc+PR) still\n# runs so the delivered branch carries docs and a PR/PR.md.\nreturn {\"green\": green, \"wait_mode\": wait_mode, \"escalate\": escalate}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_green",
+      "type": "if",
+      "position": {
+        "x": 3100,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Gates green?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_escalate",
+      "type": "if",
+      "position": {
+        "x": 3100,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Stuck: ask human?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_noop",
+      "type": "set_var",
+      "position": {
+        "x": 3460,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Iteration ends (red)",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "doc_prompt",
+      "type": "code",
+      "position": {
+        "x": 3460,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Documenter prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\ns = loop_state if isinstance(loop_state, dict) else {}\npd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\ngoal = str(pd.get(\"goal\") or req).strip()\ndeg = bool(s.get(\"skills_degraded\"))\np = (\"You are the DOCUMENTER. The build passed its verification gates on this branch.\\n\"\n     \"STRICT RULE: do NOT modify any source/code file - the verified bytes must ship exactly as tested. \"\n     \"You write DOCUMENTATION FILES ONLY: README.md and files under docs/.\\n\\nTasks:\\n\"\n     \"1. Write or update README.md: what this delivers, how to run it, controls/usage, structure.\\n\"\n     \"2. Keep docs truthful to the CURRENT code - read the source before describing it; never invent features.\\n\\n\"\n     \"What was built:\\n\" + goal)\nif deg:\n    p = p + \"\\n\\n(coredoc skill not active on this host - follow the rules above on your own judgment. #FALLBACK)\"\nreturn {\"prompt\": p}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "doc",
+      "type": "agent",
+      "position": {
+        "x": 3460,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Documenter",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files"
+          ],
+          "max_iterations": 15,
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "docguard_args",
+      "type": "code",
+      "position": {
+        "x": 3820,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose doc guard",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws = str(workspace_root or \"\").strip()\nws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n# POSIX-safe: no process substitution (execute_command may run sh, not\n# bash); a temp file keeps the drift flag in the same shell as the loop.\ncmd = (\"cd '\" + ws_q + \"' && if [ -f SELFCHECK.md ]; then \"\n       \"grep '^ARTIFACT-SHA256:' SELFCHECK.md > .docguard.tmp 2>/dev/null || true; \"\n       \"drift=0; while IFS= read -r line; do \"\n       \"rest=${line#ARTIFACT-SHA256: }; sha=${rest##* }; f=${rest% *}; \"\n       \"if [ -f \\\"$f\\\" ]; then now=$(shasum -a 256 \\\"$f\\\" | awk '{print $1}'); \"\n       \"if [ \\\"$now\\\" != \\\"$sha\\\" ]; then echo \\\"DOC_DRIFT $f\\\"; drift=1; fi; \"\n       \"else echo \\\"DOC_DRIFT $f (deleted)\\\"; drift=1; fi; \"\n       \"done < .docguard.tmp; rm -f .docguard.tmp; \"\n       \"if [ $drift -eq 0 ]; then echo DOC_GUARD_OK; fi; \"\n       \"else echo NO_SELFCHECK_TO_GUARD; fi\")\nreturn {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"doc-guard\"}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "docguard_call",
+      "type": "call_tool",
+      "position": {
+        "x": 3820,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Doc guard (hash check)",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "docguard_fold",
+      "type": "code",
+      "position": {
+        "x": 3820,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Doc drift?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "guard_raw",
+            "label": "guard_raw",
+            "type": "object"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "def text_of(raw):\n    parts = []\n    stack = [raw]\n    depth = 0\n    while stack and depth < 400:\n        depth = depth + 1\n        cur = stack.pop()\n        if isinstance(cur, str):\n            if cur:\n                parts.append(cur)\n            continue\n        if isinstance(cur, dict):\n            for k in (\"stdout\", \"stderr\", \"stdout_preview\", \"stderr_preview\"):\n                v = cur.get(k)\n                if isinstance(v, str) and v:\n                    parts.append(v)\n            for k in (\"output\", \"result\", \"results\", \"payload\"):\n                if k in cur:\n                    stack.append(cur.get(k))\n            continue\n        if isinstance(cur, list):\n            for item in cur:\n                stack.append(item)\n    return \"\\n\".join(parts)\n\ns = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\ntxt = text_of(guard_raw)\ndrifted = []\nfor ln in txt.split(\"\\n\"):\n    t = ln.strip()\n    if t.startswith(\"DOC_DRIFT \"):\n        drifted.append(t[10:])\nok = (\"DOC_GUARD_OK\" in txt) or (\"NO_SELFCHECK_TO_GUARD\" in txt and not drifted)\nif drifted:\n    ok = False\n    s2[\"all_passed\"] = False\n    s2[\"build_feedback\"] = (\"doc: the documentation pass modified verified source files: \" +\n                            \", \".join(drifted[:10]) +\n                            \" - restore or re-verify them and refresh SELFCHECK.md hashes\")\nreturn {\"ok\": ok, \"state\": s2, \"drifted\": drifted}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_docok",
+      "type": "if",
+      "position": {
+        "x": 4180,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Source untouched?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_docred",
+      "type": "set_var",
+      "position": {
+        "x": 4180,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Doc broke it (red)",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pr_fields",
+      "type": "code",
+      "position": {
+        "x": 4180,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "PR body + gh command",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\npd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\ntitle = str(s.get(\"title\") or pd.get(\"title\") or \"work\").strip()\ngoal = str(pd.get(\"goal\") or \"\").strip()\nbranch = str(s.get(\"branch\") or s.get(\"branch_slug\") or \"work\")\nv = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\nwarns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\nlines = [\"# PR: \" + title, \"\", \"Branch: \" + branch, \"\", \"## Goal\", goal, \"\", \"## Verification\"]\nlines.append(\"- gates: \" + (\"green\" if bool(v.get(\"all_passed\")) else \"NOT GREEN\"))\nfor w in warns:\n    lines.append(\"- advisory: \" + str(w))\nbody = \"\\n\".join(lines)\nws = str(workspace_root or \"\").strip()\nws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\nbranch_q = branch.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n# GIT_TERMINAL_PROMPT=0 + GIT_ASKPASS=true: a credentialed https remote must\n# fail fast, never sit on a hidden credential prompt for the full command\n# timeout (adversary F6 - unattended runs). timeout arg tightens the cap.\ncmd = (\"cd '\" + ws_q + \"' && export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true; \"\n       \"if git remote get-url origin >/dev/null 2>&1; then \"\n       \"if command -v gh >/dev/null 2>&1; then \"\n       \"git push -u origin '\" + branch_q + \"' 2>&1 | tail -2; \"\n       \"GH_PROMPT_DISABLED=1 gh pr create --fill --head '\" + branch_q + \"' 2>&1 | tail -2 || echo PR_EXISTS_OR_FAILED; \"\n       \"else echo GH_UNAVAILABLE_LOCAL_PR_MD_ONLY; fi; \"\n       \"else echo NO_REMOTE_LOCAL_PR_MD_ONLY; fi\")\nreturn {\"pr_path\": \"PR.md\", \"pr_body\": body,\n        \"gh_call\": {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 120}, \"call_id\": \"pr-create\"}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pr_write",
+      "type": "write_file",
+      "position": {
+        "x": 4540,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "write_file",
+        "label": "Write PR.md",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pr_call",
+      "type": "call_tool",
+      "position": {
+        "x": 4900,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Push + PR (if remote)",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_g2",
+      "type": "if",
+      "position": {
+        "x": 5260,
+        "y": 980
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Wait mode?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate2_prompt",
+      "type": "code",
+      "position": {
+        "x": 5260,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Gate-2 prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\nbranch = str(s.get(\"branch\") or \"work\")\ngreen = bool(s.get(\"all_passed\"))\nv = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\nfails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\nwarns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\nrev = int(s.get(\"review_rounds\", 0) or 0)\nmaxrev = int(s.get(\"max_review_rounds\", 2) or 2)\nlines = []\nif green:\n    lines.append(\"REVIEW GATE: the build is green on branch '\" + branch + \"' and PR.md summarizes it.\")\n    lines.append(\"Test the artifact yourself now (the gates are static checks; runtime behavior is yours to judge).\")\n    choices = [\"approve\", \"request changes\"]\nelse:\n    lines.append(\"BUILD STUCK on branch '\" + branch + \"': the fix budget is exhausted (or the same failures repeat).\")\n    lines.append(\"Open failures:\")\n    for f in fails[:12]:\n        lines.append(\"- \" + str(f))\n    lines.append(\"Comment to guide further repairs (resets the fix budget), or reply 'stop' to end the run unmerged.\")\n    choices = [\"stop\", \"guide repairs\"]\nfor w in warns:\n    lines.append(\"- advisory: \" + str(w))\nif rev >= maxrev:\n    lines.append(\"\")\n    lines.append(\"NOTE: this is the FINAL review round - a rejection ends the run unmerged.\")\nlines.append(\"\")\nif green:\n    lines.append(\"Reply 'approve' to merge into main, or anything else as CHANGE REQUESTS sent back to the builder.\")\nreturn {\"prompt\": \"\\n\".join(lines), \"choices\": choices}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate2",
+      "type": "ask_user",
+      "position": {
+        "x": 5620,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "GATE 2: approve merge?",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "Test the build; approve the merge?"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate2_parse",
+      "type": "code",
+      "position": {
+        "x": 5980,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Parse gate-2",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\ngreen = bool(s.get(\"all_passed\"))\nresp = str(response or \"\").strip()\nlow = resp.lower()\napprove = low.startswith(\"approve\") or low in (\"yes\", \"ok\", \"lgtm\", \"merge\")\nstop = low == \"stop\" or low.startswith(\"stop\")\nif green and approve:\n    s2[\"approved\"] = True\n    s2[\"last_gate2\"] = \"approved\"\nelif stop:\n    # escalation (or a green review) answered 'stop': end unmerged, honestly\n    s2[\"approved\"] = False\n    s2[\"user_stopped\"] = True\n    s2[\"last_gate2\"] = \"stopped\"\nelse:\n    # change requests / repair guidance (an 'approve' on a RED build is NOT a\n    # merge - merge requires green in both modes; treat it as guidance)\n    s2[\"approved\"] = False\n    s2[\"review_rounds\"] = int(s.get(\"review_rounds\", 0) or 0) + 1\n    s2[\"fix_cycles\"] = 0\n    s2[\"same_signature_count\"] = 0\n    s2[\"failure_signature\"] = \"\"\n    s2[\"all_passed\"] = False\n    s2[\"last_gate2\"] = \"rejected\" if green else \"escalated\"\n    s2[\"build_feedback\"] = (\"REVIEWER CHANGE REQUESTS (gate 2):\\n\" +\n                            (resp if resp else \"(no comment - reviewer rejected; improve robustness and polish)\"))\nreturn {\"state\": s2}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_g2",
+      "type": "set_var",
+      "position": {
+        "x": 5980,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record review",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_g2auto",
+      "type": "set_var",
+      "position": {
+        "x": 5620,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Auto mode: end iteration",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_done",
+      "type": "get_var",
+      "position": {
+        "x": 940,
+        "y": 1420
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get mw.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "done_check",
+      "type": "code",
+      "position": {
+        "x": 940,
+        "y": 1640
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Approved + green?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\nreturn {\"approved\": bool(s.get(\"approved\")) and bool(s.get(\"all_passed\"))}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_approved",
+      "type": "if",
+      "position": {
+        "x": 940,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Merge?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "merge_args",
+      "type": "code",
+      "position": {
+        "x": 1300,
+        "y": 1420
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose merge",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\nws = str(workspace_root or \"\").strip()\nws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\nbranch = str(s.get(\"branch\") or \"work\").replace(\"'\", \"'\" + \"\\\\\" + \"''\")\ncmd = (\"cd '\" + ws_q + \"' && git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n       \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'final: docs + PR' >/dev/null 2>&1 || true; \"\n       \"if git checkout main 2>/dev/null || git checkout master 2>/dev/null; then \"\n       \"if git -c user.name='workflow' -c user.email='workflow@local' merge --no-ff '\" + branch + \"' -m 'merge: \" + branch + \"' 2>&1; then \"\n       \"echo MERGED_OK $(git rev-parse --abbrev-ref HEAD); \"\n       \"else git merge --abort 2>/dev/null; echo MERGE_CONFLICT_ABORTED; fi; \"\n       \"else echo NO_MAINLINE_BRANCH; fi\")\nreturn {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-merge\"}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "merge_call",
+      "type": "call_tool",
+      "position": {
+        "x": 1300,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Merge --no-ff to main",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "merge_fold",
+      "type": "code",
+      "position": {
+        "x": 1660,
+        "y": 1420
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Record merge",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "merge_raw",
+            "label": "merge_raw",
+            "type": "object"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "def text_of(raw):\n    parts = []\n    stack = [raw]\n    depth = 0\n    while stack and depth < 400:\n        depth = depth + 1\n        cur = stack.pop()\n        if isinstance(cur, str):\n            if cur:\n                parts.append(cur)\n            continue\n        if isinstance(cur, dict):\n            for k in (\"stdout\", \"stderr\", \"stdout_preview\", \"stderr_preview\"):\n                v = cur.get(k)\n                if isinstance(v, str) and v:\n                    parts.append(v)\n            for k in (\"output\", \"result\", \"results\", \"payload\"):\n                if k in cur:\n                    stack.append(cur.get(k))\n            continue\n        if isinstance(cur, list):\n            for item in cur:\n                stack.append(item)\n    return \"\\n\".join(parts)\n\ns = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\ntxt = text_of(merge_raw)\nmerged_ok = \"MERGED_OK\" in txt\nconflict = \"MERGE_CONFLICT_ABORTED\" in txt\nno_mainline = \"NO_MAINLINE_BRANCH\" in txt\ns2[\"merged\"] = merged_ok and bool(s.get(\"approved\"))\nwarns = s2.get(\"warnings\") if isinstance(s2.get(\"warnings\"), list) else []\nwarns = list(warns)\nif conflict:\n    warns.append(\"merge: conflict - merge aborted; branch left unmerged (#FALLBACK)\")\nelif no_mainline:\n    warns.append(\"merge: no main/master branch found - merge skipped; branch left unmerged (#FALLBACK)\")\nelif not merged_ok:\n    warns.append(\"merge: no MERGED_OK confirmation in output - treating as unmerged (#FALLBACK)\")\ns2[\"warnings\"] = warns\nreturn {\"state\": s2}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state_merge",
+      "type": "set_var",
+      "position": {
+        "x": 1660,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record merge state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_final",
+      "type": "get_var",
+      "position": {
+        "x": 2020,
+        "y": 1420
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get mw.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mw.state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final_report",
+      "type": "code",
+      "position": {
+        "x": 2020,
+        "y": 1640
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Final report",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\naccepted = bool(s.get(\"accepted\"))\napproved = bool(s.get(\"approved\"))\nmerged = bool(s.get(\"merged\"))\npassed = bool(s.get(\"all_passed\"))\nstopped = bool(s.get(\"user_stopped\"))\nlast_g2 = str(s.get(\"last_gate2\") or \"\")\nbranch = str(s.get(\"branch\") or \"\")\nwarns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\nv = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\nfails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\nbf = str(s.get(\"build_feedback\") or \"\").strip()\nstalled = int(s.get(\"same_signature_count\", 0) or 0) >= 2\nenv_blocked = bool(s.get(\"environment_blocked\"))\nif not accepted:\n    reason = \"plan-not-accepted (plan revisions exhausted without approval)\"\nelif merged:\n    reason = \"approved-and-merged\"\nelif approved:\n    reason = \"approved-merge-failed\"\nelif env_blocked:\n    reason = \"delivered-not-verifiable (environment cannot run the verification steps)\"\nelif stopped:\n    reason = \"stopped-by-reviewer (run ended unmerged at the review gate)\"\nelif (last_g2 in (\"rejected\", \"escalated\")\n      and int(s.get(\"review_rounds\", 0) or 0) > int(s.get(\"max_review_rounds\", 2) or 2)):\n    reason = \"review-rounds-exhausted (last reviewer change requests unaddressed)\"\nelif passed:\n    reason = \"green-pending-approval\"\nelif stalled:\n    reason = \"stalled (same failures repeated; needs a different approach or human help)\"\nelse:\n    reason = \"stopped-open-failures (budgets exhausted)\"\nlines = [\"# Multi-agent coding workflow result\", \"\"]\nlines.append(\"Outcome: \" + reason)\nlines.append(\"Branch: \" + (branch if branch else \"(none)\"))\nlines.append(\"Gates: \" + (\"green\" if passed else \"not green\"))\nlines.append(\"Merged: \" + (\"yes\" if merged else \"no\"))\nlines.append(\"Plan revisions: \" + str(int(s.get(\"plan_revisions\", 0) or 0)) +\n             \" | fix cycles: \" + str(int(s.get(\"fix_cycles\", 0) or 0)) +\n             \" | review rounds: \" + str(int(s.get(\"review_rounds\", 0) or 0)))\nif not accepted:\n    # plan-exhaustion evidence: the last plan + the reviewer comments that\n    # sent it back (an empty terminal hides why planning failed)\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    pf = str(s.get(\"plan_feedback\") or \"\").strip()\n    lines.append(\"\")\n    lines.append(\"Last plan title: \" + (str(s.get(\"title\") or pd.get(\"title\") or \"\").strip() or \"(none)\"))\n    if pf:\n        lines.append(\"Last reviewer comments on the plan:\")\n        for ln in pf.split(\"\\n\")[:8]:\n            lines.append(\"  \" + ln)\nif reason.startswith(\"review-rounds-exhausted\") and bf:\n    lines.append(\"\")\n    lines.append(\"Unaddressed reviewer change requests:\")\n    for ln in bf.split(\"\\n\")[:10]:\n        lines.append(\"  \" + ln)\nif fails:\n    lines.append(\"\")\n    lines.append(\"Open failures:\")\n    for f in fails[:15]:\n        lines.append(\"- \" + str(f))\nenvf = v.get(\"environment_failures\") if isinstance(v.get(\"environment_failures\"), list) else []\nif envf:\n    lines.append(\"\")\n    lines.append(\"Environment (not fixable by the builder; artifacts delivered unverified):\")\n    for f in envf[:10]:\n        lines.append(\"- \" + str(f))\nif warns:\n    lines.append(\"\")\n    lines.append(\"Advisories:\")\n    for w in warns:\n        lines.append(\"- \" + str(w))\nreport = \"\\n\".join(lines)\nreturn {\"report\": report, \"success\": merged or (passed and approved),\n        \"stopped_reason\": reason, \"branch\": branch}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 2380,
+        "y": 1200
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Result",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "branch",
+            "label": "branch",
+            "type": "string"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-set_state0-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "set_state0",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-state-set_state0-value",
+      "source": "preflight",
+      "sourceHandle": "state",
+      "target": "set_state0",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-preflight-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "preflight",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-preflight-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "preflight",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-gating_mode-preflight-gating_mode",
+      "source": "start",
+      "sourceHandle": "gating_mode",
+      "target": "preflight",
+      "targetHandle": "gating_mode",
+      "animated": false
+    },
+    {
+      "id": "e-start-skills-preflight-skills",
+      "source": "start",
+      "sourceHandle": "skills",
+      "target": "preflight",
+      "targetHandle": "skills",
+      "animated": false
+    },
+    {
+      "id": "e-get_skills_res-value-preflight-skills_resolution",
+      "source": "get_skills_res",
+      "sourceHandle": "value",
+      "target": "preflight",
+      "targetHandle": "skills_resolution",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_review_rounds-preflight-max_review_rounds",
+      "source": "start",
+      "sourceHandle": "max_review_rounds",
+      "target": "preflight",
+      "targetHandle": "max_review_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-start-browser_probe_available-preflight-browser_probe_available",
+      "source": "start",
+      "sourceHandle": "browser_probe_available",
+      "target": "preflight",
+      "targetHandle": "browser_probe_available",
+      "animated": false
+    },
+    {
+      "id": "e-set_state0-exec-out-if_preflight-exec-in",
+      "source": "set_state0",
+      "sourceHandle": "exec-out",
+      "target": "if_preflight",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-preflight_ok-if_preflight-condition",
+      "source": "preflight",
+      "sourceHandle": "preflight_ok",
+      "target": "if_preflight",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_preflight-false-end_pre-exec-in",
+      "source": "if_preflight",
+      "sourceHandle": "false",
+      "target": "end_pre",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-failures-pre_report-failures",
+      "source": "preflight",
+      "sourceHandle": "failures",
+      "target": "pre_report",
+      "targetHandle": "failures",
+      "animated": false
+    },
+    {
+      "id": "e-pre_report-report-end_pre-report",
+      "source": "pre_report",
+      "sourceHandle": "report",
+      "target": "end_pre",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-preflight_ok-end_pre-success",
+      "source": "preflight",
+      "sourceHandle": "preflight_ok",
+      "target": "end_pre",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-pre_report-reason-end_pre-stopped_reason",
+      "source": "pre_report",
+      "sourceHandle": "reason",
+      "target": "end_pre",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-if_preflight-true-plan_while-exec-in",
+      "source": "if_preflight",
+      "sourceHandle": "true",
+      "target": "plan_while",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-plan_cond-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "plan_cond",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_plan_revisions-plan_cond-max_plan_revisions",
+      "source": "start",
+      "sourceHandle": "max_plan_revisions",
+      "target": "plan_cond",
+      "targetHandle": "max_plan_revisions",
+      "animated": false
+    },
+    {
+      "id": "e-plan_cond-condition-plan_while-condition",
+      "source": "plan_cond",
+      "sourceHandle": "condition",
+      "target": "plan_while",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-plan_while-loop-if_scout-exec-in",
+      "source": "plan_while",
+      "sourceHandle": "loop",
+      "target": "if_scout",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-plan_cond-need_scout-if_scout-condition",
+      "source": "plan_cond",
+      "sourceHandle": "need_scout",
+      "target": "if_scout",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_scout-true-scout_code-exec-in",
+      "source": "if_scout",
+      "sourceHandle": "true",
+      "target": "scout_code",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_scout-false-planner-exec-in",
+      "source": "if_scout",
+      "sourceHandle": "false",
+      "target": "planner",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-scout_code_prompt-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "scout_code_prompt",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-scout_code_prompt-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "scout_code_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-scout_code_prompt-prompt-scout_code-prompt",
+      "source": "scout_code_prompt",
+      "sourceHandle": "prompt",
+      "target": "scout_code",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-scout_code-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "scout_code",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-scout_code-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "scout_code",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-scout_code-exec-out-scout_web-exec-in",
+      "source": "scout_code",
+      "sourceHandle": "exec-out",
+      "target": "scout_web",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-scout_web_prompt-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "scout_web_prompt",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-scout_web_prompt-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "scout_web_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-scout_web_prompt-prompt-scout_web-prompt",
+      "source": "scout_web_prompt",
+      "sourceHandle": "prompt",
+      "target": "scout_web",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-scout_web-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "scout_web",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-scout_web-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "scout_web",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-scout_web-exec-out-set_state_scout-exec-in",
+      "source": "scout_web",
+      "sourceHandle": "exec-out",
+      "target": "set_state_scout",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-scout_code-response-scout_merge-code_findings",
+      "source": "scout_code",
+      "sourceHandle": "response",
+      "target": "scout_merge",
+      "targetHandle": "code_findings",
+      "animated": false
+    },
+    {
+      "id": "e-scout_web-response-scout_merge-web_findings",
+      "source": "scout_web",
+      "sourceHandle": "response",
+      "target": "scout_merge",
+      "targetHandle": "web_findings",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-scout_merge-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "scout_merge",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-scout_merge-state-set_state_scout-value",
+      "source": "scout_merge",
+      "sourceHandle": "state",
+      "target": "set_state_scout",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-set_state_scout-exec-out-planner-exec-in",
+      "source": "set_state_scout",
+      "sourceHandle": "exec-out",
+      "target": "planner",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-planner_prompt-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "planner_prompt",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-planner_prompt-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "planner_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-planner_prompt-prompt-planner-prompt",
+      "source": "planner_prompt",
+      "sourceHandle": "prompt",
+      "target": "planner",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-planner_prompt-schema-planner-resp_schema",
+      "source": "planner_prompt",
+      "sourceHandle": "schema",
+      "target": "planner",
+      "targetHandle": "resp_schema",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-planner-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "planner",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-planner-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "planner",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-planner-exec-out-if_g1-exec-in",
+      "source": "planner",
+      "sourceHandle": "exec-out",
+      "target": "if_g1",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-plan_cond-wait_mode-if_g1-condition",
+      "source": "plan_cond",
+      "sourceHandle": "wait_mode",
+      "target": "if_g1",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_g1-true-gate1-exec-in",
+      "source": "if_g1",
+      "sourceHandle": "true",
+      "target": "gate1",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-planner-data-gate1_prompt-planner_data",
+      "source": "planner",
+      "sourceHandle": "data",
+      "target": "gate1_prompt",
+      "targetHandle": "planner_data",
+      "animated": false
+    },
+    {
+      "id": "e-gate1_prompt-prompt-gate1-prompt",
+      "source": "gate1_prompt",
+      "sourceHandle": "prompt",
+      "target": "gate1",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-gate1_prompt-choices-gate1-choices",
+      "source": "gate1_prompt",
+      "sourceHandle": "choices",
+      "target": "gate1",
+      "targetHandle": "choices",
+      "animated": false
+    },
+    {
+      "id": "e-gate1-exec-out-set_state_plan-exec-in",
+      "source": "gate1",
+      "sourceHandle": "exec-out",
+      "target": "set_state_plan",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate1-response-gate1_parse-response",
+      "source": "gate1",
+      "sourceHandle": "response",
+      "target": "gate1_parse",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-gate1_parse-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "gate1_parse",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-planner-data-gate1_parse-planner_data",
+      "source": "planner",
+      "sourceHandle": "data",
+      "target": "gate1_parse",
+      "targetHandle": "planner_data",
+      "animated": false
+    },
+    {
+      "id": "e-gate1_parse-state-set_state_plan-value",
+      "source": "gate1_parse",
+      "sourceHandle": "state",
+      "target": "set_state_plan",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-if_g1-false-set_state_plan_auto-exec-in",
+      "source": "if_g1",
+      "sourceHandle": "false",
+      "target": "set_state_plan_auto",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-gate1_auto-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "gate1_auto",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-planner-data-gate1_auto-planner_data",
+      "source": "planner",
+      "sourceHandle": "data",
+      "target": "gate1_auto",
+      "targetHandle": "planner_data",
+      "animated": false
+    },
+    {
+      "id": "e-gate1_auto-state-set_state_plan_auto-value",
+      "source": "gate1_auto",
+      "sourceHandle": "state",
+      "target": "set_state_plan_auto",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-plan_while-done-if_accepted-exec-in",
+      "source": "plan_while",
+      "sourceHandle": "done",
+      "target": "if_accepted",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-plan_done_check-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "plan_done_check",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-plan_done_check-accepted-if_accepted-condition",
+      "source": "plan_done_check",
+      "sourceHandle": "accepted",
+      "target": "if_accepted",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_accepted-false-end-exec-in",
+      "source": "if_accepted",
+      "sourceHandle": "false",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_accepted-true-backlog_write-exec-in",
+      "source": "if_accepted",
+      "sourceHandle": "true",
+      "target": "backlog_write",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-backlog_fields-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "backlog_fields",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-backlog_fields-file_path-backlog_write-file_path",
+      "source": "backlog_fields",
+      "sourceHandle": "file_path",
+      "target": "backlog_write",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-backlog_fields-content-backlog_write-content",
+      "source": "backlog_fields",
+      "sourceHandle": "content",
+      "target": "backlog_write",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "e-backlog_write-exec-out-git_call-exec-in",
+      "source": "backlog_write",
+      "sourceHandle": "exec-out",
+      "target": "git_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-backlog_fields-slug-git_args-branch_slug",
+      "source": "backlog_fields",
+      "sourceHandle": "slug",
+      "target": "git_args",
+      "targetHandle": "branch_slug",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-git_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "git_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-git_args-output-git_call-tool_call",
+      "source": "git_args",
+      "sourceHandle": "output",
+      "target": "git_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-git_call-exec-out-set_state_git-exec-in",
+      "source": "git_call",
+      "sourceHandle": "exec-out",
+      "target": "set_state_git",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-git_call-raw-git_fold-git_raw",
+      "source": "git_call",
+      "sourceHandle": "raw",
+      "target": "git_fold",
+      "targetHandle": "git_raw",
+      "animated": false
+    },
+    {
+      "id": "e-backlog_fields-slug-git_fold-slug",
+      "source": "backlog_fields",
+      "sourceHandle": "slug",
+      "target": "git_fold",
+      "targetHandle": "slug",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_p-value-git_fold-loop_state",
+      "source": "get_state_p",
+      "sourceHandle": "value",
+      "target": "git_fold",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-git_fold-state-set_state_git-value",
+      "source": "git_fold",
+      "sourceHandle": "state",
+      "target": "set_state_git",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-set_state_git-exec-out-build_while-exec-in",
+      "source": "set_state_git",
+      "sourceHandle": "exec-out",
+      "target": "build_while",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_b-value-build_cond-loop_state",
+      "source": "get_state_b",
+      "sourceHandle": "value",
+      "target": "build_cond",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_fix_cycles-build_cond-max_fix_cycles",
+      "source": "start",
+      "sourceHandle": "max_fix_cycles",
+      "target": "build_cond",
+      "targetHandle": "max_fix_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_review_rounds-build_cond-max_review_rounds",
+      "source": "start",
+      "sourceHandle": "max_review_rounds",
+      "target": "build_cond",
+      "targetHandle": "max_review_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-build_cond-condition-build_while-condition",
+      "source": "build_cond",
+      "sourceHandle": "condition",
+      "target": "build_while",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-build_while-loop-builder-exec-in",
+      "source": "build_while",
+      "sourceHandle": "loop",
+      "target": "builder",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-builder_prompt-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "builder_prompt",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_b-value-builder_prompt-loop_state",
+      "source": "get_state_b",
+      "sourceHandle": "value",
+      "target": "builder_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-builder_prompt-prompt-builder-prompt",
+      "source": "builder_prompt",
+      "sourceHandle": "prompt",
+      "target": "builder",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-builder-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "builder",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-builder-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "builder",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-builder-exec-out-lint_call-exec-in",
+      "source": "builder",
+      "sourceHandle": "exec-out",
+      "target": "lint_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-lint_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "lint_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-lint_args-output-lint_call-tool_call",
+      "source": "lint_args",
+      "sourceHandle": "output",
+      "target": "lint_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-lint_call-exec-out-selfcheck_call-exec-in",
+      "source": "lint_call",
+      "sourceHandle": "exec-out",
+      "target": "selfcheck_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-lint_call-raw-lint_parse-lint_raw",
+      "source": "lint_call",
+      "sourceHandle": "raw",
+      "target": "lint_parse",
+      "targetHandle": "lint_raw",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-selfcheck_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "selfcheck_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_args-output-selfcheck_call-tool_call",
+      "source": "selfcheck_args",
+      "sourceHandle": "output",
+      "target": "selfcheck_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-selfcheck_call-exec-out-commit_call-exec-in",
+      "source": "selfcheck_call",
+      "sourceHandle": "exec-out",
+      "target": "commit_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-commit_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "commit_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-commit_args-output-commit_call-tool_call",
+      "source": "commit_args",
+      "sourceHandle": "output",
+      "target": "commit_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-commit_call-exec-out-verify-exec-in",
+      "source": "commit_call",
+      "sourceHandle": "exec-out",
+      "target": "verify",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_b-value-verify_input-loop_state",
+      "source": "get_state_b",
+      "sourceHandle": "value",
+      "target": "verify_input",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-verify_input-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "verify_input",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-verify_input-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "verify_input",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-build_command-verify_input-build_command",
+      "source": "start",
+      "sourceHandle": "build_command",
+      "target": "verify_input",
+      "targetHandle": "build_command",
+      "animated": false
+    },
+    {
+      "id": "e-start-run_command-verify_input-run_command",
+      "source": "start",
+      "sourceHandle": "run_command",
+      "target": "verify_input",
+      "targetHandle": "run_command",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-verify_input-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "verify_input",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-verify_input-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "verify_input",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-verify_input-input-verify-input",
+      "source": "verify_input",
+      "sourceHandle": "input",
+      "target": "verify",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-verify-exec-out-set_state_build-exec-in",
+      "source": "verify",
+      "sourceHandle": "exec-out",
+      "target": "set_state_build",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-verify-output-get_verdict-object",
+      "source": "verify",
+      "sourceHandle": "output",
+      "target": "get_verdict",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_verdict-value-next_state-verify_verdict",
+      "source": "get_verdict",
+      "sourceHandle": "value",
+      "target": "next_state",
+      "targetHandle": "verify_verdict",
+      "animated": false
+    },
+    {
+      "id": "e-verify-child_output-next_state-verify_meta",
+      "source": "verify",
+      "sourceHandle": "child_output",
+      "target": "next_state",
+      "targetHandle": "verify_meta",
+      "animated": false
+    },
+    {
+      "id": "e-builder-response-next_state-builder_response",
+      "source": "builder",
+      "sourceHandle": "response",
+      "target": "next_state",
+      "targetHandle": "builder_response",
+      "animated": false
+    },
+    {
+      "id": "e-lint_parse-residuals-next_state-lint_out",
+      "source": "lint_parse",
+      "sourceHandle": "residuals",
+      "target": "next_state",
+      "targetHandle": "lint_out",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_b-value-next_state-loop_state",
+      "source": "get_state_b",
+      "sourceHandle": "value",
+      "target": "next_state",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-next_state-state-set_state_build-value",
+      "source": "next_state",
+      "sourceHandle": "state",
+      "target": "set_state_build",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-set_state_build-exec-out-if_green-exec-in",
+      "source": "set_state_build",
+      "sourceHandle": "exec-out",
+      "target": "if_green",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-tail_check-green-if_green-condition",
+      "source": "tail_check",
+      "sourceHandle": "green",
+      "target": "if_green",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_tail-value-tail_check-loop_state",
+      "source": "get_state_tail",
+      "sourceHandle": "value",
+      "target": "tail_check",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_fix_cycles-tail_check-max_fix_cycles",
+      "source": "start",
+      "sourceHandle": "max_fix_cycles",
+      "target": "tail_check",
+      "targetHandle": "max_fix_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-if_green-false-if_escalate-exec-in",
+      "source": "if_green",
+      "sourceHandle": "false",
+      "target": "if_escalate",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-tail_check-escalate-if_escalate-condition",
+      "source": "tail_check",
+      "sourceHandle": "escalate",
+      "target": "if_escalate",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_escalate-true-gate2-exec-in",
+      "source": "if_escalate",
+      "sourceHandle": "true",
+      "target": "gate2",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_escalate-false-set_state_noop-exec-in",
+      "source": "if_escalate",
+      "sourceHandle": "false",
+      "target": "set_state_noop",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_tail-value-set_state_noop-value",
+      "source": "get_state_tail",
+      "sourceHandle": "value",
+      "target": "set_state_noop",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-if_green-true-doc-exec-in",
+      "source": "if_green",
+      "sourceHandle": "true",
+      "target": "doc",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-doc_prompt-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "doc_prompt",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_tail-value-doc_prompt-loop_state",
+      "source": "get_state_tail",
+      "sourceHandle": "value",
+      "target": "doc_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-doc_prompt-prompt-doc-prompt",
+      "source": "doc_prompt",
+      "sourceHandle": "prompt",
+      "target": "doc",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-doc-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "doc",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-doc-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "doc",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-doc-exec-out-docguard_call-exec-in",
+      "source": "doc",
+      "sourceHandle": "exec-out",
+      "target": "docguard_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-docguard_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "docguard_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-docguard_args-output-docguard_call-tool_call",
+      "source": "docguard_args",
+      "sourceHandle": "output",
+      "target": "docguard_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-docguard_call-exec-out-if_docok-exec-in",
+      "source": "docguard_call",
+      "sourceHandle": "exec-out",
+      "target": "if_docok",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-docguard_call-raw-docguard_fold-guard_raw",
+      "source": "docguard_call",
+      "sourceHandle": "raw",
+      "target": "docguard_fold",
+      "targetHandle": "guard_raw",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_tail-value-docguard_fold-loop_state",
+      "source": "get_state_tail",
+      "sourceHandle": "value",
+      "target": "docguard_fold",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-docguard_fold-ok-if_docok-condition",
+      "source": "docguard_fold",
+      "sourceHandle": "ok",
+      "target": "if_docok",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_docok-false-set_state_docred-exec-in",
+      "source": "if_docok",
+      "sourceHandle": "false",
+      "target": "set_state_docred",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-docguard_fold-state-set_state_docred-value",
+      "source": "docguard_fold",
+      "sourceHandle": "state",
+      "target": "set_state_docred",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-if_docok-true-pr_write-exec-in",
+      "source": "if_docok",
+      "sourceHandle": "true",
+      "target": "pr_write",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_tail-value-pr_fields-loop_state",
+      "source": "get_state_tail",
+      "sourceHandle": "value",
+      "target": "pr_fields",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-pr_fields-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "pr_fields",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-pr_fields-pr_path-pr_write-file_path",
+      "source": "pr_fields",
+      "sourceHandle": "pr_path",
+      "target": "pr_write",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-pr_fields-pr_body-pr_write-content",
+      "source": "pr_fields",
+      "sourceHandle": "pr_body",
+      "target": "pr_write",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "e-pr_write-exec-out-pr_call-exec-in",
+      "source": "pr_write",
+      "sourceHandle": "exec-out",
+      "target": "pr_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-pr_fields-gh_call-pr_call-tool_call",
+      "source": "pr_fields",
+      "sourceHandle": "gh_call",
+      "target": "pr_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-pr_call-exec-out-if_g2-exec-in",
+      "source": "pr_call",
+      "sourceHandle": "exec-out",
+      "target": "if_g2",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-tail_check-wait_mode-if_g2-condition",
+      "source": "tail_check",
+      "sourceHandle": "wait_mode",
+      "target": "if_g2",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_g2-true-gate2-exec-in",
+      "source": "if_g2",
+      "sourceHandle": "true",
+      "target": "gate2",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate2_prompt-prompt-gate2-prompt",
+      "source": "gate2_prompt",
+      "sourceHandle": "prompt",
+      "target": "gate2",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-gate2_prompt-choices-gate2-choices",
+      "source": "gate2_prompt",
+      "sourceHandle": "choices",
+      "target": "gate2",
+      "targetHandle": "choices",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_tail-value-gate2_prompt-loop_state",
+      "source": "get_state_tail",
+      "sourceHandle": "value",
+      "target": "gate2_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-gate2-exec-out-set_state_g2-exec-in",
+      "source": "gate2",
+      "sourceHandle": "exec-out",
+      "target": "set_state_g2",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate2-response-gate2_parse-response",
+      "source": "gate2",
+      "sourceHandle": "response",
+      "target": "gate2_parse",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_tail-value-gate2_parse-loop_state",
+      "source": "get_state_tail",
+      "sourceHandle": "value",
+      "target": "gate2_parse",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-gate2_parse-state-set_state_g2-value",
+      "source": "gate2_parse",
+      "sourceHandle": "state",
+      "target": "set_state_g2",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-if_g2-false-set_state_g2auto-exec-in",
+      "source": "if_g2",
+      "sourceHandle": "false",
+      "target": "set_state_g2auto",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_tail-value-set_state_g2auto-value",
+      "source": "get_state_tail",
+      "sourceHandle": "value",
+      "target": "set_state_g2auto",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-build_while-done-if_approved-exec-in",
+      "source": "build_while",
+      "sourceHandle": "done",
+      "target": "if_approved",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_done-value-done_check-loop_state",
+      "source": "get_state_done",
+      "sourceHandle": "value",
+      "target": "done_check",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-done_check-approved-if_approved-condition",
+      "source": "done_check",
+      "sourceHandle": "approved",
+      "target": "if_approved",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_approved-true-merge_call-exec-in",
+      "source": "if_approved",
+      "sourceHandle": "true",
+      "target": "merge_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_done-value-merge_args-loop_state",
+      "source": "get_state_done",
+      "sourceHandle": "value",
+      "target": "merge_args",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-merge_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "merge_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-merge_args-output-merge_call-tool_call",
+      "source": "merge_args",
+      "sourceHandle": "output",
+      "target": "merge_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-merge_call-exec-out-set_state_merge-exec-in",
+      "source": "merge_call",
+      "sourceHandle": "exec-out",
+      "target": "set_state_merge",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-merge_call-raw-merge_fold-merge_raw",
+      "source": "merge_call",
+      "sourceHandle": "raw",
+      "target": "merge_fold",
+      "targetHandle": "merge_raw",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_done-value-merge_fold-loop_state",
+      "source": "get_state_done",
+      "sourceHandle": "value",
+      "target": "merge_fold",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-merge_fold-state-set_state_merge-value",
+      "source": "merge_fold",
+      "sourceHandle": "state",
+      "target": "set_state_merge",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-set_state_merge-exec-out-end-exec-in",
+      "source": "set_state_merge",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_approved-false-end-exec-in",
+      "source": "if_approved",
+      "sourceHandle": "false",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_final-value-final_report-loop_state",
+      "source": "get_state_final",
+      "sourceHandle": "value",
+      "target": "final_report",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-report-end-report",
+      "source": "final_report",
+      "sourceHandle": "report",
+      "target": "end",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-success-end-success",
+      "source": "final_report",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-branch-end-branch",
+      "source": "final_report",
+      "sourceHandle": "branch",
+      "target": "end",
+      "targetHandle": "branch",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-stopped_reason-end-stopped_reason",
+      "source": "final_report",
+      "sourceHandle": "stopped_reason",
+      "target": "end",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-23T20:38:04.034207+00:00",
+  "updated_at": "2026-07-23T20:38:04.034207+00:00"
+}

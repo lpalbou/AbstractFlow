@@ -36,6 +36,21 @@ const bundledFlowModules = import.meta.glob<VisualFlow>(
     '../../examples/flows/meta-reflect.json',
     '../../examples/flows/meta-perspectives.json',
     '../../examples/flows/meta-deliberate.json',
+    // The multi-agent coding pipeline (operator directive 2026-07-23, backlog
+    // 0152): scouts -> planner -> gate -> build/verify loop -> doc -> PR ->
+    // gate -> merge. Wildcard (the deep-* precedent) so new family members
+    // surface at the next build without editing this list — the 2026-07-25
+    // invisibility incident was a per-file list lagging the family
+    // (entity-tool-rounds/-goodbye existed on disk, absent here) on top of a
+    // stale dist.
+    '../../examples/flows/multiagent-*.json',
+    // The ENTITY BRAIN family (operator directive 2026-07-24, backlog 0153):
+    // the master life loop + its cognition subflows, animating the served
+    // cognition_graph. entity-life is the master (THE DAY GATE routes each
+    // moment to one phase); entity-chat is the agent.v1 chat door; the rest
+    // are the named brain processes (composed, listed as children). Same
+    // wildcard rationale as multiagent-*.
+    '../../examples/flows/entity-*.json',
   ],
   {
     eager: true,
@@ -55,8 +70,13 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   '81795ea9': {
     flowId: '81795ea9',
     bundleId: 'basic-agent',
-    bundleVersion: '0.0.2',
-    bundleRef: 'basic-agent@0.0.2',
+    // 0.0.3 = the stale-model-pin republish (2026-07-21): 0.0.2 pins
+    // lmstudio/qwen3-next-80b and fails for default-following clients.
+    // 0.0.2 stayed registered on the gateway, so this pin silently kept
+    // one-click library runs on the known-bad version until the surfacing
+    // check compared pins against the registry (2026-07-25).
+    bundleVersion: '0.0.3',
+    bundleRef: 'basic-agent@0.0.3',
   },
   'coding-agent': {
     flowId: 'coding-agent',
@@ -136,6 +156,23 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     bundleId: 'meta-deliberate',
     bundleVersion: '0.1.1',
     bundleRef: 'meta-deliberate@0.1.1',
+  },
+  'multiagent-coding': {
+    flowId: 'multiagent-coding',
+    bundleId: 'multiagent-coding',
+    // 0.0.2 = dual-interface: coding.v1 strict root (gated) + agent.v1 wrapper
+    // 'multiagent-coder' (picker-visible), so agent apps can drive it like
+    // basic-agent/coder. 0.0.1 = cycle-3 fix wave (coding.v1, gateway-truth
+    // skills, diagnostic-grammar lint, MERGED_OK sentinel, verifier-death
+    // fold, gate-2 escalation, post-doc hash guard).
+    bundleVersion: '0.0.3',
+    bundleRef: 'multiagent-coding@0.0.3',
+  },
+  'multiagent-coder': {
+    flowId: 'multiagent-coder',
+    bundleId: 'multiagent-coding',
+    bundleVersion: '0.0.3',
+    bundleRef: 'multiagent-coding@0.0.3',
   },
 };
 

@@ -1,0 +1,1238 @@
+{
+  "id": "entity-personal",
+  "name": "Entity — Personal (own time)",
+  "description": "Granted own time: the entity ticks itself — explores an interest, works an open question, follows what is alive — in bounded turns, then closes the day reflectively.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 80,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Own time opens",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "max_ticks",
+            "label": "max_ticks",
+            "type": "number"
+          },
+          {
+            "id": "participants",
+            "label": "participants",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "max_ticks": 3,
+          "participants": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_init",
+      "type": "set_var",
+      "position": {
+        "x": 380,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Session state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "personal_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "loop",
+      "type": "while",
+      "position": {
+        "x": 640,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "While the day lasts",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_for_cond",
+      "type": "get_var",
+      "position": {
+        "x": 400,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get personal_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "personal_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pcond",
+      "type": "code",
+      "position": {
+        "x": 640,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Day budget",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "max_ticks",
+            "label": "max_ticks",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: code nodes are volatile (re-evaluated per data pull), so\n# inputs must NEVER be mutated in place — copy before writing.\nstate = dict(state)\nmax_ticks = _input.get(\"max_ticks\")\nif not isinstance(max_ticks, int) or max_ticks < 1:\n    max_ticks = 3\nticks = state.get(\"turn_count\")\nif not isinstance(ticks, int):\n    ticks = 0\nkeep = 1\nif ticks >= max_ticks:\n    keep = 0\nreturn {\"condition\": keep}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "drives",
+      "type": "life_query",
+      "position": {
+        "x": 640,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "life_query",
+        "label": "What is alive? (day-open cue)",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "k",
+            "label": "k",
+            "type": "number"
+          },
+          {
+            "id": "as_of",
+            "label": "as_of",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": "alive_drives",
+          "k": 5
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "drive_cue",
+      "type": "code",
+      "position": {
+        "x": 800,
+        "y": 180
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose the cue",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# The day-open cue: what is ALIVE for the entity (open questions, interests,\n# unresolved threads) — read from the engine, offered as the self-tick\n# stimulus. Absent drives = an honest open day.\n# DREAMS carry their record id (adversary A, P2-2 + runtime c5215): a dream\n# is the entity's to DISPOSE (confirm|reject via the ```tend fence), and\n# disposal needs the addressable id — an unnamed dream is undischargeable.\nitems = _input.get(\"items\")\nif not isinstance(items, list):\n    items = []\nlines = []\nhas_dream = 0\nfor it in items[:5]:\n    if isinstance(it, dict):\n        kind = str(it.get(\"kind\") or \"\")\n        rid = str(it.get(\"record_id\") or \"\")\n        if kind == \"dream\" and rid:\n            # A dream line must be HUMAN words (wave-4 adversary E, F3):\n            # dream TITLES are mechanical bridge strings (\"'Diary entry…'\n            # beside 'Diary entry…'\") — feeding them back as the day cue\n            # made the entity's own time recursive boilerplate. The digest's\n            # first clause carries the dream's actual content.\n            d = str(it.get(\"digest\") or it.get(\"title\") or \"\").strip().replace(\"\\n\", \" \")\n            cut = d.find(\". \")\n            clause = d[:cut + 1] if 0 < cut < 140 else d[:140]\n            lines.append(\"- an unresolved dream [\" + rid + \"]: \" + clause)\n            has_dream = 1\n            continue\n        t = str(it.get(\"title\") or it.get(\"digest\") or it.get(\"text\") or \"\").strip()\n        if t:\n            lines.append(\"- \" + t)\n    elif isinstance(it, str) and it.strip():\n        lines.append(\"- \" + it.strip())\nif lines:\n    cue = \"What is alive for you today:\\n\" + \"\\n\".join(lines) + \"\\n\\nFollow one of these — or what they awaken.\"\n    if has_dream == 1:\n        cue = cue + (\"\\nA dream above is yours to judge by waking evidence: dispose it in your\"\n                     \" tend fence — `dispose: <dream id> confirm|reject -- reason: <your verdict>`.\")\nelse:\n    cue = \"\"\nreturn {\"cue\": cue}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_cur",
+      "type": "get_var",
+      "position": {
+        "x": 700,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get personal_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "personal_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "turn_in",
+      "type": "make_object",
+      "position": {
+        "x": 940,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the moment",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "stimulus",
+            "label": "stimulus",
+            "type": "string"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "participants",
+            "label": "participants",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "phase": "personal"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "turn",
+      "type": "subflow",
+      "position": {
+        "x": 940,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Cognition Turn (self-directed)",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-cognition-turn"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_out",
+      "type": "get",
+      "position": {
+        "x": 1240,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "turn_guard",
+      "type": "code",
+      "position": {
+        "x": 1240,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "The moment must have lived",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "child",
+            "label": "child",
+            "type": "object"
+          },
+          {
+            "id": "fallback",
+            "label": "fallback",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "fallback": ""
+        },
+        "functionName": "transform",
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_fold",
+      "type": "set_var",
+      "position": {
+        "x": 1240,
+        "y": 300
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fold session state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "personal_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "state_for_close",
+      "type": "get_var",
+      "position": {
+        "x": 640,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get personal_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "personal_state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "close_in",
+      "type": "make_object",
+      "position": {
+        "x": 900,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Compose the close",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "phase": "personal",
+          "reason": "own time ended"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "close",
+      "type": "subflow",
+      "position": {
+        "x": 1160,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Session Close (summary + diary)",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "entity-session-close"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "turns_out",
+      "type": "get",
+      "position": {
+        "x": 1460,
+        "y": 840
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get turns",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "turns",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "closed_state",
+      "type": "get",
+      "position": {
+        "x": 1460,
+        "y": 1020
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1740,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Day closed",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "turns",
+            "label": "turns",
+            "type": "number"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-drives-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "drives",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-drives-exec-out-state_init-exec-in",
+      "source": "drives",
+      "sourceHandle": "exec-out",
+      "target": "state_init",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-state_init-exec-out-loop-exec-in",
+      "source": "state_init",
+      "sourceHandle": "exec-out",
+      "target": "loop",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-loop-loop-turn-exec-in",
+      "source": "loop",
+      "sourceHandle": "loop",
+      "target": "turn",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-turn-exec-out-turn_guard-exec-in",
+      "source": "turn",
+      "sourceHandle": "exec-out",
+      "target": "turn_guard",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-turn_guard-exec-out-state_fold-exec-in",
+      "source": "turn_guard",
+      "sourceHandle": "exec-out",
+      "target": "state_fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-loop-done-close-exec-in",
+      "source": "loop",
+      "sourceHandle": "done",
+      "target": "close",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-close-exec-out-end-exec-in",
+      "source": "close",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-state-state_init-value",
+      "source": "start",
+      "sourceHandle": "state",
+      "target": "state_init",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-state_for_cond-value-pcond-state",
+      "source": "state_for_cond",
+      "sourceHandle": "value",
+      "target": "pcond",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_ticks-pcond-max_ticks",
+      "source": "start",
+      "sourceHandle": "max_ticks",
+      "target": "pcond",
+      "targetHandle": "max_ticks",
+      "animated": false
+    },
+    {
+      "id": "e-pcond-condition-loop-condition",
+      "source": "pcond",
+      "sourceHandle": "condition",
+      "target": "loop",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-drives-items-drive_cue-items",
+      "source": "drives",
+      "sourceHandle": "items",
+      "target": "drive_cue",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "e-drive_cue-cue-turn_in-stimulus",
+      "source": "drive_cue",
+      "sourceHandle": "cue",
+      "target": "turn_in",
+      "targetHandle": "stimulus",
+      "animated": false
+    },
+    {
+      "id": "e-state_cur-value-turn_in-state",
+      "source": "state_cur",
+      "sourceHandle": "value",
+      "target": "turn_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-system-turn_in-system",
+      "source": "start",
+      "sourceHandle": "system",
+      "target": "turn_in",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-turn_in-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "turn_in",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-turn_in-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "turn_in",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-participants-turn_in-participants",
+      "source": "start",
+      "sourceHandle": "participants",
+      "target": "turn_in",
+      "targetHandle": "participants",
+      "animated": false
+    },
+    {
+      "id": "e-turn_in-result-turn-input",
+      "source": "turn_in",
+      "sourceHandle": "result",
+      "target": "turn",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-turn-output-state_out-object",
+      "source": "turn",
+      "sourceHandle": "output",
+      "target": "state_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-state_out-value-turn_guard-value",
+      "source": "state_out",
+      "sourceHandle": "value",
+      "target": "turn_guard",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-turn-child_output-turn_guard-child",
+      "source": "turn",
+      "sourceHandle": "child_output",
+      "target": "turn_guard",
+      "targetHandle": "child",
+      "animated": false
+    },
+    {
+      "id": "e-state_for_cond-value-turn_guard-fallback",
+      "source": "state_for_cond",
+      "sourceHandle": "value",
+      "target": "turn_guard",
+      "targetHandle": "fallback",
+      "animated": false
+    },
+    {
+      "id": "e-turn_guard-value-state_fold-value",
+      "source": "turn_guard",
+      "sourceHandle": "value",
+      "target": "state_fold",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-state_for_close-value-close_in-state",
+      "source": "state_for_close",
+      "sourceHandle": "value",
+      "target": "close_in",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-close_in-result-close-input",
+      "source": "close_in",
+      "sourceHandle": "result",
+      "target": "close",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-close-output-turns_out-object",
+      "source": "close",
+      "sourceHandle": "output",
+      "target": "turns_out",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-close-output-closed_state-object",
+      "source": "close",
+      "sourceHandle": "output",
+      "target": "closed_state",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-closed_state-value-end-state",
+      "source": "closed_state",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-turns_out-value-end-turns",
+      "source": "turns_out",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "turns",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-25T06:34:59.960111+00:00",
+  "updated_at": "2026-07-25T06:34:59.960111+00:00"
+}

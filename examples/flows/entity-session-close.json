@@ -1,0 +1,449 @@
+{
+  "id": "entity-session-close",
+  "name": "Entity — Session Close",
+  "description": "The close of a session: the summary record forms, and the diary receives its DETERMINISTIC end-of-session note (the conscious history never skips a day).",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 80,
+        "y": 260
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Close begins",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "phase",
+            "label": "phase",
+            "type": "string"
+          },
+          {
+            "id": "reason",
+            "label": "reason",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "reason": "session end"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prep",
+      "type": "code",
+      "position": {
+        "x": 400,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Shape summary + diary note",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "phase",
+            "label": "phase",
+            "type": "string"
+          },
+          {
+            "id": "reason",
+            "label": "reason",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# The close: the session summary record + the DETERMINISTIC diary note.\n# Operator rule: at the end of EVERY session the diary receives an\n# experiential note, deterministically (mechanical floor — never skipped,\n# entity prose upstream can only enrich it).\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: code nodes are volatile (re-evaluated per data pull), so\n# inputs must NEVER be mutated in place — copy before writing.\nstate = dict(state)\nphase = str(_input.get(\"phase\") or \"visit\")\nreason = str(_input.get(\"reason\") or \"session end\")\n\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nn = len(log)\n\nfirst_stim = \"\"\nlast_reply = \"\"\nif n > 0:\n    first = log[0]\n    if isinstance(first, dict):\n        first_stim = str(first.get(\"stimulus\") or \"\")\n    last = log[n - 1]\n    if isinstance(last, dict):\n        last_reply = str(last.get(\"reply\") or \"\")\n\ntitle = \"session close (\" + phase + \", \" + str(n) + \" turns)\"\ndigest = \"A \" + phase + \" session of \" + str(n) + \" turns.\"\nif first_stim:\n    lead = first_stim.replace(\"\\n\", \" \")\n    if len(lead) > 120:\n        lead = lead[:117] + \"...\"\n    digest = digest + \" It began with: \" + lead\n\n# A summary must name its sources (engine guard): wire summarizes edges to\n# the session's episode records. An episode-less close is an honest\n# observation. Caps are LABELED (the #TRUNCATION law).\nepisode_ids = []\nfor t in log:\n    if isinstance(t, dict):\n        eid = str(t.get(\"episode\") or \"\")\n        if eid:\n            episode_ids.append(eid)\nedges = []\nfor eid in episode_ids[-12:]:\n    edges.append([\"summarizes\", eid])\n\nattrs = {\"phase\": phase, \"turns\": n, \"close_reason\": reason,\n         \"digest_method\": \"mechanical-flow-v1\", \"sources_total\": len(episode_ids)}\nif len(episode_ids) > 12:\n    attrs[\"sources_truncated\"] = True\n\nsummary_records = [{\n    \"kind\": \"summary\" if edges else \"observation\",\n    \"title\": title,\n    \"digest\": digest,\n    \"edges\": edges,\n    \"attributes\": attrs,\n}]\n\ndiary = \"Session closed (\" + phase + \"): \" + str(n) + \" turns.\"\nif first_stim:\n    lead2 = first_stim.replace(\"\\n\", \" \")\n    if len(lead2) > 100:\n        lead2 = lead2[:97] + \"...\"\n    diary = diary + \" It started with: \" + lead2\nif last_reply:\n    tail = last_reply.replace(\"\\n\", \" \")\n    if len(tail) > 100:\n        tail = tail[:97] + \"...\"\n    diary = diary + \" My last words: \" + tail\ndiary = diary + \" (\" + reason + \")\"\n\nturn_count = state.get(\"turn_count\")\nif not isinstance(turn_count, int):\n    turn_count = 0\ndays2 = state.get(\"days_lived\")\nif not isinstance(days2, int):\n    days2 = 0\nclose_turn_id = phase + \"-close-d\" + str(days2) + \"-\" + str(turn_count)\n\nreturn {\n    \"summary_records\": summary_records,\n    \"diary_text\": diary,\n    \"close_turn_id\": close_turn_id,\n    \"turns\": n,\n}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "summary",
+      "type": "memory_form",
+      "position": {
+        "x": 400,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "memory_form",
+        "label": "The session summary forms",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "records",
+            "label": "records",
+            "type": "array"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "turn_id",
+            "label": "turn_id",
+            "type": "string"
+          },
+          {
+            "id": "idempotency_key",
+            "label": "idempotency_key",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "record_ids",
+            "label": "record_ids",
+            "type": "array"
+          },
+          {
+            "id": "formed",
+            "label": "formed",
+            "type": "number"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "scope": "life"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "diary",
+      "type": "diary_write",
+      "position": {
+        "x": 720,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "diary_write",
+        "label": "The deterministic diary note",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "gist",
+            "label": "gist",
+            "type": "string"
+          },
+          {
+            "id": "kind",
+            "label": "kind",
+            "type": "string"
+          },
+          {
+            "id": "visibility",
+            "label": "visibility",
+            "type": "string"
+          },
+          {
+            "id": "anchor_graph_ids",
+            "label": "anchor_graph_ids",
+            "type": "array"
+          },
+          {
+            "id": "turn_id",
+            "label": "turn_id",
+            "type": "string"
+          },
+          {
+            "id": "digest_method",
+            "label": "digest_method",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "entry_id",
+            "label": "entry_id",
+            "type": "string"
+          },
+          {
+            "id": "projected_record_id",
+            "label": "projected_record_id",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "kind": "note",
+          "visibility": "self",
+          "digest_method": "mechanical-flow-v1"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1040,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Closed",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "summary_record_ids",
+            "label": "summary_record_ids",
+            "type": "array"
+          },
+          {
+            "id": "diary_entry_id",
+            "label": "diary_entry_id",
+            "type": "string"
+          },
+          {
+            "id": "turns",
+            "label": "turns",
+            "type": "number"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-diary-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "diary",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-diary-exec-out-summary-exec-in",
+      "source": "diary",
+      "sourceHandle": "exec-out",
+      "target": "summary",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-summary-exec-out-end-exec-in",
+      "source": "summary",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-state-prep-state",
+      "source": "start",
+      "sourceHandle": "state",
+      "target": "prep",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-phase-prep-phase",
+      "source": "start",
+      "sourceHandle": "phase",
+      "target": "prep",
+      "targetHandle": "phase",
+      "animated": false
+    },
+    {
+      "id": "e-start-reason-prep-reason",
+      "source": "start",
+      "sourceHandle": "reason",
+      "target": "prep",
+      "targetHandle": "reason",
+      "animated": false
+    },
+    {
+      "id": "e-prep-summary_records-summary-records",
+      "source": "prep",
+      "sourceHandle": "summary_records",
+      "target": "summary",
+      "targetHandle": "records",
+      "animated": false
+    },
+    {
+      "id": "e-prep-close_turn_id-summary-turn_id",
+      "source": "prep",
+      "sourceHandle": "close_turn_id",
+      "target": "summary",
+      "targetHandle": "turn_id",
+      "animated": false
+    },
+    {
+      "id": "e-prep-diary_text-diary-text",
+      "source": "prep",
+      "sourceHandle": "diary_text",
+      "target": "diary",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "e-prep-close_turn_id-diary-turn_id",
+      "source": "prep",
+      "sourceHandle": "close_turn_id",
+      "target": "diary",
+      "targetHandle": "turn_id",
+      "animated": false
+    },
+    {
+      "id": "e-summary-record_ids-end-summary_record_ids",
+      "source": "summary",
+      "sourceHandle": "record_ids",
+      "target": "end",
+      "targetHandle": "summary_record_ids",
+      "animated": false
+    },
+    {
+      "id": "e-diary-entry_id-end-diary_entry_id",
+      "source": "diary",
+      "sourceHandle": "entry_id",
+      "target": "end",
+      "targetHandle": "diary_entry_id",
+      "animated": false
+    },
+    {
+      "id": "e-prep-turns-end-turns",
+      "source": "prep",
+      "sourceHandle": "turns",
+      "target": "end",
+      "targetHandle": "turns",
+      "animated": false
+    },
+    {
+      "id": "e-start-state-end-state",
+      "source": "start",
+      "sourceHandle": "state",
+      "target": "end",
+      "targetHandle": "state",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-25T06:34:59.960636+00:00",
+  "updated_at": "2026-07-25T06:34:59.960636+00:00"
+}

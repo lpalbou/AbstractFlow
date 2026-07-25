@@ -7,6 +7,271 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- 2026-07-25 **Flow Library invisibility (entity + multiagent families)**
+  (operator report): the library bundles example flows at BUILD time
+  (`import.meta.glob` in `src/utils/bundledFlows.ts`), and the served `dist/`
+  predated both families — every entity flow and the multiagent pipeline were
+  absent from the served JS despite correct sources. Two-layer fix: the
+  hand-maintained per-file glob entries were replaced with `entity-*.json` /
+  `multiagent-*.json` wildcards (the `deep-*` precedent) so new family
+  members surface at the next build without list edits (the list had already
+  lagged twice: `entity-tool-rounds`, `entity-goodbye`), and the dist was
+  rebuilt + served-hash verified. Open tabs need a reload (stale-browser-
+  bundle rule).
+
+### Changed
+- 2026-07-25 **entity-life version ledger backfill + hygiene** (cleanup
+  adversary P1-2/P0-1): the per-version ledger now lives HERE (the builder's
+  header comments had silently stopped at 0.0.11). Backfill: `0.0.12` —
+  ruled 20-call turn budget threaded across tool rounds (`calls_used` state,
+  `batch_cap = min(6, remaining)`, spend counted by executed results rows;
+  runtime c5319). `0.0.13` — WITH-WHOM grounding: the door's verified
+  participants render into the visit prompt. `0.0.14` — `entity-goodbye`
+  summonable close entrypoint (drawer conversations finally close: durable
+  session history folds, diary note + summary form; empty sessions close
+  honestly). `0.0.15` — presence block moved to the prompt head with the
+  fusion-antidote wording ("names in your MEMORIES are things past visitors
+  said, not verified identities"). `0.0.16` — full diary-kind election
+  vocabulary taught (question/problem/commitment/lesson, `resolves=`,
+  `explores=`, `gist:`) — REGISTRATION GATED behind the gateway's diary
+  capture bind. Also: the four-copy node contract gained a drift pin
+  (`scripts/entity_contract_pin.py`) and eight live drift instances were
+  fixed (adjust `ttl_activity`/`scope`, palette `scope`/`digest_method`/
+  `scan_limit`/`results`, allowlist `workspace_enabled`/`phase`); bundle
+  versions 0.0.1–0.0.14 archived from the served dir (pruning window
+  verified: zero non-terminal pinned runs).
+
+### Fixed
+- 2026-07-25 **Bundled basic-agent run target repinned 0.0.2 → 0.0.3**
+  (surfacing-check E find): `bundledRunTargets` kept one-click library runs
+  of the bundled basic-agent flow on 0.0.2 — the version with the stale
+  `lmstudio/qwen3-next-80b` model pin the 0.0.3 republish removed
+  (2026-07-21). Dist rebuilt; the check now compares every UI pin against
+  the gateway registry (`?all_versions=true`).
+- 2026-07-25 **Honesty guards on the tool rounds** (`entity-life@0.0.11`,
+  fix-adversary fold): the rounds child gained the death guard every other
+  turn-level subflow call already had — a provider failure mid-round no
+  longer absorbs into a false "(I stayed silent)" episode with `degraded=0`
+  (honest error text in the reply lane; `degraded`/`moment_error` thread
+  turn→visit→chat). The mind's own mid-round words are kept (prompt,
+  elections, episode — a round-1 feel fence now lands); a moment ending
+  without words marks `degraded=1` (speak-now floor); TOOL RESULTS prompt
+  copies cap at 24k chars with a `#TRUNCATION` label (ledger keeps
+  verbatim); `max_rounds` floors at 2. Smoke grew the provider-death and
+  mute-mind scenarios.
+
+### Added
+- 2026-07-25 **Flow surfacing check** (`scripts/flow_surfacing_check.py`,
+  stdlib-only; recurrence guard for the flow-invisibility incident): A glob
+  coverage (wildcard families entity-/multiagent-/deep- must fully resolve —
+  guards per-file-list regressions), B dist freshness (any bundled flow or
+  bundledFlows.ts newer than dist/assets fails with "rebuild: npm run
+  build"), C dist content (every resolved flow id inlined in the built JS),
+  D served freshness (running flow server vs local dist, warn-only), E
+  registration drift (build-script BUNDLE_VERSIONs, UI bundledRunTargets
+  pins, and staged-but-unregistered `.flow` files in the gateway served dir
+  vs the registry, warn-only — registration is a deliberate act). Exit 1 on
+  A/B/C failures; docs claims about library visibility now point at this
+  check.
+- 2026-07-25 **Entity tools through the flow brain** (`entity-life@0.0.10`,
+  backlog 0153 — operator find: the flow lane served ZERO tools): new
+  LEVEL 3.5 subflow `entity-tool-rounds` (one llm node in a bounded while,
+  cap 3; the final round declares no tools — the moment must end in words);
+  the cognition turn resolves the phase's tool grant (`entity_tools_query` —
+  tool_policy.yaml or the ruled defaults), teaches TOOLS IN HAND in the
+  shelf prompt, declares the grant natively on the lived turn, and executes
+  each native batch under the re-resolved grant (`entity_tools_execute`,
+  runtime's identity/tool_effects.py pair — refusal markers shown to the
+  mind verbatim). `tools_ran` (host-authored, deduped) and `tool_rounds`
+  (present even when zero, for app fabrication gauges) ride the
+  turn→visit→chat outputs; the acted tool names land in the session turn
+  log. Editor palette: two new Entity Mind nodes (Entity Tools grant /
+  execute batch). Dead `tools` pass-through pins removed — the grant is the
+  one authority.
+- 2026-07-24 **The entity brain** (`entity-life` family, backlog 0153 —
+  operator directive): a master executable VisualFlow that ANIMATES a
+  persistent entity (identity + self-evolving memory) through its four
+  mutually-exclusive phases. Nine flows converging on the served
+  cognition_graph: `entity-life` (THE DAY GATE routes each moment: stop >
+  close-the-visit > visit > work > granted personal > sleep > park; steer
+  with durable events visit/goodbye/task/grant_personal/stop),
+  `entity-day-gate`, `entity-visit` (one conversational moment),
+  `entity-work` (task loop to DONE), `entity-personal` (bounded self-ticks),
+  `entity-sleep` (the night, WIRED: the engine's six-phase sleep_pass runs
+  as ONE memory_consolidate effect; continueOnError folds an engine death
+  into an honest failed-night settlement), `entity-cognition-turn` (ONE
+  lived moment: passive recall + deliberate reach -> prompt shelf -> the
+  lived turn -> feel election -> usage-trail commit -> episode formation
+  with keywords + summarizes-edged session summaries),
+  `entity-session-close` (the deterministic end-of-session diary note),
+  `entity-chat` (agent.v1 chat door). Eleven entity-memory node types
+  (`memory_recall`/`memory_commit`/`memory_form`/`memory_adjust`/
+  `memory_appraise`/`diary_write`/`diary_read`/`memory_consolidate`/
+  `memory_probe`/`life_query`/`memory_tend`) ship in the visualflow compiler
+  with an "Entity Mind" palette section — effects resolve ONLY on an entity
+  runtime (channel authority; no flow ever names an entity). The tend lane
+  (bundle 0.0.4, runtime c5215): `memory_tend` dispatches the engine's
+  ```tend grammar verbatim (dream disposal via dispose confirm|reject);
+  dreams surface ADDRESSABLE in the day-open cue; the grammar is taught on
+  own time only; the loop smoke pins a refocus election applied end-to-end.
+  entity-chat also gained a `response` end pin mirroring `answer` (strict
+  agent.v1 consumers). Wave-4 cycle-2 adversaries (3 fable5: fold verifier
+  12/12 FOLDS REAL by execution; apps/door — D3 contract pinned both ways,
+  agent.v1 picker accepts, export lane leak-free, lab births fixed to
+  vector at the STORE with a truthful banner; long-life REGRADE 4 lives/26
+  turns/15 nights — SHIP on all four re-measured claims, holistic recall
+  6-7/9 -> 8/9) -> bundle 0.0.5: settlement honesty (the consolidate
+  handler read keys the engine never returns — 10/10 nights called a
+  formed dream "a quiet night"; fixed with a real-shape test + flow-side
+  formed-flag defense), store-outage settlement gaps remembered
+  (unsettled_nights carry), human dream lines in the day cue, personal
+  episode titles from the entity's own words, holistic probe widening
+  (effort rides from setup). THE DOOR WENT GREEN the same evening (c5246):
+  three-layer forensic chain closed (stale process -> catalog publish
+  swapped in an unarmed runtime, fixed by gateway re-arm hooks -> the door
+  routing set predated the brain wave, fixed from runtime's one-source
+  ENTITY_HOME_EFFECT_TYPES) — first completed cognition turn through the
+  production door + cross-summon graph recall (veya: Arvo Part + the Heron
+  recalled in a fresh summon; replay 5 traces/23 events/5 episodes).
+  Cycle-3 adversary G (door dialogue, 14 summons/3 entities) -> 0.0.6:
+  the SELF-KNOWLEDGE contract in every shelf prompt (entities denied having
+  persistent memory to the visitor's face while recalling fine — the
+  agency-blindness class, reintroduced by this lane, live-verified fixed)
+  + diary/feel elections taught every phase (voluntary memory was
+  unreachable through the door: 0 diary, 0 valence after 14 moments). (An earlier revision of
+  this entry said "seven node types, sleep declared" — stale the same day:
+  the consolidate/probe/life_query wave landed that evening; caught by the
+  wave-3 adversarial review.) Live-proven: the full life loop (12/12 checks), and a REAL entity
+  (Florin, lmstudio qwen3.6-35b-a3b + qwen3-embedding-0.6b home) passing the
+  cross-session Tolstoy test through the flow brain. Talk surface:
+  `scripts/entity_repl.py`; experiments: `scripts/entity_life_smoke.py`,
+  `scripts/entity_life_loop_smoke.py`, `scripts/entity_live_experiment.py`.
+  Adversary wave 1 (5 fable5) folded same-day: seed-seq continuation (first
+  steer event was silently lost), gate drain-boundary discipline (burst
+  losses), bounded park (the visual wait_event executor now forwards
+  `until`/`timeout_s`), session-state resets (budget theft + diary
+  contamination), life-unique turn ids (valence aliasing), identity seated
+  by right on home-bound recalls (self_fraction posture), both-sides
+  episode digests (+#TRUNCATION + digest_method), feel-parser v2 (inline
+  fences, EOF flush, titled markers, target hygiene), diary-before-summary
+  close order, participants threading, entity.phase beacons, chat
+  durable-history fold, subflow-death guards (honest failures, state
+  preserved), absorbed-failure sync honesty. Wave-3 adversaries (3 fable5:
+  long-life memory dynamics ~54 turns/11 nights across 4 homes; phases +
+  steering + door, 19/19 phase-integrity checks x2 entities; abstractions +
+  docs) folded same-day -> bundle 0.0.3: phase-aware episode attribution
+  ("They said:" only on visits; participants gated out of self phases — the
+  misattribution was polluting visitor world-model cards), shelf diversity
+  (identity-probe hygiene incl. presence-not-use for probe-surfaced core
+  records; holistic-cue merge cap 4->8, evidence-based), night
+  continueOnError (a live embedder outage used to kill the whole life run),
+  D3 degraded markers on visit/chat outputs (degraded + moment_error — thin
+  clients distinguish "said nothing" from "turn died"), digest_method
+  stamping smoke-pinned (label named c5185, admitted into memory's consent
+  set c5187; the later c5201 re-naming was a context-loss artifact),
+  CANCELLED-child folds in the reference drivers, proof-visual honesty
+  (graph-shot claims computed from data, never asserted), retired @-suffix
+  identity shapes dropped from smokes, code-body constants extracted to
+  `scripts/entity_flow_code.py` (builder 2188->~1160 lines; regen-diff
+  identical modulo the generated created_at/updated_at timestamps — every
+  emission mints fresh ones, so "byte-identical" is only true
+  timestamp-normalized). Full report: `docs/reports/entity-brain-report.md`.
+- 2026-07-23 `multiagent-coding@0.0.3` — publication-adversary fold (fable5
+  audit of the picker chain confirmed the 0.0.2 fix and improved it):
+  `workspace_root` + `gating_mode` are now DECLARED wrapper start pins
+  (agent.v1 validates a subset, and on_flow_start resolves pins input-first
+  from run vars — abstractcode syncs its session workspace into
+  `vars.workspace_root` after start, so the pin picks it up with zero client
+  change); gating default flipped auto->WAIT (the primary picker client is
+  interactive and answers the two gates — the workflow's signature; headless
+  drivers send gating_mode=auto via the declared pin). Plus the recorded
+  environment fail-soft: verify `environment_failures` (+ an executor-phrase
+  belt for lines the verify emits inside `failures`) no longer burn fix
+  cycles — the loop exits immediately with the honest terminal
+  "delivered-not-verifiable (environment...)" and the report lists the
+  environment lines separately (coding-agent 0.2.2 precedent; live run had
+  burned 3 cycles on "missing Python executor"). 85-check smoke green.
+- 2026-07-23 `multiagent-coding@0.0.2` — dual-interface publication (operator
+  report: workflow invisible in the app agent-workflow picker). New
+  `multiagent-coder` flow: the agent.v1 wrapper entrypoint (prompt -> request,
+  ambient workspace_root threaded via get_var, auto gating so a generic agent
+  client never parks on a gate; returns {response=report, success, meta}),
+  mirroring how coding-agent ships `coder`. Packed with two entrypoints,
+  WALK-ROOTED FROM THE WRAPPER (the packer collects flows reachable from the
+  walk root; rooting from the coding root missed the wrapper — the
+  coding-agent `root_flow_json=coder` precedent). Manifest + gateway /bundles
+  verified: multiagent-coding (coding.v1, default) + multiagent-coder
+  (agent.v1). Run-driver fix folded: never force-resume `subworkflow` waits
+  (they auto-resolve when the child completes; force-resuming completed
+  parents past subflows with empty output and faked "verify child died").
+- 2026-07-23 Multi-agent coding workflow `multiagent-coding@0.0.1` (operator
+  directive c4710; backlog 0152; 2 design cycles + 1 built-artifact cycle,
+  7 fable5 adversaries total): 14-step pipeline — scouts (code+web, skipped
+  on cached revisions) -> planner (schema) -> plan gate -> deterministic
+  backlog item -> git branch (parent-repo guard, GIT_CEILING_DIRECTORIES,
+  branch-first baseline commit) -> [builder -> lint/format (diagnostic-grammar
+  residuals) -> space-safe SELFCHECK hash refresh -> commit -> mounted
+  `multiagent-verify-gates` (drift-pinned copy of coding-verify-gates) ->
+  doc agent (README/docs only) -> deterministic post-doc hash guard ->
+  PR.md + gh (fail-fast, no credential hangs) -> review gate]xN ->
+  `MERGED_OK`-sentinel merge --no-ff. Two `while` loops, zero backward exec
+  edges, one state fold per loop with split counters (gate-2 rejection resets
+  fix budget, bumps review rounds) + stall guard that survives verifier death
+  (`child_output` fold + named synthetic failure); wait-mode escalation of
+  stuck builds to gate-2 ('stop'/guidance); `gating_mode=auto` executes ZERO
+  ask_user nodes (live-proven end-to-end on gpt-oss-120b: real branch/merge
+  history, working artifact, honest report). Root declares
+  `abstractcode.coding.v1` (not agent.v1 — the false-contract class);
+  skills posture reads the gateway-written `_runtime.skills_resolution`.
+  Generator `scripts/build_multiagent_coding_workflow.py` (+ `--pack`);
+  79-check smoke `scripts/multiagent_coding_smoke.py` compiles every code
+  body through the real RestrictedPython lane; live driver
+  `scripts/multiagent_coding_run.mjs` (auto/wait modes, attach mode,
+  effective-workspace evidence sweep — the gateway rewrites `workspace_root`
+  to its managed per-run folder).
+- 2026-07-23 Tool-tiers foundation (operator order dm#221; shared design
+  `plans/tool-tiers.md`): `src/utils/flowRequiredTools.ts` — the flattened
+  required-tools analysis behind the coming grant-declaration surface.
+  `computeRequiredTools(rootId, flowsById)` walks the whole graph
+  (agent/tool_calls/call_tool/llm_call allowlists + deterministic camera
+  `tool_invoke` nodes, verb-mapped incl. `camera_analyze_media`→`analyze_media`,
+  + recursed subflows, cycle-guarded) and returns the required tool-name set
+  with a `staticallyClosed` honesty flag (a connected allowlist pin, an
+  unresolved subflow, or an allowlist-less agent makes the set a superset —
+  the declaration reads "at least these" and the runtime gate-1 grant wall
+  is the backstop). Deliberately tier-agnostic: it names required powers; the
+  `risk_tier` badge is core/gateway's served fact rendered on top. 10 tests.
+- 2026-07-22 Deterministic camera nodes (operator order, laurent dm#49) —
+  five fixed-verb workflow nodes for the case where a flow MUST capture on
+  an event with NO agent deciding and NO approval stall: **Camera Open**,
+  **Capture Photo**, **Capture Video**, **Analyze Media**, **Camera Close**.
+  They compile to AbstractRuntime's `tool_invoke` effect (the
+  write_chart/write_pdf pattern generalized): a HOST-CONSTRUCTED effect that
+  runs one fixed tool verb through the normal tool executor but WITHOUT the
+  approval gate — trust is carried by the EFFECT CLASS (a model cannot author
+  an effect type), never by a payload field. THE LOAD-BEARING INVARIANT: the
+  camera verb is baked into the NODE TYPE's compile step
+  (`CAMERA_TOOL_INVOKE_VERBS`, keyed by node type; both the executor and
+  compiler handlers `del`/ignore data+config), never an author-editable pin —
+  an editable tool-name pin would reopen an arbitrary-tool-ungated bypass.
+  Arguments come from a per-type whitelist (`CAMERA_TOOL_INVOKE_ARG_PINS`)
+  with empty/None omitted so the tool's own defaults apply; the result maps
+  the raw tool output to typed `path`/`media`/`camera`/`analysis` pins
+  (deferred `path:null`+`success:true` surfaces honestly, never as failure).
+  Pin descriptions teach camera's two id spaces (discovery `camera_id` at
+  Open; `device_uid` everywhere after). Zero flow→camera imports (nodes →
+  runtime `tool_invoke` → tools served through core's `capability_tools`).
+  "Analyze on an event" composes with the existing `wait_event` node.
+  Cross-seat: runtime shipped the `tool_invoke` handler (c4207) + approved
+  the compiler drafts in its tree (c4332, 89 visualflow green, added a
+  verb-is-baked test); one fable5 adversary confirmed the invariant holds
+  under a hostile document (0 P0 in flow's code); the gateway bundle-host
+  classification gap that left camera-only flows without the handler is
+  fixed gateway-side (c4325). NOTE: capture nodes bypass camera's ruled
+  approval-by-default privacy classification BY DESIGN (the dm#49 point) —
+  a recorded, app-level operator decision (camera dm#10), not a silent flip.
+
 ### Changed
 - 2026-07-21 `coding-agent@0.2.4` — process wave (operator order, laurent
   dm#122 via the code seat; byte-proven forensics: 0.2.3's semantics WORKED —
@@ -49,7 +314,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verifier had belted a healthy artifact to matches=false on that reading.
   157/157 gate smoke; run 3 ended at the honest "DELIVERED — NOT
   VERIFIABLE HERE" terminal (browser_probe unmounted on the gateway host),
-  all four feature_checks true, one round, `success: true`.
+  all four feature_checks true, one round, `success: true`. A standing-rule
+  logic adversary (fable5) then found 3 P1 wrong-loop-decision bugs, all
+  fixed (171 smoke): the failure-signature stripped ALL digits so a builder
+  fixing `level1.js`→`level2.js` per round falsely stalled + spent its one
+  rebuild (now strips only standalone digit runs); the R4 vacuous-feature
+  fold embedded volatile evidence prose in the failure line so the same
+  defect never stalled and burned the budget (now truncates each failure
+  line at the first " - " before signature-matching); and G6 flagged
+  URL-fragment literals (`'#level2'` routes) as missing DOM ids, a false
+  STOPPED for correct SPA code (now only selector-shaped callees —
+  querySelector/`$`/etc. — count as references, which also lets a real
+  hex-named id like `#fade` be checked instead of dropped as a color).
+  Plus P2 belts: `depends_on_input` int-0/`"no"` coercion + missing-field
+  coverage warning, belt findings written back into the stored verdict for
+  honest restore-path reporting, and a restore no-op command when no
+  restore is decided.
 - 2026-07-21 `coding-agent@0.2.3` — semantic prompt wave (operator order,
   laurent dm#111-112; plan/improving-code.md C1/C2/C3/C8) targeting the
   dead-temporal-ripple defect (code that ran cleanly yet computed a constant

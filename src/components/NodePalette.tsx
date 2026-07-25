@@ -31,7 +31,8 @@ const PALETTE_SECTIONS: { key: string; label: string; icon: string; categories: 
   { key: 'values', label: 'Values & Schema', icon: '&#x270F;', categories: ['literals', 'schema'] },
   { key: 'files', label: 'Files & Artifacts', icon: '&#x1F4C1;', categories: ['files', 'artifacts'] },
   { key: 'media', label: 'Media', icon: '&#x1F3A8;', categories: ['media'] },
-  { key: 'memory', label: 'Memory', icon: '&#x1F9E0;', categories: ['memory'] },
+  { key: 'memory', label: 'Memory', icon: '&#x1F4BE;', categories: ['memory'] },
+  { key: 'entity', label: 'Entity Mind', icon: '&#x1F9E0;', categories: ['entity'] },
   { key: 'math', label: 'Math', icon: '&#x1F522;', categories: ['math'] },
 ];
 

@@ -1,11 +1,24 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-07-21
+- Updated: 2026-07-22
 - Planned: 0
 - Proposed: 40
-- Completed: 52
+- Completed: 53
 - Deprecated: 0
+
+## 2026-07-22 deterministic camera nodes (0151)
+Item 0151 (`abstractflow-0151`): operator order (laurent dm#49) — five
+fixed-verb camera nodes (Open/Capture Photo/Capture Video/Analyze Media/Close)
+compiling to runtime's `tool_invoke` effect (write_chart pattern generalized:
+host-constructed effect, capture runs ungated because trust rides the EFFECT
+CLASS, never a forgeable payload field). Verb baked into the node type, never
+an editable pin (the load-bearing anti-forgery invariant, adversary-proven
+under a hostile doc). tsc/nodes-test/audit/compile green; runtime owner-review
+approved (c4332, 89 visualflow green); gateway bundle-host classification gap
+fixed (c4325). Live proof + operator receipt pending the gateway bounce +
+`analyze_media` served. Capture bypasses camera's approval-by-default BY
+DESIGN — a recorded operator decision (dm#10), named to laurent.
 
 ## 2026-07-21 coding-agent 0.2.4 process wave (0150)
 Item 0150 (`abstractflow-0150`): operator order (laurent dm#122 via code;

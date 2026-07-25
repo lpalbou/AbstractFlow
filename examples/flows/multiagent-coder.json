@@ -1,0 +1,606 @@
+{
+  "id": "multiagent-coder",
+  "name": "Multi-agent coder",
+  "description": "Chat-agent entrypoint for the multi-agent coding pipeline (scouts -> plan -> gates -> build/verify loop -> docs -> PR -> merge). Defaults to gating_mode=wait: interactive clients answer TWO ask_user gates (plan approval, merge approval). Unattended clients must send gating_mode=auto and input_data._runtime.tool_policy = {\"auto_approve_tools\": [\"execute_command\"]} (or drive approvals externally). workspace_root resolves from the session workspace var or input_data; an empty workspace is refused at preflight (this workflow writes files and runs git).",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Prompt",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "",
+          "workspace_root": "",
+          "gating_mode": "wait"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "map_input",
+      "type": "code",
+      "position": {
+        "x": -560,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Map prompt -> request",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "p = str(prompt or \"\").strip()\nws = str(workspace_root or \"\").strip()\ng = str(gating_mode or \"wait\").strip().lower()\nif g not in (\"wait\", \"auto\"):\n    g = \"wait\"\nbuilt = {\n    \"request\": p,\n    \"workspace_root\": ws,\n    \"provider\": provider,\n    \"model\": model,\n    \"gating_mode\": g,\n    \"browser_probe_available\": False,\n}\nreturn {\"built\": built}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "build",
+      "type": "subflow",
+      "position": {
+        "x": -220,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Run multi-agent coding",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "multiagent-coding"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_report",
+      "type": "get",
+      "position": {
+        "x": 140,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get report",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "report",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_success",
+      "type": "get",
+      "position": {
+        "x": 140,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get success",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "success",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_branch",
+      "type": "get",
+      "position": {
+        "x": 140,
+        "y": 240
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get branch",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "branch",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_reason",
+      "type": "get",
+      "position": {
+        "x": 500,
+        "y": 240
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get stopped_reason",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "stopped_reason",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta_obj",
+      "type": "make_object",
+      "position": {
+        "x": 500,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Build meta",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "branch",
+            "label": "branch",
+            "type": "string"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 860,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-build-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "build",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-build-exec-out-end-exec-in",
+      "source": "build",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-map_input-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "map_input",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-map_input-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "map_input",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-gating_mode-map_input-gating_mode",
+      "source": "start",
+      "sourceHandle": "gating_mode",
+      "target": "map_input",
+      "targetHandle": "gating_mode",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-map_input-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "map_input",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-map_input-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "map_input",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-map_input-built-build-input",
+      "source": "map_input",
+      "sourceHandle": "built",
+      "target": "build",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_report-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_report",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_success-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_success",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_branch-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_branch",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_reason-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_reason",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_branch-value-meta_obj-branch",
+      "source": "get_branch",
+      "sourceHandle": "value",
+      "target": "meta_obj",
+      "targetHandle": "branch",
+      "animated": false
+    },
+    {
+      "id": "e-get_reason-value-meta_obj-stopped_reason",
+      "source": "get_reason",
+      "sourceHandle": "value",
+      "target": "meta_obj",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-get_report-value-end-response",
+      "source": "get_report",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-get_success-value-end-success",
+      "source": "get_success",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-meta_obj-result-end-meta",
+      "source": "meta_obj",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-23T20:38:04.037937+00:00",
+  "updated_at": "2026-07-23T20:38:04.037937+00:00"
+}

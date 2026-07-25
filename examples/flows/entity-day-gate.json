@@ -1,0 +1,224 @@
+{
+  "id": "entity-day-gate",
+  "name": "Entity — The Day Gate",
+  "description": "What does this moment call for? The MASTER hands in its durable inbox + life state; the gate drains by cursor and decides: stop > close-the-open-visit > visit > work > granted personal > the maintenance nap > park. One mailbox, one consumer.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 80,
+        "y": 240
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Gate consult",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "inbox",
+            "label": "inbox",
+            "type": "array"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate",
+      "type": "code",
+      "position": {
+        "x": 400,
+        "y": 240
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "THE DAY GATE (stop > close > visit > work > personal > sleep)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "inbox",
+            "label": "inbox",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# THE DAY GATE: what does this moment call for?\n# ONE MAILBOX, ONE CONSUMER: the master's inbox is drained here (cursor\n# semantics), and ONLY here. Priority: stop > close the open visit session\n# (goodbye, or a different call while a session is open) > visit > work >\n# granted personal > the maintenance nap > park.\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: code nodes are volatile (re-evaluated per data pull), so\n# inputs must NEVER be mutated in place — copy before writing.\nstate = dict(state)\ninbox = _input.get(\"inbox\")\nif not isinstance(inbox, list):\n    inbox = []\ncursor = state.get(\"inbox_cursor\")\nif not isinstance(cursor, int):\n    cursor = 0\n\nvisitor_message = \"\"\ngoodbye = 0\ntask = \"\"\npersonal_granted = state.get(\"personal_granted\")\nif not isinstance(personal_granted, int):\n    personal_granted = 0\nstop = 0\n\n# DRAIN-BOUNDARY DISCIPLINE (adversary P0/P1: burst losses): the gate\n# consumes at most ONE phase-DETERMINING event per consult (visit message,\n# goodbye, stop) and stops the drain there — later events stay beyond the\n# cursor for the next gate, so a goodbye+hello burst never closes over an\n# unanswered message and a second task is deferred, never dropped.\nfor env in inbox:\n    if not isinstance(env, dict):\n        continue\n    seq = env.get(\"seq\")\n    if not isinstance(seq, int):\n        continue\n    if seq <= cursor:\n        continue\n    payload = env.get(\"payload\")\n    if not isinstance(payload, dict):\n        payload = {}\n    kind = str(payload.get(\"kind\") or \"\")\n    if kind == \"visit\":\n        cursor = seq\n        visitor_message = str(payload.get(\"message\") or \"\")\n        break\n    if kind == \"goodbye\":\n        cursor = seq\n        goodbye = 1\n        break\n    if kind == \"stop\":\n        cursor = seq\n        stop = 1\n        break\n    if kind == \"task\":\n        already_pending = str(state.get(\"pending_task\") or \"\")\n        if task or already_pending:\n            # A task while one is captured OR PENDING is deferred (cursor\n            # stays before it) — consuming it would overwrite an unlived\n            # task (wave-2 probe: TASK-ONE silently lost across drains).\n            break\n        cursor = seq\n        task = str(payload.get(\"task\") or \"\")\n        continue\n    cursor = seq\n    if kind == \"grant_personal\":\n        personal_granted = 1\n\ncarried_stop = state.get(\"stop_requested\")\nif isinstance(carried_stop, int) and carried_stop == 1:\n    stop = 1\n\nstate[\"inbox_cursor\"] = cursor\nstate[\"personal_granted\"] = personal_granted\nif stop == 1:\n    state[\"stop_requested\"] = 1\n\npending_task = str(state.get(\"pending_task\") or \"\")\nif task:\n    pending_task = task\nstate[\"pending_task\"] = pending_task\n\nsession_open = state.get(\"visit_session_open\")\nif not isinstance(session_open, int):\n    session_open = 0\n\ndays = state.get(\"days_lived\")\nif not isinstance(days, int):\n    days = 0\nslept = state.get(\"slept_after_day\")\nif not isinstance(slept, int):\n    slept = 1\n\nphase = \"park\"\nif stop == 1:\n    phase = \"close_visit\" if session_open == 1 else \"stop\"\nelif goodbye == 1 and session_open == 1:\n    phase = \"close_visit\"\nelif visitor_message:\n    phase = \"visit\"\n    state[\"visit_session_open\"] = 1\nelif session_open == 1 and (pending_task or personal_granted == 1):\n    # A different call while the visitor is silent: close the session first.\n    phase = \"close_visit\"\nelif pending_task:\n    phase = \"work\"\nelif personal_granted == 1:\n    phase = \"personal\"\n    state[\"personal_granted\"] = 0\nelif session_open == 1:\n    # The conversation is alive and the visitor is quiet: wait for them\n    # (a session never sleeps out from under the visitor).\n    phase = \"park\"\nelif days > 0 and slept == 0:\n    # A lived day settles into sleep before parking (consolidation-first).\n    phase = \"sleep\"\n\nreturn {\n    \"phase\": phase,\n    \"visitor_message\": visitor_message,\n    \"task\": pending_task,\n    \"stop\": stop,\n    \"state\": state,\n}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 720,
+        "y": 240
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Decision",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "phase",
+            "label": "phase",
+            "type": "string"
+          },
+          {
+            "id": "visitor_message",
+            "label": "visitor_message",
+            "type": "string"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          },
+          {
+            "id": "stop",
+            "label": "stop",
+            "type": "boolean"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-end-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-state-gate-state",
+      "source": "start",
+      "sourceHandle": "state",
+      "target": "gate",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-inbox-gate-inbox",
+      "source": "start",
+      "sourceHandle": "inbox",
+      "target": "gate",
+      "targetHandle": "inbox",
+      "animated": false
+    },
+    {
+      "id": "e-gate-phase-end-phase",
+      "source": "gate",
+      "sourceHandle": "phase",
+      "target": "end",
+      "targetHandle": "phase",
+      "animated": false
+    },
+    {
+      "id": "e-gate-visitor_message-end-visitor_message",
+      "source": "gate",
+      "sourceHandle": "visitor_message",
+      "target": "end",
+      "targetHandle": "visitor_message",
+      "animated": false
+    },
+    {
+      "id": "e-gate-task-end-task",
+      "source": "gate",
+      "sourceHandle": "task",
+      "target": "end",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "e-gate-stop-end-stop",
+      "source": "gate",
+      "sourceHandle": "stop",
+      "target": "end",
+      "targetHandle": "stop",
+      "animated": false
+    },
+    {
+      "id": "e-gate-state-end-state",
+      "source": "gate",
+      "sourceHandle": "state",
+      "target": "end",
+      "targetHandle": "state",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-25T06:34:59.959878+00:00",
+  "updated_at": "2026-07-25T06:34:59.959878+00:00"
+}

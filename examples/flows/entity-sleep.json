@@ -1,0 +1,465 @@
+{
+  "id": "entity-sleep",
+  "name": "Entity — Sleep (consolidation night)",
+  "description": "The rest window: the engine's six-phase consolidation runs as ONE memory_consolidate call (resolution, maintenance, world models, lesson mining, identity review, dream — sleep proposes, waking disposes), then the settlement record folds its honest result. A non-run (another writer holds the home; operator pause) is a valid, honestly-reported night.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 80,
+        "y": 240
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Night falls",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "night",
+      "type": "memory_consolidate",
+      "position": {
+        "x": 380,
+        "y": 240
+      },
+      "data": {
+        "nodeType": "memory_consolidate",
+        "label": "The engine pass (six phases)",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "scopes",
+            "label": "scopes",
+            "type": "array"
+          },
+          {
+            "id": "include_dream",
+            "label": "include_dream",
+            "type": "boolean"
+          },
+          {
+            "id": "include_identity",
+            "label": "include_identity",
+            "type": "boolean"
+          },
+          {
+            "id": "report_only",
+            "label": "report_only",
+            "type": "boolean"
+          },
+          {
+            "id": "max_candidates",
+            "label": "max_candidates",
+            "type": "number"
+          },
+          {
+            "id": "scan_limit",
+            "label": "scan_limit",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "ran",
+            "label": "ran",
+            "type": "boolean"
+          },
+          {
+            "id": "reason",
+            "label": "reason",
+            "type": "string"
+          },
+          {
+            "id": "dream_record_id",
+            "label": "dream_record_id",
+            "type": "string"
+          },
+          {
+            "id": "maintenance_candidates",
+            "label": "maintenance_candidates",
+            "type": "array"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "include_dream": true,
+          "include_identity": true
+        },
+        "effectConfig": {
+          "continueOnError": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prep",
+      "type": "code",
+      "position": {
+        "x": 680,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold the night honestly",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "night",
+            "label": "night",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# The night, WIRED (runtime shipped memory_consolidate 2026-07-24): the\n# engine's six-phase pass ran — fold its honest result into the settlement\n# record. A non-run ({ran: false, reason: lease-held/paused}) is a VALID\n# night, reported as such (never faked).\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: code nodes are volatile (re-evaluated per data pull), so\n# inputs must NEVER be mutated in place — copy before writing.\nstate = dict(state)\nnight = _input.get(\"night\")\nif not isinstance(night, dict):\n    night = {}\ndays = state.get(\"days_lived\")\nif not isinstance(days, int):\n    days = 0\n\nran = 1 if night.get(\"ran\") else 0\ndream_id = str(night.get(\"dream_record_id\") or \"\")\ncands = night.get(\"maintenance_candidates\")\nn_cands = len(cands) if isinstance(cands, list) else 0\nreason = str(night.get(\"reason\") or \"\")\n# ABSORBED FAILURE (wave-3 adversary A, P1-3): the night node runs with\n# continueOnError — a mid-life engine death (live case: embedder HTTP 400\n# during an LMStudio outage) lands {ok: false, absorbed_failure} here\n# instead of killing the whole life run. It folds as a failed-not-skipped\n# night: honest settlement record, life continues, next night retries.\nfailed_err = \"\"\nif night.get(\"ok\") is False or \"absorbed_failure\" in night:\n    ran = 0\n    failed_err = str(night.get(\"absorbed_failure\") or night.get(\"error\") or \"engine pass failed\")\n\nif ran == 1:\n    digest = \"The night ran the consolidation pass over day \" + str(days) + \".\"\n    # DEFENSE IN DEPTH (wave-4 adversary E, F1): key on the engine's\n    # `formed` flag FIRST — when a handler fold drops the id, the\n    # settlement must still say a dream formed, never \"a quiet night\"\n    # over a real dream (10/10 nights were false-negative before).\n    formed_flag = 1 if night.get(\"formed\") else 0\n    if dream_id:\n        digest = digest + \" A dream formed (\" + dream_id + \") — interpretation belongs to waking.\"\n    elif formed_flag == 1:\n        digest = digest + \" A dream formed — interpretation belongs to waking.\"\n    else:\n        digest = digest + \" A quiet night: no dream tonight.\"\n    if n_cands > 0:\n        digest = digest + \" \" + str(n_cands) + \" maintenance candidate(s) proposed for review.\"\n    report = \"night \" + str(days) + \": engine pass ran; dream=\" + (dream_id or \"none\") + \"; candidates=\" + str(n_cands)\nelif failed_err:\n    digest = (\"The night's consolidation pass FAILED over day \" + str(days) +\n              \" (\" + failed_err + \") — the rest window still closed the day; the next night retries.\")\n    report = \"night \" + str(days) + \": pass FAILED (\" + failed_err + \")\"\nelse:\n    digest = \"A rest window closed day \" + str(days) + \" without the engine pass (\" + (reason or \"no engine\") + \").\"\n    report = \"night \" + str(days) + \": pass did not run (\" + (reason or \"unknown\") + \")\"\n\n# F2 (wave-4 adversary E): a store-outage night could not write its own\n# settlement — the gap rides state.unsettled_nights (written by the\n# settle-check fold) and the NEXT healthy settlement names it here, then\n# clears it. The honest target is \"the next record mentions the missed\n# one\", never \"write anyway\" while the store is down.\nunsettled = state.get(\"unsettled_nights\")\nif isinstance(unsettled, list) and unsettled:\n    named = \", \".join([str(u) for u in unsettled])\n    digest = digest + (\" Earlier night(s) \" + named + \" closed without a settlement\"\n                       \" record (the store was unreachable) — this record stands for them.\")\n    state[\"unsettled_nights\"] = []\n\nif ran == 1:\n    pass_state = \"ran\"\nelif failed_err:\n    pass_state = \"failed\"\nelse:\n    pass_state = \"skipped\"\nattrs = {\"night\": days, \"engine_pass\": pass_state,\n         \"digest_method\": \"mechanical-flow-v1\"}\nif isinstance(unsettled, list) and unsettled:\n    attrs[\"stands_for_nights\"] = unsettled\nif dream_id:\n    attrs[\"dream_record_id\"] = dream_id\nif reason:\n    attrs[\"skip_reason\"] = reason\nif failed_err:\n    attrs[\"failure\"] = failed_err\n\nrecords = [{\n    \"kind\": \"observation\",\n    \"title\": \"night \" + str(days),\n    \"digest\": digest,\n    \"attributes\": attrs,\n}]\nreturn {\n    \"records\": records,\n    \"turn_id\": \"night-d\" + str(days),\n    \"report\": report,\n    \"state\": state,\n}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "marker",
+      "type": "memory_form",
+      "position": {
+        "x": 680,
+        "y": 360
+      },
+      "data": {
+        "nodeType": "memory_form",
+        "label": "The night settlement forms",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "records",
+            "label": "records",
+            "type": "array"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "turn_id",
+            "label": "turn_id",
+            "type": "string"
+          },
+          {
+            "id": "idempotency_key",
+            "label": "idempotency_key",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "record_ids",
+            "label": "record_ids",
+            "type": "array"
+          },
+          {
+            "id": "formed",
+            "label": "formed",
+            "type": "number"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "scope": "life"
+        },
+        "effectConfig": {
+          "continueOnError": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "settle_check",
+      "type": "code",
+      "position": {
+        "x": 1000,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "The gap is remembered (F2)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          },
+          {
+            "id": "marker_result",
+            "label": "marker_result",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# F2 (wave-4 adversary E): when the settlement's OWN formation dies (store\n# outage — the marker node runs with continueOnError), the sleep child must\n# still complete AND the gap must be remembered: unsettled_nights rides the\n# life state; the next healthy settlement names it and clears the list.\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: copy before writing.\nstate = dict(state)\nres = _input.get(\"marker_result\")\nabsorbed = 1 if (isinstance(res, dict) and (res.get(\"ok\") is False or \"absorbed_failure\" in res)) else 0\nif absorbed == 1:\n    days = state.get(\"days_lived\")\n    if not isinstance(days, int):\n        days = 0\n    lst = state.get(\"unsettled_nights\")\n    lst = list(lst) if isinstance(lst, list) else []\n    lst.append(days)\n    state[\"unsettled_nights\"] = lst\nreturn {\"state\": state, \"unsettled\": absorbed}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1000,
+        "y": 360
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Morning",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-night-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "night",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-night-exec-out-marker-exec-in",
+      "source": "night",
+      "sourceHandle": "exec-out",
+      "target": "marker",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-marker-exec-out-end-exec-in",
+      "source": "marker",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-state-prep-state",
+      "source": "start",
+      "sourceHandle": "state",
+      "target": "prep",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-night-result-prep-night",
+      "source": "night",
+      "sourceHandle": "result",
+      "target": "prep",
+      "targetHandle": "night",
+      "animated": false
+    },
+    {
+      "id": "e-prep-records-marker-records",
+      "source": "prep",
+      "sourceHandle": "records",
+      "target": "marker",
+      "targetHandle": "records",
+      "animated": false
+    },
+    {
+      "id": "e-prep-turn_id-marker-turn_id",
+      "source": "prep",
+      "sourceHandle": "turn_id",
+      "target": "marker",
+      "targetHandle": "turn_id",
+      "animated": false
+    },
+    {
+      "id": "e-prep-report-end-report",
+      "source": "prep",
+      "sourceHandle": "report",
+      "target": "end",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-prep-state-settle_check-state",
+      "source": "prep",
+      "sourceHandle": "state",
+      "target": "settle_check",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-marker-result-settle_check-marker_result",
+      "source": "marker",
+      "sourceHandle": "result",
+      "target": "settle_check",
+      "targetHandle": "marker_result",
+      "animated": false
+    },
+    {
+      "id": "e-settle_check-state-end-state",
+      "source": "settle_check",
+      "sourceHandle": "state",
+      "target": "end",
+      "targetHandle": "state",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-25T06:34:59.960260+00:00",
+  "updated_at": "2026-07-25T06:34:59.960260+00:00"
+}

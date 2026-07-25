@@ -1004,6 +1004,418 @@ const CORE_NODES: NodeTemplate[] = [
     deprecated: true,
     hiddenInPalette: true,
   },
+  // Deterministic camera nodes — fixed-verb tool_invoke effects. The camera
+  // tool verb is baked into the node type by the compiler; there is no
+  // tool-name pin by design (an editable verb would bypass tool approval).
+  {
+    type: 'camera_open',
+    icon: '&#x1F4F7;', // Camera
+    label: 'Camera Open',
+    description: 'Deterministically turn a camera on (no agent, no approval). Returns the device uid all other camera nodes use.',
+    headerColor: '#16A085', // Teal - IO/tools
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'camera_id', label: 'camera_id', type: 'string', description: 'Discovery id from Camera List (empty = default device).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'camera', label: 'camera', type: 'string', description: 'Device uid for downstream camera nodes.' },
+      { id: 'result', label: 'result', type: 'any' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
+  },
+  {
+    type: 'camera_capture_photo',
+    icon: '&#x1F4F7;', // Camera
+    label: 'Capture Photo',
+    description: 'Deterministically take one photo now (no agent, no approval) and wait for the file. Returns the file path + a media ref wireable into Analyze Media or an LLM/Agent node.',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'camera', label: 'camera', type: 'string', description: 'Device uid from Camera Open.' },
+      { id: 'timeout_s', label: 'timeout_s', type: 'number', description: 'Max seconds to wait for the file (default 30).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'path', label: 'path', type: 'string', description: 'Captured image path (null on an honest deferred/on-device note).' },
+      { id: 'media', label: 'media', type: 'array', description: 'Media refs for downstream analysis.' },
+      { id: 'result', label: 'result', type: 'any' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
+  },
+  {
+    type: 'camera_capture_video',
+    icon: '&#x1F3A5;', // Movie camera
+    label: 'Capture Video',
+    description: 'Deterministically record a video clip (0.5-600s, no agent, no approval) and wait for the file.',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'camera', label: 'camera', type: 'string', description: 'Device uid from Camera Open.' },
+      { id: 'duration_s', label: 'duration_s', type: 'number', description: 'Clip length in seconds (default 5).' },
+      { id: 'timeout_s', label: 'timeout_s', type: 'number', description: 'Max seconds to wait for the file.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'path', label: 'path', type: 'string', description: 'Clip path (may be null when the body keeps the movie on its own storage).' },
+      { id: 'media', label: 'media', type: 'array', description: 'Media refs for downstream analysis.' },
+      { id: 'result', label: 'result', type: 'any' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
+  },
+  {
+    type: 'camera_analyze_media',
+    icon: '&#x1F50D;', // Magnifier
+    label: 'Analyze Media',
+    description: 'Deterministically analyze an image/video with the vision capability (no agent, no approval). Wire a captured path in; get a text description out.',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'file_path', label: 'file_path', type: 'string', description: "Path to the media to analyze (wire from Capture Photo/Video's path)." },
+      { id: 'question', label: 'question', type: 'string', description: 'Optional question to focus the analysis.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'analysis', label: 'analysis', type: 'string', description: "The vision model's description/answer." },
+      { id: 'result', label: 'result', type: 'any' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
+  },
+  {
+    type: 'camera_close',
+    icon: '&#x1F4F7;', // Camera
+    label: 'Camera Close',
+    description: 'Deterministically turn the camera off and release the device (no agent, no approval).',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'camera', label: 'camera', type: 'string', description: 'Device uid from Camera Open (empty = active camera).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'result', label: 'result', type: 'any' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
+  },
+];
+
+// Entity mind nodes — first-class MEMORY_*/DIARY_* effects over an ENTITY's
+// home (identity + memory graph + diary + valence). These resolve ONLY inside
+// a stamped entity runtime (the gateway door / open_entity_runtime binds the
+// handlers to one home); on a plain runtime they fail loudly. Authorship is
+// carried by the CHANNEL, never a pin — no node has an "entity" input by
+// design (the deposit-gate rule). Together they animate the entity cognition
+// graph (GET /api/gateway/entities/spec/cognition-graph) as visual subflows.
+const ENTITY_NODES: NodeTemplate[] = [
+  {
+    type: 'memory_recall',
+    icon: '&#x1F9E0;', // Brain
+    label: 'Memory Recall',
+    description:
+      "Reconstruct the entity's working memory for a cue (passive recall). PURE READ — nothing strengthens until Memory Commit. Identity is present by right (self seats); cue-free reads are legal only as self-core reads.",
+    headerColor: '#7D3C98', // Violet — entity mind
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'cue_text', label: 'cue_text', type: 'string', description: 'The stimulus cue (what arrived). Keep it SHORT — long cues dilute the reach.' },
+      { id: 'scopes', label: 'scopes', type: 'array', description: 'Scope ladder, e.g. ["self","diary","life"] (default: the run\'s session scope).' },
+      { id: 'view', label: 'view', type: 'string', description: "'working_set' (default) or 'shelf'." },
+      { id: 'effort', label: 'effort', type: 'string', description: "Budget preset: 'light' | 'standard' | 'deep' (ignored when budget is wired)." },
+      { id: 'budget', label: 'budget', type: 'object', description: 'Explicit RecallBudget fields (self_fraction, shelf size, token budget...).' },
+      { id: 'participants', label: 'participants', type: 'array', description: 'Who is present (person:/entity: ids) — drives shared-context scoring.' },
+      { id: 'anchor_record_ids', label: 'anchor_record_ids', type: 'array', description: 'Deliberate reach: recall around these records.' },
+      { id: 'turn_id', label: 'turn_id', type: 'string', description: 'Turn correlation id (derives the replay-safe trace id).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'handles', label: 'handles', type: 'array', description: 'Admitted memory handles (working_set view): record ids + digests + admission labels.' },
+      { id: 'trace_id', label: 'trace_id', type: 'string', description: 'Wire into Memory Commit after the turn uses the memories.' },
+      { id: 'as_of_seq', label: 'as_of_seq', type: 'number', description: 'Journal high-water mark of this reconstruction.' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'memory_commit',
+    icon: '&#x1FAA8;', // Rock (the trail deposits)
+    label: 'Memory Commit',
+    description:
+      'Deposit the involuntary usage trail: commit which recalled memories the turn ACTUALLY used. The ONLY strengthening path (selected + co-use pair trails). Empty selection = honest no-op.',
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'trace_id', label: 'trace_id', type: 'string', description: 'From Memory Recall.' },
+      { id: 'used_record_ids', label: 'used_record_ids', type: 'array', description: 'The record ids the turn actually used.' },
+      { id: 'prompt_token_estimate', label: 'prompt_token_estimate', type: 'number' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'committed', label: 'committed', type: 'number' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'memory_form',
+    icon: '&#x1F331;', // Seedling (formation)
+    label: 'Memory Form',
+    description:
+      "Land typed records in the entity's graph (episode/summary/lesson/interest/world-model...). Verbatim text goes to the artifact store; the graph keeps the digest. turn_id is REQUIRED (replay-safe idempotency).",
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'records', label: 'records', type: 'array', description: 'Record dicts: {kind, title, digest, keywords?, edges?, verbatim?, attributes?...}.' },
+      { id: 'scope', label: 'scope', type: 'string', description: "Scope name (e.g. 'self' | 'life' | session scope; default: the run's scope)." },
+      { id: 'turn_id', label: 'turn_id', type: 'string', description: 'REQUIRED: derives the content-aware idempotency key.' },
+      { id: 'idempotency_key', label: 'idempotency_key', type: 'string', description: 'Optional explicit key (wins over the derived one).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'record_ids', label: 'record_ids', type: 'array', description: 'Graph ids of the formed records.' },
+      { id: 'formed', label: 'formed', type: 'number' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'memory_adjust',
+    icon: '&#x2696;', // Balance scale
+    label: 'Memory Adjust',
+    description:
+      'Deliberate salience act on one record: reinforce / attenuate / refocus / close. Reason + turn_id are REQUIRED (deliberate acts are audited; replays stay idempotent).',
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'op', label: 'op', type: 'string', description: "'reinforce' | 'attenuate' | 'refocus' | 'close'." },
+      { id: 'record_id', label: 'record_id', type: 'string', description: 'Target record (not needed for refocus).' },
+      { id: 'reason', label: 'reason', type: 'string', description: 'REQUIRED: why this deliberate act.' },
+      { id: 'weight', label: 'weight', type: 'number', description: 'Salience weight (1-25).' },
+      { id: 'ttl_activity', label: 'ttl_activity', type: 'number', description: 'Bounds a refocus (ttl_activity, NOT ttl — the misnamed pin silently inverted a bounded refocus into never-expires).' },
+      { id: 'scope', label: 'scope', type: 'string', description: 'Scope name.' },
+      { id: 'turn_id', label: 'turn_id', type: 'string', description: 'REQUIRED: replay idempotency.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'memory_appraise',
+    icon: '&#x2764;', // Heart (feelings)
+    label: 'Memory Appraise',
+    description:
+      'Elected feeling toward a target (person:/tool:/idea:/record id): signed valence, routine band ±1..3, clamped loudly. Also heals scars / breaks bonds (marker lifecycle). Reason + turn_id REQUIRED.',
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'op', label: 'op', type: 'string', description: "'appraise' (default) | 'heal_scar' | 'break_bond' | gradation reads." },
+      { id: 'target_id', label: 'target_id', type: 'string', description: "Namespace-prefixed target ('person:laurent', 'idea:...', or a record id)." },
+      { id: 'sign', label: 'sign', type: 'number', description: '+1 or -1.' },
+      { id: 'magnitude', label: 'magnitude', type: 'number', description: 'Routine band 1..3 (higher needs the entity-reflection/operator channel).' },
+      { id: 'reason', label: 'reason', type: 'string', description: 'REQUIRED: why it felt this way.' },
+      { id: 'turn_id', label: 'turn_id', type: 'string', description: 'REQUIRED for op=appraise.' },
+      { id: 'scope', label: 'scope', type: 'string', description: "Scope name (the shipped turn pins scope='self' — feelings are identity-plane)." },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'diary_write',
+    icon: '&#x1F4D6;', // Open book
+    label: 'Diary Write',
+    description:
+      "Append one entry to the entity's book (the elected, conscious history — sole-author, hash-chained, never purged). visibility 'self' projects an act-frame digest into the graph; 'private' stays chain-only. turn_id REQUIRED.",
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'text', label: 'text', type: 'string', description: 'Full first-person prose, verbatim (never truncated).' },
+      { id: 'gist', label: 'gist', type: 'string', description: 'Entity-authored one-line digest for the projection.' },
+      { id: 'kind', label: 'kind', type: 'string', description: "'note' | 'idea' | 'reflection' | 'commitment' | 'question' | 'problem' ..." },
+      { id: 'visibility', label: 'visibility', type: 'string', description: "'self' (default) or 'private' (chain only, words never leave the book)." },
+      { id: 'anchor_graph_ids', label: 'anchor_graph_ids', type: 'array', description: 'Graph ids attended at write time (written_amid edges).' },
+      { id: 'turn_id', label: 'turn_id', type: 'string', description: 'REQUIRED: derives the replay-safe entry id.' },
+      { id: 'digest_method', label: 'digest_method', type: 'string', description: "Writer-declared MECHANICAL authorship (e.g. 'mechanical-flow-v1') — set ONLY on machine-worded writes; entity-elected words never carry it." },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'entry_id', label: 'entry_id', type: 'string' },
+      { id: 'projected_record_id', label: 'projected_record_id', type: 'string', description: 'Graph projection id (visibility=self only).' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'diary_read',
+    icon: '&#x1F50E;', // Magnifier over the book
+    label: 'Diary Read',
+    description:
+      "Read one diary entry by id from the entity's book (with its re-entry key + birth trail). Reads are visible acts on the entity's home channel.",
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'entry_id', label: 'entry_id', type: 'string', description: 'The diary entry id (diary_...).' },
+      { id: 'reason', label: 'reason', type: 'string', description: 'Why this read (auditable).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'text', label: 'text', type: 'string', description: 'The entry prose.' },
+      { id: 'result', label: 'result', type: 'object', description: 'Full entry: kind, written_at, re_entry key, birth trail.' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'memory_consolidate',
+    icon: '&#x1F319;', // Crescent moon — the night
+    label: 'Memory Consolidate (sleep)',
+    description:
+      "The night: ONE engine sleep pass — dream-resolution, maintenance, world models, lesson mining, identity review, one dream (sleep proposes; waking evidence disposes). Honest non-runs return ran=false + reason (another writer holds the home; operator pause). report_only is a pure read.",
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'scopes', label: 'scopes', type: 'array', description: 'Scope ladder (default: self/diary/life).' },
+      { id: 'include_dream', label: 'include_dream', type: 'boolean', description: 'One novel dream per night (default true).' },
+      { id: 'include_identity', label: 'include_identity', type: 'boolean', description: 'Nightly identity review (default true; a short maintenance nap must not touch the self).' },
+      { id: 'report_only', label: 'report_only', type: 'boolean', description: 'Pure read — no writes (legal under a freeze).' },
+      { id: 'max_candidates', label: 'max_candidates', type: 'number' },
+      { id: 'scan_limit', label: 'scan_limit', type: 'number', description: 'Cap on records scanned by the pass.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'ran', label: 'ran', type: 'boolean', description: 'False = honest non-run (see reason).' },
+      { id: 'reason', label: 'reason', type: 'string' },
+      { id: 'dream_record_id', label: 'dream_record_id', type: 'string', description: 'The night\'s dream, when one formed.' },
+      { id: 'maintenance_candidates', label: 'maintenance_candidates', type: 'array' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'memory_probe',
+    icon: '&#x1F9ED;', // Compass — the deliberate reach
+    label: 'Memory Probe (deliberate reach)',
+    description:
+      'Active reconstruction: the entity goes looking. op=probe (cue + MANDATORY reason), expand (from record_ids), familiarity (the anti-fabrication reflex: density only, no content). Pure reads, shelf-race-exempt; strengthening still only happens at Memory Commit.',
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'op', label: 'op', type: 'string', description: "'probe' | 'expand' | 'familiarity'." },
+      { id: 'cue', label: 'cue', type: 'string', description: 'The deliberate cue (probe/familiarity).' },
+      { id: 'record_ids', label: 'record_ids', type: 'array', description: 'Roots for expand.' },
+      { id: 'reason', label: 'reason', type: 'string', description: 'MANDATORY on probe+expand (deliberate acts are audited).' },
+      { id: 'effort', label: 'effort', type: 'string', description: "'quick' | 'standard' | 'deep'." },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'hits', label: 'hits', type: 'array' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'life_query',
+    icon: '&#x1FA78;', // Drop — the pulse
+    label: 'Life Query',
+    description:
+      "Pure life reads: op=alive_drives (what is alive — open questions/interests/problems; the day-open cue), cognition_health (drive ratios), entity_card (the identity view, as_of-anchored). Being described deposits nothing.",
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'op', label: 'op', type: 'string', description: "'alive_drives' | 'cognition_health' | 'entity_card'." },
+      { id: 'k', label: 'k', type: 'number', description: 'Top-k drives (default 5).' },
+      { id: 'as_of', label: 'as_of', type: 'number', description: 'Historical anchor (entity_card).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'items', label: 'items', type: 'array', description: 'Drive items (alive_drives).' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'memory_tend',
+    icon: '&#x1F331;', // Seedling — tending
+    label: 'Memory Tend (elections)',
+    description:
+      "The ONE tend-election route shared with the chat driver: the body carries a ```tend fence VERBATIM (verbs pin/silence/refocus/heal_scar/break_bond/revisit/dispose — grammar and vocabulary stay engine-owned, one line one act, reason mandatory, ≤5 per block). Dream disposal rides dispose confirm|reject. Refusals return as DATA (shown to the author unedited); a refused election never fails the effect. Home-only (channel authority).",
+    headerColor: '#7D3C98',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'body', label: 'body', type: 'string', description: 'The tend fence body, verbatim (empty body fails loudly — gate dispatch on has_tend).' },
+      { id: 'scope', label: 'scope', type: 'string', description: "Scope name (default 'life')." },
+      { id: 'channel', label: 'channel', type: 'string', description: "The door-verified reflection channel — tending REFUSES without it (the privileged default was removed). Own-time = 'entity-reflection' by construction; the door re-verifies against the stamp." },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'applied', label: 'applied', type: 'array', description: 'Elections applied.' },
+      { id: 'refused', label: 'refused', type: 'array', description: 'Refusals — data, never a failure.' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'entity_tools_query',
+    icon: '&#x1F511;', // Key — what may I touch
+    label: 'Entity Tools (grant)',
+    description:
+      "The phase's tool grant resolves (pure read): tool_policy.yaml when the operator wrote one, the RULED per-phase defaults otherwise. Outputs the granted names (teach them in the prompt) and the native declaration specs (wire them to the llm tools pin). The grant is the ONE authority — execution re-resolves it server-side, so this node can never widen access. Home-only (channel authority).",
+    headerColor: '#B7950B',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'phase', label: 'phase', type: 'string', description: 'visit | work | personal | sleep (required).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'tools', label: 'tools', type: 'array', description: 'Granted tool names.' },
+      { id: 'specs', label: 'specs', type: 'array', description: 'Native declaration payloads for the llm tools pin.' },
+      { id: 'notes', label: 'notes', type: 'array', description: 'Grant resolution notes (legacy spellings, dropped names).' },
+      { id: 'source', label: 'source', type: 'string', description: "'policy-file' (tool_policy.yaml) or 'default' (the ruled defaults)." },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
+  {
+    type: 'entity_tools_execute',
+    icon: '&#x1F6E0;', // Hammer and wrench — the granted tools run
+    label: 'Entity Tools (execute batch)',
+    description:
+      "ONE batch of native tool calls executes under the grant (re-resolved at execution — a caller-carried list can never widen it; tier gating stays runtime-owned). Rounds live in the FLOW graph: loop llm → this node → fold results, bounded. Refusals return as marker lines shown to the mind verbatim; tools_ran carries the host-authored unique names for honest gauges (never parsed from prose). Home-only (channel authority).",
+    headerColor: '#B7950B',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'tool_calls', label: 'tool_calls', type: 'array', description: "The model reply's native tool_calls list (wire shape)." },
+      { id: 'phase', label: 'phase', type: 'string', description: 'visit | work | personal | sleep (required).' },
+      { id: 'max_calls', label: 'max_calls', type: 'number', description: 'Batch cap (default 6, hard-capped runtime-side).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'results_message', label: 'results_message', type: 'string', description: 'The TOOL RESULTS text to fold back into the prompt.' },
+      { id: 'tools_ran', label: 'tools_ran', type: 'array', description: 'Unique tool names actually executed (the honest gauge).' },
+      { id: 'results', label: 'results', type: 'array', description: 'Per-election rows (name + result) — the ruled turn budget spends by counting these.' },
+      { id: 'markers', label: 'markers', type: 'array', description: 'Refusal marker lines (ungranted names) — show them to the mind.' },
+      { id: 'notices', label: 'notices', type: 'array', description: 'Execution notices.' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'entity',
+  },
 ];
 
 // Math nodes - Pure functions (no execution pins, just data in/out)
@@ -2164,6 +2576,11 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     label: 'Media',
     icon: '&#x1F3A8;', // Palette/media
     nodes: MEDIA_NODES,
+  },
+  entity: {
+    label: 'Entity Mind',
+    icon: '&#x1F9E0;', // Brain — the entity cognition lane
+    nodes: ENTITY_NODES,
   },
   files: {
     label: 'Files',

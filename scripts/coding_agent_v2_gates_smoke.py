@@ -549,6 +549,26 @@ def main() -> int:
                                                              "rendered": "Command executed"}}]}
     r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True, "hash_output": compacted})
     check("G5 falls back to stdout_preview on compacted durable results", r["selfcheck_ok"] and not r["failures"], str(r))
+    # Self-review (2026-07-21): distinguish FILES-missing (a real binding
+    # failure — the builder attested a file that is not there) from
+    # HOST-can't-hash (tooling absent → honest #FALLBACK). shasum RAN and said
+    # "No such file"; no hex parsed -> must be a per-claim failure, NOT a
+    # blanket host warning that misattributes the cause.
+    phantom = {"success": False, "stdout": "", "stderr": "shasum: ghost.html: No such file or directory\n", "return_code": 1}
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: ghost.html " + aa, "selfcheck_ok": True, "hash_output": phantom})
+    check("G5 all-phantom claim -> honest binding failure (not a host #FALLBACK)",
+          not r["selfcheck_ok"] and any("ghost.html" in str(f) and "could not be hashed" in str(f) for f in r["failures"]) and not r["warnings"], str(r))
+    missing = {"success": False, "stdout": "", "stderr": "sh: shasum: command not found\n", "return_code": 127}
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True, "hash_output": missing})
+    check("G5 shasum-missing stays #FALLBACK (host tooling, not a failure)",
+          r["selfcheck_ok"] and not r["failures"] and any("#FALLBACK" in str(w) for w in r["warnings"]), str(r))
+
+    print("unit: SELFCHECK_HASH_ARGS ws single-quote escape (self-review 2026-07-21)")
+    hash_args_ws = code_body("SELFCHECK_HASH_ARGS_CODE")
+    r = run_code(hash_args_ws, {"selfcheck_content": "x\nARTIFACT-SHA256: index.html " + aa,
+                                "selfcheck_ok": True, "workspace_root": "/tmp/a'b"})
+    cmd = r["arguments"]["command"]
+    check("ws with a single quote yields a well-formed POSIX cd", cmd.startswith("cd '/tmp/a'\\''b' && shasum"), cmd)
 
     print("unit: SELFCHECK_HASH_ARGS recompute composition (R3)")
     hash_args = code_body("SELFCHECK_HASH_ARGS_CODE")
@@ -695,6 +715,59 @@ def main() -> int:
     check("dead verify subflow still records history + zero score",
           rd["attempt_history"][0]["gate_score"] == [0, 0, 0] and rd["last_verdict"].get("verifier_died") is True, str(rd))
 
+    print("unit: NEXT_STATE failure-signature normalization (F1/F2 self-review 2026-07-21)")
+    def _fail_verdict(fails):
+        return {"all_passed": False, "builds": False, "executes": False, "matches": False,
+                "failures": fails, "environment_failures": [], "deterministic": {"delivery_ok": True}}
+    # F1: distinct files fixed one-per-round must NOT collapse (identifier digits kept)
+    p = {}
+    counts = []
+    for rnd in range(3):
+        v = _fail_verdict(["integration: entrypoint index.html references 'level%d.js' which does not exist in the workspace" % (rnd + 1)])
+        p = run_code(next_state, {"verifier": v, "verify_meta": {}, "round_index": rnd, "builder_report": "x", "prev_state": p, "snapshot_ok": True})
+        counts.append(p["same_signature_count"])
+    check("F1: level1.js/level2.js/level3.js do NOT collapse (real progress, no false stall)", counts == [0, 0, 0], str(counts))
+    # F1 control: identical file every round SHOULD accumulate + escalate
+    p = {}
+    counts = []
+    for rnd in range(3):
+        v = _fail_verdict(["integration: entrypoint index.html references 'level1.js' which does not exist in the workspace"])
+        p = run_code(next_state, {"verifier": v, "verify_meta": {}, "round_index": rnd, "builder_report": "x", "prev_state": p, "snapshot_ok": True})
+        counts.append(p["same_signature_count"])
+    check("F1 control: same file repeats -> signature accumulates (0,1,then escalate)", counts[0] == 0 and counts[1] == 1, str(counts))
+    # F1: round-counter digits STILL collapse (standalone digit run)
+    p = {}
+    counts = []
+    for rnd in range(2):
+        v = _fail_verdict(["execute(web): canvas is blank - still blank on round %d; draw the game state" % (rnd + 1)])
+        p = run_code(next_state, {"verifier": v, "verify_meta": {}, "round_index": rnd, "builder_report": "x", "prev_state": p, "snapshot_ok": True})
+        counts.append(p["same_signature_count"])
+    check("F1: 'round N' counter digits normalize away (stall still detectable)", counts == [0, 1], str(counts))
+    # F2: same vacuous feature with drifting evidence prose MUST stall (truncate at ' - ')
+    p = {}
+    counts = []
+    evid = ["score fn reads no input", "handler present but body constant", "the update path ignores it"]
+    for rnd in range(3):
+        v = _fail_verdict(["matches: task-named feature 'score updates' does not depend on its input - " + evid[rnd] + " - a feature that is present but vacuous is a FAILURE, not a pass"])
+        p = run_code(next_state, {"verifier": v, "verify_meta": {}, "round_index": rnd, "builder_report": "x", "prev_state": p, "snapshot_ok": True})
+        counts.append(p["same_signature_count"])
+    check("F2: same vacuous feature stalls despite drifting evidence prose", counts[0] == 0 and counts[1] == 1, str(counts))
+    # F2 control: DIFFERENT vacuous features must NOT collapse
+    p = {}
+    counts = []
+    feats = ["score updates", "timer resets", "level advances"]
+    for rnd in range(3):
+        v = _fail_verdict(["matches: task-named feature '" + feats[rnd] + "' does not depend on its input - reason - vacuous FAILURE"])
+        p = run_code(next_state, {"verifier": v, "verify_meta": {}, "round_index": rnd, "builder_report": "x", "prev_state": p, "snapshot_ok": True})
+        counts.append(p["same_signature_count"])
+    check("F2 control: distinct feature names do NOT collapse", counts == [0, 0, 0], str(counts))
+    # F7: belted failures are written back into the stored verdict
+    v_lie = {"all_passed": True, "builds": True, "executes": True, "matches": False,
+             "failures": [], "environment_failures": [], "deterministic": {"delivery_ok": True}}
+    r = run_code(next_state, {"verifier": v_lie, "verify_meta": {}, "round_index": 0, "builder_report": "x", "prev_state": {}, "snapshot_ok": True})
+    check("F7: belt writes back into last_verdict (not just state.failures)",
+          r["last_verdict"].get("all_passed") is False and any("all_passed but a gate was false" in str(f) for f in (r["last_verdict"].get("failures") or [])), str(r["last_verdict"]))
+
     print("unit: ROUND_MODE_PINS budget shaping (R5)")
     rmp = code_body("ROUND_MODE_PINS_CODE")
     r = run_code(rmp, {"loop_state": {}})
@@ -727,6 +800,11 @@ def main() -> int:
     check("all_passed -> never restore", r["restore"] is False, str(r))
     r = run_code(restore_decide, {"loop_state": dict(regressed, best_snapshot=""), "workspace_root": "/ws"})
     check("no snapshot -> no restore", r["restore"] is False, str(r))
+    # F8 (self-review 2026-07-21): a false restore emits a no-op command, never
+    # a degenerate copy (cp -R '/.' .) riding the unexecuted pin.
+    check("F8: no-restore emits a 'true' no-op command", r["tool_call"]["arguments"]["command"] == "true", str(r["tool_call"]))
+    r = run_code(restore_decide, {"loop_state": regressed, "workspace_root": "/ws"})
+    check("F8: real restore still emits the copy-back command", r["tool_call"]["arguments"]["command"].startswith("cd '/ws'") and "cp -R '.cg_rounds/round_1/.' ." in r["tool_call"]["arguments"]["command"], str(r["tool_call"]))
 
     print("unit: VERIFIER_PROMPT static-feature semantics (R4, live-found)")
     # Live-found (first 0.2.4 gateway run): the verifier marked a CORRECTLY
@@ -763,6 +841,22 @@ def main() -> int:
     r = run_code(merge, {"verifier_data": v_feature_str, "verifier_ok": True, "verifier_response": "",
                          "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
     check("string 'false' coerces (tool-arg coercion class)", r["matches"] is False, str(r))
+    # F6 (self-review 2026-07-21): int 0 and "no" coerce to false; a missing /
+    # unrecognized depends_on_input does NOT fail the verdict but IS surfaced
+    # as a coverage warning (was: silent pass with zero trace).
+    v_zero = dict(v_feature, feature_checks=[{"feature": "playback", "input": "Play", "expected_change": "g", "evidence": "", "depends_on_input": 0}])
+    r = run_code(merge, {"verifier_data": v_zero, "verifier_ok": True, "verifier_response": "",
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
+    check("F6: integer 0 coerces to false", r["matches"] is False, str(r))
+    v_no = dict(v_feature, feature_checks=[{"feature": "playback", "input": "Play", "expected_change": "g", "evidence": "", "depends_on_input": "no"}])
+    r = run_code(merge, {"verifier_data": v_no, "verifier_ok": True, "verifier_response": "",
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
+    check("F6: 'no' coerces to false", r["matches"] is False, str(r))
+    v_missing = dict(v_feature, feature_checks=[{"feature": "playback", "input": "Play", "expected_change": "g", "evidence": "e"}])
+    r = run_code(merge, {"verifier_data": v_missing, "verifier_ok": True, "verifier_response": "",
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
+    check("F6: missing depends_on_input -> coverage warning, not a verdict failure",
+          r["matches"] is True and any("depends_on_input" in str(w) and "UNVERIFIED" in str(w) for w in r["warnings"]), str(r.get("warnings")))
     r = run_code(merge, {"verifier_data": v_feature_ok, "verifier_ok": True, "verifier_response": "",
                          "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok,
                          "gate5_out": {"warnings": ["selfcheck: SELFCHECK.md not found in the workspace - advisory"]}})

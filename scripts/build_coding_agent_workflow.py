@@ -691,7 +691,13 @@ if not paths:
 quoted = []
 for p in paths:
     quoted.append("'" + p + "'")
-prefix = ("cd '" + ws + "' && ") if ws else ""
+# ws is operator/gateway config (not builder-authored), but a workspace path
+# carrying a single quote would break the cd quoting and leave shasum running
+# in the wrong directory (self-review 2026-07-21). Escape embedded quotes with
+# the POSIX close/quote/reopen idiom so the cd is always well-formed; the paths
+# themselves already refuse embedded quotes via bad_chars above.
+ws_q = ws.replace("'", "'" + "\\\\" + "''") if ws else ""
+prefix = ("cd '" + ws_q + "' && ") if ws else ""
 cmd = prefix + "shasum -a 256 -- " + " ".join(quoted)
 return {
     "name": "execute_command",
@@ -821,7 +827,19 @@ if claims:
             p2 = p2[2:]
         if len(h2) == 64:
             recomputed[p2] = h2
-    if not recomputed:
+    # Distinguish HOST-can't-hash (tooling absent → honest #FALLBACK, never a
+    # failure) from FILES-can't-be-hashed (the builder attested a file that is
+    # not there → a real binding failure). The old blanket "recomputed empty
+    # -> #FALLBACK" wrongly blamed the host when the true cause was a claim
+    # for a nonexistent file (self-review 2026-07-21): an all-phantom claim
+    # slipped through as advisory while a mixed real+phantom claim failed —
+    # inconsistent, and the warning misattributed the cause. Now the per-claim
+    # loop always runs; only a genuine tooling signal (no output at all, or a
+    # "command not found"-class message from a broken cd / missing shasum)
+    # degrades to #FALLBACK.
+    low = hash_text.lower()
+    host_cant_hash = (not hash_text.strip()) or ("command not found" in low) or ("not recognized" in low)
+    if host_cant_hash:
         warnings.append("selfcheck: could not recompute artifact hashes on this host (" + hash_text.strip()[:160] + ") - hash binding unchecked (#FALLBACK)" if hash_text.strip() else "selfcheck: could not recompute artifact hashes on this host (no output) - hash binding unchecked (#FALLBACK)")
     else:
         for pair in claims:
@@ -829,7 +847,7 @@ if claims:
             h = pair[1]
             rh = recomputed.get(p)
             if not rh:
-                failures.append("self-report unbound: SELFCHECK.md attests '" + p + "' but that file could not be hashed on this host (missing or unreadable) - the attestation does not bind to a delivered file")
+                failures.append("self-report unbound: SELFCHECK.md attests '" + p + "' but that file could not be hashed (missing or unreadable in the workspace) - the attestation does not bind to a delivered file")
             elif rh != h:
                 failures.append("self-report stale: SELFCHECK.md attests different bytes than the delivered " + p + " - the artifact was modified after the last self-verification; re-verify and regenerate SELFCHECK.md (with fresh ARTIFACT-SHA256 lines) after your final edit")
 return {
@@ -861,7 +879,6 @@ defined = set()
 refs = []
 if web:
     idset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-$"
-    hexdigits = "0123456789abcdefABCDEF"
     text = str(entry_content or "")
     if bool(script_ok) and script_content:
         text = text + "\\n" + str(script_content)
@@ -969,9 +986,23 @@ if web:
                 break
         if ok_id and name not in refs:
             refs.append(name)
-    # Referenced ids, lane 2: quoted '#ident' selector literals passed to a
-    # call (querySelector/querySelectorAll/$()/jQuery-likes). A complex
-    # selector's LEADING id ('#hud .score') still requires the id to exist.
+    # Referenced ids, lane 2: a quoted '#ident' selector literal passed as the
+    # FIRST argument to a SELECTOR call. The receiving call must be
+    # selector-shaped (querySelector/querySelectorAll/matches/closest or a
+    # $-family jQuery call) — this is what makes '#x' a DOM lookup rather than
+    # a URL fragment / route name / color string (F3, self-review 2026-07-21:
+    # history.pushState(null,'','#level2'), ['#home','#about'], url.split('#s')
+    # all matched the old any-"("/","-context rule and falsely failed correct
+    # SPA hash-routing code, which — repeating identically every round — could
+    # trip the stall guard and ship a STOPPED verdict for a working artifact).
+    # Restricting to the selector callee also SUBSUMES the old hex-color
+    # suppression: a color literal reaches a color function, never a selector,
+    # so a genuinely-named id like '#fade' is no longer silently dropped (F5).
+    # Backtick template literals with no ${...} are static selectors too (F4).
+    # A COMMA in a selector is OR (querySelector('#a, #b') matches if EITHER
+    # exists) — a missing alternative does NOT null the result, so only the
+    # LEADING id is contract-bound; post-comma ids are deliberately not flagged.
+    sel_suffixes = ["queryselector", "queryselectorall", "matches", "closest"]
     pos = 0
     while True:
         i = text.find("#", pos)
@@ -981,12 +1012,29 @@ if web:
         if i == 0 or i + 1 >= n:
             continue
         q = text[i - 1]
-        if q != "'" and q != "\\"":
+        if q != "'" and q != "\\"" and q != "`":
             continue
         j = i - 2
         while j >= 0 and text[j] in " \\t":
             j = j - 1
-        if j < 0 or (text[j] != "(" and text[j] != ","):
+        if j < 0 or text[j] != "(":
+            continue
+        # Collect the callee identifier immediately before the "(".
+        c = j - 1
+        while c >= 0 and text[c] in " \\t":
+            c = c - 1
+        callee = ""
+        while c >= 0 and text[c] in idset:
+            callee = text[c] + callee
+            c = c - 1
+        callee_low = callee.lower()
+        is_selector = callee.endswith("$")
+        if not is_selector:
+            for suf in sel_suffixes:
+                if callee_low.endswith(suf):
+                    is_selector = True
+                    break
+        if not is_selector:
             continue
         k = i + 1
         name = ""
@@ -997,14 +1045,6 @@ if web:
             continue
         nxt = text[k]
         if nxt != q and nxt not in " >.[:,+~":
-            continue
-        is_hex = len(name) in (3, 4, 6, 8)
-        if is_hex:
-            for c in name:
-                if c not in hexdigits:
-                    is_hex = False
-                    break
-        if is_hex:
             continue
         if name not in refs:
             refs.append(name)
@@ -1314,15 +1354,31 @@ env_failures = [str(f) for f in env_failures]
 # enumeration is BINDING — any entry it marked depends_on_input=false becomes
 # a failures[] line naming the mechanism and belts matches=false. A feature
 # that is present but vacuous can never ride a matches=true verdict. String
-# "false" coerces (tool-arg coercion class, 2026-02-20 note).
+# "false"/"no"/0 all coerce to false (tool-arg coercion class, 2026-02-20
+# note; F6 self-review 2026-07-21). A MISSING/unrecognized depends_on_input
+# does not fail the verdict (the verifier that judged a feature vacuous also
+# sets matches=false itself), but it IS surfaced as a coverage warning so the
+# gap is visible rather than silently passing.
 fchecks = v.get("feature_checks") or []
 if not isinstance(fchecks, list):
     fchecks = []
+warnings = [str(w) for w in (g3.get("warnings") or [])]
+for w in (g5.get("warnings") or []):
+    if str(w) not in warnings:
+        warnings.append(str(w))
+falsey = ["false", "no", "0"]
+truthy = ["true", "yes", "1"]
 for fc in fchecks:
     if not isinstance(fc, dict):
         continue
     dep = fc.get("depends_on_input")
-    dep_false = (dep is False) or (str(dep).strip().lower() == "false")
+    # str() normalization covers every JSON shape uniformly: bool False ->
+    # "false", int 0 -> "0", the string forms directly; True/1/yes -> pass.
+    # A MISSING field (None) or an unrecognized token is neither -> a coverage
+    # warning, not a verdict failure.
+    dep_norm = "(missing)" if dep is None else str(dep).strip().lower()
+    dep_false = dep_norm in falsey
+    dep_known = dep_false or (dep_norm in truthy)
     if dep_false:
         feat = str(fc.get("feature") or "unnamed feature").strip()
         ev = str(fc.get("evidence") or fc.get("expected_change") or "").strip()
@@ -1330,10 +1386,11 @@ for fc in fchecks:
         if line not in failures:
             failures.append(line)
         matches = False
-warnings = [str(w) for w in (g3.get("warnings") or [])]
-for w in (g5.get("warnings") or []):
-    if str(w) not in warnings:
-        warnings.append(str(w))
+    elif not dep_known:
+        feat = str(fc.get("feature") or "unnamed feature").strip()
+        w = "feature-checks: '" + feat[:120] + "' reported depends_on_input=" + (str(dep)[:40] if dep is not None else "(missing)") + " - not a clear true/false; input-dependence for this feature is UNVERIFIED (#FALLBACK)"
+        if w not in warnings:
+            warnings.append(w)
 if web:
     # World-side truth: the probe decided executes; its environment failures
     # ride regardless of what the LLM reported.
@@ -1719,20 +1776,65 @@ if not isinstance(env_failures, list):
     env_failures = [str(env_failures)]
 env_failures = [str(f) for f in env_failures]
 # Belt: if the verdict claims pass but a gate is false, do not trust the pass.
+belted = False
 if all_passed and not (verdict.get("builds") and verdict.get("executes") and verdict.get("matches")):
     all_passed = False
     failures = failures + ["verifier marked all_passed but a gate was false"]
+    belted = True
 if all_passed and env_failures:
     all_passed = False
     failures = failures + ["verifier marked all_passed despite environment_failures"]
-# R1: normalized failure signature (per-line lowercase, digits stripped,
-# compared as a SET — tolerates vocabulary shifts and round counters).
+    belted = True
+# F7 (self-review 2026-07-21): write the belted decision BACK into the verdict
+# dict before it is stored as last_verdict/best_verdict. Otherwise the stored
+# verdict keeps the verifier's raw failures:[]/all_passed:True, and the
+# restore-path FINAL_REPORT (which reads best_verdict.failures) would omit the
+# belt findings for the delivered round even though the status line stayed
+# honest. Plain subscript writes only (RestrictedPython forbids augmented
+# assignment on subscripts).
+if belted:
+    verdict["all_passed"] = all_passed
+    verdict["failures"] = failures
+# R1: normalized failure signature (per-line, compared as a SET) — the KEY is
+# the stable failure MECHANISM, not its volatile phrasing.
+#   (F2, self-review 2026-07-21) truncate each line at the first " - ": failure
+#   lines are "<class>: <specific> - <reason/evidence>" and the reason half is
+#   LLM-authored prose (verifier failures[], the R4 vacuous-feature fold's
+#   evidence) that drifts every round — keeping it meant the same unfixed
+#   defect never matched itself and the stall guard never fired, burning the
+#   whole budget. The discriminating specifics (filenames, ids, feature names)
+#   always sit in the prefix before the first " - ".
+#   (F1, self-review 2026-07-21) strip only STANDALONE digit runs (round
+#   counters like "round 2", "3 errors"); KEEP digits fused to an identifier
+#   (level2.js vs level3.js, sprite1.png) — collapsing those made a builder
+#   fixing one distinct file per round look stalled and wrongly spent its one
+#   rebuild. A digit run is standalone iff neither boundary char is a letter,
+#   "_" or "." (so "gate3" keeps its 3 — a stable gate name — while the
+#   counter after "round " drops).
+ident = "abcdefghijklmnopqrstuvwxyz_."
 norm = []
 for f in failures:
+    t = str(f).strip().lower()
+    dash = t.find(" - ")
+    if dash >= 0:
+        t = t[:dash]
     s = ""
-    for c in str(f).strip().lower():
-        if c not in "0123456789":
+    i = 0
+    n = len(t)
+    while i < n:
+        c = t[i]
+        if c in "0123456789":
+            j = i
+            while j < n and t[j] in "0123456789":
+                j = j + 1
+            before = t[i - 1] if i > 0 else ""
+            after = t[j] if j < n else ""
+            if (before in ident) or (after in ident):
+                s = s + t[i:j]
+            i = j
+        else:
             s = s + c
+            i = i + 1
     norm.append(s)
 sig = "|".join(sorted(set(norm)))
 prev_sig = str(prev.get("failure_signature") or "")
@@ -1889,8 +1991,17 @@ if (not passed) and best_snapshot.startswith(".cg_rounds/") and isinstance(best_
         f2 = int(final_score[2] or 0)
     best = (int(best_score[0] or 0), int(best_score[1] or 0), int(best_score[2] or 0))
     restore = best > (f0, f1, f2)
-prefix = ("cd '" + ws + "' && ") if ws else ""
-cmd = prefix + "cp -R '" + best_snapshot + "/.' ."
+# F8 (self-review 2026-07-21): emit the copy-back command ONLY when a restore
+# is actually decided. The if_restore node gates execution on `restore` today,
+# so a false branch never ran the command — but composing `cp -R '<snap>/.' .`
+# unconditionally left a live command riding an unexecuted pin (degenerate
+# `cp -R '/.' .` when best_snapshot is empty). A no-op keeps the pin honest and
+# defends against any future wiring that consumes tool_call directly.
+if restore:
+    prefix = ("cd '" + ws + "' && ") if ws else ""
+    cmd = prefix + "cp -R '" + best_snapshot + "/.' ."
+else:
+    cmd = "true"
 return {
     "restore": restore,
     "tool_call": {

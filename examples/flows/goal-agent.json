@@ -1,0 +1,1576 @@
+{
+  "id": "goal-agent",
+  "name": "Goal agent",
+  "description": "Bounded goal loop: [one ReAct work cycle -> independent verifier verdict -> fold]xN with optional wait_until pacing; stops on verified-done, max_cycles, or a two-cycle no-progress stall. Progress evidence is the verifier's verdict, never worker self-report.",
+  "interfaces": [
+    "abstractcode.goal.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1500,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Goal",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "goal",
+            "label": "goal",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "pace_seconds",
+            "label": "pace_seconds",
+            "type": "number"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "goal": "",
+          "max_cycles": 10,
+          "pace_seconds": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "init",
+      "type": "code",
+      "position": {
+        "x": -1500,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Init goal state",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "goal",
+            "label": "goal",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "pace_seconds",
+            "label": "pace_seconds",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g = str(goal or \"\").strip()\nmc = int(max_cycles or 10)\nif mc < 1:\n    mc = 1\nif mc > 100:\n    mc = 100\nps = float(pace_seconds or 0)\nif ps < 0:\n    ps = 0\nif ps > 86400:\n    ps = 86400\nstate = {\n    \"goal\": g, \"max_cycles\": mc, \"pace_seconds\": ps,\n    \"cycles_used\": 0, \"done\": False, \"no_progress\": 0,\n    \"progress_log\": [], \"last_verdict\": {}, \"stopped_reason\": \"\",\n}\nfailures = []\nif not g:\n    failures.append(\"goal-agent: empty goal\")\nreturn {\"state\": state, \"ok\": len(failures) == 0, \"failures\": failures}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "seed",
+      "type": "set_var",
+      "position": {
+        "x": -1140,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Seed state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ga.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_ok",
+      "type": "if",
+      "position": {
+        "x": -780,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Goal present?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "refuse",
+      "type": "code",
+      "position": {
+        "x": -780,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Refusal report",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "failures",
+            "label": "failures",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "fails = failures if isinstance(failures, list) else []\nlines = [\"# Goal-agent refused\", \"\"]\nfor f in fails:\n    lines.append(\"- \" + str(f))\nreturn {\"result\": \"\\n\".join(lines), \"reason\": \"refused-empty-goal\",\n        \"cycles\": 0, \"ok\": False}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end_refused",
+      "type": "on_flow_end",
+      "position": {
+        "x": -780,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Refused",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "cycles_used",
+            "label": "cycles_used",
+            "type": "number"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state",
+      "type": "get_var",
+      "position": {
+        "x": -420,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get ga.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ga.state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cond",
+      "type": "code",
+      "position": {
+        "x": -420,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Another cycle?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ndone = bool(s.get(\"done\"))\nused = int(s.get(\"cycles_used\", 0) or 0)\nmc = int(s.get(\"max_cycles\", 10) or 10)\n# no-progress stall: two consecutive verifier verdicts acknowledging zero\n# progress end the run honestly (an unattended loop must not burn max_cycles\n# repeating a stuck approach)\nstalled = int(s.get(\"no_progress\", 0) or 0) >= 2\npace = float(s.get(\"pace_seconds\", 0) or 0)\nreturn {\"condition\": (not done) and (not stalled) and (used < mc),\n        \"pace_on\": pace > 0}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "loop",
+      "type": "while",
+      "position": {
+        "x": -420,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "Goal loop",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "worker_prompt",
+      "type": "code",
+      "position": {
+        "x": -60,
+        "y": -260
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Worker prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ng = str(s.get(\"goal\") or \"\")\nused = int(s.get(\"cycles_used\", 0) or 0)\nlog = s.get(\"progress_log\") if isinstance(s.get(\"progress_log\"), list) else []\nhist = \"\"\nfor entry in log[-6:]:\n    hist = hist + \"- \" + str(entry) + \"\\n\"\nv = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\nremaining = str(v.get(\"remaining\") or \"\").strip()\np = (\"You are working toward this GOAL across multiple bounded cycles:\\n\" + g +\n     \"\\n\\nThis is cycle \" + str(used + 1) + \". Do ONE focused increment of real work now - \"\n     \"use your tools, verify what you did, and end with a short factual summary of \"\n     \"(a) what you actually did this cycle and (b) what concretely remains.\")\nif hist:\n    p = p + \"\\n\\nVerified progress so far:\\n\" + hist\nif remaining:\n    p = p + \"\\nThe verifier says this remains:\\n\" + remaining\nreturn {\"prompt\": p}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "worker",
+      "type": "agent",
+      "position": {
+        "x": -60,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Worker (one cycle)",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "max_iterations": 20,
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verifier_prompt",
+      "type": "code",
+      "position": {
+        "x": 300,
+        "y": -260
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Verifier prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "worker_response",
+            "label": "worker_response",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ng = str(s.get(\"goal\") or \"\")\nw = str(worker_response or \"\").strip()\nif len(w) > 6000:\n    w = w[:6000] + \"\\n[...truncated #TRUNCATION]\"\np = (\"You are the independent VERIFIER for a goal loop. The GOAL:\\n\" + g +\n     \"\\n\\nThe worker's report for this cycle:\\n\" + w +\n     \"\\n\\nJudge STRICTLY on evidence in the report (files named, commands run, outputs shown) - \"\n     \"a bare claim of completion without evidence is NOT done and NOT progress. Return JSON: \"\n     \"done (boolean: the WHOLE goal is verifiably complete), progressed (boolean: this cycle \"\n     \"produced real verifiable progress), summary (one factual line of what was achieved), \"\n     \"remaining (what concretely remains, empty if done).\")\nschema = {\"type\": \"object\", \"properties\": {\n    \"done\": {\"type\": \"boolean\"}, \"progressed\": {\"type\": \"boolean\"},\n    \"summary\": {\"type\": \"string\"}, \"remaining\": {\"type\": \"string\"}},\n    \"required\": [\"done\", \"progressed\", \"summary\"]}\nreturn {\"prompt\": p, \"schema\": schema}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verifier",
+      "type": "llm_call",
+      "position": {
+        "x": 300,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Independent verifier",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold",
+      "type": "code",
+      "position": {
+        "x": 660,
+        "y": -260
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold verdict",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "verdict",
+            "label": "verdict",
+            "type": "object"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\nv = verdict if isinstance(verdict, dict) else {}\n# verifier death/no-verdict is NOT progress and NOT done (never trust absence)\ndone = bool(v.get(\"done\")) if \"done\" in v else False\nprogressed = bool(v.get(\"progressed\")) if \"progressed\" in v else False\nsummary = str(v.get(\"summary\") or \"\").strip()\ns2[\"cycles_used\"] = int(s.get(\"cycles_used\", 0) or 0) + 1\ns2[\"done\"] = done\ns2[\"last_verdict\"] = {\"done\": done, \"progressed\": progressed,\n                      \"summary\": summary[:300],\n                      \"remaining\": str(v.get(\"remaining\") or \"\")[:500]}\nlog = s.get(\"progress_log\") if isinstance(s.get(\"progress_log\"), list) else []\nlog = list(log)\nif summary:\n    log.append((\"cycle \" + str(s2[\"cycles_used\"]) + \": \" + summary)[:240])\ns2[\"progress_log\"] = log[-20:]\nif \"done\" not in v:\n    s2[\"no_progress\"] = int(s.get(\"no_progress\", 0) or 0) + 1\n    lw = list(s2.get(\"progress_log\") or [])\n    lw.append(\"cycle \" + str(s2[\"cycles_used\"]) + \": verifier returned no verdict (#FALLBACK)\")\n    s2[\"progress_log\"] = lw[-20:]\nelif progressed:\n    s2[\"no_progress\"] = 0\nelse:\n    s2[\"no_progress\"] = int(s.get(\"no_progress\", 0) or 0) + 1\nreturn {\"state\": s2}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state",
+      "type": "set_var",
+      "position": {
+        "x": 660,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record cycle",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ga.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_pace",
+      "type": "if",
+      "position": {
+        "x": 1020,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Pace?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_pace",
+      "type": "get_var",
+      "position": {
+        "x": 1380,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get ga.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ga.state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pace_dur",
+      "type": "code",
+      "position": {
+        "x": 1380,
+        "y": 560
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Pace seconds",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\nreturn {\"duration\": float(s.get(\"pace_seconds\", 0) or 0)}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pause",
+      "type": "wait_until",
+      "position": {
+        "x": 1380,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "wait_until",
+        "label": "Pause between cycles",
+        "icon": "&#x23F0;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "duration",
+            "label": "duration",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "pinDefaults": {
+          "durationType": "seconds"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_final",
+      "type": "get_var",
+      "position": {
+        "x": 60,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get ga.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ga.state",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final",
+      "type": "code",
+      "position": {
+        "x": 420,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Final report",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ndone = bool(s.get(\"done\"))\nused = int(s.get(\"cycles_used\", 0) or 0)\nmc = int(s.get(\"max_cycles\", 10) or 10)\nstalled = int(s.get(\"no_progress\", 0) or 0) >= 2\nv = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\nlog = s.get(\"progress_log\") if isinstance(s.get(\"progress_log\"), list) else []\nif done:\n    reason = \"verified-done\"\nelif stalled:\n    reason = \"no-progress-stall (two consecutive cycles without verifiable progress)\"\nelif used >= mc:\n    reason = \"max-cycles\"\nelse:\n    reason = \"stopped\"\nlines = [\"# Goal-agent result\", \"\"]\nlines.append(\"Goal: \" + str(s.get(\"goal\") or \"\"))\nlines.append(\"Outcome: \" + reason)\nlines.append(\"Cycles used: \" + str(used) + \" / \" + str(mc))\nif log:\n    lines.append(\"\")\n    lines.append(\"Verified progress log:\")\n    for entry in log:\n        lines.append(\"- \" + str(entry))\nremaining = str(v.get(\"remaining\") or \"\").strip()\nif remaining and not done:\n    lines.append(\"\")\n    lines.append(\"Remaining (verifier):\")\n    lines.append(remaining)\nreturn {\"result\": \"\\n\".join(lines), \"success\": done,\n        \"cycles_used\": used, \"stopped_reason\": reason}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 780,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Result",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "cycles_used",
+            "label": "cycles_used",
+            "type": "number"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-seed-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "seed",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-goal-init-goal",
+      "source": "start",
+      "sourceHandle": "goal",
+      "target": "init",
+      "targetHandle": "goal",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_cycles-init-max_cycles",
+      "source": "start",
+      "sourceHandle": "max_cycles",
+      "target": "init",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-start-pace_seconds-init-pace_seconds",
+      "source": "start",
+      "sourceHandle": "pace_seconds",
+      "target": "init",
+      "targetHandle": "pace_seconds",
+      "animated": false
+    },
+    {
+      "id": "e-init-state-seed-value",
+      "source": "init",
+      "sourceHandle": "state",
+      "target": "seed",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-seed-exec-out-if_ok-exec-in",
+      "source": "seed",
+      "sourceHandle": "exec-out",
+      "target": "if_ok",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-init-ok-if_ok-condition",
+      "source": "init",
+      "sourceHandle": "ok",
+      "target": "if_ok",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_ok-false-end_refused-exec-in",
+      "source": "if_ok",
+      "sourceHandle": "false",
+      "target": "end_refused",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-init-failures-refuse-failures",
+      "source": "init",
+      "sourceHandle": "failures",
+      "target": "refuse",
+      "targetHandle": "failures",
+      "animated": false
+    },
+    {
+      "id": "e-refuse-result-end_refused-result",
+      "source": "refuse",
+      "sourceHandle": "result",
+      "target": "end_refused",
+      "targetHandle": "result",
+      "animated": false
+    },
+    {
+      "id": "e-refuse-ok-end_refused-success",
+      "source": "refuse",
+      "sourceHandle": "ok",
+      "target": "end_refused",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-refuse-reason-end_refused-stopped_reason",
+      "source": "refuse",
+      "sourceHandle": "reason",
+      "target": "end_refused",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-refuse-cycles-end_refused-cycles_used",
+      "source": "refuse",
+      "sourceHandle": "cycles",
+      "target": "end_refused",
+      "targetHandle": "cycles_used",
+      "animated": false
+    },
+    {
+      "id": "e-if_ok-true-loop-exec-in",
+      "source": "if_ok",
+      "sourceHandle": "true",
+      "target": "loop",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state-value-cond-loop_state",
+      "source": "get_state",
+      "sourceHandle": "value",
+      "target": "cond",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-cond-condition-loop-condition",
+      "source": "cond",
+      "sourceHandle": "condition",
+      "target": "loop",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-loop-loop-worker-exec-in",
+      "source": "loop",
+      "sourceHandle": "loop",
+      "target": "worker",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state-value-worker_prompt-loop_state",
+      "source": "get_state",
+      "sourceHandle": "value",
+      "target": "worker_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-worker_prompt-prompt-worker-prompt",
+      "source": "worker_prompt",
+      "sourceHandle": "prompt",
+      "target": "worker",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-worker-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "worker",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-worker-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "worker",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-tools-worker-tools",
+      "source": "start",
+      "sourceHandle": "tools",
+      "target": "worker",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "e-worker-exec-out-verifier-exec-in",
+      "source": "worker",
+      "sourceHandle": "exec-out",
+      "target": "verifier",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state-value-verifier_prompt-loop_state",
+      "source": "get_state",
+      "sourceHandle": "value",
+      "target": "verifier_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-worker-response-verifier_prompt-worker_response",
+      "source": "worker",
+      "sourceHandle": "response",
+      "target": "verifier_prompt",
+      "targetHandle": "worker_response",
+      "animated": false
+    },
+    {
+      "id": "e-verifier_prompt-prompt-verifier-prompt",
+      "source": "verifier_prompt",
+      "sourceHandle": "prompt",
+      "target": "verifier",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-verifier_prompt-schema-verifier-resp_schema",
+      "source": "verifier_prompt",
+      "sourceHandle": "schema",
+      "target": "verifier",
+      "targetHandle": "resp_schema",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-verifier-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "verifier",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-verifier-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "verifier",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-verifier-exec-out-set_state-exec-in",
+      "source": "verifier",
+      "sourceHandle": "exec-out",
+      "target": "set_state",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-verifier-data-fold-verdict",
+      "source": "verifier",
+      "sourceHandle": "data",
+      "target": "fold",
+      "targetHandle": "verdict",
+      "animated": false
+    },
+    {
+      "id": "e-get_state-value-fold-loop_state",
+      "source": "get_state",
+      "sourceHandle": "value",
+      "target": "fold",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-fold-state-set_state-value",
+      "source": "fold",
+      "sourceHandle": "state",
+      "target": "set_state",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-set_state-exec-out-if_pace-exec-in",
+      "source": "set_state",
+      "sourceHandle": "exec-out",
+      "target": "if_pace",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-cond-pace_on-if_pace-condition",
+      "source": "cond",
+      "sourceHandle": "pace_on",
+      "target": "if_pace",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_pace-true-pause-exec-in",
+      "source": "if_pace",
+      "sourceHandle": "true",
+      "target": "pause",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-pace_dur-duration-pause-duration",
+      "source": "pace_dur",
+      "sourceHandle": "duration",
+      "target": "pause",
+      "targetHandle": "duration",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_pace-value-pace_dur-loop_state",
+      "source": "get_state_pace",
+      "sourceHandle": "value",
+      "target": "pace_dur",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-loop-done-end-exec-in",
+      "source": "loop",
+      "sourceHandle": "done",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_final-value-final-loop_state",
+      "source": "get_state_final",
+      "sourceHandle": "value",
+      "target": "final",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-final-result-end-result",
+      "source": "final",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "result",
+      "animated": false
+    },
+    {
+      "id": "e-final-success-end-success",
+      "source": "final",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-final-cycles_used-end-cycles_used",
+      "source": "final",
+      "sourceHandle": "cycles_used",
+      "target": "end",
+      "targetHandle": "cycles_used",
+      "animated": false
+    },
+    {
+      "id": "e-final-stopped_reason-end-stopped_reason",
+      "source": "final",
+      "sourceHandle": "stopped_reason",
+      "target": "end",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-23T21:06:39.262029+00:00",
+  "updated_at": "2026-07-23T21:06:39.262029+00:00"
+}

@@ -30,6 +30,20 @@ flows/
 !examples/flows/dp-*.json
 untracked/
 
+# Lab experiments (entity homes, artifacts, scratch figures)
+lab/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# SQLite databases created by tests/experiments (never track live stores)
+*.sqlite
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+.writer_lease
+
 # Test/cache output
 coverage/
 .eslintcache
