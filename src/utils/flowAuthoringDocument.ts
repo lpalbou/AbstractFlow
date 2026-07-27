@@ -49,6 +49,10 @@ export interface AuthoringDocumentNode {
   position?: { x: number; y: number };
   /** Defaults for unconnected input pins; merged per key. */
   pin_defaults?: Record<string, JsonValue>;
+  /** Inline pin expressions (tier 1): sandboxed Python computing the pin at
+   * resolution time (reads vars.* and value). Merged per key like
+   * pin_defaults; an explicit empty string removes one. */
+  pin_expressions?: Record<string, string>;
   /** literalValue (literal nodes, tools_allowlist names array, var_decl {name,type,default}). */
   literal?: JsonValue;
   /** Code node body (Python, body only). */
@@ -89,6 +93,13 @@ export interface AuthoringDocument {
   nodes: AuthoringDocumentNode[];
   /** Edge list as "sourceNode.sourcePin -> targetNode.targetPin" strings. */
   edges: string[];
+  /**
+   * Flow-level named helper functions (tier 2): full `def name(...)` sources
+   * callable from pin expressions. Document-owned like nodes: omission of a
+   * previously-present function is a deletion (refused while call sites
+   * remain — the diff surfaces the error instead).
+   */
+  functions?: Array<{ name: string; code: string; kind?: string; description?: string }>;
   /**
    * Deletion confirmation: when a document omits MANY existing nodes at once
    * (a truncation-shaped emission), the diff refuses the implied mass
@@ -224,6 +235,13 @@ export function flowToAuthoringDocument(flow: VisualFlow): AuthoringDocument {
     if (data.pinDefaults && Object.keys(data.pinDefaults).length > 0) {
       doc.pin_defaults = redactValue(data.pinDefaults as JsonValue, '') as Record<string, JsonValue>;
     }
+    if (data.pinExpressions && Object.keys(data.pinExpressions).length > 0) {
+      // Expressions are CODE (like code bodies, serialized verbatim): the
+      // key-pattern secret redaction does not apply to code text. Authors
+      // must not embed literal secrets in expressions — same standing rule
+      // as code bodies.
+      doc.pin_expressions = { ...data.pinExpressions };
+    }
     if (data.literalValue !== undefined) {
       doc.literal = redactValue(data.literalValue, 'literal');
     }
@@ -285,7 +303,17 @@ export function flowToAuthoringDocument(flow: VisualFlow): AuthoringDocument {
   });
 
   const edges = flow.edges.map((edge) => `${edge.source}.${edge.sourceHandle} -> ${edge.target}.${edge.targetHandle}`);
-  return { flow_name: flow.name, nodes, edges };
+  const doc: AuthoringDocument = { flow_name: flow.name, nodes, edges };
+  if (Array.isArray(flow.functions) && flow.functions.length > 0) {
+    // Function code serializes VERBATIM (it is code, like code bodies).
+    doc.functions = flow.functions.map((fn) => ({
+      name: fn.name,
+      code: fn.code,
+      ...(fn.kind ? { kind: fn.kind } : {}),
+      ...(fn.description ? { description: fn.description } : {}),
+    }));
+  }
+  return doc;
 }
 
 /** Prompt-facing rendering of the current workflow document. */
@@ -337,6 +365,10 @@ interface NormalizedDocument {
   flowName: string;
   nodes: AuthoringDocumentNode[];
   edges: { source: string; sourceHandle: string; target: string; targetHandle: string }[];
+  /** Present ONLY when the document carried a functions key (absence means
+   * "not authored" and the diff leaves the library alone — an older prompt
+   * emission must not mass-delete the library). */
+  functions?: Array<{ name: string; code: string; kind?: string; description?: string }>;
   confirmDeletions: Set<string>;
   errors: string[];
 }
@@ -371,6 +403,41 @@ function normalizeDocument(raw: unknown, currentNodeIds: Set<string>): Normalize
       .map((item) => cleanText(item, 120))
       .filter(Boolean)
   );
+
+  // Flow function library (tier 2). Key ABSENT -> undefined (not authored,
+  // diff leaves the library untouched); key present -> full ownership.
+  let functions: NormalizedDocument['functions'];
+  const rawFunctions = firstDefined(record, ['functions', 'flow_functions', 'flowFunctions']);
+  if (rawFunctions !== undefined) {
+    functions = [];
+    if (!Array.isArray(rawFunctions)) {
+      errors.push('graph document "functions" must be an array of {name, code} entries');
+    } else {
+      for (const item of rawFunctions) {
+        const fnRecord = asRecord(item);
+        if (!fnRecord) {
+          errors.push('graph document contains a non-object functions entry');
+          continue;
+        }
+        const name = cleanText(fnRecord.name, 120);
+        const code = typeof fnRecord.code === 'string' ? fnRecord.code : '';
+        if (!name || !code.trim()) {
+          errors.push(`graph function entry missing name or code (${name || 'unnamed'})`);
+          continue;
+        }
+        if (functions.some((f) => f.name === name)) {
+          errors.push(`graph document contains duplicate function name "${name}"`);
+          continue;
+        }
+        const entry: { name: string; code: string; kind?: string; description?: string } = { name, code };
+        const kind = cleanText(fnRecord.kind, 40);
+        if (kind) entry.kind = kind;
+        const description = cleanText(fnRecord.description, 300);
+        if (description) entry.description = description;
+        functions.push(entry);
+      }
+    }
+  }
 
   const nodes: AuthoringDocumentNode[] = [];
   const rawNodes = Array.isArray(record.nodes) ? record.nodes : [];
@@ -412,6 +479,14 @@ function normalizeDocument(raw: unknown, currentNodeIds: Set<string>): Normalize
     }
     const pinDefaults = asRecord(firstDefined(nodeRecord, ['pin_defaults', 'pinDefaults', 'defaults']));
     if (pinDefaults) node.pin_defaults = pinDefaults as Record<string, JsonValue>;
+    const pinExpressions = asRecord(firstDefined(nodeRecord, ['pin_expressions', 'pinExpressions', 'expressions']));
+    if (pinExpressions) {
+      const cleaned: Record<string, string> = {};
+      for (const [k, v] of Object.entries(pinExpressions)) {
+        if (typeof v === 'string') cleaned[k] = v;
+      }
+      node.pin_expressions = cleaned;
+    }
     const literal = firstDefined(nodeRecord, ['literal', 'literalValue', 'literal_value']);
     if (literal !== undefined) node.literal = literal as JsonValue;
     const code = firstDefined(nodeRecord, ['code', 'codeBody', 'code_body']);
@@ -494,7 +569,7 @@ function normalizeDocument(raw: unknown, currentNodeIds: Set<string>): Normalize
     edges.push({ source: source.node, sourceHandle: source.handle, target: target.node, targetHandle: target.handle });
   }
 
-  return { flowName, nodes, edges, confirmDeletions, errors };
+  return { flowName, nodes, edges, functions, confirmDeletions, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -565,6 +640,25 @@ function pinDefaultsCommands(
     // set_pin_default every cycle (round-trip invariant violation).
     if (deepEqual(redactValue(currentDefaults[pin] ?? null, pin), value)) continue;
     commands.push({ action: 'set_pin_default', nodeId, pin, value });
+  }
+  return commands;
+}
+
+function pinExpressionsCommands(
+  nodeId: string,
+  docExpressions: Record<string, string> | undefined,
+  currentExpressions: Record<string, string>
+): unknown[] {
+  // Merge-per-key like pin_defaults (a document that omits the section keeps
+  // current expressions); an explicit empty string REMOVES one — expressions
+  // need a removal verb because an absent key cannot distinguish "left
+  // untouched" from "delete" under merge semantics.
+  const commands: unknown[] = [];
+  for (const [pin, expr] of Object.entries(docExpressions || {})) {
+    const next = typeof expr === 'string' ? expr.trim() : '';
+    const cur = (currentExpressions[pin] || '').trim();
+    if (next === cur) continue;
+    commands.push({ action: 'set_pin_expression', nodeId, pin, expression: next });
   }
   return commands;
 }
@@ -868,6 +962,30 @@ export function diffAuthoringDocument(
     commands.push({ action: 'set_flow_name', name: document.flowName });
   }
 
+  // Function library diff (only when the document authored a functions key —
+  // absence leaves the library alone so a functions-unaware emission cannot
+  // mass-delete it). Removal of a still-called function is refused by the
+  // apply layer; the diff emits the command and lets the refusal name the
+  // call sites.
+  if (document.functions !== undefined) {
+    const currentFns = new Map((flow.functions || []).map((fn) => [fn.name, fn]));
+    const docFns = new Map(document.functions.map((fn) => [fn.name, fn]));
+    for (const [name, fn] of docFns) {
+      const existing = currentFns.get(name);
+      if (
+        !existing ||
+        existing.code !== fn.code ||
+        (existing.kind || '') !== (fn.kind || '') ||
+        (existing.description || '') !== (fn.description || '')
+      ) {
+        commands.push({ action: 'set_function', ...fn });
+      }
+    }
+    for (const name of currentFns.keys()) {
+      if (!docFns.has(name)) commands.push({ action: 'remove_function', name });
+    }
+  }
+
   const currentById = new Map(flow.nodes.map((node) => [node.id, node]));
   const docById = new Map(document.nodes.map((node) => [node.id, node]));
 
@@ -926,6 +1044,9 @@ export function diffAuthoringDocument(
         );
         if (Object.keys(cleanDefaults).length > 0) addCommand.pinDefaults = cleanDefaults;
       }
+      if (node.pin_expressions && Object.keys(node.pin_expressions).length > 0) {
+        addCommand.pinExpressions = { ...node.pin_expressions };
+      }
       if (node.literal !== undefined && !isRedacted(node.literal)) addCommand.literalValue = node.literal;
       if (node.code !== undefined) addCommand.codeBody = node.code;
       if (node.function_name) addCommand.functionName = node.function_name;
@@ -956,6 +1077,9 @@ export function diffAuthoringDocument(
     }
     commands.push(
       ...pinDefaultsCommands(node.id, node.pin_defaults, (current.data.pinDefaults || {}) as Record<string, JsonValue>)
+    );
+    commands.push(
+      ...pinExpressionsCommands(node.id, node.pin_expressions, (current.data.pinExpressions || {}) as Record<string, string>)
     );
     if (node.literal !== undefined && !isRedacted(node.literal)) {
       const currentLiteral = redactValue(current.data.literalValue ?? null, 'literal');

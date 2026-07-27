@@ -220,6 +220,15 @@ function flowSignatureFor(flow: Partial<VisualFlow> | null | undefined): string 
       label: edge.label,
     };
   };
+  const normalizeFunction = (fn: any) => {
+    if (!fn || typeof fn !== 'object') return fn;
+    return {
+      name: fn.name,
+      code: fn.code,
+      kind: fn.kind || null,
+      description: fn.description || null,
+    };
+  };
   return JSON.stringify({
     name: String(value.name || '').trim(),
     description: String(value.description || ''),
@@ -227,6 +236,13 @@ function flowSignatureFor(flow: Partial<VisualFlow> | null | undefined): string 
     nodes: Array.isArray(value.nodes) ? value.nodes.map(normalizeNode) : [],
     edges: Array.isArray(value.edges) ? value.edges.map(normalizeEdge) : [],
     entryNode: value.entryNode || null,
+    // Flow-level function library (tier 2): the code IS a runtime artifact, so
+    // a function-only edit MUST dirty the flow — otherwise the drawer's whole
+    // "edit shared logic in one place" pitch silently loses edits (the save
+    // gate returns early on "no unsaved changes"). Adversary P0-1.
+    functions: Array.isArray((value as any).functions)
+      ? (value as any).functions.map(normalizeFunction)
+      : [],
   });
 }
 
@@ -280,6 +296,7 @@ export function Toolbar() {
     nodes,
     edges,
     flowInterfaces,
+    flowFunctions,
     execView,
     setExecView,
     setPreflightIssues,
@@ -319,7 +336,10 @@ export function Toolbar() {
   const isEmptyFlow = nodes.length === 0 && edges.length === 0;
   const currentFlowSignature = useMemo(
     () => flowSignatureFor(getFlow()),
-    [edges, flowInterfaces, flowName, getFlow, nodes]
+    // flowFunctions is load-bearing: a function-only edit changes the flow's
+    // saved bytes but touches no node/edge, so without it here the signature
+    // never recomputes and Save stays disabled on a real change (adversary P0-1).
+    [edges, flowInterfaces, flowName, flowFunctions, getFlow, nodes]
   );
   const [savedFlowSignature, setSavedFlowSignature] = useState(() => flowSignatureFor(getFlow()));
   const savedFlowIdentityRef = useRef<string | null>(flowId || null);
@@ -1021,6 +1041,7 @@ export function Toolbar() {
       gatewayReadiness,
       gatewayCapabilitiesLoading: gatewayCapabilitiesQuery.isLoading,
       gatewayCapabilitiesKnown: Boolean(gatewayContracts && !gatewayCapabilitiesQuery.isError),
+      flowFunctions: useFlowStore.getState().flowFunctions,
     });
     if (issues.length > 0) {
       setPreflightIssues(issues);

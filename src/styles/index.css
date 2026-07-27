@@ -180,6 +180,14 @@ body,
   flex-basis: calc(clamp(276px, calc(var(--sidebar-width) * 1.15), 360px) + var(--right-drawer-rail-width));
 }
 
+/* Functions library panel: signatures + code need the assistant-class width
+   (the properties width truncates `name(params)` rows into unreadability —
+   the frame_2 mockup's drawer is wide for a reason). */
+.properties-drawer.functions-drawer-open {
+  width: calc(clamp(340px, 30vw, 480px) + var(--right-drawer-rail-width));
+  flex-basis: calc(clamp(340px, 30vw, 480px) + var(--right-drawer-rail-width));
+}
+
 .properties-drawer.collapsed {
   width: var(--right-drawer-rail-width);
   min-width: var(--right-drawer-rail-width);

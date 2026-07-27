@@ -1,11 +1,24 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-07-22
+- Updated: 2026-07-26
 - Planned: 0
-- Proposed: 40
+- Proposed: 46 (39 numbered + 7 legacy-named; the prior snapshot said 40 and
+  had drifted from the directory contents)
 - Completed: 53
 - Deprecated: 0
+
+## 2026-07-26 pin expressions tier-2 hold + amendments (0154)
+Item 0154 (`abstractflow-0154`): decision record — tier 1 (anonymous inline
+pin expressions) shipped 2026-07-25; the named-library tier is deliberately
+HELD until tier 1 proves out, reshaped per the ruled amendments (promote at
+the second call site, never at a line count; multi-output helpers stay nodes;
+paste embeds definitions with hash dedup; the authoring assistant keeps
+emitting nodes with collapse as a mechanical post-pass). Also records the
+tier-1 loose ends open at hold time: entity-life migration deferred, two
+acceptance screenshots owed, while-condition failure-channel divergence,
+min-runtime bundle gate undecided, multiagent-coding 0.0.4 version bump owed,
+dist rebuild owed.
 
 ## 2026-07-22 deterministic camera nodes (0151)
 Item 0151 (`abstractflow-0151`): operator order (laurent dm#49) — five

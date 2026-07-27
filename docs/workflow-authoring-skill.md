@@ -56,6 +56,14 @@ Node fields:
   defaults.
 - `pin_defaults`: values for unconnected input pins. Merged per key — omitted
   keys keep their current values; emit a key to change it.
+- `pin_expressions`: sandboxed Python expressions computing input pins at
+  resolution time: `{"condition": "vars.fix_cycles < 3"}`. An expression
+  reads `vars.*` (run variables, read-only) and `value` (the pin's wire value
+  if connected, else its pin default) and replaces the pin's value. Merged
+  per key like `pin_defaults`; emit an empty string to remove one. Prefer an
+  expression over a Get Variable -> Code chain for a small condition or field
+  read; use a Code node for multi-statement logic. Secret-looking expression
+  text is refused.
 - `literal`: value of literal/config nodes. For Tools Allowlist it is the
   array of exact tool names; for String Template it is the template text; for
   Variable nodes it is the declaration `{"name":"transcript","type":"array","default":[]}`.

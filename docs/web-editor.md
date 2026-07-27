@@ -172,17 +172,18 @@ failure directly.
 Assistant output is treated as an untrusted edit proposal. The emitted
 document is compiled by a diff against the current graph into the editor's
 internal validated command set (node creation/deletion, safe dynamic pins,
-pin defaults, literals, Code node bodies, labels, concat separators, and
-validated connections), so every existing validator and security guard stays
+pin defaults, pin expressions, literals, Code node bodies, labels, concat
+separators, and validated connections), so every existing validator and
+security guard stays
 the single source of truth for graph mutation. The reducer rejects unknown
 node types, invalid edges, secret-looking values, Code `full_access`, and Tool
 Calls nodes without an explicit `allowed_tools` allowlist. Node deletions are
 allowed as part of document ownership and remain recoverable with Undo Turn;
 secrets are serialized to the model as `<redacted>` and the diff never writes
-that sentinel back. `pin_defaults` merge per key, node ids are stable
-identities (a type change requires a new id), existing node positions are
-never moved, and new nodes without explicit positions get execution-depth
-auto-layout.
+that sentinel back. `pin_defaults` and `pin_expressions` merge per key (an
+empty-string expression removes one), node ids are stable identities (a type
+change requires a new id), existing node positions are never moved, and new
+nodes without explicit positions get execution-depth auto-layout.
 
 Compiled changes are applied per-command in dependency order (nodes first, then
 configuration, then connections, with disconnects before connects). Valid

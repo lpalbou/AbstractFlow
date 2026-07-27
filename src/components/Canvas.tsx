@@ -707,6 +707,16 @@ function CanvasBody() {
     [nodes, DEFAULT_ZOOM]
   );
 
+  // Honor cross-component focus requests (the Functions drawer's Used-by rows
+  // live outside this component and signal through the store — adversary
+  // P1-10: a Used-by click must actually bring the consumer into view).
+  const focusNodeRequest = useFlowStore((s) => s.focusNodeRequest);
+  useEffect(() => {
+    if (focusNodeRequest?.nodeId) focusNode(focusNodeRequest.nodeId);
+    // Keyed on nonce so repeated clicks on the same row re-center.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNodeRequest?.nonce]);
+
   const minimapNodeColor = useCallback((node: Node<FlowNodeData>): string => {
     const data = node.data as FlowNodeData;
     return data?.headerColor || '#71819a';

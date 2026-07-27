@@ -261,6 +261,18 @@ export interface FlowNodeData {
    */
   pinDefaults?: Record<string, JsonValue>;
   /**
+   * Inline pin expressions (tier 1, 2026-07-25): small sandboxed Python
+   * expressions evaluated at input resolution on the consuming node. The
+   * expression may read `vars.*` (run vars, read-only) and `value` (the
+   * pin's wire value if wired, else its pin default). Stored in its OWN
+   * field — deliberately never inside pinDefaults — so pre-expression
+   * runtimes skew SAFE: an unread key means the pin falls back to its
+   * default (falsy conditions keep loops bounded) instead of a truthy
+   * expression-dict spinning a while loop (the fail-dangerous encoding the
+   * design verdict rejected).
+   */
+  pinExpressions?: Record<string, string>;
+  /**
    * Stable route order for nodes with multiple incoming execution edges.
    * The editor derives this from exec-in wires on save; the runtime lowers it
    * into internal join/path-mux nodes.
@@ -429,6 +441,21 @@ export interface FlowNodeData {
 }
 
 // Visual flow definition
+/**
+ * A named flow-level helper function (tier 2 of the expression redesign,
+ * 2026-07-26). `code` is the full `def name(...): ...` source; it compiles
+ * runtime-side into the SAME RestrictedPython sandbox as code-node bodies,
+ * and pin expressions call it by name (`build_again(vars.state, 3)`).
+ * `kind` is a display tag (checker / shaper / parser / composer); it carries
+ * no runtime meaning.
+ */
+export interface FlowFunction {
+  name: string;
+  code: string;
+  kind?: string;
+  description?: string;
+}
+
 export interface VisualFlow {
   id: string;
   name: string;
@@ -441,6 +468,12 @@ export interface VisualFlow {
   nodes: VisualNode[];
   edges: VisualEdge[];
   entryNode?: string;
+  /**
+   * Flow-level named helper functions callable from pin expressions.
+   * Skew-safe: older runtimes never read this field (and never read
+   * pinExpressions either, so calling pins fall back to their defaults).
+   */
+  functions?: FlowFunction[];
   created_at?: string;
   updated_at?: string;
 }

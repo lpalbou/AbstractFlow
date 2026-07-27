@@ -53,48 +53,6 @@
       "outputs": []
     },
     {
-      "id": "ctx_var",
-      "type": "get_var",
-      "position": {
-        "x": 200,
-        "y": 100
-      },
-      "data": {
-        "nodeType": "get_var",
-        "label": "Get context",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "name",
-            "label": "name",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "name": "context",
-          "default": {}
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "chat_state",
       "type": "code",
       "position": {
@@ -144,7 +102,10 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "\n# Session continuity for chat clients: when the host seeds durable session\n# history (use_session_history -> context.messages), fold the recent turns\n# into the session log so the shelf's THIS-SESSION block carries the live\n# conversation — without this every chat prompt was an amnesiac turn and\n# only graph recall bridged prompts (adversary F6).\nstate = _input.get(\"state\")\nif not isinstance(state, dict):\n    state = {}\nstate = dict(state)\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nif not log:\n    ctx = _input.get(\"context\")\n    if not isinstance(ctx, dict):\n        ctx = {}\n    msgs = ctx.get(\"messages\")\n    if not isinstance(msgs, list):\n        msgs = []\n    pending_user = \"\"\n    folded = []\n    for m in msgs[-24:]:\n        if not isinstance(m, dict):\n            continue\n        role = str(m.get(\"role\") or \"\")\n        content = str(m.get(\"content\") or \"\")\n        if role == \"user\":\n            pending_user = content\n        elif role == \"assistant\" and pending_user:\n            folded.append({\"stimulus\": pending_user, \"reply\": content})\n            pending_user = \"\"\n    if folded:\n        log = folded[-12:]\n        state[\"turn_log\"] = log\nreturn {\"state\": state}\n"
+        "codeBody": "\n# Session continuity for chat clients: when the host seeds durable session\n# history (use_session_history -> context.messages), fold the recent turns\n# into the session log so the shelf's THIS-SESSION block carries the live\n# conversation — without this every chat prompt was an amnesiac turn and\n# only graph recall bridged prompts (adversary F6).\nstate = _input.get(\"state\")\nif not isinstance(state, dict):\n    state = {}\nstate = dict(state)\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nif not log:\n    ctx = _input.get(\"context\")\n    if not isinstance(ctx, dict):\n        ctx = {}\n    msgs = ctx.get(\"messages\")\n    if not isinstance(msgs, list):\n        msgs = []\n    pending_user = \"\"\n    folded = []\n    for m in msgs[-24:]:\n        if not isinstance(m, dict):\n            continue\n        role = str(m.get(\"role\") or \"\")\n        content = str(m.get(\"content\") or \"\")\n        if role == \"user\":\n            pending_user = content\n        elif role == \"assistant\" and pending_user:\n            folded.append({\"stimulus\": pending_user, \"reply\": content})\n            pending_user = \"\"\n    if folded:\n        log = folded[-12:]\n        state[\"turn_log\"] = log\nreturn {\"state\": state}\n",
+        "pinExpressions": {
+          "context": "vars.get(\"context\", {})"
+        }
       },
       "label": null,
       "icon": null,
@@ -293,53 +254,6 @@
       "outputs": []
     },
     {
-      "id": "entry_out",
-      "type": "get",
-      "position": {
-        "x": 940,
-        "y": 200
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get diary_entry_id",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "diary_entry_id",
-          "default": ""
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "close_word",
       "type": "code",
       "position": {
@@ -436,7 +350,10 @@
             "type": "string"
           }
         ],
-        "outputs": []
+        "outputs": [],
+        "pinExpressions": {
+          "diary_entry_id": "(value or {}).get(\"diary_entry_id\", \"\")"
+        }
       },
       "label": null,
       "icon": null,
@@ -471,14 +388,6 @@
       "animated": false
     },
     {
-      "id": "e-ctx_var-value-chat_state-context",
-      "source": "ctx_var",
-      "sourceHandle": "value",
-      "target": "chat_state",
-      "targetHandle": "context",
-      "animated": false
-    },
-    {
       "id": "e-chat_state-state-close_in-state",
       "source": "chat_state",
       "sourceHandle": "state",
@@ -507,14 +416,6 @@
       "source": "close",
       "sourceHandle": "output",
       "target": "turns_out",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-close-output-entry_out-object",
-      "source": "close",
-      "sourceHandle": "output",
-      "target": "entry_out",
       "targetHandle": "object",
       "animated": false
     },
@@ -559,15 +460,15 @@
       "animated": false
     },
     {
-      "id": "e-entry_out-value-end-diary_entry_id",
-      "source": "entry_out",
-      "sourceHandle": "value",
+      "id": "e-close-output-end-diary_entry_id",
+      "source": "close",
+      "sourceHandle": "output",
       "target": "end",
       "targetHandle": "diary_entry_id",
       "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-25T06:34:59.960773+00:00",
-  "updated_at": "2026-07-25T06:34:59.960773+00:00"
+  "created_at": "2026-07-26T07:14:57.024011+00:00",
+  "updated_at": "2026-07-26T07:14:57.024011+00:00"
 }

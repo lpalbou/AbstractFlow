@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
+import textwrap
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -44,7 +45,7 @@ def pin(pin_id: str, label: str, pin_type: str) -> dict[str, Any]:
 
 
 def node(node_id, node_type, label, x, y, *, inputs=None, outputs=None,
-         pin_defaults=None, extra=None) -> dict[str, Any]:
+         pin_defaults=None, pin_expressions=None, extra=None) -> dict[str, Any]:
     data: dict[str, Any] = {
         "nodeType": node_type, "label": label,
         "icon": _ICON.get(node_type, "&#x25A1;"),
@@ -53,11 +54,26 @@ def node(node_id, node_type, label, x, y, *, inputs=None, outputs=None,
     }
     if pin_defaults:
         data["pinDefaults"] = pin_defaults
+    if pin_expressions:
+        # Inline pin expressions (tier 1, 2026-07-25): {pin_id: "vars.x < 3"}.
+        # Sandboxed Python evaluated at input resolution; reads vars.* and
+        # `value` (the pin's wire/default). Own field — NEVER a pinDefaults
+        # sentinel — so pre-expression runtimes skew safe (unread key -> pin
+        # falls back to default -> falsy conditions keep loops bounded).
+        data["pinExpressions"] = pin_expressions
     if extra:
         data.update(extra)
     return {"id": node_id, "type": node_type, "position": {"x": x, "y": y},
             "data": data, "label": None, "icon": None, "headerColor": None,
             "inputs": [], "outputs": []}
+
+
+def with_expressions(node_dict: dict[str, Any], exprs: dict[str, str]) -> dict[str, Any]:
+    """Attach pin expressions to an already-built node (for the typed helper
+    builders like while_node/code_node that don't expose the kwarg)."""
+    node_dict["data"]["pinExpressions"] = {
+        **node_dict["data"].get("pinExpressions", {}), **exprs}
+    return node_dict
 
 
 def edge(source, source_handle, target, target_handle, *, animated=False):
@@ -68,11 +84,30 @@ def edge(source, source_handle, target, target_handle, *, animated=False):
     }
 
 
-def base_flow(flow_id, name, description, interfaces=None):
+def base_flow(flow_id, name, description, interfaces=None, functions=None):
     now = datetime.now(timezone.utc).isoformat()
-    return {"id": flow_id, "name": name, "description": description,
+    flow = {"id": flow_id, "name": name, "description": description,
             "interfaces": interfaces or [], "nodes": [], "edges": [],
             "entryNode": "start", "created_at": now, "updated_at": now}
+    if functions:
+        # Flow-level named helper functions (tier 2, 2026-07-26): entries from
+        # fn(...). Compiled runtime-side into the code-node sandbox; pin
+        # expressions call them by name. Skew-safe: old runtimes read neither
+        # this field nor pinExpressions.
+        flow["functions"] = functions
+    return flow
+
+
+def fn(name: str, code: str, *, kind: str = "", description: str = "") -> dict[str, Any]:
+    """One flow-level function entry. `code` is the FULL `def name(...)` source
+    (dedented); the def name must match `name` (runtime + editor both refuse a
+    mismatch)."""
+    entry: dict[str, Any] = {"name": name, "code": textwrap.dedent(code).strip() + "\n"}
+    if kind:
+        entry["kind"] = kind
+    if description:
+        entry["description"] = description
+    return entry
 
 
 def start_node(label, outputs, x, y, *, pin_defaults=None):
@@ -604,11 +639,16 @@ def validate_edges(flow: dict[str, Any]) -> list[str]:
         if n["data"].get("nodeType") != "code":
             continue
         defaults = n["data"].get("pinDefaults") or {}
+        # A pin expression SATISFIES an input (same rule as the editor's
+        # preflight): the runtime computes the pin at resolution time, so an
+        # expression-fed code input is not a coverage gap.
+        expressions = n["data"].get("pinExpressions") or {}
         for p in n["data"].get("inputs") or []:
             pid = p.get("id")
             if pid == "permissions" or p.get("type") == "execution":
                 continue
-            if pid not in incoming.get(n["id"], set()) and pid not in defaults:
+            if (pid not in incoming.get(n["id"], set())
+                    and pid not in defaults and pid not in expressions):
                 problems.append(f"{n['id']}.{pid}: code input has no edge and no pin default")
     return problems
 

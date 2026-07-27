@@ -1,5 +1,5 @@
 import type { Edge, Node } from 'reactflow';
-import type { FlowNodeData, JsonValue, NodeType, Pin, PinType, VisualFlow } from '../types/flow';
+import type { FlowFunction, FlowNodeData, JsonValue, NodeType, Pin, PinType, VisualFlow } from '../types/flow';
 import { createNodeData, getAllNodeTemplates, getNodeTemplate, type NodeTemplate } from '../types/nodes';
 import { subflowPinPatchForSelectedFlow } from './subflowPins';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from './validation';
@@ -21,6 +21,7 @@ export interface FlowAuthoringSnapshot {
   flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
+  flowFunctions: FlowFunction[];
 }
 
 export interface FlowAuthoringApplyInput {
@@ -28,6 +29,8 @@ export interface FlowAuthoringApplyInput {
   flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
+  /** Flow function library (tier 2); set_function/remove_function edit it. */
+  flowFunctions?: FlowFunction[];
   commands: unknown[];
   allowDestructive?: boolean;
   /**
@@ -43,6 +46,7 @@ export interface FlowAuthoringApplyResult {
   flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
+  flowFunctions: FlowFunction[];
   applied: string[];
   warnings: string[];
   errors: string[];
@@ -382,7 +386,7 @@ function nodeById(nodes: Node<FlowNodeData>[], id: string): Node<FlowNodeData> |
   return nodes.find((node) => node.id === id);
 }
 
-function hasSecretLikeValue(key: string, value: JsonValue): boolean {
+export function hasSecretLikeValue(key: string, value: JsonValue): boolean {
   if (SECRET_KEY_PATTERN.test(key)) return true;
   if (typeof value === 'string' && SECRET_VALUE_PATTERN.test(value)) return true;
   if (Array.isArray(value)) return value.some((item, index) => hasSecretLikeValue(`${key}.${index}`, item));
@@ -481,12 +485,14 @@ export function makeFlowAuthoringSnapshot(
   flowInterfaces: string[],
   nodes: Node<FlowNodeData>[],
   edges: Edge[],
+  flowFunctions: FlowFunction[] = [],
 ): FlowAuthoringSnapshot {
   return {
     flowName,
     flowInterfaces: [...flowInterfaces],
     nodes: clone(nodes),
     edges: clone(edges),
+    flowFunctions: clone(flowFunctions),
   };
 }
 
@@ -501,7 +507,10 @@ function commandOrderRank(kind: string): number {
   // disconnect shares the connect rank so "disconnect a->b, connect c->b"
   // batches apply in the order the model emitted them (stable sort).
   if (kind === 'connect' || kind === 'disconnect') return 2;
-  if (kind === 'delete_node' || kind === 'delete_edge') return 3;
+  // remove_function ranks with the destructive edits: a batch that rewrites
+  // call-site expressions AND removes the function must apply the rewrites
+  // first or the removal is refused for call sites the same batch clears.
+  if (kind === 'delete_node' || kind === 'delete_edge' || kind === 'remove_function') return 3;
   return 1;
 }
 
@@ -540,7 +549,10 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
   let flowInterfaces = [...input.flowInterfaces];
   let nodes = clone(input.nodes);
   let edges = clone(input.edges);
-  const snapshot = makeFlowAuthoringSnapshot(input.flowName, input.flowInterfaces, input.nodes, input.edges);
+  let flowFunctions = clone(input.flowFunctions || []);
+  const snapshot = makeFlowAuthoringSnapshot(
+    input.flowName, input.flowInterfaces, input.nodes, input.edges, input.flowFunctions || []
+  );
   const applied: string[] = [];
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -602,6 +614,73 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
         : [];
       flowInterfaces = Array.from(new Set(values));
       applied.push('Updated flow interfaces');
+      continue;
+    }
+
+    if (kind === 'set_function') {
+      const name = cleanText(command.name, 120);
+      const code = typeof command.code === 'string' ? command.code : '';
+      if (!name || !/^[A-Za-z_]\w*$/.test(name) || name.startsWith('__')) {
+        errors.push(`set_function requires a plain-identifier name (got '${name || 'nothing'}')`);
+        continue;
+      }
+      if (!code.trim()) {
+        errors.push(`set_function '${name}' requires non-empty code`);
+        continue;
+      }
+      const defRe = new RegExp(`(^|\\n)\\s*def\\s+${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`);
+      if (!defRe.test(code)) {
+        errors.push(`set_function '${name}': code must contain 'def ${name}(...)' — the def name must match`);
+        continue;
+      }
+      const entry: FlowFunction = { name, code };
+      const kindTag = cleanText(command.kind, 40);
+      if (kindTag) entry.kind = kindTag;
+      const description = cleanText(command.description, 300);
+      if (description) entry.description = description;
+      const idx = flowFunctions.findIndex((fn) => fn.name === name);
+      if (idx >= 0) {
+        if (deepEqualJson(flowFunctions[idx], entry)) {
+          warnings.push(`set_function '${name}' matched the existing definition (no-op)`);
+          continue;
+        }
+        flowFunctions[idx] = entry;
+        applied.push(`Updated function ${name}`);
+      } else {
+        flowFunctions.push(entry);
+        applied.push(`Added function ${name}`);
+      }
+      continue;
+    }
+
+    if (kind === 'remove_function') {
+      const name = cleanText(command.name, 120);
+      const idx = flowFunctions.findIndex((fn) => fn.name === name);
+      if (idx < 0) {
+        errors.push(`remove_function: no function named '${name}'`);
+        continue;
+      }
+      // Refuse while pin expressions still CALL it — deleting the definition
+      // under live call sites turns them into runtime NameErrors.
+      const callRe = new RegExp(`(^|[^\\w.])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`);
+      const callSites: string[] = [];
+      for (const node of nodes) {
+        const exprs = node.data?.pinExpressions;
+        if (!exprs) continue;
+        for (const [pinId, expr] of Object.entries(exprs)) {
+          if (typeof expr === 'string' && callRe.test(expr)) {
+            callSites.push(`${node.data.label || node.id}.${pinId}`);
+          }
+        }
+      }
+      if (callSites.length > 0) {
+        errors.push(
+          `remove_function '${name}' refused: still called by ${callSites.slice(0, 4).join(', ')}${callSites.length > 4 ? ', …' : ''} — rewrite those expressions first`
+        );
+        continue;
+      }
+      flowFunctions.splice(idx, 1);
+      applied.push(`Removed function ${name}`);
       continue;
     }
 
@@ -667,6 +746,22 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
         continue;
       }
       if (Object.keys(validDefaults).length > 0) data.pinDefaults = { ...(data.pinDefaults || {}), ...validDefaults };
+      const rawExprs = command.pinExpressions ?? command.pin_expressions;
+      if (rawExprs && typeof rawExprs === 'object' && !Array.isArray(rawExprs)) {
+        const exprs: Record<string, string> = {};
+        let exprRefused = false;
+        for (const [pinId, e] of Object.entries(rawExprs as Record<string, unknown>)) {
+          if (typeof e !== 'string' || !e.trim()) continue;
+          if (hasSecretLikeValue(pinId, e)) {
+            errors.push(`add_node ${id}: refused secret-looking expression on '${pinId}'`);
+            exprRefused = true;
+            break;
+          }
+          exprs[pinId] = e.trim();
+        }
+        if (exprRefused) continue;
+        if (Object.keys(exprs).length > 0) data.pinExpressions = exprs;
+      }
       if (literal !== undefined) {
         if (hasSecretLikeValue('literalValue', literal)) {
           errors.push(`add_node ${id}: refused secret-looking literal value`);
@@ -811,6 +906,61 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       );
       touched.add(nodeId);
       applied.push(`Set ${nodeId}.${pin} = ${describePinValue(value)}`);
+      continue;
+    }
+
+    if (kind === 'set_pin_expression') {
+      // Inline pin expressions (tier 1, 2026-07-25): sandboxed Python computed
+      // at input resolution. Empty string REMOVES (merge-per-key documents
+      // need a removal verb). Same pin-existence guards as set_pin_default.
+      const nodeId = resolveNodeId(command.nodeId || command.node_id, idMap);
+      const pin = normalizeId(command.pin || command.pinId || command.pin_id, '');
+      const node = nodeById(nodes, nodeId);
+      const rawExpr = command.expression ?? command.expr ?? command.value;
+      if (!node || !pin || typeof rawExpr !== 'string') {
+        errors.push(`set_pin_expression requires node, pin, and a string expression (${nodeId || 'missing'}.${pin || 'missing'})`);
+        continue;
+      }
+      const targetPin = pinById(node, pin, 'input');
+      if (!targetPin) {
+        const available = (node.data.inputs || [])
+          .filter((item) => item.type !== 'execution')
+          .map((item) => item.id);
+        errors.push(
+          `set_pin_expression refused unknown input pin '${pin}' on ${nodeId}${available.length > 0 ? ` (available input pins: ${available.join(', ')})` : ' (node has no data input pins)'}`
+        );
+        continue;
+      }
+      if (targetPin.type === 'execution') {
+        errors.push(`set_pin_expression refused execution input pin '${pin}' on ${nodeId}`);
+        continue;
+      }
+      const expr = rawExpr.trim();
+      if (hasSecretLikeValue(pin, expr)) {
+        errors.push(`set_pin_expression refused secret-looking expression for ${nodeId}.${pin}`);
+        continue;
+      }
+      const currentExprs = (node.data.pinExpressions || {}) as Record<string, string>;
+      const existing = (currentExprs[pin] || '').trim();
+      if (existing === expr) {
+        warnings.push(`${nodeId}.${pin} expression is already ${expr ? `\`${expr}\`` : 'empty'}; no change`);
+        continue;
+      }
+      nodes = nodes.map((item) => {
+        if (item.id !== nodeId) return item;
+        const nextExprs: Record<string, string> = { ...(item.data.pinExpressions || {}) };
+        if (expr) nextExprs[pin] = expr;
+        else delete nextExprs[pin];
+        return {
+          ...item,
+          data: {
+            ...item.data,
+            pinExpressions: Object.keys(nextExprs).length ? nextExprs : undefined,
+          },
+        };
+      });
+      touched.add(nodeId);
+      applied.push(expr ? `Set ${nodeId}.${pin} expression = \`${expr.length > 60 ? `${expr.slice(0, 59)}…` : expr}\`` : `Removed ${nodeId}.${pin} expression`);
       continue;
     }
 
@@ -1863,6 +2013,7 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
     flowInterfaces,
     nodes,
     edges,
+    flowFunctions,
     applied,
     warnings,
     errors,

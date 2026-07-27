@@ -676,6 +676,68 @@ describe('flow authoring commands', () => {
     expect(result.errors.some((error) => error.includes('secret-looking literal'))).toBe(true);
   });
 
+  // Inline pin expressions (tier 1, cycle 2): set_pin_expression guards.
+  it('sets a valid pin expression on an existing input pin', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'add_input_pin', nodeId: 'end', id: 'answer', label: 'answer', pinType: 'number' },
+        { action: 'set_pin_expression', nodeId: 'end', pin: 'answer', expression: 'vars.count * 2' },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+    const end = result.nodes.find((n) => n.id === 'end');
+    expect(end?.data.pinExpressions).toEqual({ answer: 'vars.count * 2' });
+  });
+
+  it('set_pin_expression refuses a secret-looking expression (value + key patterns)', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'add_input_pin', nodeId: 'end', id: 'answer', label: 'answer', pinType: 'string' },
+        { action: 'add_input_pin', nodeId: 'end', id: 'api_key', label: 'api_key', pinType: 'string' },
+        // secret VALUE pattern (a hardcoded token in the expression text)
+        { action: 'set_pin_expression', nodeId: 'end', pin: 'answer', expression: '"sk-abcdefghijklmnopqrstuvwxyz"' },
+        // secret KEY pattern (the pin name itself looks credential-shaped)
+        { action: 'set_pin_expression', nodeId: 'end', pin: 'api_key', expression: 'vars.token' },
+      ],
+    });
+    expect(result.errors.some((e) => e.includes('secret-looking expression'))).toBe(true);
+    const end = result.nodes.find((n) => n.id === 'end');
+    expect(end?.data.pinExpressions).toBeUndefined();
+  });
+
+  it('set_pin_expression refuses an unknown input pin (stale rename/delete)', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'add_input_pin', nodeId: 'end', id: 'answer', label: 'answer', pinType: 'number' },
+        { action: 'set_pin_expression', nodeId: 'end', pin: 'ghost', expression: 'vars.count' },
+      ],
+    });
+    expect(result.errors.some((e) => e.includes("unknown input pin 'ghost'"))).toBe(true);
+    const end = result.nodes.find((n) => n.id === 'end');
+    expect(end?.data.pinExpressions).toBeUndefined();
+  });
+
+  it('set_pin_expression with an empty string removes an existing expression', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'add_input_pin', nodeId: 'end', id: 'answer', label: 'answer', pinType: 'number' },
+        { action: 'set_pin_expression', nodeId: 'end', pin: 'answer', expression: 'vars.count' },
+        { action: 'set_pin_expression', nodeId: 'end', pin: 'answer', expression: '' },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+    const end = result.nodes.find((n) => n.id === 'end');
+    expect(end?.data.pinExpressions).toBeUndefined();
+  });
+
   it('applies commands in dependency order so connect can precede add_node in the batch', () => {
     const result = applyFlowAuthoringCommands({
       ...emptyState(),

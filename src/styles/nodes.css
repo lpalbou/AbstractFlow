@@ -1271,3 +1271,304 @@
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Inline pin expressions (tier 1, 2026-07-25). Amber (#EBB443) is the
+   "computed" accent — a NEW color distinct from every pin type color so a
+   computed pin can never be confused with a wired or defaulted one.
+   --------------------------------------------------------------------------- */
+
+/* Ghost creator: rendered always, revealed on pin-row hover only — hundreds
+   of idle pins must stay visually silent. */
+.fx-ghost {
+  opacity: 0;
+  pointer-events: none;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid rgba(235, 180, 67, 0.45);
+  border-radius: 6px;
+  background: rgba(235, 180, 67, 0.08);
+  color: #ebb443;
+  font-size: 9px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 16px;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+.pin-row:hover .fx-ghost {
+  opacity: 0.85;
+  pointer-events: auto;
+}
+/* Keyboard parity with the hover reveal: a focused ghost must be visible
+   (an invisible focus stop is a keyboard trap — Tab could land here and
+   Enter would activate a control the user cannot see). Plain :focus, not
+   :focus-visible: any focus modality must reveal it, and mouse focus only
+   ever happens when hover already revealed it, so there is no noise cost.
+   The app-wide focus-visible outline still provides the keyboard ring. */
+.fx-ghost:focus {
+  opacity: 0.85;
+  pointer-events: auto;
+}
+.fx-ghost:hover {
+  opacity: 1 !important;
+  background: rgba(235, 180, 67, 0.18);
+}
+
+/* The chip a bound pin carries: fx glyph + truncated expression preview. */
+.fx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 190px;
+  margin-left: 6px;
+  padding: 1px 7px 1px 5px;
+  border: 1px solid rgba(235, 180, 67, 0.55);
+  border-radius: 7px;
+  background: rgba(235, 180, 67, 0.1);
+  color: #ebb443;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.fx-chip:hover {
+  background: rgba(235, 180, 67, 0.2);
+}
+.fx-chip .fx-glyph {
+  font-size: 9px;
+  font-style: italic;
+  font-weight: 700;
+}
+.fx-chip .fx-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 9.5px;
+  color: rgba(235, 180, 67, 0.92);
+}
+
+/* The pin dot's third state: computed. Wire-or-default filled state stays
+   the shape's own; the amber halo says "an expression computes this value".
+   Chained hard drop-shadows dilate the svg's own silhouette, so the halo
+   FOLLOWS the pin's type shape (diamond, square, hexagon, circle) — the
+   earlier circular box-shadow ring read as a solid amber coin around
+   non-circular shapes and drowned the type glyph it must preserve. */
+.pin-row.pin-computed .pin-shape svg {
+  filter: drop-shadow(1.5px 0 0 rgba(235, 180, 67, 0.7))
+    drop-shadow(-1.5px 0 0 rgba(235, 180, 67, 0.7))
+    drop-shadow(0 1.5px 0 rgba(235, 180, 67, 0.7))
+    drop-shadow(0 -1.5px 0 rgba(235, 180, 67, 0.7));
+}
+
+/* Inline editor: an expansion under the pin row, inside the card. */
+.fx-editor {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 4px 0 6px;
+  padding: 7px 8px;
+  border: 1px solid rgba(235, 180, 67, 0.4);
+  border-radius: 8px;
+  background: rgba(20, 20, 34, 0.92);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fx-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ebb443;
+}
+.fx-editor-head .fx-glyph {
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 700;
+}
+.fx-editor-title {
+  font-size: 10px;
+  color: rgba(240, 240, 250, 0.85);
+}
+.fx-editor-area {
+  width: 100%;
+  resize: vertical;
+  min-height: 26px;
+  padding: 5px 7px;
+  border: 1px solid rgba(120, 120, 160, 0.35);
+  border-radius: 6px;
+  background: rgba(10, 10, 20, 0.85);
+  color: #e8e8f2;
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
+  outline: none;
+}
+.fx-editor-area:focus {
+  border-color: rgba(235, 180, 67, 0.6);
+}
+.fx-editor-hint {
+  font-size: 9px;
+  color: rgba(200, 200, 220, 0.6);
+}
+.fx-editor-hint code {
+  color: rgba(235, 180, 67, 0.85);
+  font-size: 9px;
+}
+.fx-editor-vars {
+  color: rgba(160, 200, 255, 0.7);
+}
+.fx-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fx-editor-spacer {
+  flex: 1;
+}
+.fx-btn {
+  padding: 2px 10px;
+  border: 1px solid rgba(120, 120, 160, 0.4);
+  border-radius: 6px;
+  background: rgba(60, 60, 90, 0.4);
+  color: #d8d8e8;
+  font-size: 10px;
+  cursor: pointer;
+}
+.fx-btn:hover {
+  background: rgba(80, 80, 120, 0.5);
+}
+.fx-btn-primary {
+  border-color: rgba(155, 89, 182, 0.7);
+  background: rgba(155, 89, 182, 0.35);
+  color: #f2e8fa;
+}
+.fx-btn-primary:hover {
+  background: rgba(155, 89, 182, 0.55);
+}
+.fx-btn-danger {
+  border-color: rgba(220, 90, 90, 0.5);
+  background: rgba(220, 90, 90, 0.15);
+  color: #f0b0b0;
+}
+.fx-btn-danger:hover {
+  background: rgba(220, 90, 90, 0.3);
+}
+
+/* Condition inline preview on while/if cards: the deciding law stays
+   readable ON the canvas (the readability bar's question 3), no hover needed. */
+.fx-condition-preview {
+  margin: 2px 8px 6px 26px;
+  padding: 3px 8px;
+  border-left: 2px solid rgba(235, 180, 67, 0.5);
+  color: rgba(235, 200, 140, 0.85);
+  font-size: 9.5px;
+  font-style: italic;
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 260px;
+}
+
+/* Function-binding chip: a pin whose expression is a call into the flow's
+   named library renders `ƒ name` (frame_2/3 mockups) — logic reads as a
+   NAME, not as code text. Same amber family, slightly stronger fill so a
+   bound name and a raw expression are distinguishable at a glance. */
+.fx-chip-fn {
+  border-color: rgba(235, 180, 67, 0.75);
+  background: rgba(235, 180, 67, 0.16);
+}
+.fx-chip-fn .fx-preview {
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* Docked function bindings (proposal_6): a footer strip on the consumer
+   card listing each `ƒ function → pin` binding. */
+.fx-docked {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 6px 6px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(235, 180, 67, 0.25);
+}
+.fx-docked-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  border: 1px solid rgba(235, 180, 67, 0.35);
+  border-radius: 6px;
+  background: rgba(28, 24, 40, 0.85);
+  color: #ebb443;
+  font-size: 9.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.fx-docked-row:hover {
+  background: rgba(235, 180, 67, 0.14);
+}
+.fx-docked-row .fx-glyph {
+  font-size: 9px;
+  font-style: italic;
+  font-weight: 700;
+}
+.fx-docked-name {
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+  color: rgba(235, 200, 140, 0.95);
+}
+.fx-docked-pin {
+  color: rgba(200, 200, 220, 0.55);
+  font-size: 9px;
+}
+
+/* Promote-to-function panel inside the expression editor (frame_4). */
+.fx-promote {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(235, 180, 67, 0.3);
+}
+.fx-promote-row {
+  display: flex;
+  gap: 6px;
+}
+.fx-promote-name {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 7px;
+  border: 1px solid rgba(120, 120, 160, 0.35);
+  border-radius: 6px;
+  background: rgba(10, 10, 20, 0.85);
+  color: #e8e8f2;
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 10.5px;
+  outline: none;
+}
+.fx-promote-name:focus {
+  border-color: rgba(235, 180, 67, 0.6);
+}
+.fx-promote-kind {
+  padding: 3px 6px;
+  border: 1px solid rgba(120, 120, 160, 0.35);
+  border-radius: 6px;
+  background: rgba(10, 10, 20, 0.85);
+  color: #d8d8e8;
+  font-size: 10px;
+}
+.fx-promote-preview {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(120, 120, 160, 0.3);
+  border-radius: 6px;
+  background: rgba(10, 10, 20, 0.85);
+  color: rgba(200, 220, 200, 0.9);
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 9.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 140px;
+  overflow: auto;
+}

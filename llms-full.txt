@@ -441,17 +441,18 @@ failure directly.
 Assistant output is treated as an untrusted edit proposal. The emitted
 document is compiled by a diff against the current graph into the editor's
 internal validated command set (node creation/deletion, safe dynamic pins,
-pin defaults, literals, Code node bodies, labels, concat separators, and
-validated connections), so every existing validator and security guard stays
+pin defaults, pin expressions, literals, Code node bodies, labels, concat
+separators, and validated connections), so every existing validator and
+security guard stays
 the single source of truth for graph mutation. The reducer rejects unknown
 node types, invalid edges, secret-looking values, Code `full_access`, and Tool
 Calls nodes without an explicit `allowed_tools` allowlist. Node deletions are
 allowed as part of document ownership and remain recoverable with Undo Turn;
 secrets are serialized to the model as `<redacted>` and the diff never writes
-that sentinel back. `pin_defaults` merge per key, node ids are stable
-identities (a type change requires a new id), existing node positions are
-never moved, and new nodes without explicit positions get execution-depth
-auto-layout.
+that sentinel back. `pin_defaults` and `pin_expressions` merge per key (an
+empty-string expression removes one), node ids are stable identities (a type
+change requires a new id), existing node positions are never moved, and new
+nodes without explicit positions get execution-depth auto-layout.
 
 Compiled changes are applied per-command in dependency order (nodes first, then
 configuration, then connections, with disconnects before connects). Valid
@@ -687,6 +688,14 @@ Node fields:
   defaults.
 - `pin_defaults`: values for unconnected input pins. Merged per key — omitted
   keys keep their current values; emit a key to change it.
+- `pin_expressions`: sandboxed Python expressions computing input pins at
+  resolution time: `{"condition": "vars.fix_cycles < 3"}`. An expression
+  reads `vars.*` (run variables, read-only) and `value` (the pin's wire value
+  if connected, else its pin default) and replaces the pin's value. Merged
+  per key like `pin_defaults`; emit an empty string to remove one. Prefer an
+  expression over a Get Variable -> Code chain for a small condition or field
+  read; use a Code node for multi-statement logic. Secret-looking expression
+  text is refused.
 - `literal`: value of literal/config nodes. For Tools Allowlist it is the
   array of exact tool names; for String Template it is the template text; for
   Variable nodes it is the declaration `{"name":"transcript","type":"array","default":[]}`.
@@ -3647,6 +3656,60 @@ Execution semantics are owned by AbstractRuntime. Flow's job is to author and se
 - Secrets must not be embedded in VisualFlow JSON.
 - Reusable endpoint credentials belong in Gateway provider endpoint profiles.
 
+## Pin Expressions
+
+A data input pin may carry a small sandboxed Python expression instead of a
+wire or a static default. Expressions are stored on the node as
+`data.pinExpressions` — a field of its own, deliberately never encoded inside
+`pinDefaults`:
+
+```json
+{
+  "id": "loop",
+  "type": "while",
+  "data": {
+    "nodeType": "while",
+    "pinExpressions": { "condition": "vars.fix_cycles < 3" }
+  }
+}
+```
+
+AbstractRuntime evaluates the expression at input resolution on the consuming
+node, after wires and pin defaults have resolved, and the result replaces the
+pin's value. The expression environment is small:
+
+- `vars` — the run variables, read-only (`vars.count`, `vars["count"]`,
+  `vars.get("count", 0)`, `"count" in vars`). Writing state stays the
+  Set Variable node's job.
+- `value` — what the pin would have resolved to without the expression: the
+  wire value if connected, else the pin default, else `None`.
+- The Code-node sandbox builtins (`len`, `sorted`, `sum`, ...) plus
+  `parse_json` / `to_json`.
+
+Expressions compile under the same RestrictedPython policy as Code node
+bodies, in expression mode: statements and imports cannot appear, while
+lambdas, comprehensions, and conditional expressions remain available.
+Failures are loud and attributed — an unparseable expression fails the flow
+build naming node and pin, and an expression that raises at run time fails
+the consuming step with an error naming `<node>.<pin>` plus an expression
+preview. Evaluation happens at every resolution, so a While condition
+expression re-reads `vars.*` fresh each iteration.
+
+Use an expression for a small condition, field read, or one-line transform
+that would otherwise need a Get Variable → Code chain (`vars.fix_cycles < 3`,
+`value["field"]`, `to_json(value)`). Use a Code node when the logic needs
+multiple statements or several outputs.
+
+Version skew is safe by construction: a runtime that predates pin expressions
+never reads the field, so the pin falls back to its wire or default value —
+a stale value, never a spinning loop. The no-secrets rule above applies to
+expressions too; the editor and the authoring commands refuse
+credential-looking expression text.
+
+In the editor, hover a pin row and click the `ƒx` control to add or edit an
+expression; computed pins show an amber chip. In the authoring document the
+field is `pin_expressions`, merged per key (an empty string removes one).
+
 ## File And Document Nodes
 
 File/document side effects are execution nodes and must be on the execution path
@@ -3832,6 +3895,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+- 2026-07-25 **Inline pin expressions (editor + authoring halves)**: a data
+  input pin can carry a small sandboxed Python expression, stored at
+  `node.data.pinExpressions` — its own field, never a `pinDefaults` sentinel,
+  so pre-expression runtimes ignore the key and the pin falls back to its
+  wire/default (skew degrades stale, never a spinning truthy dict).
+  Evaluation is AbstractRuntime's (see its changelog): expressions read
+  `vars.*` (run vars, read-only) and `value` (the pin's wire/default) and
+  replace the pin's value at input resolution. Editor: hover a pin row for
+  the `ƒx` control; computed pins carry an amber chip and halo; an inline
+  editor expands under the row; While/If cards render a condition preview.
+  Preflight counts an expression as a satisfied input and warns before any
+  run on stale pin ids, empty expressions, `value` reads with no wire and no
+  default, and `vars.<name>` reads no set_var/start pin declares (abstains
+  when the graph declares no vars). Authoring lane: `pin_expressions`
+  document field and `set_pin_expression` command (merge per key, empty
+  string removes; secret-looking expression text refused through the same
+  `hasSecretLikeValue` gate as the canvas editor, on both save paths).
+  `scripts/wf_common.py` gains a `pin_expressions=` kwarg and a
+  `with_expressions()` helper, and its `validate_edges` code-input coverage
+  rule counts an expression-fed input as satisfied (same rule as preflight —
+  a readiness check must be satisfiable by a compliant graph). Contract
+  documented in `docs/visualflow.md`; document field in
+  `docs/workflow-authoring-skill.md`.
 
 ### Fixed
 - 2026-07-25 **Flow Library invisibility (entity + multiagent families)**

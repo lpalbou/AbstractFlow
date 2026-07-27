@@ -43,6 +43,60 @@ Execution semantics are owned by AbstractRuntime. Flow's job is to author and se
 - Secrets must not be embedded in VisualFlow JSON.
 - Reusable endpoint credentials belong in Gateway provider endpoint profiles.
 
+## Pin Expressions
+
+A data input pin may carry a small sandboxed Python expression instead of a
+wire or a static default. Expressions are stored on the node as
+`data.pinExpressions` — a field of its own, deliberately never encoded inside
+`pinDefaults`:
+
+```json
+{
+  "id": "loop",
+  "type": "while",
+  "data": {
+    "nodeType": "while",
+    "pinExpressions": { "condition": "vars.fix_cycles < 3" }
+  }
+}
+```
+
+AbstractRuntime evaluates the expression at input resolution on the consuming
+node, after wires and pin defaults have resolved, and the result replaces the
+pin's value. The expression environment is small:
+
+- `vars` — the run variables, read-only (`vars.count`, `vars["count"]`,
+  `vars.get("count", 0)`, `"count" in vars`). Writing state stays the
+  Set Variable node's job.
+- `value` — what the pin would have resolved to without the expression: the
+  wire value if connected, else the pin default, else `None`.
+- The Code-node sandbox builtins (`len`, `sorted`, `sum`, ...) plus
+  `parse_json` / `to_json`.
+
+Expressions compile under the same RestrictedPython policy as Code node
+bodies, in expression mode: statements and imports cannot appear, while
+lambdas, comprehensions, and conditional expressions remain available.
+Failures are loud and attributed — an unparseable expression fails the flow
+build naming node and pin, and an expression that raises at run time fails
+the consuming step with an error naming `<node>.<pin>` plus an expression
+preview. Evaluation happens at every resolution, so a While condition
+expression re-reads `vars.*` fresh each iteration.
+
+Use an expression for a small condition, field read, or one-line transform
+that would otherwise need a Get Variable → Code chain (`vars.fix_cycles < 3`,
+`value["field"]`, `to_json(value)`). Use a Code node when the logic needs
+multiple statements or several outputs.
+
+Version skew is safe by construction: a runtime that predates pin expressions
+never reads the field, so the pin falls back to its wire or default value —
+a stale value, never a spinning loop. The no-secrets rule above applies to
+expressions too; the editor and the authoring commands refuse
+credential-looking expression text.
+
+In the editor, hover a pin row and click the `ƒx` control to add or edit an
+expression; computed pins show an amber chip. In the authoring document the
+field is `pin_expressions`, merged per key (an empty string removes one).
+
 ## File And Document Nodes
 
 File/document side effects are execution nodes and must be on the execution path

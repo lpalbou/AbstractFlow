@@ -278,48 +278,6 @@
       "outputs": []
     },
     {
-      "id": "state_cur",
-      "type": "get_var",
-      "position": {
-        "x": 700,
-        "y": 60
-      },
-      "data": {
-        "nodeType": "get_var",
-        "label": "Get work_state",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "name",
-            "label": "name",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "name": "work_state",
-          "default": {}
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "turn_in",
       "type": "make_object",
       "position": {
@@ -377,6 +335,9 @@
         ],
         "pinDefaults": {
           "phase": "work"
+        },
+        "pinExpressions": {
+          "state": "vars.get(\"work_state\", {})"
         }
       },
       "label": null,
@@ -430,53 +391,6 @@
           "inherit_context": false
         },
         "subflowId": "entity-cognition-turn"
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "state_out",
-      "type": "get",
-      "position": {
-        "x": 1240,
-        "y": 480
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get state",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "state",
-          "default": {}
-        }
       },
       "label": null,
       "icon": null,
@@ -550,7 +464,10 @@
           "fallback": ""
         },
         "functionName": "transform",
-        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n",
+        "pinExpressions": {
+          "value": "(value or {}).get(\"state\", {})"
+        }
       },
       "label": null,
       "icon": null,
@@ -610,48 +527,6 @@
       "outputs": []
     },
     {
-      "id": "state_for_close",
-      "type": "get_var",
-      "position": {
-        "x": 640,
-        "y": 900
-      },
-      "data": {
-        "nodeType": "get_var",
-        "label": "Get work_state",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "name",
-            "label": "name",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "name": "work_state",
-          "default": {}
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "close_in",
       "type": "make_object",
       "position": {
@@ -680,6 +555,9 @@
         "pinDefaults": {
           "phase": "work",
           "reason": "the task closed"
+        },
+        "pinExpressions": {
+          "state": "vars.get(\"work_state\", {})"
         }
       },
       "label": null,
@@ -741,100 +619,6 @@
       "outputs": []
     },
     {
-      "id": "turns_out",
-      "type": "get",
-      "position": {
-        "x": 1460,
-        "y": 840
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get turns",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "turns",
-          "default": 0
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "closed_state",
-      "type": "get",
-      "position": {
-        "x": 1460,
-        "y": 1020
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get state",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "state",
-          "default": {}
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "end",
       "type": "on_flow_end",
       "position": {
@@ -863,7 +647,11 @@
             "type": "number"
           }
         ],
-        "outputs": []
+        "outputs": [],
+        "pinExpressions": {
+          "state": "(value or {}).get(\"state\", {})",
+          "turns": "(value or {}).get(\"turns\", 0)"
+        }
       },
       "label": null,
       "icon": null,
@@ -978,14 +766,6 @@
       "animated": false
     },
     {
-      "id": "e-state_cur-value-turn_in-state",
-      "source": "state_cur",
-      "sourceHandle": "value",
-      "target": "turn_in",
-      "targetHandle": "state",
-      "animated": false
-    },
-    {
       "id": "e-start-system-turn_in-system",
       "source": "start",
       "sourceHandle": "system",
@@ -1026,17 +806,9 @@
       "animated": false
     },
     {
-      "id": "e-turn-output-state_out-object",
+      "id": "e-turn-output-turn_guard-value",
       "source": "turn",
       "sourceHandle": "output",
-      "target": "state_out",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-state_out-value-turn_guard-value",
-      "source": "state_out",
-      "sourceHandle": "value",
       "target": "turn_guard",
       "targetHandle": "value",
       "animated": false
@@ -1066,14 +838,6 @@
       "animated": false
     },
     {
-      "id": "e-state_for_close-value-close_in-state",
-      "source": "state_for_close",
-      "sourceHandle": "value",
-      "target": "close_in",
-      "targetHandle": "state",
-      "animated": false
-    },
-    {
       "id": "e-close_in-result-close-input",
       "source": "close_in",
       "sourceHandle": "result",
@@ -1082,39 +846,23 @@
       "animated": false
     },
     {
-      "id": "e-close-output-turns_out-object",
+      "id": "e-close-output-end-state",
       "source": "close",
       "sourceHandle": "output",
-      "target": "turns_out",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-close-output-closed_state-object",
-      "source": "close",
-      "sourceHandle": "output",
-      "target": "closed_state",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-closed_state-value-end-state",
-      "source": "closed_state",
-      "sourceHandle": "value",
       "target": "end",
       "targetHandle": "state",
       "animated": false
     },
     {
-      "id": "e-turns_out-value-end-turns",
-      "source": "turns_out",
-      "sourceHandle": "value",
+      "id": "e-close-output-end-turns",
+      "source": "close",
+      "sourceHandle": "output",
       "target": "end",
       "targetHandle": "turns",
       "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-25T06:34:59.960000+00:00",
-  "updated_at": "2026-07-25T06:34:59.960000+00:00"
+  "created_at": "2026-07-26T07:14:57.023468+00:00",
+  "updated_at": "2026-07-26T07:14:57.023468+00:00"
 }

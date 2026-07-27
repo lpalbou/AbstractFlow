@@ -14,6 +14,9 @@ import toast from 'react-hot-toast';
 import type { FlowNodeData, JsonValue, Pin, PinType, VisualFlow } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
+import { PinExpressionChip, PinExpressionEditor, libraryCallName } from '../pins/PinExpressionControl';
+import { collectDeclaredVarNames } from '../../utils/preflight';
+import { hasSecretLikeValue } from '../../utils/flowAuthoringCommands';
 import { useFlowStore } from '../../hooks/useFlow';
 import { useModels, useProviders } from '../../hooks/useProviders';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../../utils/capabilityRoutes';
@@ -3385,6 +3388,60 @@ export const BaseNode = memo(function BaseNode({
     [data.pinDefaults, id, updateNodeData]
   );
 
+  // Inline pin expressions (tier 1): one pin edits at a time per node card;
+  // the chip/ghost renders inline in the row and the editor expands below it.
+  const [fxEditingPin, setFxEditingPin] = useState<string | null>(null);
+  // Known run vars for the editor's hint line — the SAME collection preflight
+  // uses for its unknown-vars.X warning (one definition of "declared var",
+  // never two drifting copies). Computed only while an editor is open.
+  const fxKnownVars = useMemo(() => {
+    if (!fxEditingPin) return [] as string[];
+    return Array.from(collectDeclaredVarNames(allNodes)).sort();
+  }, [fxEditingPin, allNodes]);
+  // Flow function library (tier 2): names drive the ƒ-chip rendering and the
+  // editor's promote/hint surfaces. Subscribed here (not passed as props) so
+  // every card re-renders its chips when the library changes.
+  const flowFunctions = useFlowStore((s) => s.flowFunctions);
+  const promoteExpressionToFunction = useFlowStore((s) => s.promoteExpressionToFunction);
+  const fxLibraryNames = useMemo(() => flowFunctions.map((f) => f.name), [flowFunctions]);
+  const setPinExpression = useCallback(
+    (pinId: string, expression: string | undefined) => {
+      // Secret-gate parity with the assistant lane (set_pin_expression in
+      // flowAuthoringCommands): refuse a secret-looking pin id or an
+      // expression carrying a literal token so a hand-typed credential never
+      // serializes into the flow JSON in plaintext. ONE definition of
+      // "secret-looking", shared across both save paths.
+      if (expression !== undefined && hasSecretLikeValue(pinId, expression)) {
+        toast.error('Refused: that expression looks like it contains a secret. Reference a variable instead of hardcoding a credential.');
+        return;
+      }
+      const prev = data.pinExpressions || {};
+      const next: Record<string, string> = { ...prev };
+      if (expression === undefined) {
+        delete next[pinId];
+      } else {
+        next[pinId] = expression;
+      }
+      // Empty map drops the key entirely: absence IS the skew-safe encoding.
+      updateNodeData(id, Object.keys(next).length ? { pinExpressions: next } : { pinExpressions: undefined });
+    },
+    [data.pinExpressions, id, updateNodeData]
+  );
+  // Promote flow (frame_4): create the named function AND rebind this pin to
+  // the generated call as ONE undo step (adversary P1-14). Returns the store's
+  // refusal (name collision …) so the editor shows it inline, not half-applied.
+  const promotePinExpression = useCallback(
+    (pinId: string) =>
+      (fn: { name: string; kind?: string; code: string }, call: string): string | null =>
+        promoteExpressionToFunction(
+          { name: fn.name, code: fn.code, kind: fn.kind },
+          id,
+          pinId,
+          call
+        ),
+    [promoteExpressionToFunction, id]
+  );
+
   const handleArtifactPinUpload = useCallback(
     async (pin: Pin, file: File | null) => {
       if (!file || !isArtifactPinType(pin.type)) return;
@@ -4171,12 +4228,14 @@ export const BaseNode = memo(function BaseNode({
         <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => {
             const feedback = connectionPreview?.inputs?.[pin.id];
+            const pinExpression = data.pinExpressions?.[pin.id];
             return (
             <Fragment key={pin.id}>
               <div
                 className={clsx(
                   'pin-row',
                   'input',
+                  pinExpression && 'pin-computed',
                   feedback?.status === 'valid' && 'pin-feedback-valid',
                   feedback?.status === 'invalid' && 'pin-feedback-invalid'
                 )}
@@ -4204,6 +4263,12 @@ export const BaseNode = memo(function BaseNode({
                     <span className="pin-label">{pin.label}</span>
                   </span>
                 </AfTooltip>
+                <PinExpressionChip
+                  pinLabel={pin.label || pin.id}
+                  expression={pinExpression}
+                  libraryNames={fxLibraryNames}
+                  onOpen={() => setFxEditingPin(pin.id)}
+                />
                 {(() => {
                   const connected = isPinConnected(pin.id, true);
                   const controls: ReactNode[] = [];
@@ -5505,6 +5570,32 @@ export const BaseNode = memo(function BaseNode({
                 })()}
               </div>
 
+              {/* Inline expression editor: expands below the row it edits. */}
+              {fxEditingPin === pin.id ? (
+                <PinExpressionEditor
+                  pinId={pin.id}
+                  pinLabel={pin.label || pin.id}
+                  expression={pinExpression}
+                  connected={isPinConnected(pin.id, true)}
+                  knownVars={fxKnownVars}
+                  libraryNames={fxLibraryNames}
+                  onSave={(expr) => setPinExpression(pin.id, expr)}
+                  onClose={() => setFxEditingPin(null)}
+                  onPromote={promotePinExpression(pin.id)}
+                />
+              ) : null}
+
+              {/* Condition preview: the deciding law stays readable ON the
+                  card (while/if), no hover needed — the readability bar's
+                  "what decides this loop/branch?" answered at a glance. */}
+              {pinExpression && fxEditingPin !== pin.id && pin.id === 'condition' &&
+              (data.nodeType === 'while' || data.nodeType === 'if') ? (
+                <div className="fx-condition-preview" title={pinExpression}>
+                  {data.nodeType === 'while' ? 'runs while: ' : 'if: '}
+                  {pinExpression.length > 90 ? `${pinExpression.slice(0, 89)}…` : pinExpression}
+                </div>
+              ) : null}
+
               {/* Models Catalog: provider must be the first pin row; models selection follows. */}
               {isProviderModelsNode && pin.id === 'provider' ? (
                 <div className="pin-row input nodrag">
@@ -5640,6 +5731,43 @@ export const BaseNode = memo(function BaseNode({
             </button>
           </div>
         )}
+
+        {/* Docked function bindings (proposal_6): pins bound to library
+            functions surface as a footer strip on the consumer card, so the
+            logic feeding a node is readable without opening anything.
+            Click = open that pin's expression editor. */}
+        {(() => {
+          const exprs = data.pinExpressions;
+          if (!exprs || fxLibraryNames.length === 0) return null;
+          const docked = Object.entries(exprs)
+            .map(([pinId, expr]) => ({
+              pinId,
+              fnName: libraryCallName(typeof expr === 'string' ? expr : undefined, fxLibraryNames),
+              expr: typeof expr === 'string' ? expr : '',
+            }))
+            .filter((d) => d.fnName);
+          if (docked.length === 0) return null;
+          return (
+            <div className="fx-docked nodrag">
+              {docked.map((d) => (
+                <button
+                  key={d.pinId}
+                  type="button"
+                  className="fx-docked-row"
+                  title={`${d.expr}\n(click to edit binding)`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFxEditingPin(d.pinId);
+                  }}
+                >
+                  <span className="fx-glyph">ƒ</span>
+                  <span className="fx-docked-name">{d.fnName}</span>
+                  <span className="fx-docked-pin">→ {d.pinId}</span>
+                </button>
+              ))}
+            </div>
+          );
+        })()}
       </div>
       </div>
 

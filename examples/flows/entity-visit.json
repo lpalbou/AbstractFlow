@@ -178,147 +178,6 @@
       "outputs": []
     },
     {
-      "id": "reply_out",
-      "type": "get",
-      "position": {
-        "x": 660,
-        "y": 60
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get reply",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "reply",
-          "default": ""
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "tools_out",
-      "type": "get",
-      "position": {
-        "x": 660,
-        "y": 500
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get tools_ran",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "tools_ran",
-          "default": []
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "rounds_out",
-      "type": "get",
-      "position": {
-        "x": 660,
-        "y": 620
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get tool_rounds",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "tool_rounds",
-          "default": 0
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "turn_guard",
       "type": "code",
       "position": {
@@ -384,7 +243,10 @@
           "fallback": ""
         },
         "functionName": "transform",
-        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n",
+        "pinExpressions": {
+          "value": "(value or {}).get(\"reply\", \"\")"
+        }
       },
       "label": null,
       "icon": null,
@@ -428,53 +290,6 @@
             "type": "string"
           }
         ]
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "state_out",
-      "type": "get",
-      "position": {
-        "x": 940,
-        "y": 60
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get state",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "state",
-          "default": {}
-        }
       },
       "label": null,
       "icon": null,
@@ -537,7 +352,10 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n",
+        "pinExpressions": {
+          "value": "(value or {}).get(\"state\", {})"
+        }
       },
       "label": null,
       "icon": null,
@@ -657,7 +475,11 @@
             "type": "number"
           }
         ],
-        "outputs": []
+        "outputs": [],
+        "pinExpressions": {
+          "tools_ran": "(value or {}).get(\"tools_ran\", [])",
+          "tool_rounds": "(value or {}).get(\"tool_rounds\", 0)"
+        }
       },
       "label": null,
       "icon": null,
@@ -756,17 +578,9 @@
       "animated": false
     },
     {
-      "id": "e-turn-output-reply_out-object",
+      "id": "e-turn-output-turn_guard-value",
       "source": "turn",
       "sourceHandle": "output",
-      "target": "reply_out",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-reply_out-value-turn_guard-value",
-      "source": "reply_out",
-      "sourceHandle": "value",
       "target": "turn_guard",
       "targetHandle": "value",
       "animated": false
@@ -788,17 +602,9 @@
       "animated": false
     },
     {
-      "id": "e-turn-output-state_out-object",
+      "id": "e-turn-output-state_guard-value",
       "source": "turn",
       "sourceHandle": "output",
-      "target": "state_out",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-state_out-value-state_guard-value",
-      "source": "state_out",
-      "sourceHandle": "value",
       "target": "state_guard",
       "targetHandle": "value",
       "animated": false
@@ -876,39 +682,23 @@
       "animated": false
     },
     {
-      "id": "e-turn-output-tools_out-object",
+      "id": "e-turn-output-end-tools_ran",
       "source": "turn",
       "sourceHandle": "output",
-      "target": "tools_out",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-tools_out-value-end-tools_ran",
-      "source": "tools_out",
-      "sourceHandle": "value",
       "target": "end",
       "targetHandle": "tools_ran",
       "animated": false
     },
     {
-      "id": "e-turn-output-rounds_out-object",
+      "id": "e-turn-output-end-tool_rounds",
       "source": "turn",
       "sourceHandle": "output",
-      "target": "rounds_out",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-rounds_out-value-end-tool_rounds",
-      "source": "rounds_out",
-      "sourceHandle": "value",
       "target": "end",
       "targetHandle": "tool_rounds",
       "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-25T06:34:59.959910+00:00",
-  "updated_at": "2026-07-25T06:34:59.959910+00:00"
+  "created_at": "2026-07-26T07:14:57.023381+00:00",
+  "updated_at": "2026-07-26T07:14:57.023381+00:00"
 }

@@ -54,8 +54,18 @@ def main() -> int:
     agent = Door(base, arg("--token-agent") or None, label="agent")
     stamp = time.strftime("%H%M%S")
 
-    # 0. Fixture only + awake.
+    # 0. Fixture only + awake + a CLEAN seat. Back-to-back gate runs (or a
+    #    prior conversation's 300s TTL hold) would otherwise refuse this run's
+    #    opening summon — a fixture reset is the honest setup, not a cheat.
     agent.state(entity, "awake", f"seat acceptance gate {stamp} (fixture)")
+    freed = agent.reset_seat(entity)
+    if not freed:
+        _, s = agent.seat(entity)
+        ttl = s.get("ttl_remaining_s")
+        check("seat free at gate start", False,
+              f"seat still TTL-held (ttl_remaining_s={ttl}) from a prior conversation — "
+              f"wait it out or use a fresh fixture; gate cannot start clean")
+        return finish()
 
     # 1. Empty seat read (honest shape).
     code, seat = agent.seat(entity)
@@ -79,10 +89,15 @@ def main() -> int:
     check("seat read shows the holder block", code == 200 and held,
           f"http={code} seat={seat} run1={run1[:12]}")
 
-    # 3. Colliding summon: refused + census marker written.
+    # 3. Colliding summon (agent-vs-agent): refused with the slice-2 body
+    #    contract (retry_after_s + lane) + census marker written.
     ccode, cbody = agent.summon(entity, "Second caller - this should be refused.",
-                                f"gate-intruder-{stamp}")
+                                f"gate-intruder-{stamp}", caller_kind="agent")
     check("colliding summon refused (409)", ccode == 409, f"http={ccode} body={str(cbody)[:200]}")
+    detail = cbody.get("detail") if isinstance(cbody.get("detail"), dict) else cbody
+    check("409 body carries retry_after_s (slice 2 contract)",
+          isinstance(detail, dict) and detail.get("retry_after_s") is not None,
+          f"body={str(cbody)[:240]}")
     time.sleep(1.0)
     markers_after = [m for m in host_markers(entity) if m.get("kind") == "summon_refused"]
     new = markers_after[len(markers_before):]
@@ -95,38 +110,81 @@ def main() -> int:
         check("marker names the refused caller session", f"gate-intruder-{stamp}" in blob,
               f"marker={blob[:240]}")
 
-    # 4. Holder frees -> retry accepted.
+    # 4. Holder's RUN completes -> the seat stays TTL-HELD for the holder
+    #    (slice 2: conversation-level protection, the incident fix).
+    #    4a. A DIFFERENT session (agent) is still refused, with honest
+    #        retry_after_s <= the TTL window.
+    #    4b. The SAME session+holder SLIDES (one conversation, many runs).
     out1 = agent.await_terminal(run1, deadline_s=600)
     check("holder run reached terminal honestly", out1.get("status") == "completed",
           f"status={out1.get('status')} err={out1.get('error')}")
-    rcode, r2 = agent.summon(entity, "Retry after the seat freed - one line is enough.",
-                             f"gate-intruder-{stamp}")
-    check("retry accepted after the seat freed", rcode == 200, f"http={rcode}")
-    if rcode == 200:
-        agent.await_terminal(str(r2.get("run_id") or ""), deadline_s=600)
+    rcode, rbody = agent.summon(entity, "Different session during the TTL hold.",
+                                f"gate-intruder-{stamp}", caller_kind="agent")
+    check("TTL hold: different-session agent still refused (conversation protected)",
+          rcode == 409, f"http={rcode} body={str(rbody)[:200]}")
+    rdetail = rbody.get("detail") if isinstance(rbody.get("detail"), dict) else rbody
+    ttl = rdetail.get("retry_after_s") if isinstance(rdetail, dict) else None
+    check("TTL hold: retry_after_s is an honest bound (0 < s <= 300)",
+          isinstance(ttl, (int, float)) and 0 < float(ttl) <= 300.0, f"retry_after_s={ttl}")
+    scode2, s2 = agent.summon(entity, "Same conversation continues - one line.",
+                              f"gate-agent-{stamp}", caller_kind="agent")
+    check("TTL hold: same-session same-holder SLIDES (accepted)", scode2 == 200,
+          f"http={scode2} body={str(s2)[:160]}")
+    if scode2 == 200:
+        agent.await_terminal(str(s2.get("run_id") or ""), deadline_s=600)
 
-    # SLICE 2 - preemption (staged).
+    # SLICE 2 - human-wins preemption (staged behind --slice2).
+    #
+    # NOTE on the holder: after step 4 the agent's conversation (session
+    # gate-agent-{stamp}) still holds the seat via the 300s TTL. That IS the
+    # holder the human must win against — the incident's exact shape (a human
+    # arriving at an agent-held seat). We do NOT start a fresh agent session
+    # (it would 409 against the TTL hold — correct product behavior, proven in
+    # step 4). The preemption is valid whether the holder's run is live
+    # (cancelled at the turn boundary) or TTL-held post-completion
+    # (cancelled_runs=[] but the seat is still handed over) — the seat_preempted
+    # marker carries the true story either way.
     if "--slice2" in sys.argv:
         human = Door(base, arg("--token-human") or None, label="human")
-        scode, s3 = agent.summon(entity, "Take another slow breath, in detail.",
-                                 f"gate-agent2-{stamp}")
-        check("slice2: agent re-takes the seat", scode == 200, f"http={scode}")
-        run3 = str(s3.get("run_id") or "")
-        time.sleep(2.0)
+        preempts_before = [m for m in host_markers(entity)
+                           if m.get("kind") == "seat_preempted"]
+        # Confirm the agent still holds (TTL) before the human arrives.
+        _, seat_pre = agent.seat(entity)
+        check("slice2: agent still holds the seat (TTL) before the human arrives",
+              bool(seat_pre.get("held")), f"seat={seat_pre}")
+        # THE INCIDENT CASE, inverted: the human arrives at an agent-held seat
+        # and WINS — the message is never lost.
         hcode, h1 = human.summon(entity, "A human arrives - this must WIN the seat.",
-                                 f"gate-human-{stamp}")
+                                 f"gate-human-{stamp}", caller_kind="human")
         check("slice2: human summon accepted (never refused)", hcode == 200,
               f"http={hcode} body={str(h1)[:200]}")
         if hcode == 200:
             hout = human.await_terminal(str(h1.get("run_id") or ""), deadline_s=600)
             check("slice2: the human's moment completed (message never lost)",
                   hout.get("status") == "completed", f"out={hout}")
-        a3 = agent.run(run3)
-        check("slice2: the preempted agent run ended CANCELLED (never false-completed)",
-              str(a3.get("status")) == "cancelled", f"status={a3.get('status')}")
-        preempts = [m for m in host_markers(entity) if "preempt" in str(m.get("kind", ""))]
-        check("slice2: the preempt marker landed", len(preempts) >= 1,
+        preempts_after = [m for m in host_markers(entity)
+                          if m.get("kind") == "seat_preempted"]
+        newp = preempts_after[len(preempts_before):]
+        check("slice2: the seat_preempted census marker landed", len(newp) >= 1,
               f"kinds={[m.get('kind') for m in host_markers(entity)[-6:]]}")
+        if newp:
+            m = newp[-1]
+            # The holder's run is terminal either way; if it was LIVE it is
+            # listed in cancelled_runs, if TTL-held it is []. Both honest.
+            check("slice2: marker names the preempted holder + preempting human",
+                  m.get("holder_kind") == "agent"
+                  and str(m.get("preempting_session_id", "")).startswith("gate-human"),
+                  f"marker={str(m)[:280]}")
+            check("slice2: marker carries the act, never message words",
+                  "must WIN the seat" not in str(m), f"marker={str(m)[:240]}")
+        # Same-principal idle reclaim: the human returns with a NEW session —
+        # one human never queues behind themself.
+        h2code, h2 = human.summon(entity, "The same human returns - reclaim, not queue.",
+                                  f"gate-human2-{stamp}", caller_kind="human")
+        check("slice2: same-principal human reclaims their idle seat", h2code == 200,
+              f"http={h2code} body={str(h2)[:160]}")
+        if h2code == 200:
+            human.await_terminal(str(h2.get("run_id") or ""), deadline_s=600)
 
     agent.state(entity, "asleep", "seat acceptance gate done - fixture back to sleep")
     return finish()

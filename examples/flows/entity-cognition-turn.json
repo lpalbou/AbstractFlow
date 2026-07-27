@@ -594,53 +594,6 @@
       "outputs": []
     },
     {
-      "id": "reply_r",
-      "type": "get",
-      "position": {
-        "x": 900,
-        "y": 60
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get reply",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "reply",
-          "default": ""
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "ran_r",
       "type": "get",
       "position": {
@@ -679,147 +632,6 @@
         "pinDefaults": {
           "key": "tools_ran",
           "default": []
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "rounds_r",
-      "type": "get",
-      "position": {
-        "x": 900,
-        "y": 660
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get rounds_used",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "rounds_used",
-          "default": 0
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "words_r",
-      "type": "get",
-      "position": {
-        "x": 900,
-        "y": 760
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get prior_words",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "prior_words",
-          "default": ""
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "silent_r",
-      "type": "get",
-      "position": {
-        "x": 900,
-        "y": 860
-      },
-      "data": {
-        "nodeType": "get",
-        "label": "Get silent",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          },
-          {
-            "id": "key",
-            "label": "key",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "key": "silent",
-          "default": 0
         }
       },
       "label": null,
@@ -894,7 +706,10 @@
           "fallback": ""
         },
         "functionName": "transform",
-        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n"
+        "codeBody": "\n# Subflow-death guard (code nodes cannot raise: the sandbox absorbs\n# exceptions into success=false outputs and the spine continues). So the\n# guard ROUTES honestly instead: a dead child yields an HONEST error value\n# (never a silent empty answer) or the caller-supplied fallback (the prior\n# state — never {} folded over a life). `died` lets flows branch.\nchild = _input.get(\"child\")\nvalue = _input.get(\"value\")\nfallback = _input.get(\"fallback\")\ndied = 1 if (isinstance(child, dict) and child.get(\"success\") is False) else 0\nif died == 1:\n    err = str(child.get(\"error\") or \"unknown error\")\n    if fallback is not None and fallback != \"\":\n        out = fallback\n        if isinstance(out, dict):\n            out = dict(out)\n            out[\"last_moment_error\"] = err\n            # A dying turn must not spin its loop: close the task honestly.\n            # PAIRED INVARIANT (adversary C): this fires on ANY dict fallback,\n            # so a visit-day death also plants task_done=1 into life_state —\n            # safe ONLY because WORK_COND requires turn_count > 0 before\n            # honoring task_done. Change either side and re-check the other.\n            out[\"task_done\"] = 1\n        return {\"value\": out, \"died\": 1, \"error\": err}\n    return {\"value\": \"[the moment could not be lived: \" + err + \"]\", \"died\": 1, \"error\": err}\nreturn {\"value\": value, \"died\": 0, \"error\": \"\"}\n",
+        "pinExpressions": {
+          "value": "(value or {}).get(\"reply\", \"\")"
+        }
       },
       "label": null,
       "icon": null,
@@ -957,7 +772,10 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "\n# Mid-turn elections, flow half: parse the FEEL and TEND fences from the\n# reply. Feel shapes:\n#   ```feel target=person:x sign=+1 magnitude=2 reason=...```     (one line)\n#   ```feel target=person:x sign=+1 magnitude=2 reason=... \\n```  (fence line)\n#   ```feel\\n target=... sign=... reason=...\\n```                 (inner line)\n# The feel election is REPLACED by a titled marker [felt: target +N - \"reason\"];\n# spoofed targets (record ids / self) are refused BEFORE any marker exists\n# (a refused election must never leave a lying marker). The TEND fence body\n# is extracted VERBATIM (grammar engine-owned; dispatched via MEMORY_TEND).\n# Unclosed fences flush their words back at EOF — reply words are never\n# silently lost. DIARY elections never reach this node (LLM boundary, G1).\nreply = str(_input.get(\"reply\") or \"\")\n# TEND IS OWN-TIME-ONLY, ENFORCED AT THE PARSE (memory c5425: the tend node\n# is shared across phases, so a VISITOR-injected ```tend fence on a visit\n# would dispatch and — with a pinned channel — claim the privileged\n# reflection channel: P0-1 alive through a constant. Teaching it only on\n# own-time never gated the PARSER. Gating has_tend on phase==personal makes\n# the pinned channel='entity-reflection' true BY CONSTRUCTION: tend reaches\n# the node only where the session IS the entity's own reflection. A\n# visit/work tend fence is dropped with a visible warning, never dispatched.)\nphase = str(_input.get(\"phase\") or \"visit\")\ntend_allowed = 1 if phase == \"personal\" else 0\nbox = {\"target\": \"\", \"sign\": 0, \"magnitude\": 0, \"reason\": \"\"}\nwarnings = []\n\ndef parse_params(text):\n    t = str(text or \"\")\n    out = {\"target\": \"\", \"sign\": 0, \"magnitude\": 0, \"reason\": \"\"}\n    idx = t.find(\"reason=\")\n    rest = t\n    if idx >= 0:\n        out[\"reason\"] = t[idx + 7:].strip().strip('\"').strip(\"`\").strip()\n        rest = t[:idx]\n    for tok in rest.split():\n        if tok.startswith(\"target=\"):\n            out[\"target\"] = tok[7:].strip()\n        if tok.startswith(\"sign=\"):\n            v = tok[5:].strip()\n            if v in (\"+1\", \"1\"):\n                out[\"sign\"] = 1\n            if v == \"-1\":\n                out[\"sign\"] = -1\n        if tok.startswith(\"magnitude=\"):\n            v = tok[10:].strip()\n            digits = \"\"\n            for ch in v:\n                if ch in \"0123456789\":\n                    digits = digits + ch\n            if digits:\n                m = int(digits)\n                if m > 3:\n                    m = 3\n                    warnings.append(\"feel magnitude clamped to the routine band (3)\")\n                if m < 1:\n                    m = 1\n                out[\"magnitude\"] = m\n    return out\n\ndef merge(inner, fence):\n    out = {}\n    for k in (\"target\", \"sign\", \"magnitude\", \"reason\"):\n        v = inner[k] if inner[k] else fence.get(k, \"\" if k in (\"target\", \"reason\") else 0)\n        out[k] = v\n    return out\n\nclean_lines = []\n\ndef fold_and_mark(params):\n    # Hygiene FIRST (W2-4): a refused election leaves no marker. The box\n    # pattern mutates the outer state (nested defs cannot rebind outer\n    # locals in the sandbox).\n    tgt = str(params.get(\"target\") or \"\")\n    complete = 1 if (tgt and params[\"sign\"] != 0 and params[\"magnitude\"] > 0 and params[\"reason\"]) else 0\n    if complete == 0:\n        warnings.append(\"malformed feel election dropped\")\n        return\n    if tgt.startswith(\"ex:\") or tgt.startswith(\"diary_\") or tgt == \"self\":\n        warnings.append(\"feel target refused (record-id/self spoof): \" + tgt)\n        return\n    if box[\"target\"]:\n        warnings.append(\"second feel election dropped (one per turn)\")\n        return\n    box[\"target\"] = tgt\n    box[\"sign\"] = params[\"sign\"]\n    box[\"magnitude\"] = params[\"magnitude\"]\n    box[\"reason\"] = params[\"reason\"]\n    clean_lines.append('[felt: ' + tgt + ' ' + ('+' if params[\"sign\"] > 0 else '-') + str(params[\"magnitude\"]) + ' - \"' + params[\"reason\"] + '\"]')\n\n# TEND fence (runtime c5215 — the ONE tend-election route shared with the\n# chat driver): the flow half only EXTRACTS the fence body VERBATIM; the\n# grammar (pin/silence/refocus/heal_scar/break_bond/revisit/dispose) and\n# every refusal stay engine-owned (parse_tend_block). One fence per turn;\n# the fence is replaced by a marker — the ledger carries the applied/refused\n# result of the MEMORY_TEND dispatch.\ntend_box = {\"body\": \"\"}\n\ndef fold_tend(body_lines):\n    body = \"\\n\".join(body_lines).strip()\n    if not body:\n        warnings.append(\"empty tend fence dropped\")\n        return\n    if tend_allowed == 0:\n        # Own-time-only (memory c5425): a tend fence outside personal phase\n        # is dropped, never dispatched — closes the visitor-steered\n        # privileged-channel hole at the source.\n        warnings.append(\"tend fence dropped: tending is own-time-only \"\n                        \"(this phase is not personal)\")\n        return\n    if tend_box[\"body\"]:\n        warnings.append(\"second tend fence dropped (one per turn)\")\n        return\n    tend_box[\"body\"] = body\n    clean_lines.append(\"[tended memory - result in the ledger]\")\n\nmode = \"\"\nfence_params = {}\nblock_lines = []\n\n# Fence-language TOKEN BOUNDARY (adversary K, P3-1): \"```tendencies\" /\n# \"```feelings\" are PROSE fences, not elections — after the 7-char prefix\n# the next char must end the token (whitespace, backtick, or nothing).\ndef fence_boundary_ok(s):\n    nxt = s[7:8]\n    return 1 if (nxt == \"\" or nxt in (\" \", \"\\t\", \"`\")) else 0\n\n# MID-ROUND WORDS scan first (fix adversary P1-1): the mind's own prose from\n# tool rounds carries real elections (a round-1 feel fence was silently\n# dropped before). Those lines PARSE (collect=0 — markers still land) but\n# never enter the clean reply: the answer stays the final words. A synthetic\n# bare ``` line closes any fence left open across the boundary; when no\n# fence is open it toggles nothing (falls to the collect-gated append).\nprior_words = str(_input.get(\"prior_words\") or \"\")\nscan = []\nif prior_words.strip():\n    for pl in prior_words.split(\"\\n\"):\n        scan.append((pl, 0))\n    scan.append((\"```\", 0))\nfor rl in reply.split(\"\\n\"):\n    scan.append((rl, 1))\n\nfor pair in scan:\n    line = pair[0]\n    collect = pair[1]\n    stripped = line.strip()\n    if mode == \"\":\n        if stripped.startswith(\"```feel\") and fence_boundary_ok(stripped) == 1:\n            body = stripped[7:]\n            closed_inline = 0\n            b = body.rstrip()\n            if b.endswith(\"```\"):\n                # One-line closed fence (W2-2): fold NOW, never enter\n                # fence mode — entering it ate the rest of the reply.\n                body = b[:-3]\n                closed_inline = 1\n            fence_params = parse_params(body)\n            if closed_inline == 1:\n                fold_and_mark(fence_params)\n                fence_params = {}\n                continue\n            mode = \"feel\"\n            block_lines = []\n            continue\n        if stripped.startswith(\"```tend\") and fence_boundary_ok(stripped) == 1:\n            body = stripped[7:]\n            b = body.rstrip()\n            if b.endswith(\"```\"):\n                # One-line closed tend fence: one act inline.\n                fold_tend([b[:-3]])\n                continue\n            mode = \"tend\"\n            block_lines = []\n            continue\n        if collect == 1:\n            clean_lines.append(line)\n    elif mode == \"tend\":\n        if stripped.startswith(\"```\"):\n            fold_tend(block_lines)\n            mode = \"\"\n            block_lines = []\n            continue\n        block_lines.append(line)\n    else:\n        if stripped.startswith(\"```\"):\n            inner = parse_params(block_lines[0] if block_lines else \"\")\n            fold_and_mark(merge(inner, fence_params))\n            mode = \"\"\n            fence_params = {}\n            block_lines = []\n            continue\n        block_lines.append(line)\n\nif mode == \"feel\":\n    # Unclosed fence at EOF: fold when complete, then ALWAYS flush the\n    # block's words back (never swallow prose behind an unclosed fence).\n    inner = parse_params(block_lines[0] if block_lines else \"\")\n    merged = merge(inner, fence_params)\n    before = box[\"target\"]\n    fold_and_mark(merged)\n    if box[\"target\"] == before:\n        warnings.append(\"unclosed feel fence flushed back into the reply\")\n        for bl in block_lines:\n            clean_lines.append(bl)\n    else:\n        # The first block line carried the election; flush any EXTRA lines.\n        extra = block_lines[1:] if block_lines else []\n        for bl in extra:\n            clean_lines.append(bl)\nelif mode == \"tend\":\n    # Unclosed tend fence at EOF: the body still carries deliberate acts —\n    # dispatch it (the engine parser refuses unusable lines as data) and\n    # warn; never swallow, never lose the election.\n    warnings.append(\"unclosed tend fence folded at EOF\")\n    fold_tend(block_lines)\n\nclean_reply = \"\\n\".join(clean_lines).strip()\nhas_feel = 1 if (box[\"target\"] and box[\"sign\"] != 0 and box[\"magnitude\"] > 0 and box[\"reason\"]) else 0\nhas_tend = 1 if tend_box[\"body\"] else 0\n\nreturn {\n    \"clean_reply\": clean_reply,\n    \"feel_target\": box[\"target\"],\n    \"feel_sign\": box[\"sign\"],\n    \"feel_magnitude\": box[\"magnitude\"],\n    \"feel_reason\": box[\"reason\"],\n    \"has_feel\": has_feel,\n    \"tend_body\": tend_box[\"body\"],\n    \"has_tend\": has_tend,\n    \"warnings\": warnings,\n}\n"
+        "codeBody": "\n# Mid-turn elections, flow half: parse the FEEL and TEND fences from the\n# reply. Feel shapes:\n#   ```feel target=person:x sign=+1 magnitude=2 reason=...```     (one line)\n#   ```feel target=person:x sign=+1 magnitude=2 reason=... \\n```  (fence line)\n#   ```feel\\n target=... sign=... reason=...\\n```                 (inner line)\n# The feel election is REPLACED by a titled marker [felt: target +N - \"reason\"];\n# spoofed targets (record ids / self) are refused BEFORE any marker exists\n# (a refused election must never leave a lying marker). The TEND fence body\n# is extracted VERBATIM (grammar engine-owned; dispatched via MEMORY_TEND).\n# Unclosed fences flush their words back at EOF — reply words are never\n# silently lost. DIARY elections never reach this node (LLM boundary, G1).\nreply = str(_input.get(\"reply\") or \"\")\n# TEND IS OWN-TIME-ONLY, ENFORCED AT THE PARSE (memory c5425: the tend node\n# is shared across phases, so a VISITOR-injected ```tend fence on a visit\n# would dispatch and — with a pinned channel — claim the privileged\n# reflection channel: P0-1 alive through a constant. Teaching it only on\n# own-time never gated the PARSER. Gating has_tend on phase==personal makes\n# the pinned channel='entity-reflection' true BY CONSTRUCTION: tend reaches\n# the node only where the session IS the entity's own reflection. A\n# visit/work tend fence is dropped with a visible warning, never dispatched.)\nphase = str(_input.get(\"phase\") or \"visit\")\ntend_allowed = 1 if phase == \"personal\" else 0\nbox = {\"target\": \"\", \"sign\": 0, \"magnitude\": 0, \"reason\": \"\"}\nwarnings = []\n\ndef parse_params(text):\n    t = str(text or \"\")\n    out = {\"target\": \"\", \"sign\": 0, \"magnitude\": 0, \"reason\": \"\"}\n    idx = t.find(\"reason=\")\n    rest = t\n    if idx >= 0:\n        out[\"reason\"] = t[idx + 7:].strip().strip('\"').strip(\"`\").strip()\n        rest = t[:idx]\n    for tok in rest.split():\n        if tok.startswith(\"target=\"):\n            out[\"target\"] = tok[7:].strip()\n        if tok.startswith(\"sign=\"):\n            v = tok[5:].strip()\n            if v in (\"+1\", \"1\"):\n                out[\"sign\"] = 1\n            if v == \"-1\":\n                out[\"sign\"] = -1\n        if tok.startswith(\"magnitude=\"):\n            v = tok[10:].strip()\n            digits = \"\"\n            for ch in v:\n                if ch in \"0123456789\":\n                    digits = digits + ch\n            if digits:\n                m = int(digits)\n                if m > 3:\n                    m = 3\n                    warnings.append(\"feel magnitude clamped to the routine band (3)\")\n                if m < 1:\n                    m = 1\n                out[\"magnitude\"] = m\n    return out\n\ndef merge(inner, fence):\n    out = {}\n    for k in (\"target\", \"sign\", \"magnitude\", \"reason\"):\n        v = inner[k] if inner[k] else fence.get(k, \"\" if k in (\"target\", \"reason\") else 0)\n        out[k] = v\n    return out\n\nclean_lines = []\n\ndef fold_and_mark(params):\n    # Hygiene FIRST (W2-4): a refused election leaves no marker. The box\n    # pattern mutates the outer state (nested defs cannot rebind outer\n    # locals in the sandbox).\n    tgt = str(params.get(\"target\") or \"\")\n    complete = 1 if (tgt and params[\"sign\"] != 0 and params[\"magnitude\"] > 0 and params[\"reason\"]) else 0\n    if complete == 0:\n        warnings.append(\"malformed feel election dropped\")\n        return\n    if tgt.startswith(\"ex:\") or tgt.startswith(\"diary_\") or tgt == \"self\":\n        warnings.append(\"feel target refused (record-id/self spoof): \" + tgt)\n        return\n    if box[\"target\"]:\n        warnings.append(\"second feel election dropped (one per turn)\")\n        return\n    box[\"target\"] = tgt\n    box[\"sign\"] = params[\"sign\"]\n    box[\"magnitude\"] = params[\"magnitude\"]\n    box[\"reason\"] = params[\"reason\"]\n    clean_lines.append('[felt: ' + tgt + ' ' + ('+' if params[\"sign\"] > 0 else '-') + str(params[\"magnitude\"]) + ' - \"' + params[\"reason\"] + '\"]')\n\n# TEND fence (runtime c5215 — the ONE tend-election route shared with the\n# chat driver): the flow half only EXTRACTS the fence body VERBATIM; the\n# grammar (pin/silence/refocus/heal_scar/break_bond/revisit/dispose) and\n# every refusal stay engine-owned (parse_tend_block). One fence per turn;\n# the fence is replaced by a marker — the ledger carries the applied/refused\n# result of the MEMORY_TEND dispatch.\ntend_box = {\"body\": \"\"}\n\ndef fold_tend(body_lines):\n    body = \"\\n\".join(body_lines).strip()\n    if not body:\n        warnings.append(\"empty tend fence dropped\")\n        return\n    if tend_allowed == 0:\n        # Own-time-only (memory c5425): a tend fence outside personal phase\n        # is dropped, never dispatched — closes the visitor-steered\n        # privileged-channel hole at the source.\n        warnings.append(\"tend fence dropped: tending is own-time-only \"\n                        \"(this phase is not personal)\")\n        return\n    if tend_box[\"body\"]:\n        warnings.append(\"second tend fence dropped (one per turn)\")\n        return\n    tend_box[\"body\"] = body\n    clean_lines.append(\"[tended memory - result in the ledger]\")\n\nmode = \"\"\nfence_params = {}\nblock_lines = []\n\n# Fence-language TOKEN BOUNDARY (adversary K, P3-1): \"```tendencies\" /\n# \"```feelings\" are PROSE fences, not elections — after the 7-char prefix\n# the next char must end the token (whitespace, backtick, or nothing).\ndef fence_boundary_ok(s):\n    nxt = s[7:8]\n    return 1 if (nxt == \"\" or nxt in (\" \", \"\\t\", \"`\")) else 0\n\n# MID-ROUND WORDS scan first (fix adversary P1-1): the mind's own prose from\n# tool rounds carries real elections (a round-1 feel fence was silently\n# dropped before). Those lines PARSE (collect=0 — markers still land) but\n# never enter the clean reply: the answer stays the final words. A synthetic\n# bare ``` line closes any fence left open across the boundary; when no\n# fence is open it toggles nothing (falls to the collect-gated append).\nprior_words = str(_input.get(\"prior_words\") or \"\")\nscan = []\nif prior_words.strip():\n    for pl in prior_words.split(\"\\n\"):\n        scan.append((pl, 0))\n    scan.append((\"```\", 0))\nfor rl in reply.split(\"\\n\"):\n    scan.append((rl, 1))\n\nfor pair in scan:\n    line = pair[0]\n    collect = pair[1]\n    stripped = line.strip()\n    if mode == \"\":\n        if stripped.startswith(\"```feel\") and fence_boundary_ok(stripped) == 1:\n            body = stripped[7:]\n            closed_inline = 0\n            b = body.rstrip()\n            if b.endswith(\"```\"):\n                # One-line closed fence (W2-2): fold NOW, never enter\n                # fence mode — entering it ate the rest of the reply.\n                body = b[:-3]\n                closed_inline = 1\n            fence_params = parse_params(body)\n            if closed_inline == 1:\n                fold_and_mark(fence_params)\n                fence_params = {}\n                continue\n            mode = \"feel\"\n            block_lines = []\n            continue\n        if stripped.startswith(\"```tend\") and fence_boundary_ok(stripped) == 1:\n            body = stripped[7:]\n            b = body.rstrip()\n            if b.endswith(\"```\"):\n                # One-line closed tend fence: one act inline.\n                fold_tend([b[:-3]])\n                continue\n            mode = \"tend\"\n            block_lines = []\n            continue\n        if collect == 1:\n            clean_lines.append(line)\n    elif mode == \"tend\":\n        if stripped.startswith(\"```\"):\n            fold_tend(block_lines)\n            mode = \"\"\n            block_lines = []\n            continue\n        block_lines.append(line)\n    else:\n        if stripped.startswith(\"```\"):\n            inner = parse_params(block_lines[0] if block_lines else \"\")\n            fold_and_mark(merge(inner, fence_params))\n            mode = \"\"\n            fence_params = {}\n            block_lines = []\n            continue\n        block_lines.append(line)\n\nif mode == \"feel\":\n    # Unclosed fence at EOF: fold when complete, then ALWAYS flush the\n    # block's words back (never swallow prose behind an unclosed fence).\n    inner = parse_params(block_lines[0] if block_lines else \"\")\n    merged = merge(inner, fence_params)\n    before = box[\"target\"]\n    fold_and_mark(merged)\n    if box[\"target\"] == before:\n        warnings.append(\"unclosed feel fence flushed back into the reply\")\n        for bl in block_lines:\n            clean_lines.append(bl)\n    else:\n        # The first block line carried the election; flush any EXTRA lines.\n        extra = block_lines[1:] if block_lines else []\n        for bl in extra:\n            clean_lines.append(bl)\nelif mode == \"tend\":\n    # Unclosed tend fence at EOF: the body still carries deliberate acts —\n    # dispatch it (the engine parser refuses unusable lines as data) and\n    # warn; never swallow, never lose the election.\n    warnings.append(\"unclosed tend fence folded at EOF\")\n    fold_tend(block_lines)\n\nclean_reply = \"\\n\".join(clean_lines).strip()\nhas_feel = 1 if (box[\"target\"] and box[\"sign\"] != 0 and box[\"magnitude\"] > 0 and box[\"reason\"]) else 0\nhas_tend = 1 if tend_box[\"body\"] else 0\n\nreturn {\n    \"clean_reply\": clean_reply,\n    \"feel_target\": box[\"target\"],\n    \"feel_sign\": box[\"sign\"],\n    \"feel_magnitude\": box[\"magnitude\"],\n    \"feel_reason\": box[\"reason\"],\n    \"has_feel\": has_feel,\n    \"tend_body\": tend_box[\"body\"],\n    \"has_tend\": has_tend,\n    \"warnings\": warnings,\n}\n",
+        "pinExpressions": {
+          "prior_words": "(value or {}).get(\"prior_words\", \"\")"
+        }
       },
       "label": null,
       "icon": null,
@@ -1502,7 +1320,10 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "\n# Fold the turn outcome into the rolling session state.\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: code nodes are volatile (re-evaluated per data pull), so\n# inputs must NEVER be mutated in place — copy before writing.\nstate = dict(state)\nreply = str(_input.get(\"clean_reply\") or \"\")\nstimulus = str(_input.get(\"stimulus\") or \"\")\nepisode_ids = _input.get(\"episode_record_ids\")\nif not isinstance(episode_ids, list):\n    episode_ids = []\n\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nentry = {\"stimulus\": stimulus, \"reply\": reply}\nif episode_ids:\n    entry[\"episode\"] = episode_ids[0]\n# TOOLS (0.0.10): the acted round's host-authored names ride the turn log —\n# session-level observability of WHAT the mind touched, per turn.\ntools_ran = _input.get(\"tools_ran\")\nif isinstance(tools_ran, list) and tools_ran:\n    entry[\"tools\"] = [str(t) for t in tools_ran[:12]]\nlog = log + [entry]\nif len(log) > 40:\n    log = log[-40:]\nstate[\"turn_log\"] = log\nstate[\"last_reply\"] = reply\n\n# TEND FEEDBACK CARRY (adversary K, P2-2): the tend dispatch happens after\n# the reply is final, so its applied/refused result rides session state and\n# the NEXT turn's shelf shows it (\"YOUR LAST TENDING\"). No tend this turn\n# (or a turn without elections) CLEARS the carry — feedback never goes stale.\ntres = _input.get(\"tend_result\")\nlast_tend = None\nif isinstance(tres, dict):\n    applied = tres.get(\"applied\")\n    refused = tres.get(\"refused\")\n    n_applied = len(applied) if isinstance(applied, list) else 0\n    r_lines = []\n    if isinstance(refused, list):\n        for r in refused[:5]:\n            if isinstance(r, dict):\n                r_lines.append(str(r.get(\"line\") or \"\") + \" - \" + str(r.get(\"reason\") or \"\"))\n            else:\n                r_lines.append(str(r))\n    if n_applied > 0 or r_lines:\n        last_tend = {\"applied\": n_applied, \"refused\": r_lines}\nif last_tend is not None:\n    state[\"last_tend\"] = last_tend\nelif \"last_tend\" in state:\n    state.pop(\"last_tend\")\n\ndone = 0\nif reply.strip().endswith(\"DONE\"):\n    done = 1\nstate[\"task_done\"] = done\n\n# HONESTY SIGNALS out of the turn (fix adversary P0-1 + P1-2): a dead\n# rounds child (guard fired — the reply lane already carries the honest\n# error text) or a moment that ended without words marks the turn DEGRADED\n# so the visit/chat surfaces and the app's gauge know the difference\n# between \"the entity said nothing\" and \"the machinery failed\".\nguard_died = 1 if _input.get(\"guard_died\") == 1 else 0\nended_silent = 1 if _input.get(\"ended_silent\") == 1 else 0\ndegraded = 1 if (guard_died == 1 or ended_silent == 1) else 0\nmoment_error = str(_input.get(\"guard_error\") or \"\")\nif degraded == 1 and not moment_error:\n    moment_error = \"the moment ended without words\"\n\nreturn {\"state\": state, \"done\": done, \"reply\": reply,\n        \"degraded\": degraded, \"moment_error\": moment_error}\n"
+        "codeBody": "\n# Fold the turn outcome into the rolling session state.\nstate = _input.get(\"state\") or {}\nif not isinstance(state, dict):\n    state = {}\n# PURE-NODE LAW: code nodes are volatile (re-evaluated per data pull), so\n# inputs must NEVER be mutated in place — copy before writing.\nstate = dict(state)\nreply = str(_input.get(\"clean_reply\") or \"\")\nstimulus = str(_input.get(\"stimulus\") or \"\")\nepisode_ids = _input.get(\"episode_record_ids\")\nif not isinstance(episode_ids, list):\n    episode_ids = []\n\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nentry = {\"stimulus\": stimulus, \"reply\": reply}\nif episode_ids:\n    entry[\"episode\"] = episode_ids[0]\n# TOOLS (0.0.10): the acted round's host-authored names ride the turn log —\n# session-level observability of WHAT the mind touched, per turn.\ntools_ran = _input.get(\"tools_ran\")\nif isinstance(tools_ran, list) and tools_ran:\n    entry[\"tools\"] = [str(t) for t in tools_ran[:12]]\nlog = log + [entry]\nif len(log) > 40:\n    log = log[-40:]\nstate[\"turn_log\"] = log\nstate[\"last_reply\"] = reply\n\n# TEND FEEDBACK CARRY (adversary K, P2-2): the tend dispatch happens after\n# the reply is final, so its applied/refused result rides session state and\n# the NEXT turn's shelf shows it (\"YOUR LAST TENDING\"). No tend this turn\n# (or a turn without elections) CLEARS the carry — feedback never goes stale.\ntres = _input.get(\"tend_result\")\nlast_tend = None\nif isinstance(tres, dict):\n    applied = tres.get(\"applied\")\n    refused = tres.get(\"refused\")\n    n_applied = len(applied) if isinstance(applied, list) else 0\n    r_lines = []\n    if isinstance(refused, list):\n        for r in refused[:5]:\n            if isinstance(r, dict):\n                r_lines.append(str(r.get(\"line\") or \"\") + \" - \" + str(r.get(\"reason\") or \"\"))\n            else:\n                r_lines.append(str(r))\n    if n_applied > 0 or r_lines:\n        last_tend = {\"applied\": n_applied, \"refused\": r_lines}\nif last_tend is not None:\n    state[\"last_tend\"] = last_tend\nelif \"last_tend\" in state:\n    state.pop(\"last_tend\")\n\ndone = 0\nif reply.strip().endswith(\"DONE\"):\n    done = 1\nstate[\"task_done\"] = done\n\n# HONESTY SIGNALS out of the turn (fix adversary P0-1 + P1-2): a dead\n# rounds child (guard fired — the reply lane already carries the honest\n# error text) or a moment that ended without words marks the turn DEGRADED\n# so the visit/chat surfaces and the app's gauge know the difference\n# between \"the entity said nothing\" and \"the machinery failed\".\nguard_died = 1 if _input.get(\"guard_died\") == 1 else 0\nended_silent = 1 if _input.get(\"ended_silent\") == 1 else 0\ndegraded = 1 if (guard_died == 1 or ended_silent == 1) else 0\nmoment_error = str(_input.get(\"guard_error\") or \"\")\nif degraded == 1 and not moment_error:\n    moment_error = \"the moment ended without words\"\n\nreturn {\"state\": state, \"done\": done, \"reply\": reply,\n        \"degraded\": degraded, \"moment_error\": moment_error}\n",
+        "pinExpressions": {
+          "ended_silent": "(value or {}).get(\"silent\", 0)"
+        }
       },
       "label": null,
       "icon": null,
@@ -1564,7 +1385,10 @@
             "type": "string"
           }
         ],
-        "outputs": []
+        "outputs": [],
+        "pinExpressions": {
+          "tool_rounds": "(value or {}).get(\"rounds_used\", 0)"
+        }
       },
       "label": null,
       "icon": null,
@@ -1887,14 +1711,6 @@
       "animated": false
     },
     {
-      "id": "e-turn-output-reply_r-object",
-      "source": "turn",
-      "sourceHandle": "output",
-      "target": "reply_r",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
       "id": "e-turn-output-ran_r-object",
       "source": "turn",
       "sourceHandle": "output",
@@ -1903,33 +1719,9 @@
       "animated": false
     },
     {
-      "id": "e-turn-output-rounds_r-object",
+      "id": "e-turn-output-rounds_guard-value",
       "source": "turn",
       "sourceHandle": "output",
-      "target": "rounds_r",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-turn-output-words_r-object",
-      "source": "turn",
-      "sourceHandle": "output",
-      "target": "words_r",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-turn-output-silent_r-object",
-      "source": "turn",
-      "sourceHandle": "output",
-      "target": "silent_r",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "e-reply_r-value-rounds_guard-value",
-      "source": "reply_r",
-      "sourceHandle": "value",
       "target": "rounds_guard",
       "targetHandle": "value",
       "animated": false
@@ -1951,9 +1743,9 @@
       "animated": false
     },
     {
-      "id": "e-words_r-value-elections-prior_words",
-      "source": "words_r",
-      "sourceHandle": "value",
+      "id": "e-turn-output-elections-prior_words",
+      "source": "turn",
+      "sourceHandle": "output",
       "target": "elections",
       "targetHandle": "prior_words",
       "animated": false
@@ -2167,9 +1959,9 @@
       "animated": false
     },
     {
-      "id": "e-silent_r-value-fold-ended_silent",
-      "source": "silent_r",
-      "sourceHandle": "value",
+      "id": "e-turn-output-fold-ended_silent",
+      "source": "turn",
+      "sourceHandle": "output",
       "target": "fold",
       "targetHandle": "ended_silent",
       "animated": false
@@ -2207,9 +1999,9 @@
       "animated": false
     },
     {
-      "id": "e-rounds_r-value-end-tool_rounds",
-      "source": "rounds_r",
-      "sourceHandle": "value",
+      "id": "e-turn-output-end-tool_rounds",
+      "source": "turn",
+      "sourceHandle": "output",
       "target": "end",
       "targetHandle": "tool_rounds",
       "animated": false
@@ -2232,6 +2024,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-25T06:34:59.960310+00:00",
-  "updated_at": "2026-07-25T06:34:59.960310+00:00"
+  "created_at": "2026-07-26T07:14:57.023667+00:00",
+  "updated_at": "2026-07-26T07:14:57.023667+00:00"
 }

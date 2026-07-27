@@ -10,6 +10,7 @@ import {
   type GatewayConnectionStatus,
 } from './components/GatewayConnectionModal';
 import { AuthoringAssistantDrawer } from './components/AuthoringAssistantDrawer';
+import { FunctionsDrawer } from './components/FunctionsDrawer';
 import { NodePalette } from './components/NodePalette';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { Toolbar } from './components/Toolbar';
@@ -51,7 +52,7 @@ function has_browser_gateway_session(status: GatewayConnectionStatus | null): bo
   return true;
 }
 
-type RightDrawerMode = 'assistant' | 'properties' | null;
+type RightDrawerMode = 'assistant' | 'properties' | 'functions' | null;
 
 function App() {
   const { selectedNode } = useFlowStore();
@@ -81,17 +82,24 @@ function App() {
   const selected_node_id = selectedNode?.id || null;
   const assistant_open = right_drawer_mode === 'assistant';
   const properties_open = right_drawer_mode === 'properties';
-  const right_drawer_open = assistant_open || properties_open;
+  const functions_open = right_drawer_mode === 'functions';
+  const right_drawer_open = assistant_open || properties_open || functions_open;
   const toggle_assistant_drawer = () => {
     set_right_drawer_mode((mode) => (mode === 'assistant' ? null : 'assistant'));
   };
   const toggle_properties_drawer = () => {
     set_right_drawer_mode((mode) => (mode === 'properties' ? null : 'properties'));
   };
+  const toggle_functions_drawer = () => {
+    set_right_drawer_mode((mode) => (mode === 'functions' ? null : 'functions'));
+  };
 
   useEffect(() => {
     set_right_drawer_mode((mode) => {
-      if (mode === 'assistant') return mode;
+      // Assistant and Functions drawers hold their ground on selection: the
+      // functions panel's Used-by rows SELECT nodes — flipping to Properties
+      // on that click would close the panel the user is navigating from.
+      if (mode === 'assistant' || mode === 'functions') return mode;
       if (selected_node_id) return 'properties';
       return null;
     });
@@ -254,12 +262,13 @@ function App() {
 
         {/* Right sidebar - Properties / Assistant drawer */}
         <aside
-          className={`sidebar right properties-drawer ${right_drawer_open ? 'open' : 'collapsed'} ${assistant_open ? 'assistant-drawer-open' : ''} ${properties_open ? 'properties-drawer-open' : ''}`}
+          className={`sidebar right properties-drawer ${right_drawer_open ? 'open' : 'collapsed'} ${assistant_open ? 'assistant-drawer-open' : ''} ${properties_open ? 'properties-drawer-open' : ''} ${functions_open ? 'functions-drawer-open' : ''}`}
         >
           {right_drawer_open || assistant_mounted ? (
             <div className="right-drawer-content" style={right_drawer_open ? undefined : { display: 'none' }}>
               {assistant_mounted ? <AuthoringAssistantDrawer isOpen={assistant_open} /> : null}
               {properties_open ? <PropertiesPanel node={selectedNode} /> : null}
+              {functions_open ? <FunctionsDrawer /> : null}
             </div>
           ) : null}
           <div className="right-drawer-rail" aria-label="Right drawer">
@@ -282,6 +291,16 @@ function App() {
             >
               <span className="right-drawer-rail-icon" aria-hidden="true">⚙</span>
               <span className="right-drawer-rail-text">Properties</span>
+            </button>
+            <button
+              type="button"
+              className={`right-drawer-rail-action ${functions_open ? 'active' : ''}`}
+              onClick={toggle_functions_drawer}
+              title={functions_open ? 'Close functions' : 'Open functions'}
+              aria-label={functions_open ? 'Close functions' : 'Open functions'}
+            >
+              <span className="right-drawer-rail-icon" aria-hidden="true">ƒ</span>
+              <span className="right-drawer-rail-text">Functions</span>
             </button>
           </div>
         </aside>

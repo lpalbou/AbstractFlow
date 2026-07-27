@@ -355,6 +355,7 @@ describe('AuthoringAssistantDrawer repair feedback', () => {
         result: {
           flowName: 'Deep Research',
           flowInterfaces: [],
+          flowFunctions: [],
           nodes: [
             {
               id: 'trace_report',
@@ -368,7 +369,7 @@ describe('AuthoringAssistantDrawer repair feedback', () => {
           warnings: [],
           errors: ['connect refused invalid edge trace_report.result -> on_end.trace_summary (Type mismatch: cannot connect string to object)'],
           touchedNodeIds: ['trace_report'],
-          snapshot: { flowName: 'Untitled Flow', flowInterfaces: [], nodes: [], edges: [] },
+          snapshot: { flowName: 'Untitled Flow', flowInterfaces: [], nodes: [], edges: [], flowFunctions: [] },
         },
         candidateReadiness: { issues: ['Expose an audit or trace summary through a connected On Flow End data input.'], requiresRuntimeTools: true, requiresResearchScaffold: true },
       },

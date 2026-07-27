@@ -64,6 +64,11 @@ const RESEARCH_FLOW_COMMANDS = [
   { action: 'add_output_pin', nodeId: 'start', id: 'topic', label: 'topic', pinType: 'string' },
   { action: 'add_node', id: 'agent', nodeType: 'agent', label: 'Research agent', position: { x: 320, y: 0 } },
   { action: 'set_pin_default', nodeId: 'agent', pin: 'system', value: 'You are a research agent.' },
+  // A pin expression rides the shared fixture so the round-trip invariant
+  // below also covers the pin_expressions document field (serialize -> diff
+  // must be zero commands; a drift here would silently re-emit set_pin_expression
+  // every cycle and defeat the stall guard).
+  { action: 'set_pin_expression', nodeId: 'agent', pin: 'max_iterations', expression: 'vars.depth + 1' },
   { action: 'add_node', id: 'end', nodeType: 'on_flow_end', position: { x: 640, y: 0 } },
   { action: 'add_input_pin', nodeId: 'end', id: 'report', label: 'report', pinType: 'string' },
   { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'agent', targetHandle: 'exec-in' },
@@ -84,6 +89,7 @@ describe('flowToAuthoringDocument', () => {
     const agent = doc.nodes.find((node) => node.id === 'agent');
     expect(agent?.label).toBe('Research agent');
     expect(agent?.pin_defaults?.system).toBe('You are a research agent.');
+    expect(agent?.pin_expressions).toEqual({ max_iterations: 'vars.depth + 1' });
     const end = doc.nodes.find((node) => node.id === 'end');
     expect(end?.inputs).toEqual([{ id: 'report', type: 'string' }]);
     expect(doc.edges).toContain('start.topic -> agent.prompt');

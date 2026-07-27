@@ -160,19 +160,18 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   'multiagent-coding': {
     flowId: 'multiagent-coding',
     bundleId: 'multiagent-coding',
-    // 0.0.2 = dual-interface: coding.v1 strict root (gated) + agent.v1 wrapper
-    // 'multiagent-coder' (picker-visible), so agent apps can drive it like
-    // basic-agent/coder. 0.0.1 = cycle-3 fix wave (coding.v1, gateway-truth
-    // skills, diagnostic-grammar lint, MERGED_OK sentinel, verifier-death
-    // fold, gate-2 escalation, post-doc hash guard).
-    bundleVersion: '0.0.3',
-    bundleRef: 'multiagent-coding@0.0.3',
+    // 0.0.4 = pin-expression migration (accessor nodes -> consumer pin
+    // expressions; behavior identical, equivalence-verified). 0.0.3 = the
+    // stale-model-pin republish; 0.0.2 = dual-interface (coding.v1 strict
+    // root + agent.v1 wrapper 'multiagent-coder'); 0.0.1 = cycle-3 fix wave.
+    bundleVersion: '0.0.7',
+    bundleRef: 'multiagent-coding@0.0.7',
   },
   'multiagent-coder': {
     flowId: 'multiagent-coder',
     bundleId: 'multiagent-coding',
-    bundleVersion: '0.0.3',
-    bundleRef: 'multiagent-coding@0.0.3',
+    bundleVersion: '0.0.7',
+    bundleRef: 'multiagent-coding@0.0.7',
   },
 };
 

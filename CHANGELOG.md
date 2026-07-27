@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 2026-07-26 **Flow function library (tier 2) + Functions drawer**: flows carry
+  named helper functions at `flow.functions` (`{name, code, kind?, description?}`),
+  compiled once into the same sandbox as code-node bodies; pin expressions call
+  them by name (`build_again(vars.state)`). A right-rail **Functions** drawer
+  (search, `name(params)` rows, kind tags, used-by counts + jump-to-node, inline
+  create/edit, delete-refused-while-called) manages them; a pin whose expression
+  is exactly a library call renders a `ƒ name` chip and a docked `ƒ name → pin`
+  strip on the consumer card; the inline expression editor gains **Promote to
+  function…** (string-literal-aware read extraction → parameters). Authoring
+  lane: `functions` document field + `set_function`/`remove_function` commands;
+  preflight refuses calls to names that are neither a flow function nor a sandbox
+  builtin (Python keywords excluded — `in`/`and`/`not`/`else` are not calls).
+  Runtime half (statelessness enforced, imports/dunder parity with code nodes)
+  is in AbstractRuntime's changelog.
+
+### Changed
+- 2026-07-26 **multiagent-coding migrated to the function library (0.0.5)**: the
+  root flow's 33 pure code nodes collapsed to 3 (genuinely multi-wire folds)
+  via 31 library functions + pin expressions — **79 → 45 nodes**, the canvas now
+  reading as the execution spine instead of a wire tangle. Config folds once
+  into the seeded state (`mw_preflight`); the loop-state var renamed nested
+  `mw.state` → flat `state` (no external consumers). Behavior verified
+  equivalent to 0.0.4 across 11 differential scenarios by an adversarial audit
+  (one regression found + fixed: gate 1's approval prompt/choices are computed
+  by `gate1_prompt`, not the raw planner dict — a dead planner now recycles the
+  bounded revision loop instead of failing the run). Deliberate, more-correct
+  divergence on a failure path: an empty git-branch result records the computed
+  slug as the branch name (the branch the command used) rather than the literal
+  `"work"`. Loop-condition pins carry a `false` default as a skew belt behind
+  the `metadata.min_runtime` gate. Entity-life family + wrapper/verify copies
+  carry the tier-1 accessor collapses.
+
+- 2026-07-25 **Inline pin expressions (editor + authoring halves)**: a data
+  input pin can carry a small sandboxed Python expression, stored at
+  `node.data.pinExpressions` — its own field, never a `pinDefaults` sentinel,
+  so pre-expression runtimes ignore the key and the pin falls back to its
+  wire/default (skew degrades stale, never a spinning truthy dict).
+  Evaluation is AbstractRuntime's (see its changelog): expressions read
+  `vars.*` (run vars, read-only) and `value` (the pin's wire/default) and
+  replace the pin's value at input resolution. Editor: hover a pin row for
+  the `ƒx` control; computed pins carry an amber chip and halo; an inline
+  editor expands under the row; While/If cards render a condition preview.
+  Preflight counts an expression as a satisfied input and warns before any
+  run on stale pin ids, empty expressions, `value` reads with no wire and no
+  default, and `vars.<name>` reads no set_var/start pin declares (abstains
+  when the graph declares no vars). Authoring lane: `pin_expressions`
+  document field and `set_pin_expression` command (merge per key, empty
+  string removes; secret-looking expression text refused through the same
+  `hasSecretLikeValue` gate as the canvas editor, on both save paths).
+  `scripts/wf_common.py` gains a `pin_expressions=` kwarg and a
+  `with_expressions()` helper, and its `validate_edges` code-input coverage
+  rule counts an expression-fed input as satisfied (same rule as preflight —
+  a readiness check must be satisfiable by a compliant graph). Contract
+  documented in `docs/visualflow.md`; document field in
+  `docs/workflow-authoring-skill.md`.
+
 ### Fixed
 - 2026-07-25 **Flow Library invisibility (entity + multiagent families)**
   (operator report): the library bundles example flows at BUILD time
@@ -21,6 +78,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bundle rule).
 
 ### Changed
+- 2026-07-25 **multiagent-coding flows migrated to pin expressions
+  (conservative tier-1 pass)**: the eight single-consumer accessor nodes
+  across the three flows collapsed into expressions on their consumer pins —
+  wrapper `multiagent-coder` 9→5 nodes / 17→13 edges (get_report/get_success/
+  get_branch/get_reason → `build.output` wired straight to end.response,
+  end.success, meta_obj.branch, meta_obj.stopped_reason with
+  `(value or {}).get(field, default)`), root `multiagent-coding` 82→79 nodes /
+  178→175 edges (get_skills_res → `preflight.skills_resolution`,
+  get_verdict → `next_state.verify_verdict` with `verify.output` rewired
+  direct, get_state_final → `final_report.loop_state`), pinned verify copy
+  `multiagent-verify-gates` 32→31 nodes / 83→82 edges (read_verdict →
+  `end.verdict`, applied to the COPY only via a hard-asserted transform in
+  `build_verify_copy` — the coding-agent source flow stays byte-untouched and
+  any source drift fails the build loudly). Faithful forms are single-sourced
+  in the builder (`field_expr`/`var_expr`: get-node = field-or-default off the
+  wire; get_var = dotted read with missing-at-any-level → default), verified
+  equivalent against the real handlers over an edge-case matrix (dead-child
+  None, empty/missing, found-None leaf). The four multi-consumer state hubs
+  (get_state_p/b/tail/done) deliberately STAY nodes — their fan-out is the
+  design; statement-bodied code nodes are law and were not touched.
 - 2026-07-25 **entity-life version ledger backfill + hygiene** (cleanup
   adversary P1-2/P0-1): the per-version ledger now lives HERE (the builder's
   header comments had silently stopped at 0.0.11). Backfill: `0.0.12` —

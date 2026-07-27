@@ -13,7 +13,7 @@ import {
   NodeChange,
   EdgeChange,
 } from 'reactflow';
-import type { FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
+import type { FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { inferEntryNode, isRouteOverrideEdge, routeKey as buildRouteKey, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
@@ -32,10 +32,18 @@ interface FlowState {
   flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
+  // Flow-level named helper functions (tier 2). Owned by the document like
+  // nodes/edges: load/save round-trips them, undo/redo covers edits.
+  flowFunctions: FlowFunction[];
 
   // Selection
   selectedNode: Node<FlowNodeData> | null;
   selectedEdge: Edge | null;
+  // Cross-component "pan/zoom the canvas to this node" request. The Functions
+  // drawer's Used-by rows live outside Canvas (which owns the React Flow
+  // instance), so they signal through the store; Canvas watches the nonce and
+  // fits the view. Nonce lets the same node be re-focused on repeated clicks.
+  focusNodeRequest: { nodeId: string; nonce: number } | null;
 
   // Execution state
   executingNodeId: string | null;
@@ -74,6 +82,17 @@ interface FlowState {
   setFlowInterfaces: (interfaces: string[]) => void;
   setNodes: (nodes: Node<FlowNodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
+  /** Create or update a named function (undoable). Returns an error string on refusal. */
+  upsertFlowFunction: (fn: FlowFunction, options?: { previousName?: string }) => string | null;
+  /** Remove a named function (undoable). Refuses (returns error) while pin expressions still call it. */
+  removeFlowFunction: (name: string) => string | null;
+  /** Promote an expression to a named function AND rebind the pin, as ONE undo step. */
+  promoteExpressionToFunction: (
+    fn: FlowFunction,
+    nodeId: string,
+    pinId: string,
+    call: string
+  ) => string | null;
   applyAuthoringCommands: (
     commands: unknown[],
     options?: { allowDestructive?: boolean; resolvedSubflows?: Map<string, VisualFlow> }
@@ -89,6 +108,8 @@ interface FlowState {
   disconnectPin: (nodeId: string, handleId: string, isInput: boolean) => void;
   setSelectedNode: (node: Node<FlowNodeData> | null) => void;
   setSelectedEdge: (edge: Edge | null) => void;
+  /** Ask the canvas to pan/zoom to a node (used by the Functions drawer). */
+  requestFocusNode: (nodeId: string) => void;
   copySelectionToClipboard: () => number;
   pasteClipboard: () => number;
   duplicateSelection: () => number;
@@ -127,6 +148,7 @@ interface HistoryEntry {
   edges: Edge[];
   flowName: string;
   flowInterfaces: string[];
+  flowFunctions: FlowFunction[];
 }
 
 type Point = { x: number; y: number };
@@ -177,14 +199,112 @@ function isNodeSelected(node: Node<FlowNodeData>): boolean {
 
 /** Deep-cloned snapshot of the undoable graph state (isolated from the store). */
 function historySnapshot(
-  s: Pick<FlowState, 'nodes' | 'edges' | 'flowName' | 'flowInterfaces'>
+  s: Pick<FlowState, 'nodes' | 'edges' | 'flowName' | 'flowInterfaces' | 'flowFunctions'>
 ): HistoryEntry {
   return {
     nodes: deepClone(s.nodes),
     edges: deepClone(s.edges),
     flowName: s.flowName,
     flowInterfaces: Array.isArray(s.flowInterfaces) ? [...s.flowInterfaces] : [],
+    flowFunctions: Array.isArray(s.flowFunctions) ? deepClone(s.flowFunctions) : [],
   };
+}
+
+/**
+ * Normalize a raw `flow.functions` value into clean FlowFunction entries.
+ * Mirrors the runtime's normalize_flow_functions: only entries with a
+ * non-empty string name AND code survive; extra fields kind/description are
+ * kept when they are strings.
+ */
+// Metadata caps MUST match the authoring-document parser's caps
+// (flowAuthoringDocument.normalizeDocument uses cleanText(description, 300) /
+// cleanText(kind, 40)). If at-rest values could exceed them, serialize→diff
+// would emit a spurious set_function every cycle (unlabeled truncation on
+// re-parse) — the round-trip invariant break the adversary found (P1-15).
+// Capping here AND on the write path keeps at-rest == doc-normalized.
+const FUNCTION_KIND_MAX = 40;
+const FUNCTION_DESCRIPTION_MAX = 300;
+
+export function normalizeFlowFunctions(raw: unknown): FlowFunction[] {
+  if (!Array.isArray(raw)) return [];
+  const out: FlowFunction[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    const rec = entry as Record<string, unknown>;
+    const name = typeof rec.name === 'string' ? rec.name.trim() : '';
+    const code = typeof rec.code === 'string' ? rec.code : '';
+    if (!name || !code.trim()) continue;
+    const fn: FlowFunction = { name, code };
+    if (typeof rec.kind === 'string' && rec.kind.trim()) fn.kind = rec.kind.trim().slice(0, FUNCTION_KIND_MAX);
+    if (typeof rec.description === 'string' && rec.description.trim()) {
+      fn.description = rec.description.trim().slice(0, FUNCTION_DESCRIPTION_MAX);
+    }
+    out.push(fn);
+  }
+  return out;
+}
+
+/**
+ * Find pin expressions that reference a function name as a CALL
+ * (`name(...)`). Used for delete-refusal and used-by listings. A word-boundary
+ * call-site scan (not a full parse) — matches the runtime's failure honesty:
+ * a missed exotic reference fails loudly at build time anyway.
+ */
+export function findFunctionCallSites(
+  nodes: Node<FlowNodeData>[],
+  name: string
+): Array<{ nodeId: string; nodeLabel: string; pinId: string; expression: string }> {
+  const sites: Array<{ nodeId: string; nodeLabel: string; pinId: string; expression: string }> = [];
+  if (!name) return sites;
+  const re = new RegExp(`(^|[^\\w.])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`);
+  for (const node of nodes) {
+    const exprs = node.data?.pinExpressions;
+    if (!exprs || typeof exprs !== 'object') continue;
+    for (const [pinId, expr] of Object.entries(exprs)) {
+      if (typeof expr !== 'string') continue;
+      if (re.test(expr)) {
+        sites.push({
+          nodeId: node.id,
+          nodeLabel: String(node.data?.label || node.id),
+          pinId,
+          expression: expr,
+        });
+      }
+    }
+  }
+  return sites;
+}
+
+/**
+ * Rewrite every pin expression that CALLS `from`(…) to call `to`(…), returning
+ * a new nodes array (only touched nodes are new objects). Used on rename so a
+ * renamed function never orphans its call sites (findFunctionCallSites uses
+ * the same call-shape regex, so this rewrites exactly what that would report).
+ */
+export function renameFunctionCallSites(
+  nodes: Node<FlowNodeData>[],
+  from: string,
+  to: string
+): Node<FlowNodeData>[] {
+  if (!from || !to || from === to) return nodes;
+  const re = new RegExp(`(^|[^\\w.])(${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(\\s*\\()`, 'g');
+  return nodes.map((node) => {
+    const exprs = node.data?.pinExpressions;
+    if (!exprs || typeof exprs !== 'object') return node;
+    let changed = false;
+    const nextExprs: Record<string, string> = {};
+    for (const [pinId, expr] of Object.entries(exprs)) {
+      if (typeof expr === 'string' && re.test(expr)) {
+        re.lastIndex = 0;
+        nextExprs[pinId] = expr.replace(re, (_all, pre, _name, tail) => `${pre}${to}${tail}`);
+        changed = true;
+      } else {
+        nextExprs[pinId] = expr as string;
+      }
+      re.lastIndex = 0;
+    }
+    return changed ? { ...node, data: { ...node.data, pinExpressions: nextExprs } } : node;
+  });
 }
 
 function getSelection(state: Pick<FlowState, 'nodes' | 'selectedNode'>): Node<FlowNodeData>[] {
@@ -217,8 +337,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   flowInterfaces: [],
   nodes: [],
   edges: [],
+  flowFunctions: [],
   selectedNode: null,
   selectedEdge: null,
+  focusNodeRequest: null,
   executingNodeId: null,
   isRunning: false,
   execView: false,
@@ -244,6 +366,84 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
   setEdges: (edges) => set({ edges }),
 
+  upsertFlowFunction: (fn, options) => {
+    const name = (fn?.name || '').trim();
+    const code = fn?.code || '';
+    if (!name) return 'Function name is required';
+    if (!/^[A-Za-z_]\w*$/.test(name) || name.startsWith('__')) {
+      return `Function name '${name}' must be a plain identifier`;
+    }
+    if (!code.trim()) return 'Function code is required';
+    // The def must define the declared name (mirrors the runtime refusal).
+    const defRe = new RegExp(`(^|\\n)\\s*def\\s+${name}\\s*\\(`);
+    if (!defRe.test(code)) {
+      return `Function code must contain 'def ${name}(...)' — the def name must match`;
+    }
+    const s = get();
+    const previousName = options?.previousName?.trim();
+    const existing = s.flowFunctions.filter((f) => f.name !== (previousName || name));
+    if (existing.some((f) => f.name === name)) {
+      return `A function named '${name}' already exists`;
+    }
+    get()._captureHistory();
+    const entry: FlowFunction = { name, code };
+    // Cap metadata to the authoring-document limits so serialize→diff is a
+    // no-op (round-trip invariant; adversary P1-15).
+    if (fn.kind?.trim()) entry.kind = fn.kind.trim().slice(0, FUNCTION_KIND_MAX);
+    if (fn.description?.trim()) entry.description = fn.description.trim().slice(0, FUNCTION_DESCRIPTION_MAX);
+    // Preserve list order on edit (stable drawer rows); append on create.
+    const idx = s.flowFunctions.findIndex((f) => f.name === (previousName || name));
+    const next = [...s.flowFunctions];
+    if (idx >= 0) next[idx] = entry;
+    else next.push(entry);
+    // RENAME: rewrite every call site so a renamed function never orphans its
+    // callers (adversary P1-6). Delete refuses while called; rename is
+    // delete+create from the call sites' view, so it gets the same care —
+    // here by rewriting rather than refusing (the friendlier resolution).
+    let nextNodes = s.nodes;
+    if (previousName && previousName !== name) {
+      nextNodes = renameFunctionCallSites(s.nodes, previousName, name);
+    }
+    set({ flowFunctions: next, nodes: nextNodes });
+    return null;
+  },
+
+  promoteExpressionToFunction: (fn, nodeId, pinId, call) => {
+    const name = (fn?.name || '').trim();
+    const err = get().upsertFlowFunction({ name, code: fn.code, kind: fn.kind });
+    // upsertFlowFunction already captured history for the function add; fold
+    // the pin rebind into the SAME undo step (one gesture = one entry —
+    // adversary P1-14) by coalescing on a shared key within the window.
+    if (err) return err;
+    const s = get();
+    const node = s.nodes.find((n) => n.id === nodeId);
+    if (!node) return `No node '${nodeId}' to rebind`;
+    const nextExprs = { ...(node.data.pinExpressions || {}), [pinId]: call };
+    set({
+      nodes: s.nodes.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, pinExpressions: nextExprs } } : n
+      ),
+    });
+    return null;
+  },
+
+  removeFlowFunction: (name) => {
+    const s = get();
+    const target = (name || '').trim();
+    if (!s.flowFunctions.some((f) => f.name === target)) return `No function named '${target}'`;
+    const sites = findFunctionCallSites(s.nodes, target);
+    if (sites.length > 0) {
+      const where = sites
+        .slice(0, 3)
+        .map((x) => `${x.nodeLabel}.${x.pinId}`)
+        .join(', ');
+      return `'${target}' is still used by ${sites.length} pin${sites.length > 1 ? 's' : ''} (${where}${sites.length > 3 ? ', …' : ''}) — remove those expressions first`;
+    }
+    get()._captureHistory();
+    set({ flowFunctions: s.flowFunctions.filter((f) => f.name !== target) });
+    return null;
+  },
+
   applyAuthoringCommands: (commands, options) => {
     const state = get();
     const result = applyFlowAuthoringCommands({
@@ -251,6 +451,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowInterfaces: state.flowInterfaces,
       nodes: state.nodes,
       edges: state.edges,
+      flowFunctions: state.flowFunctions,
       commands,
       allowDestructive: options?.allowDestructive,
       resolvedSubflows: options?.resolvedSubflows,
@@ -274,6 +475,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowInterfaces: result.flowInterfaces,
       nodes: result.nodes,
       edges: result.edges,
+      flowFunctions: result.flowFunctions,
       selectedNode,
       selectedEdge: null,
     });
@@ -288,6 +490,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowInterfaces: Array.isArray(snapshot.flowInterfaces) ? snapshot.flowInterfaces : [],
       nodes: snapshot.nodes,
       edges: snapshot.edges,
+      flowFunctions: Array.isArray(snapshot.flowFunctions) ? snapshot.flowFunctions : [],
       selectedNode: null,
       selectedEdge: null,
     });
@@ -579,6 +782,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Selection
   setSelectedNode: (node) => set({ selectedNode: node, selectedEdge: null }),
   setSelectedEdge: (edge) => set({ selectedEdge: edge, selectedNode: null }),
+  requestFocusNode: (nodeId) =>
+    set((state) => ({
+      focusNodeRequest: { nodeId, nonce: (state.focusNodeRequest?.nonce || 0) + 1 },
+    })),
 
   copySelectionToClipboard: () => {
     const state = get();
@@ -707,6 +914,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: deepClone(previous.edges),
       flowName: previous.flowName,
       flowInterfaces: [...previous.flowInterfaces],
+      flowFunctions: deepClone(previous.flowFunctions || []),
       selectedNode: null,
       selectedEdge: null,
       // A restore is not a gesture — the next mutation always baselines.
@@ -728,6 +936,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: deepClone(next.edges),
       flowName: next.flowName,
       flowInterfaces: [...next.flowInterfaces],
+      flowFunctions: deepClone(next.flowFunctions || []),
       selectedNode: null,
       selectedEdge: null,
       _historyLastKey: null,
@@ -2462,6 +2671,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         animated: e.animated,
       }));
     const canonicalFlow = normalizeLegacyMusicCompatVisualFlow(visualNodes, visualEdges);
+    const flowFunctions = normalizeFlowFunctions((flow as VisualFlow).functions);
     const loadedFlow: VisualFlow = {
       id: flow.id,
       name: flow.name,
@@ -2469,6 +2679,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: canonicalFlow.nodes,
       edges: canonicalFlow.edges,
       entryNode,
+      ...(flowFunctions.length ? { functions: flowFunctions } : {}),
     };
 
     set({
@@ -2478,6 +2689,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowInterfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes,
       edges: displayEdges,
+      flowFunctions,
       selectedNode: null,
       selectedEdge: null,
       // A freshly loaded document starts a new timeline — undoing into the
@@ -2520,6 +2732,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: normalizedFlow.nodes,
       edges: normalizedFlow.edges,
       entryNode,
+      ...(state.flowFunctions.length ? { functions: deepClone(state.flowFunctions) } : {}),
     };
   },
 
@@ -2532,6 +2745,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowInterfaces: [],
       nodes: [],
       edges: [],
+      flowFunctions: [],
       selectedNode: null,
       selectedEdge: null,
       clipboard: null,

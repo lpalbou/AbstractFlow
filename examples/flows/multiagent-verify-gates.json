@@ -1958,48 +1958,6 @@
       "outputs": []
     },
     {
-      "id": "read_verdict",
-      "type": "get_var",
-      "position": {
-        "x": 2560,
-        "y": 400
-      },
-      "data": {
-        "nodeType": "get_var",
-        "label": "Get vg.verdict",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "name",
-            "label": "name",
-            "type": "string"
-          },
-          {
-            "id": "default",
-            "label": "default",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "name": "vg.verdict",
-          "default": {}
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "end",
       "type": "on_flow_end",
       "position": {
@@ -2023,7 +1981,10 @@
             "type": "object"
           }
         ],
-        "outputs": []
+        "outputs": [],
+        "pinExpressions": {
+          "verdict": "(vars.get(\"vg\") or {}).get(\"verdict\", {})"
+        }
       },
       "label": null,
       "icon": null,
@@ -2687,14 +2648,6 @@
       "sourceHandle": "output",
       "target": "set_verdict_llm",
       "targetHandle": "value",
-      "animated": false
-    },
-    {
-      "id": "e-read_verdict-value-end-verdict",
-      "source": "read_verdict",
-      "sourceHandle": "value",
-      "target": "end",
-      "targetHandle": "verdict",
       "animated": false
     }
   ],

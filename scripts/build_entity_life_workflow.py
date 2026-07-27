@@ -84,7 +84,7 @@ from wf_common import (  # noqa: E402
     subflow_node, memory_recall_node, memory_commit_node, memory_form_node,
     memory_appraise_node, diary_write_node, memory_consolidate_node,
     memory_probe_node, life_query_node, memory_tend_node,
-    entity_tools_query_node, entity_tools_execute_node,
+    entity_tools_query_node, entity_tools_execute_node, with_expressions,
     write_json, validate_edges, pack_bundle, compile_check,
 )
 from entity_flow_code import (  # noqa: E402
@@ -114,7 +114,13 @@ ROUNDS_ID = "entity-tool-rounds"
 GOODBYE_ID = "entity-goodbye"
 
 BUNDLE_ID = "entity-life"
-BUNDLE_VERSION = "0.0.16"
+# 0.0.17 (2026-07-26): pin-expression migration — 50 single-consumer accessor
+# nodes (get/get_var) collapsed into consumer pin expressions across the family
+# (master 75->49; goodbye/chat/cognition-turn/visit/work/personal also); behavior
+# identical (both entity smokes green). Version bump because 0.0.16 shipped the
+# pre-migration bytes. This bundle now REQUIRES a pin-expression runtime
+# (metadata.min_runtime below; enforcement gate is gateway's lane, backlog 0154).
+BUNDLE_VERSION = "0.0.17"
 # Version history: CHANGELOG.md (entity-life entries) — the per-version
 # ledger moved there 2026-07-25 (cleanup adversary P1-2: the header-comment
 # practice bloated this file AND silently stopped at 0.0.11 while five
@@ -122,6 +128,54 @@ BUNDLE_VERSION = "0.0.16"
 
 EVENT_KEY_PREFIX = "evt:global:global:"
 # AGENT_INTERFACE imported from wf_common (one definition — adversary C).
+
+
+# --- pin-expression forms (tier 1 migration, 2026-07-26) --------------------
+# Faithful single-expression equivalents of the two accessor node classes
+# this migration collapses (the multiagent-coder precedent, copied exactly —
+# ONE helper each so every converted pin carries the same audited form).
+# ENTITY-BRAIN SEMANTICS AUDIT: every converted `get` here reads a SUBFLOW
+# `output` pin — a dict of the child's collected on_flow_end fields on a
+# healthy child, None on a dead one — so the two documented field_expr
+# divergences stay unreachable: (a) truthy-non-dict objects never occur, and
+# (b) explicit-None fields never occur (every child end-field producer is a
+# defensive code body emitting typed values — see entity_flow_code.py — or
+# an effect output whose failure kills the child, which lands as None output
+# and takes the `(value or {})` lane exactly like the old get default).
+
+
+def field_expr(key: str, default_literal: str) -> str:
+    """`get` node equivalent for a WIRED object: field or default.
+
+    `(value or {})` covers the None/falsy object (dead subflow child delivers
+    None) exactly like data_get's _get_path(None) -> default. Divergence vs
+    the get node, both unreachable for these producers: a non-dict TRUTHY
+    object raises loudly (get returned default), and an explicit-None field
+    yields None (get returned default) - every converted consumer either
+    str/int/isinstance-normalizes its input or the producer can never emit
+    None fields.
+    """
+    return '(value or {}).get("' + key + '", ' + default_literal + ')'
+
+
+def var_expr(name: str, default_literal: str = "{}") -> str:
+    """`get_var` node equivalent: dotted-path read with missing-at-any-level
+    -> default (matches _get_by_path_with_found: a found-but-None LEAF stays
+    None; a None/missing INTERMEDIATE falls to the default). Every get_var
+    this builder converts uses a SIMPLE name, where vars.get(name, default)
+    is EXACT (found-but-None stays None; a fresh literal default per eval
+    matches get_var's _clone_default).
+
+    vars.get("_runtime") is a method CALL, so leading-underscore names are
+    fine here (the sandbox only blocks underscore ATTRIBUTE access like
+    vars._runtime)."""
+    parts = [p for p in name.split(".") if p]
+    if len(parts) == 1:
+        return 'vars.get("' + parts[0] + '", ' + default_literal + ')'
+    expr = 'vars.get("' + parts[0] + '")'
+    for p in parts[1:-1]:
+        expr = '(' + expr + ' or {}).get("' + p + '")'
+    return '(' + expr + ' or {}).get("' + parts[-1] + '", ' + default_literal + ')'
 
 
 def guard_node(node_id, label, x, y):
@@ -244,26 +298,28 @@ def build_cognition_turn() -> dict:
         ("provider", "string"), ("model", "string"),
     ], 720, 560, pin_defaults={"max_rounds": 3}))
     N.append(subflow_node("turn", "THE LIVED TURN — mind + tools", ROUNDS_ID, 720, 360))
-    N.append(get_node("reply_r", "reply", "", 900, 60))
+    # Field extraction rides pin EXPRESSIONS on the consumers (tier-1
+    # migration): turn.output wires straight to each consumer pin — the four
+    # single-consumer get nodes (reply_r/rounds_r/words_r/silent_r)
+    # collapsed here. ran_r deliberately STAYS a node: two consumers
+    # (fold.tools_ran + end.tools_ran) — its fan-out is the design.
     N.append(get_node("ran_r", "tools_ran", [], 900, 560))
-    # tool_rounds is PRESENT-EVEN-WHEN-ZERO (entity's app-half adversary,
-    # c5290): structural proof the tools lane executed lets the app's
-    # fabrication gauge accuse from turn one — an absent field stays blind.
-    N.append(get_node("rounds_r", "rounds_used", 0, 900, 660))
-    N.append(get_node("words_r", "prior_words", "", 900, 760))
-    N.append(get_node("silent_r", "silent", 0, 900, 860))
     # DEATH GUARD on the rounds child (fix adversary P0-1: this was the ONE
     # turn-level subflow call without the guard idiom — a provider failure
     # mid-round was absorbed into a FALSE "(I stayed silent)" episode in the
     # append-only graph with degraded=0 and a gauge contradicting the home's
     # own ledger). On death the honest error text becomes the reply lane and
     # the turn marks DEGRADED; the episode then records the truth.
-    N.append(guard_node("rounds_guard", "The rounds must have lived", 900, 360))
+    N.append(with_expressions(
+        guard_node("rounds_guard", "The rounds must have lived", 900, 360),
+        {"value": field_expr("reply", '""')}))
 
-    N.append(code_node("elections", "Mid-turn elections (feel fence)", ELECTIONS_CODE, 1040, 160,
-                       [pin("reply", "reply", "string"),
-                        pin("prior_words", "prior_words", "string"),
-                        pin("phase", "phase", "string")]))
+    N.append(with_expressions(
+        code_node("elections", "Mid-turn elections (feel fence)", ELECTIONS_CODE, 1040, 160,
+                  [pin("reply", "reply", "string"),
+                   pin("prior_words", "prior_words", "string"),
+                   pin("phase", "phase", "string")]),
+        {"prior_words": field_expr("prior_words", '""')}))
 
     N.append(if_node("if_feel", "feeling elected?", 1040, 360))
     N.append(memory_appraise_node("feel", "Elected feeling — valence", 1300, 200,
@@ -289,25 +345,33 @@ def build_cognition_turn() -> dict:
                               pin_defaults={"scope": "life",
                                             "channel": "entity-reflection"}))
 
-    N.append(code_node("fold", "Fold the turn into session state", TURN_FOLD_CODE, 1820, 160,
-                       [pin("state", "state", "object"), pin("clean_reply", "clean_reply", "string"),
-                        pin("stimulus", "stimulus", "string"),
-                        pin("episode_record_ids", "episode_record_ids", "array"),
-                        pin("tend_result", "tend_result", "object"),
-                        pin("tools_ran", "tools_ran", "array"),
-                        pin("guard_died", "guard_died", "number"),
-                        pin("guard_error", "guard_error", "string"),
-                        pin("ended_silent", "ended_silent", "number")]))
+    N.append(with_expressions(
+        code_node("fold", "Fold the turn into session state", TURN_FOLD_CODE, 1820, 160,
+                  [pin("state", "state", "object"), pin("clean_reply", "clean_reply", "string"),
+                   pin("stimulus", "stimulus", "string"),
+                   pin("episode_record_ids", "episode_record_ids", "array"),
+                   pin("tend_result", "tend_result", "object"),
+                   pin("tools_ran", "tools_ran", "array"),
+                   pin("guard_died", "guard_died", "number"),
+                   pin("guard_error", "guard_error", "string"),
+                   pin("ended_silent", "ended_silent", "number")]),
+        {"ended_silent": field_expr("silent", "0")}))
 
-    N.append(end_node("Moment ends", [
-        pin("reply", "reply", "string"),
-        pin("state", "state", "object"),
-        pin("done", "done", "boolean"),
-        pin("tools_ran", "tools_ran", "array"),
-        pin("tool_rounds", "tool_rounds", "number"),
-        pin("degraded", "degraded", "number"),
-        pin("moment_error", "moment_error", "string"),
-    ], 2080, 300))
+    # tool_rounds is PRESENT-EVEN-WHEN-ZERO (entity's app-half adversary,
+    # c5290): structural proof the tools lane executed lets the app's
+    # fabrication gauge accuse from turn one — an absent field stays blind.
+    # The expression keeps that invariant: a dead rounds child still lands 0.
+    N.append(with_expressions(
+        end_node("Moment ends", [
+            pin("reply", "reply", "string"),
+            pin("state", "state", "object"),
+            pin("done", "done", "boolean"),
+            pin("tools_ran", "tools_ran", "array"),
+            pin("tool_rounds", "tool_rounds", "number"),
+            pin("degraded", "degraded", "number"),
+            pin("moment_error", "moment_error", "string"),
+        ], 2080, 300),
+        {"tool_rounds": field_expr("rounds_used", "0")}))
 
     # Execution spine (effect/if nodes only; code nodes are pure/lazy).
     E.append(edge("start", "exec-out", "recall", "exec-in"))
@@ -355,15 +419,12 @@ def build_cognition_turn() -> dict:
     E.append(edge("start", "model", "rounds_in", "model"))
     E.append(edge("rounds_in", "result", "turn", "input"))
 
-    E.append(edge("turn", "output", "reply_r", "object"))
+    # the whole rounds-child output feeds each extracting pin directly
     E.append(edge("turn", "output", "ran_r", "object"))
-    E.append(edge("turn", "output", "rounds_r", "object"))
-    E.append(edge("turn", "output", "words_r", "object"))
-    E.append(edge("turn", "output", "silent_r", "object"))
-    E.append(edge("reply_r", "value", "rounds_guard", "value"))
+    E.append(edge("turn", "output", "rounds_guard", "value"))
     E.append(edge("turn", "child_output", "rounds_guard", "child"))
     E.append(edge("rounds_guard", "value", "elections", "reply"))
-    E.append(edge("words_r", "value", "elections", "prior_words"))
+    E.append(edge("turn", "output", "elections", "prior_words"))
     E.append(edge("setup", "phase", "elections", "phase"))
 
     E.append(edge("elections", "has_feel", "if_feel", "condition"))
@@ -399,13 +460,13 @@ def build_cognition_turn() -> dict:
     E.append(edge("ran_r", "value", "fold", "tools_ran"))
     E.append(edge("rounds_guard", "died", "fold", "guard_died"))
     E.append(edge("rounds_guard", "error", "fold", "guard_error"))
-    E.append(edge("silent_r", "value", "fold", "ended_silent"))
+    E.append(edge("turn", "output", "fold", "ended_silent"))
 
     E.append(edge("fold", "reply", "end", "reply"))
     E.append(edge("fold", "state", "end", "state"))
     E.append(edge("fold", "done", "end", "done"))
     E.append(edge("ran_r", "value", "end", "tools_ran"))
-    E.append(edge("rounds_r", "value", "end", "tool_rounds"))
+    E.append(edge("turn", "output", "end", "tool_rounds"))
     E.append(edge("fold", "degraded", "end", "degraded"))
     E.append(edge("fold", "moment_error", "end", "moment_error"))
 
@@ -642,42 +703,52 @@ def build_goodbye() -> dict:
         pin("state", "state", "object"),
     ], 80, 260, pin_defaults={"reason": "the visitor left", "prompt": ""}))
 
-    N.append(get_var("ctx_var", "context", {}, 200, 100))
-    N.append(code_node("chat_state", "Session history folds", CHAT_STATE_CODE, 400, 100,
-                       [pin("state", "state", "object"), pin("context", "context", "object")]))
+    # context rides a pin expression (was the single-consumer get_var
+    # ctx_var; tier-1 migration): vars.get("context", {}) is EXACT get_var
+    # semantics for a simple name — the goodbye smoke passes context as a
+    # start var, and start vars ARE run vars.
+    N.append(with_expressions(
+        code_node("chat_state", "Session history folds", CHAT_STATE_CODE, 400, 100,
+                  [pin("state", "state", "object"), pin("context", "context", "object")]),
+        {"context": var_expr("context")}))
     N.append(make_obj("close_in", "Compose the close", [
         ("state", "object"), ("reason", "string"),
     ], 640, 100, pin_defaults={"phase": "visit"}))
     N.append(subflow_node("close", "CLOSE — summary + diary note", CLOSE_ID, 640, 260))
     N.append(get_node("turns_out", "turns", 0, 940, 100))
-    N.append(get_node("entry_out", "diary_entry_id", "", 940, 200))
     # agent.v1 consumers read answer/response — the close reports itself.
     N.append(code_node("close_word", "The close reports", GOODBYE_WORD_CODE, 940, 460,
                        [pin("turns", "turns", "number"), pin("reason", "reason", "string")]))
-    N.append(end_node("Closed", [
-        pin("answer", "answer", "string"),
-        pin("response", "response", "string"),
-        pin("turns", "turns", "number"),
-        pin("diary_entry_id", "diary_entry_id", "string"),
-    ], 940, 320))
+    # diary_entry_id extraction rides the end pin (was the single-consumer
+    # get node entry_out): close.output wires straight in; a dead close
+    # child delivers None and `(value or {})` keeps the get-node default.
+    # turns_out deliberately STAYS a node — two consumers (close_word + end).
+    N.append(with_expressions(
+        end_node("Closed", [
+            pin("answer", "answer", "string"),
+            pin("response", "response", "string"),
+            pin("turns", "turns", "number"),
+            pin("diary_entry_id", "diary_entry_id", "string"),
+        ], 940, 320),
+        {"diary_entry_id": field_expr("diary_entry_id", '""')}))
 
     E.append(edge("start", "exec-out", "close", "exec-in"))
     E.append(edge("close", "exec-out", "end", "exec-in"))
 
     E.append(edge("start", "state", "chat_state", "state"))
-    E.append(edge("ctx_var", "value", "chat_state", "context"))
+    # chat_state.context: no wire - the pin expression reads run vars directly
     E.append(edge("chat_state", "state", "close_in", "state"))
     E.append(edge("start", "reason", "close_in", "reason"))
     E.append(edge("close_in", "result", "close", "input"))
 
     E.append(edge("close", "output", "turns_out", "object"))
-    E.append(edge("close", "output", "entry_out", "object"))
     E.append(edge("turns_out", "value", "close_word", "turns"))
     E.append(edge("start", "reason", "close_word", "reason"))
     E.append(edge("close_word", "answer", "end", "answer"))
     E.append(edge("close_word", "answer", "end", "response"))
     E.append(edge("turns_out", "value", "end", "turns"))
-    E.append(edge("entry_out", "value", "end", "diary_entry_id"))
+    # the whole close output feeds the extracting end pin directly
+    E.append(edge("close", "output", "end", "diary_entry_id"))
 
     return f
 
@@ -752,17 +823,23 @@ def build_visit() -> dict:
         ("participants", "array"),
     ], 360, 120, pin_defaults={"phase": "visit"}))
     N.append(subflow_node("turn", "Cognition Turn", TURN_ID, 360, 300))
-    N.append(get_node("reply_out", "reply", "", 660, 60))
-    N.append(get_node("tools_out", "tools_ran", [], 660, 500))
-    N.append(get_node("rounds_out", "tool_rounds", 0, 660, 620))
-    N.append(guard_node("turn_guard", "The moment must have lived", 660, 180))
+    # Field extraction rides pin EXPRESSIONS on the consumers (tier-1
+    # migration): turn.output wires straight to each consumer pin — the four
+    # single-consumer get nodes (reply_out/tools_out/rounds_out/state_out)
+    # collapsed here. A dead turn child delivers output=None; `(value or {})`
+    # keeps the get-node defaults and both guards still route on
+    # child_output.died.
+    N.append(with_expressions(
+        guard_node("turn_guard", "The moment must have lived", 660, 180),
+        {"value": field_expr("reply", '""')}))
     N.append(answer_node("answer", "The entity answers", 660, 300))
-    N.append(get_node("state_out", "state", {}, 940, 60))
     # PURE state guard (W2-1): a dead turn must hand back the INCOMING state,
     # never {} — the master folds this into life_state.
-    N.append(code_node("state_guard", "State survives a dead moment", GUARD_CODE, 940, 180,
-                       [pin("value", "value", "any"), pin("child", "child", "object"),
-                        pin("fallback", "fallback", "any")]))
+    N.append(with_expressions(
+        code_node("state_guard", "State survives a dead moment", GUARD_CODE, 940, 180,
+                  [pin("value", "value", "any"), pin("child", "child", "object"),
+                   pin("fallback", "fallback", "any")]),
+        {"value": field_expr("state", "{}")}))
     # Two degradation signals fold (fix adversary P0-1): the turn CHILD dying
     # (guard) OR the turn itself reporting a degraded moment (dead rounds /
     # ended-without-words) — same shape the chat layer already uses.
@@ -772,14 +849,17 @@ def build_visit() -> dict:
                         pin("guard_error", "guard_error", "string")]))
     # D3 (wave-3 adversary B): the output surface must distinguish "the entity
     # said nothing" from "the turn died" — degraded rides beside the reply.
-    N.append(end_node("Moment answered", [
-        pin("state", "state", "object"),
-        pin("reply", "reply", "string"),
-        pin("degraded", "degraded", "number"),
-        pin("moment_error", "moment_error", "string"),
-        pin("tools_ran", "tools_ran", "array"),
-        pin("tool_rounds", "tool_rounds", "number"),
-    ], 940, 300))
+    N.append(with_expressions(
+        end_node("Moment answered", [
+            pin("state", "state", "object"),
+            pin("reply", "reply", "string"),
+            pin("degraded", "degraded", "number"),
+            pin("moment_error", "moment_error", "string"),
+            pin("tools_ran", "tools_ran", "array"),
+            pin("tool_rounds", "tool_rounds", "number"),
+        ], 940, 300),
+        {"tools_ran": field_expr("tools_ran", "[]"),
+         "tool_rounds": field_expr("tool_rounds", "0")}))
 
     E.append(edge("start", "exec-out", "turn", "exec-in"))
     E.append(edge("turn", "exec-out", "turn_guard", "exec-in"))
@@ -794,12 +874,11 @@ def build_visit() -> dict:
     E.append(edge("start", "participants", "turn_in", "participants"))
     E.append(edge("turn_in", "result", "turn", "input"))
 
-    E.append(edge("turn", "output", "reply_out", "object"))
-    E.append(edge("reply_out", "value", "turn_guard", "value"))
+    # the whole turn output feeds each extracting pin directly
+    E.append(edge("turn", "output", "turn_guard", "value"))
     E.append(edge("turn", "child_output", "turn_guard", "child"))
     E.append(edge("turn_guard", "value", "answer", "message"))
-    E.append(edge("turn", "output", "state_out", "object"))
-    E.append(edge("state_out", "value", "state_guard", "value"))
+    E.append(edge("turn", "output", "state_guard", "value"))
     E.append(edge("turn", "child_output", "state_guard", "child"))
     E.append(edge("start", "state", "state_guard", "fallback"))
     E.append(edge("state_guard", "value", "end", "state"))
@@ -809,10 +888,8 @@ def build_visit() -> dict:
     E.append(edge("turn_guard", "error", "deg_fold", "guard_error"))
     E.append(edge("deg_fold", "degraded", "end", "degraded"))
     E.append(edge("deg_fold", "moment_error", "end", "moment_error"))
-    E.append(edge("turn", "output", "tools_out", "object"))
-    E.append(edge("tools_out", "value", "end", "tools_ran"))
-    E.append(edge("turn", "output", "rounds_out", "object"))
-    E.append(edge("rounds_out", "value", "end", "tool_rounds"))
+    E.append(edge("turn", "output", "end", "tools_ran"))
+    E.append(edge("turn", "output", "end", "tool_rounds"))
 
     return f
 
@@ -843,27 +920,42 @@ def build_work() -> dict:
     N.append(code_node("wcond", "Task done or budget spent?", WORK_COND_CODE, 640, 620,
                        [pin("state", "state", "object"), pin("max_ticks", "max_ticks", "number")]))
 
-    N.append(get_var("state_cur", "work_state", {}, 700, 60))
-    N.append(make_obj("turn_in", "Compose the moment", [
-        ("stimulus", "string"), ("task", "string"), ("state", "object"),
-        ("system", "string"), ("provider", "string"), ("model", "string"),
-        ("participants", "array"),
-    ], 940, 60, pin_defaults={"phase": "work"}))
+    # Session-state reads ride pin expressions (were the single-consumer
+    # get_var nodes state_cur/state_for_close; the multi-consumer
+    # state_for_cond hub deliberately STAYS — wcond + turn_guard.fallback).
+    # Volatility is identical: expressions evaluate at the consumer's input
+    # resolution, exactly when the volatile get_var used to be pulled — the
+    # loop-carried work_state stays fresh per iteration.
+    N.append(with_expressions(
+        make_obj("turn_in", "Compose the moment", [
+            ("stimulus", "string"), ("task", "string"), ("state", "object"),
+            ("system", "string"), ("provider", "string"), ("model", "string"),
+            ("participants", "array"),
+        ], 940, 60, pin_defaults={"phase": "work"}),
+        {"state": var_expr("work_state")}))
     N.append(subflow_node("turn", "Cognition Turn", TURN_ID, 940, 300))
-    N.append(get_node("state_out", "state", {}, 1240, 480))
-    N.append(guard_node("turn_guard", "The moment must have lived", 1240, 600))
+    # state extraction rides the guard's value pin (was the single-consumer
+    # get node state_out): a dead turn delivers None -> {} and the guard
+    # routes to its fallback regardless.
+    N.append(with_expressions(
+        guard_node("turn_guard", "The moment must have lived", 1240, 600),
+        {"value": field_expr("state", "{}")}))
     N.append(set_var("state_fold", "Fold session state", "work_state", 1240, 300))
 
-    N.append(get_var("state_for_close", "work_state", {}, 640, 900))
-    N.append(make_obj("close_in", "Compose the close", [("state", "object")], 900, 900,
-                      pin_defaults={"phase": "work", "reason": "the task closed"}))
+    N.append(with_expressions(
+        make_obj("close_in", "Compose the close", [("state", "object")], 900, 900,
+                 pin_defaults={"phase": "work", "reason": "the task closed"}),
+        {"state": var_expr("work_state")}))
     N.append(subflow_node("close", "Session Close (summary + diary)", CLOSE_ID, 1160, 900))
-    N.append(get_node("turns_out", "turns", 0, 1460, 840))
-    N.append(get_node("closed_state", "state", {}, 1460, 1020))
-    N.append(end_node("Work closed", [
-        pin("state", "state", "object"),
-        pin("turns", "turns", "number"),
-    ], 1740, 900))
+    # turns/state extraction rides the end pins (were the single-consumer
+    # get nodes turns_out/closed_state); close.output wires straight in.
+    N.append(with_expressions(
+        end_node("Work closed", [
+            pin("state", "state", "object"),
+            pin("turns", "turns", "number"),
+        ], 1740, 900),
+        {"state": field_expr("state", "{}"),
+         "turns": field_expr("turns", "0")}))
 
     E.append(edge("start", "exec-out", "state_init", "exec-in"))
     E.append(edge("state_init", "exec-out", "loop", "exec-in"))
@@ -881,25 +973,23 @@ def build_work() -> dict:
 
     E.append(edge("start", "task", "turn_in", "stimulus"))
     E.append(edge("start", "task", "turn_in", "task"))
-    E.append(edge("state_cur", "value", "turn_in", "state"))
+    # turn_in.state: no wire - the pin expression reads work_state directly
     E.append(edge("start", "system", "turn_in", "system"))
     E.append(edge("start", "provider", "turn_in", "provider"))
     E.append(edge("start", "model", "turn_in", "model"))
     E.append(edge("start", "participants", "turn_in", "participants"))
     E.append(edge("turn_in", "result", "turn", "input"))
 
-    E.append(edge("turn", "output", "state_out", "object"))
-    E.append(edge("state_out", "value", "turn_guard", "value"))
+    E.append(edge("turn", "output", "turn_guard", "value"))
     E.append(edge("turn", "child_output", "turn_guard", "child"))
     E.append(edge("state_for_cond", "value", "turn_guard", "fallback"))
     E.append(edge("turn_guard", "value", "state_fold", "value"))
 
-    E.append(edge("state_for_close", "value", "close_in", "state"))
+    # close_in.state: no wire - the pin expression reads work_state directly
     E.append(edge("close_in", "result", "close", "input"))
-    E.append(edge("close", "output", "turns_out", "object"))
-    E.append(edge("close", "output", "closed_state", "object"))
-    E.append(edge("closed_state", "value", "end", "state"))
-    E.append(edge("turns_out", "value", "end", "turns"))
+    # the whole close output feeds the extracting end pins directly
+    E.append(edge("close", "output", "end", "state"))
+    E.append(edge("close", "output", "end", "turns"))
 
     return f
 
@@ -933,27 +1023,35 @@ def build_personal() -> dict:
                              pin_defaults={"op": "alive_drives", "k": 5}))
     N.append(code_node("drive_cue", "Compose the cue", DRIVE_CUE_CODE, 800, 180,
                        [pin("items", "items", "array")]))
-    N.append(get_var("state_cur", "personal_state", {}, 700, 300))
-    N.append(make_obj("turn_in", "Compose the moment", [
-        ("stimulus", "string"), ("state", "object"), ("system", "string"),
-        ("provider", "string"), ("model", "string"),
-        ("participants", "array"),
-    ], 940, 60, pin_defaults={"phase": "personal"}))
+    # Same tier-1 shape as build_work (see the notes there): state_cur/
+    # state_for_close collapse into consumer pin expressions; state_out/
+    # turns_out/closed_state collapse into guard/end pin expressions; the
+    # multi-consumer state_for_cond hub STAYS.
+    N.append(with_expressions(
+        make_obj("turn_in", "Compose the moment", [
+            ("stimulus", "string"), ("state", "object"), ("system", "string"),
+            ("provider", "string"), ("model", "string"),
+            ("participants", "array"),
+        ], 940, 60, pin_defaults={"phase": "personal"}),
+        {"state": var_expr("personal_state")}))
     N.append(subflow_node("turn", "Cognition Turn (self-directed)", TURN_ID, 940, 300))
-    N.append(get_node("state_out", "state", {}, 1240, 480))
-    N.append(guard_node("turn_guard", "The moment must have lived", 1240, 600))
+    N.append(with_expressions(
+        guard_node("turn_guard", "The moment must have lived", 1240, 600),
+        {"value": field_expr("state", "{}")}))
     N.append(set_var("state_fold", "Fold session state", "personal_state", 1240, 300))
 
-    N.append(get_var("state_for_close", "personal_state", {}, 640, 900))
-    N.append(make_obj("close_in", "Compose the close", [("state", "object")], 900, 900,
-                      pin_defaults={"phase": "personal", "reason": "own time ended"}))
+    N.append(with_expressions(
+        make_obj("close_in", "Compose the close", [("state", "object")], 900, 900,
+                 pin_defaults={"phase": "personal", "reason": "own time ended"}),
+        {"state": var_expr("personal_state")}))
     N.append(subflow_node("close", "Session Close (summary + diary)", CLOSE_ID, 1160, 900))
-    N.append(get_node("turns_out", "turns", 0, 1460, 840))
-    N.append(get_node("closed_state", "state", {}, 1460, 1020))
-    N.append(end_node("Day closed", [
-        pin("state", "state", "object"),
-        pin("turns", "turns", "number"),
-    ], 1740, 900))
+    N.append(with_expressions(
+        end_node("Day closed", [
+            pin("state", "state", "object"),
+            pin("turns", "turns", "number"),
+        ], 1740, 900),
+        {"state": field_expr("state", "{}"),
+         "turns": field_expr("turns", "0")}))
 
     E.append(edge("start", "exec-out", "drives", "exec-in"))
     E.append(edge("drives", "exec-out", "state_init", "exec-in"))
@@ -972,25 +1070,23 @@ def build_personal() -> dict:
 
     E.append(edge("drives", "items", "drive_cue", "items"))
     E.append(edge("drive_cue", "cue", "turn_in", "stimulus"))
-    E.append(edge("state_cur", "value", "turn_in", "state"))
+    # turn_in.state: no wire - the pin expression reads personal_state directly
     E.append(edge("start", "system", "turn_in", "system"))
     E.append(edge("start", "provider", "turn_in", "provider"))
     E.append(edge("start", "model", "turn_in", "model"))
     E.append(edge("start", "participants", "turn_in", "participants"))
     E.append(edge("turn_in", "result", "turn", "input"))
 
-    E.append(edge("turn", "output", "state_out", "object"))
-    E.append(edge("state_out", "value", "turn_guard", "value"))
+    E.append(edge("turn", "output", "turn_guard", "value"))
     E.append(edge("turn", "child_output", "turn_guard", "child"))
     E.append(edge("state_for_cond", "value", "turn_guard", "fallback"))
     E.append(edge("turn_guard", "value", "state_fold", "value"))
 
-    E.append(edge("state_for_close", "value", "close_in", "state"))
+    # close_in.state: no wire - the pin expression reads personal_state directly
     E.append(edge("close_in", "result", "close", "input"))
-    E.append(edge("close", "output", "turns_out", "object"))
-    E.append(edge("close", "output", "closed_state", "object"))
-    E.append(edge("closed_state", "value", "end", "state"))
-    E.append(edge("turns_out", "value", "end", "turns"))
+    # the whole close output feeds the extracting end pins directly
+    E.append(edge("close", "output", "end", "state"))
+    E.append(edge("close", "output", "end", "turns"))
 
     return f
 
@@ -1094,21 +1190,30 @@ def build_master() -> dict:
 
     N.append(while_node("life", "While the entity lives", 1120, 480))
 
-    # PURE life condition (volatile get_var keeps it fresh per iteration).
-    N.append(get_var("state_for_alive", "life_state", {}, 880, 800))
-    N.append(code_node("alive", "Still alive?", LIFE_COND_CODE, 1120, 800,
-                       [pin("state", "state", "object"), pin("max_days", "max_days", "number")]))
+    # PURE life condition (the pin expression evaluates at every input
+    # resolution — the while re-pull keeps it fresh per iteration, exactly
+    # like the volatile get_var it replaces; was state_for_alive).
+    N.append(with_expressions(
+        code_node("alive", "Still alive?", LIFE_COND_CODE, 1120, 800,
+                  [pin("state", "state", "object"), pin("max_days", "max_days", "number")]),
+        {"state": var_expr("life_state")}))
 
     # Body: gate -> route -> one phase -> day end.
-    N.append(get_var("state_for_gate", "life_state", {}, 1180, 60))
-    N.append(get_var("inbox_for_gate", "events_inbox", [], 1180, 220))
-    N.append(make_obj("gate_in", "Gate consult", [("state", "object"), ("inbox", "array")], 1420, 140))
+    # Gate reads ride pin expressions (were the single-consumer get_var
+    # nodes state_for_gate/inbox_for_gate).
+    N.append(with_expressions(
+        make_obj("gate_in", "Gate consult", [("state", "object"), ("inbox", "array")], 1420, 140),
+        {"state": var_expr("life_state"),
+         "inbox": var_expr("events_inbox", "[]")}))
     N.append(subflow_node("gate", "THE DAY GATE", GATE_ID, 1420, 480))
+    # g_phase deliberately STAYS a node — THREE consumers (sv_phase, route,
+    # beacon_payload): its visible fan-out is the design. The single-consumer
+    # extractors (g_msg/g_task/g_state) collapsed into consumer pin
+    # expressions; gate.output wires straight to each consumer.
     N.append(get_node("g_phase", "phase", "park", 1720, 200))
-    N.append(get_node("g_msg", "visitor_message", "", 1720, 360))
-    N.append(get_node("g_task", "task", "", 1720, 680))
-    N.append(get_node("g_state", "state", {}, 1720, 840))
-    N.append(set_var("sv_gate_state", "Fold gate state", "life_state", 1980, 480))
+    N.append(with_expressions(
+        set_var("sv_gate_state", "Fold gate state", "life_state", 1980, 480),
+        {"value": field_expr("state", "{}")}))
     N.append(set_var("sv_phase", "This moment's phase", "current_phase", 2240, 480))
     N.append(code_node("route", "Which phase?", PHASE_ROUTE_CODE, 2240, 200,
                        [pin("phase", "phase", "string")]))
@@ -1129,86 +1234,113 @@ def build_master() -> dict:
     N.append(if_node("if_personal", "personal?", 2500, 720))
     N.append(if_node("if_sleep", "sleep?", 2500, 920))
 
+    # Phase branches (tier-1 migration): every branch's single-consumer
+    # life_state read (cstate/vstate/wstate/pstate/sstate) rides its
+    # compose node's state pin as vars.get("life_state", {}) — evaluated at
+    # the compose node's input resolution, exactly when the volatile
+    # get_var used to be pulled. Every branch's single-consumer state
+    # extractor (*_state_out) rides its guard's value pin — the child
+    # output wires straight in and a dead child (None) keeps the {} default
+    # while the guard routes to its fallback regardless.
+
     # CLOSE-VISIT branch (goodbye or a different call while the session is open).
-    N.append(get_var("cstate", "life_state", {}, 2780, 40))
-    N.append(make_obj("closev_in", "Compose the session close", [("state", "object")], 3020, 40,
-                      pin_defaults={"phase": "visit", "reason": "the visitor left"}))
+    N.append(with_expressions(
+        make_obj("closev_in", "Compose the session close", [("state", "object")], 3020, 40,
+                 pin_defaults={"phase": "visit", "reason": "the visitor left"}),
+        {"state": var_expr("life_state")}))
     N.append(subflow_node("close_visit", "CLOSE — the visit session", CLOSE_ID, 3020, 200))
-    N.append(get_node("closev_state_out", "state", {}, 3320, 120))
     N.append(set_var("sv_after_close", "Fold closed state", "life_state", 3580, 200))
 
     # VISIT branch (one conversational moment).
-    N.append(get_var("vstate", "life_state", {}, 2780, 320))
-    N.append(make_obj("visit_in", "Compose the visit", [
-        ("message", "string"), ("state", "object"), ("system", "string"),
-        ("provider", "string"), ("model", "string"),
-        ("participants", "array"),
-    ], 3020, 320))
+    N.append(with_expressions(
+        make_obj("visit_in", "Compose the visit", [
+            ("message", "string"), ("state", "object"), ("system", "string"),
+            ("provider", "string"), ("model", "string"),
+            ("participants", "array"),
+        ], 3020, 320),
+        {"message": field_expr("visitor_message", '""'),
+         "state": var_expr("life_state")}))
     N.append(subflow_node("visit", "VISIT — a conversational moment", VISIT_ID, 3020, 480))
-    N.append(get_node("visit_state_out", "state", {}, 3320, 400))
     N.append(set_var("sv_after_visit", "Fold visit state", "life_state", 3580, 480))
 
     # WORK branch.
-    N.append(get_var("wstate", "life_state", {}, 2780, 620))
     # participants field REMOVED (adversary A, P1-2): work is a self phase —
     # an unwired field would inject None over the child's [] default.
-    N.append(make_obj("work_in", "Compose the work", [
-        ("task", "string"), ("state", "object"), ("system", "string"),
-        ("provider", "string"), ("model", "string"),
-    ], 3020, 620))
+    N.append(with_expressions(
+        make_obj("work_in", "Compose the work", [
+            ("task", "string"), ("state", "object"), ("system", "string"),
+            ("provider", "string"), ("model", "string"),
+        ], 3020, 620),
+        {"task": field_expr("task", '""'),
+         "state": var_expr("life_state")}))
     N.append(subflow_node("work", "WORK — the task", WORK_ID, 3020, 780))
-    N.append(get_node("work_state_out", "state", {}, 3320, 700))
     N.append(set_var("sv_after_work", "Fold work state", "life_state", 3580, 780))
 
     # PERSONAL branch.
-    N.append(get_var("pstate", "life_state", {}, 2780, 920))
-    N.append(make_obj("personal_in", "Compose own time", [
-        ("state", "object"), ("system", "string"), ("provider", "string"), ("model", "string"),
-    ], 3020, 920))
+    N.append(with_expressions(
+        make_obj("personal_in", "Compose own time", [
+            ("state", "object"), ("system", "string"), ("provider", "string"), ("model", "string"),
+        ], 3020, 920),
+        {"state": var_expr("life_state")}))
     N.append(subflow_node("personal", "PERSONAL — own time", PERSONAL_ID, 3020, 1080))
-    N.append(get_node("personal_state_out", "state", {}, 3320, 1000))
     N.append(set_var("sv_after_personal", "Fold own-time state", "life_state", 3580, 1080))
 
     # SLEEP branch.
-    N.append(get_var("sstate", "life_state", {}, 2780, 1220))
-    N.append(make_obj("sleep_in", "Compose the night", [("state", "object")], 3020, 1220))
+    N.append(with_expressions(
+        make_obj("sleep_in", "Compose the night", [("state", "object")], 3020, 1220),
+        {"state": var_expr("life_state")}))
     N.append(subflow_node("sleep", "SLEEP — consolidation", SLEEP_ID, 3020, 1380))
-    N.append(get_node("sleep_state_out", "state", {}, 3320, 1300))
     N.append(set_var("sv_after_sleep", "Fold night state", "life_state", 3580, 1380))
 
-    # PARK branch (nothing calls): wait for a durable wake event.
-    N.append(get_var("mbx", "events_mailbox", "entity-life", 2780, 1520))
-    N.append(concat_node("wake_key", "Wake key", 3020, 1520, prefix=EVENT_KEY_PREFIX))
+    # PARK branch (nothing calls): wait for a durable wake event. The
+    # mailbox name rides the concat's b pin (was the single-consumer
+    # get_var mbx; same default).
+    N.append(with_expressions(
+        concat_node("wake_key", "Wake key", 3020, 1520, prefix=EVENT_KEY_PREFIX),
+        {"b": var_expr("events_mailbox", '"entity-life"')}))
     N.append(wait_event_node("park", "Park (nothing calls; heartbeat re-gate)", 3280, 1520,
                              timeout_s=900))
 
     # Phase-death guards: a dead phase child must never fold {} into
-    # life_state — the fallback is the PRIOR life state (volatile pull).
-    N.append(guard_node("guard_close_visit", "close guard", 3460, 120))
-    N.append(guard_node("guard_visit", "visit guard", 3460, 400))
-    N.append(guard_node("guard_work", "work guard", 3460, 700))
-    N.append(guard_node("guard_personal", "personal guard", 3460, 1000))
-    N.append(guard_node("guard_sleep", "sleep guard", 3460, 1300))
-    N.append(get_var("fb_close_visit", "life_state", {}, 3320, 60))
-    N.append(get_var("fb_visit", "life_state", {}, 3320, 340))
-    N.append(get_var("fb_work", "life_state", {}, 3320, 640))
-    N.append(get_var("fb_personal", "life_state", {}, 3320, 940))
-    N.append(get_var("fb_sleep", "life_state", {}, 3320, 1240))
+    # life_state — the fallback is the PRIOR life state, read by the
+    # fallback pin expression at guard execution (exactly when the volatile
+    # fb_* get_var used to be pulled: the guard runs BEFORE sv_after_*
+    # writes, so it sees the pre-phase life_state either way).
+    N.append(with_expressions(
+        guard_node("guard_close_visit", "close guard", 3460, 120),
+        {"value": field_expr("state", "{}"), "fallback": var_expr("life_state")}))
+    N.append(with_expressions(
+        guard_node("guard_visit", "visit guard", 3460, 400),
+        {"value": field_expr("state", "{}"), "fallback": var_expr("life_state")}))
+    N.append(with_expressions(
+        guard_node("guard_work", "work guard", 3460, 700),
+        {"value": field_expr("state", "{}"), "fallback": var_expr("life_state")}))
+    N.append(with_expressions(
+        guard_node("guard_personal", "personal guard", 3460, 1000),
+        {"value": field_expr("state", "{}"), "fallback": var_expr("life_state")}))
+    N.append(with_expressions(
+        guard_node("guard_sleep", "sleep guard", 3460, 1300),
+        {"value": field_expr("state", "{}"), "fallback": var_expr("life_state")}))
 
-    # Day end: fold the day into life state (single writer via get_var pull).
-    N.append(get_var("state_for_dayend", "life_state", {}, 3840, 300))
-    N.append(get_var("phase_for_dayend", "current_phase", "park", 3840, 640))
-    N.append(code_node("day_end", "The day ends", DAY_END_CODE, 4100, 480,
-                       [pin("state", "state", "object"), pin("phase", "phase", "string")]))
+    # Day end: fold the day into life state (single writer; the state/phase
+    # pins read the vars at day_end's input resolution — after sv_after_*
+    # wrote, exactly like the volatile get_var pulls they replace).
+    N.append(with_expressions(
+        code_node("day_end", "The day ends", DAY_END_CODE, 4100, 480,
+                  [pin("state", "state", "object"), pin("phase", "phase", "string")]),
+        {"state": var_expr("life_state"),
+         "phase": var_expr("current_phase", '"park"')}))
     N.append(set_var("sv_day_end", "Fold the day", "life_state", 4380, 480))
 
     # After the loop: the final close (life parks/stops with a diary note).
-    N.append(get_var("state_final", "life_state", {}, 1120, 1200))
-    N.append(make_obj("final_in", "Compose the final close", [("state", "object")], 1380, 1200,
-                      pin_defaults={"phase": "life", "reason": "the life loop ended"}))
+    N.append(with_expressions(
+        make_obj("final_in", "Compose the final close", [("state", "object")], 1380, 1200,
+                 pin_defaults={"phase": "life", "reason": "the life loop ended"}),
+        {"state": var_expr("life_state")}))
     N.append(subflow_node("final_close", "Life pauses (final diary)", CLOSE_ID, 1640, 1200))
-    N.append(get_node("final_state_out", "state", {}, 1940, 1120))
-    N.append(end_node("Life parked", [pin("state", "state", "object")], 2220, 1200))
+    N.append(with_expressions(
+        end_node("Life parked", [pin("state", "state", "object")], 2220, 1200),
+        {"state": field_expr("state", "{}")}))
 
     # Exec spine.
     E.append(edge("start", "exec-out", "sv_mailbox", "exec-in"))
@@ -1263,18 +1395,15 @@ def build_master() -> dict:
     E.append(edge("seed", "inbox_seq", "sv_inbox_seq", "value"))
     E.append(edge("seed", "state", "sv_state", "value"))
 
-    E.append(edge("state_for_alive", "value", "alive", "state"))
+    # alive.state / gate_in.state / gate_in.inbox: no wires - the pin
+    # expressions read the run vars directly
     E.append(edge("start", "max_days", "alive", "max_days"))
     E.append(edge("alive", "condition", "life", "condition"))
 
-    E.append(edge("state_for_gate", "value", "gate_in", "state"))
-    E.append(edge("inbox_for_gate", "value", "gate_in", "inbox"))
     E.append(edge("gate_in", "result", "gate", "input"))
     E.append(edge("gate", "output", "g_phase", "object"))
-    E.append(edge("gate", "output", "g_msg", "object"))
-    E.append(edge("gate", "output", "g_task", "object"))
-    E.append(edge("gate", "output", "g_state", "object"))
-    E.append(edge("g_state", "value", "sv_gate_state", "value"))
+    # the whole gate output feeds the extracting sv_gate_state.value pin
+    E.append(edge("gate", "output", "sv_gate_state", "value"))
     E.append(edge("g_phase", "value", "sv_phase", "value"))
     E.append(edge("g_phase", "value", "route", "phase"))
     E.append(edge("g_phase", "value", "beacon_payload", "phase"))
@@ -1287,29 +1416,29 @@ def build_master() -> dict:
     E.append(edge("route", "is_personal", "if_personal", "condition"))
     E.append(edge("route", "is_sleep", "if_sleep", "condition"))
 
-    E.append(edge("cstate", "value", "closev_in", "state"))
+    # closev_in.state: no wire - the pin expression reads life_state directly
     E.append(edge("closev_in", "result", "close_visit", "input"))
-    E.append(edge("close_visit", "output", "closev_state_out", "object"))
-    E.append(edge("closev_state_out", "value", "guard_close_visit", "value"))
+    # each phase child's whole output feeds its guard's extracting value pin;
+    # guard fallbacks carry no wire (the expression reads life_state)
+    E.append(edge("close_visit", "output", "guard_close_visit", "value"))
     E.append(edge("close_visit", "child_output", "guard_close_visit", "child"))
-    E.append(edge("fb_close_visit", "value", "guard_close_visit", "fallback"))
     E.append(edge("guard_close_visit", "value", "sv_after_close", "value"))
 
-    E.append(edge("g_msg", "value", "visit_in", "message"))
-    E.append(edge("vstate", "value", "visit_in", "state"))
+    # visit_in.message extracts from the gate output (was g_msg);
+    # visit_in.state reads life_state (was vstate)
+    E.append(edge("gate", "output", "visit_in", "message"))
     E.append(edge("start", "system", "visit_in", "system"))
     E.append(edge("start", "provider", "visit_in", "provider"))
     E.append(edge("start", "model", "visit_in", "model"))
     E.append(edge("start", "participants", "visit_in", "participants"))
     E.append(edge("visit_in", "result", "visit", "input"))
-    E.append(edge("visit", "output", "visit_state_out", "object"))
-    E.append(edge("visit_state_out", "value", "guard_visit", "value"))
+    E.append(edge("visit", "output", "guard_visit", "value"))
     E.append(edge("visit", "child_output", "guard_visit", "child"))
-    E.append(edge("fb_visit", "value", "guard_visit", "fallback"))
     E.append(edge("guard_visit", "value", "sv_after_visit", "value"))
 
-    E.append(edge("g_task", "value", "work_in", "task"))
-    E.append(edge("wstate", "value", "work_in", "state"))
+    # work_in.task extracts from the gate output (was g_task);
+    # work_in.state reads life_state (was wstate)
+    E.append(edge("gate", "output", "work_in", "task"))
     E.append(edge("start", "system", "work_in", "system"))
     E.append(edge("start", "provider", "work_in", "provider"))
     E.append(edge("start", "model", "work_in", "model"))
@@ -1317,43 +1446,36 @@ def build_master() -> dict:
     # phase — the visitor is not present; stamping them misattributed task
     # episodes into the visitor's world-model card. Subflow default = [].
     E.append(edge("work_in", "result", "work", "input"))
-    E.append(edge("work", "output", "work_state_out", "object"))
-    E.append(edge("work_state_out", "value", "guard_work", "value"))
+    E.append(edge("work", "output", "guard_work", "value"))
     E.append(edge("work", "child_output", "guard_work", "child"))
-    E.append(edge("fb_work", "value", "guard_work", "fallback"))
     E.append(edge("guard_work", "value", "sv_after_work", "value"))
 
-    E.append(edge("pstate", "value", "personal_in", "state"))
+    # personal_in.state: no wire - the pin expression reads life_state directly
     E.append(edge("start", "system", "personal_in", "system"))
     E.append(edge("start", "provider", "personal_in", "provider"))
     E.append(edge("start", "model", "personal_in", "model"))
     # NO participants into personal (same rule as work — self phase).
     E.append(edge("personal_in", "result", "personal", "input"))
-    E.append(edge("personal", "output", "personal_state_out", "object"))
-    E.append(edge("personal_state_out", "value", "guard_personal", "value"))
+    E.append(edge("personal", "output", "guard_personal", "value"))
     E.append(edge("personal", "child_output", "guard_personal", "child"))
-    E.append(edge("fb_personal", "value", "guard_personal", "fallback"))
     E.append(edge("guard_personal", "value", "sv_after_personal", "value"))
 
-    E.append(edge("sstate", "value", "sleep_in", "state"))
+    # sleep_in.state: no wire - the pin expression reads life_state directly
     E.append(edge("sleep_in", "result", "sleep", "input"))
-    E.append(edge("sleep", "output", "sleep_state_out", "object"))
-    E.append(edge("sleep_state_out", "value", "guard_sleep", "value"))
+    E.append(edge("sleep", "output", "guard_sleep", "value"))
     E.append(edge("sleep", "child_output", "guard_sleep", "child"))
-    E.append(edge("fb_sleep", "value", "guard_sleep", "fallback"))
     E.append(edge("guard_sleep", "value", "sv_after_sleep", "value"))
 
-    E.append(edge("mbx", "value", "wake_key", "b"))
+    # wake_key.b: no wire - the pin expression reads events_mailbox directly
     E.append(edge("wake_key", "result", "park", "event_key"))
 
-    E.append(edge("state_for_dayend", "value", "day_end", "state"))
-    E.append(edge("phase_for_dayend", "value", "day_end", "phase"))
+    # day_end.state/phase: no wires - the pin expressions read the vars
     E.append(edge("day_end", "state", "sv_day_end", "value"))
 
-    E.append(edge("state_final", "value", "final_in", "state"))
+    # final_in.state: no wire - the pin expression reads life_state directly
     E.append(edge("final_in", "result", "final_close", "input"))
-    E.append(edge("final_close", "output", "final_state_out", "object"))
-    E.append(edge("final_state_out", "value", "end", "state"))
+    # the whole final-close output feeds the extracting end pin
+    E.append(edge("final_close", "output", "end", "state"))
 
     return f
 
@@ -1384,19 +1506,27 @@ def build_chat() -> dict:
         pin("participants", "participants", "array"),
     ], 80, 260, pin_defaults={"participants": []}))
 
-    N.append(get_var("ctx_var", "context", {}, 200, 100))
-    N.append(code_node("chat_state", "Session state (durable history fold)", CHAT_STATE_CODE, 360, 100,
-                       [pin("state", "state", "object"), pin("context", "context", "object")]))
+    # context rides a pin expression (was the single-consumer get_var
+    # ctx_var; tier-1 migration — exact get_var semantics for a simple name).
+    N.append(with_expressions(
+        code_node("chat_state", "Session state (durable history fold)", CHAT_STATE_CODE, 360, 100,
+                  [pin("state", "state", "object"), pin("context", "context", "object")]),
+        {"context": var_expr("context")}))
     N.append(make_obj("visit_in", "Compose the visit", [
         ("message", "string"), ("state", "object"), ("system", "string"),
         ("provider", "string"), ("model", "string"),
         ("participants", "array"),
     ], 620, 100))
     N.append(subflow_node("visit", "VISIT — a conversational moment", VISIT_ID, 620, 260))
-    N.append(get_node("reply_out", "reply", "", 920, 100))
-    N.append(get_node("chat_tools_out", "tools_ran", [], 920, 500))
-    N.append(get_node("chat_rounds_out", "tool_rounds", 0, 920, 620))
-    N.append(guard_node("visit_guard", "The moment must have lived", 920, 220))
+    # Field extraction rides pin EXPRESSIONS on the consumers (tier-1
+    # migration): visit.output wires straight to each consumer pin — the
+    # three single-consumer get nodes (reply_out/chat_tools_out/
+    # chat_rounds_out) collapsed here. A dead visit child delivers
+    # output=None; `(value or {})` keeps the get-node default semantics,
+    # and the guard still routes on child_output.died regardless.
+    N.append(with_expressions(
+        guard_node("visit_guard", "The moment must have lived", 920, 220),
+        {"value": field_expr("reply", '""')}))
     N.append(code_node("degraded_fold", "Degradation is visible (D3)", CHAT_DEGRADED_CODE, 1160, 100,
                        [pin("visit_out", "visit_out", "object"),
                         pin("guard_died", "guard_died", "number"),
@@ -1404,21 +1534,24 @@ def build_chat() -> dict:
     # `response` mirrors `answer` (adversary F, P2): the documented agent.v1
     # contract reads output.response; both apps fall back to `answer` today,
     # but a strict consumer reading only `response` would get "" — carry both.
-    N.append(end_node("Answered", [
-        pin("answer", "answer", "string"),
-        pin("response", "response", "string"),
-        pin("degraded", "degraded", "number"),
-        pin("moment_error", "moment_error", "string"),
-        pin("tools_ran", "tools_ran", "array"),
-        pin("tool_rounds", "tool_rounds", "number"),
-    ], 920, 380))
+    N.append(with_expressions(
+        end_node("Answered", [
+            pin("answer", "answer", "string"),
+            pin("response", "response", "string"),
+            pin("degraded", "degraded", "number"),
+            pin("moment_error", "moment_error", "string"),
+            pin("tools_ran", "tools_ran", "array"),
+            pin("tool_rounds", "tool_rounds", "number"),
+        ], 920, 380),
+        {"tools_ran": field_expr("tools_ran", "[]"),
+         "tool_rounds": field_expr("tool_rounds", "0")}))
 
     E.append(edge("start", "exec-out", "visit", "exec-in"))
     E.append(edge("visit", "exec-out", "visit_guard", "exec-in"))
     E.append(edge("visit_guard", "exec-out", "end", "exec-in"))
 
     E.append(edge("start", "state", "chat_state", "state"))
-    E.append(edge("ctx_var", "value", "chat_state", "context"))
+    # chat_state.context: no wire - the pin expression reads run vars directly
     E.append(edge("start", "prompt", "visit_in", "message"))
     E.append(edge("chat_state", "state", "visit_in", "state"))
     E.append(edge("start", "system", "visit_in", "system"))
@@ -1427,8 +1560,9 @@ def build_chat() -> dict:
     E.append(edge("start", "participants", "visit_in", "participants"))
     E.append(edge("visit_in", "result", "visit", "input"))
 
-    E.append(edge("visit", "output", "reply_out", "object"))
-    E.append(edge("reply_out", "value", "visit_guard", "value"))
+    # the whole visit output feeds each extracting pin directly (the
+    # expression on the pin reads one field off it)
+    E.append(edge("visit", "output", "visit_guard", "value"))
     E.append(edge("visit", "child_output", "visit_guard", "child"))
     E.append(edge("visit_guard", "value", "end", "answer"))
     E.append(edge("visit_guard", "value", "end", "response"))
@@ -1437,10 +1571,8 @@ def build_chat() -> dict:
     E.append(edge("visit_guard", "error", "degraded_fold", "guard_error"))
     E.append(edge("degraded_fold", "degraded", "end", "degraded"))
     E.append(edge("degraded_fold", "moment_error", "end", "moment_error"))
-    E.append(edge("visit", "output", "chat_tools_out", "object"))
-    E.append(edge("chat_tools_out", "value", "end", "tools_ran"))
-    E.append(edge("visit", "output", "chat_rounds_out", "object"))
-    E.append(edge("chat_rounds_out", "value", "end", "tool_rounds"))
+    E.append(edge("visit", "output", "end", "tools_ran"))
+    E.append(edge("visit", "output", "end", "tool_rounds"))
 
     return f
 
@@ -1497,6 +1629,15 @@ def main() -> int:
             metadata={
                 "title": "Entity Life (the flow brain)",
                 "description": "Master life loop + cognition subflows animating a persistent entity (visit/work/personal/sleep). Requires an ENTITY runtime (gateway door stamp routing or open_entity_runtime).",
+                # 0.0.17 uses inline PIN EXPRESSIONS: requires a runtime that
+                # evaluates node.data.pinExpressions. Older runtimes ignore them
+                # and resolve collapsed pins to the whole wired object (state
+                # reads would carry the whole subflow output, not the field).
+                # Declarative marker; the loud load-refusal gate is gateway's
+                # lane (backlog 0154). abstractruntime.__version__ 0.4.30 is the
+                # first version carrying pin-expression eval (runtime-confirmed).
+                "min_runtime": "0.4.30",
+                "requires_pin_expressions": True,
             },
         )
         print(f"packed {bundle}")
