@@ -85,6 +85,14 @@ async function updateFlowInterfaces(flowId: string, interfaces: string[], contra
   return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ interfaces }, { method: 'PUT' }));
 }
 
+/** Bundled families duplicate to the gateway — confirm so operators do not spam "(copy)" rows. */
+function confirmFlowDuplicate(baseName: string, isBundledFamily: boolean): boolean {
+  const kind = isBundledFamily ? 'bundled workflow family' : 'workflow';
+  return window.confirm(
+    `Duplicate "${baseName}" as a new ${kind}?\n\nThis saves an editable copy on the gateway. Prefer opening bundled workflows directly — duplicates clutter the library.`
+  );
+}
+
 async function duplicateFlow(source: VisualFlow, newName: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
   const endpoint = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows';
   return gatewayJson<VisualFlow>(gatewayPath(endpoint), jsonRequest({
@@ -94,6 +102,9 @@ async function duplicateFlow(source: VisualFlow, newName: string, contracts: Gat
       nodes: source.nodes,
       edges: source.edges,
       entryNode: source.entryNode,
+      // The function library is part of the document — omitting it here
+      // silently stripped every function on duplicate (adversary P0-2).
+      functions: Array.isArray(source.functions) ? source.functions : [],
     }, { method: 'POST' }));
 }
 
@@ -114,6 +125,7 @@ function familyDuplicateIO(contracts: GatewayContracts | null): DuplicateFamilyI
             nodes,
             edges: flow.edges,
             entryNode: flow.entryNode,
+            functions: Array.isArray(flow.functions) ? flow.functions : [],
           },
           { method: 'PUT' }
         )
@@ -190,6 +202,9 @@ async function saveFlow(
       nodes: flow.nodes,
       edges: flow.edges,
       entryNode: flow.entryNode,
+      // Part of the document (adversary P0-1: Save used to toast success
+      // while the gateway never received the library).
+      functions: Array.isArray(flow.functions) ? flow.functions : [],
     }, { method }));
 }
 
@@ -764,6 +779,7 @@ export function Toolbar() {
       if (!src) return;
       const base = (src.name || 'Untitled').trim() || 'Untitled';
       if (bundledFlowIdSet.has(id)) {
+        if (!confirmFlowDuplicate(base, true)) return;
         const root = await duplicateBundledFamily(id, `${base} (copy)`);
         if (root) {
           const loaded = loadFlow(root);
@@ -773,6 +789,7 @@ export function Toolbar() {
         }
         return;
       }
+      if (!confirmFlowDuplicate(base, false)) return;
       const created = await duplicateFlow(src, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       const loaded = loadFlow(created);
@@ -1043,7 +1060,10 @@ export function Toolbar() {
       gatewayCapabilitiesKnown: Boolean(gatewayContracts && !gatewayCapabilitiesQuery.isError),
       flowFunctions: useFlowStore.getState().flowFunctions,
     });
-    if (issues.length > 0) {
+    // Only DEFINITE defects block the Run button; advisory 'warning' issues
+    // (heuristics that admit uncertainty) surface in the panel but never gate.
+    const blocking = issues.filter((issue) => issue.severity !== 'warning');
+    if (blocking.length > 0) {
       setPreflightIssues(issues);
       setShowRunModal(false);
       return;
@@ -1352,16 +1372,21 @@ export function Toolbar() {
         const text = await file.text();
         const flow = JSON.parse(text) as VisualFlow;
         loadFlow(flow);
+        // An imported file's id is not OUR storage identity: a minted
+        // export id would PUT to a 404, and a stored flow's id would let
+        // Save silently overwrite the original (adversary P1-1). Import
+        // always lands as a NEW unsaved document; Save creates it.
+        setFlowId(null);
         setLoadedBundledRunTarget(null);
         setSavedFlowSignature('');
-        toast.success('Flow imported!');
+        toast.success('Flow imported as a new draft — Save stores it');
       } catch (err) {
         toast.error('Failed to import flow');
       }
     };
 
     input.click();
-  }, [loadFlow]);
+  }, [loadFlow, setFlowId]);
 
   // Handle new flow
   const handleNew = useCallback(() => {
@@ -1380,6 +1405,7 @@ export function Toolbar() {
       // refusal is retired (operator ruling 2026-07-20).
       const base = (getFlow().name || loadedBundledRunTarget.flowId || 'Untitled').trim() || 'Untitled';
       try {
+        if (!confirmFlowDuplicate(base, true)) return;
         const root = await duplicateBundledFamily(loadedBundledRunTarget.flowId, `${base} (copy)`);
         if (root) {
           const loaded = loadFlow(root);
@@ -1395,6 +1421,7 @@ export function Toolbar() {
     const flow = getFlow();
     const base = (flow.name || 'Untitled').trim() || 'Untitled';
     try {
+      if (!confirmFlowDuplicate(base, false)) return;
       const created = await duplicateFlow(flow, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       const loaded = loadFlow(created);

@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- 2026-07-28 **multiagent-coding 0.0.12 (wave-B library + layout)** — one
+  operator-facing library row (`multiagent-coder`); pipeline
+  (`multiagent-coding`) and verify subflow fold under
+  `BUNDLED_COMPOSED_ONLY_IDS`; canvas layout box model aligned to **320×220**
+  with branch lanes and overlap audit in the builder; gateway `(copy)` spam
+  from Toolbar Duplicate cleaned via `scripts/cleanup_gateway_flow_copies.py`
+  (reference-guard skips in-use copies); validation gates:
+  `npm run verify:multiagent`, `npm run check:multiagent` (verify + smoke),
+  and `prebuild` hook on `npm run build`.
+
+### Fixed
+- 2026-07-27 **Expression-adapter edges survive load (wave-B live verifier
+  P1-A)**: `validateConnection` now accepts a wire of any data type into a
+  pin whose EXPRESSION consumes it as `value` (the canonical fx adapter
+  pattern, e.g. `planner.data(object) → gate1.prompt(string)` with
+  `gate1_prompt(value)`). The load-time edge filter used to silently drop
+  such in-use edges — 63 of 68 rendered on multiagent-coding, Run was
+  blocked by false "reads 'value' but the pin has no wire" positives, and
+  the next save PERSISTED the loss. Subflow nodes also declare the
+  runtime-provided `child_output` pin, so child-death wires survive the
+  pin-existence check. Exec pins are never expression-adapted (pinned by
+  test). Also from wave B: the node-hover ƒx reveal no longer caps the
+  pin-row hover brighten (`:where()` specificity fix), and multiagent-coding
+  0.0.10 makes the browser_probe grant + prompt FOLLOW
+  browser_probe_available (a probe-less gateway teaches the bounded
+  no-tool protocol instead of mandating an unmounted tool; `shq(0)` keeps
+  its text).
+- 2026-07-27 **Function library persistence + editor UX (adversary wave A)**:
+  Save/duplicate/family-duplicate now SEND `flow.functions` (they silently
+  stripped the whole library; gateway models also accept them — see
+  AbstractGateway's changelog); imported files land as NEW drafts (an
+  imported id used to PUT to a 404 or silently overwrite the original);
+  subflow pin sync is convention-aware (an IN-USE one-object `input`/`output`
+  node is never rewritten to per-field pins — a family copy used to render 60
+  of its 69 edges) and resolves bundled-only subflows locally (no more 404
+  noise); code nodes with author-shaped pins no longer grow dead template
+  pins; the ƒx affordance reveals on node hover (was pin-row-only — the
+  feature's entry point was invisible); the docked ƒ footer strip is gone
+  (one binding, one rendering); kind tags are clickable filters with
+  plain-word tooltips; expression-shadowed default editors dim honestly;
+  every flow load fits the camera; the Pin Types legend closes on Escape and
+  flow load; the uncertain `vars.<name>` preflight heuristic is an advisory
+  warning, no longer a Run blocker.
+
+### Changed
+- 2026-07-27 **multiagent-coding 0.0.9** — code-tui asks (commons c5871):
+  run-start "gating: wait|auto" answer line, `metadata.gating` catalog
+  marker, metadata.purpose corrected to the real wait default, browser_probe
+  granted to the builder + declared wrapper pin (default true) + probe
+  protocol in the builder prompt (nonce port-ownership, timeouts in seconds,
+  nonzero exit). Boundary-fold polish from the wave-A adversaries: two no-op
+  set_var nodes removed (47 nodes), labeled `state` outputs on the three fold
+  code nodes, `shq` extracted (the shell-quote escape was inlined ten times),
+  `mw_preflight(vars)` single-argument seed (defaults live in ONE place),
+  seeded `wait_gating` (kills the duplicated wait-mode read; fails safe
+  toward gates-shown), dead seed fields/defaults dropped, and a build-time
+  assertion that the seed node precedes every `vars.state` read. Smoke grew
+  auto-mode + stall-exit E2Es (8 layers, all through the real Runtime).
+- 2026-07-27 **multiagent-coding boundary cleanup (0.0.8)** — operator ruling
+  ("pure functions only where there is actual logic to test or formatting to
+  do; never for a plain variable read") + three adversarial reviews folded:
+  trivial state reads are now inline pin expressions (`vars.state.get(...)`,
+  attribute access — 12 conditions readable on the canvas), the 9 dict-returning
+  multi-output functions are gone (prompt composers reshaped to single-value
+  returns; `Final report` and `Doc drift check` RESTORED as code nodes with
+  labeled output pins so the fan-out is visible wiring), and constants demoted
+  to pin defaults (planner schema, gate-1 choices, PR.md path). Library: 31 →
+  28 functions, each real logic or formatting; `branch_slug` extracted as the
+  one genuinely reused helper. 46 → 48 nodes (the two restored decisions).
+  `wf_common.code_node` accepts declared `outputs`. Smoke suite rewritten to
+  evaluate the SHIPPED expressions through the real pin-expression lane and
+  extended with a full-path E2E through the real Runtime (scripted
+  agents/tools/gates: plan gate → build → doc-drift red cycle → repair →
+  review gate → merge, progress lines asserted).
+
 ### Added
 - 2026-07-26 **Flow function library (tier 2) + Functions drawer**: flows carry
   named helper functions at `flow.functions` (`{name, code, kind?, description?}`),

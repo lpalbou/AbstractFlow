@@ -3,9 +3,10 @@
  * Shows all pin types with their colors, shapes, and descriptions.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
+import { useFlowStore } from '../hooks/useFlow';
 
 interface PinInfo {
   type: PinType;
@@ -59,6 +60,22 @@ export const PIN_RULES: string[] = [
 
 export function PinLegend() {
   const [collapsed, setCollapsed] = useState(true);
+
+  // An open legend is transient help: Escape dismisses it, and loading a
+  // different flow closes it (UX adversary P2-2 — it used to survive both).
+  const flowId = useFlowStore((s) => s.flowId);
+  const draftInstanceId = useFlowStore((s) => s.draftInstanceId);
+  useEffect(() => {
+    setCollapsed(true);
+  }, [flowId, draftInstanceId]);
+  useEffect(() => {
+    if (collapsed) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCollapsed(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [collapsed]);
 
   return (
     <div className="pin-legend">

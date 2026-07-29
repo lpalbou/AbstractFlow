@@ -159,8 +159,13 @@ export interface FlowFamilyIndex {
   familyMembers: Map<string, string[]>;
 }
 
+export interface FlowFamilyIndexOptions {
+  /** Flow ids that fold under referencers in the library even when they declare interfaces. */
+  composedOnlyIds?: ReadonlySet<string>;
+}
+
 /** Derive the whole family index for a catalog of flows. Pure; memoize per flows array. */
-export function buildFlowFamilyIndex(flows: VisualFlow[]): FlowFamilyIndex {
+export function buildFlowFamilyIndex(flows: VisualFlow[], options?: FlowFamilyIndexOptions): FlowFamilyIndex {
   const byId = new Map(flows.map((flow) => [flow.id, flow]));
   const refs = new Map<string, string[]>();
   const inbound = new Map<string, Set<string>>();
@@ -187,9 +192,11 @@ export function buildFlowFamilyIndex(flows: VisualFlow[]): FlowFamilyIndex {
     if (missing.length > 0) missingRefsBy.set(flow.id, missing);
   }
 
+  const composedOnlyIds = options?.composedOnlyIds;
   const firstLevelIds = new Set<string>();
   for (const flow of flows) {
-    const pinned = normalizeInterfaces(flow.interfaces).length > 0;
+    const composedOnly = composedOnlyIds?.has(flow.id) ?? false;
+    const pinned = normalizeInterfaces(flow.interfaces).length > 0 && !composedOnly;
     const externalInbound = inbound.get(flow.id)?.size || 0;
     if (pinned || externalInbound === 0) firstLevelIds.add(flow.id);
   }

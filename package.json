@@ -31,9 +31,12 @@
   "scripts": {
     "dev": "vite --host --port 3003",
     "build": "tsc && vite build",
+    "prebuild": "npm run verify:multiagent",
     "preview": "vite preview",
     "start": "node ./bin/cli.js",
     "test": "vitest run",
+    "verify:multiagent": "python3 scripts/verify_multiagent_bundle.py",
+    "check:multiagent": "npm run verify:multiagent && python3 scripts/multiagent_coding_smoke.py",
     "docs:llms": "node ./scripts/generate-llms-full.mjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "prepublishOnly": "npm run build"

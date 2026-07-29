@@ -157,23 +157,30 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     bundleVersion: '0.1.1',
     bundleRef: 'meta-deliberate@0.1.1',
   },
-  'multiagent-coding': {
-    flowId: 'multiagent-coding',
-    bundleId: 'multiagent-coding',
-    // 0.0.4 = pin-expression migration (accessor nodes -> consumer pin
-    // expressions; behavior identical, equivalence-verified). 0.0.3 = the
-    // stale-model-pin republish; 0.0.2 = dual-interface (coding.v1 strict
-    // root + agent.v1 wrapper 'multiagent-coder'); 0.0.1 = cycle-3 fix wave.
-    bundleVersion: '0.0.7',
-    bundleRef: 'multiagent-coding@0.0.7',
-  },
   'multiagent-coder': {
     flowId: 'multiagent-coder',
     bundleId: 'multiagent-coding',
-    bundleVersion: '0.0.7',
-    bundleRef: 'multiagent-coding@0.0.7',
+    // 0.0.12 = canvas-aligned layout + verify_input inline; sole library run target.
+    bundleVersion: '0.0.12',
+    bundleRef: 'multiagent-coding@0.0.12',
   },
 };
+
+/**
+ * Bundled flows that are composed members only — fold under their library
+ * referencer even when they declare interfaces (multiagent-coding carries
+ * abstractcode.coding.v1 but only multiagent-coder is the operator-facing row).
+ */
+export const BUNDLED_COMPOSED_ONLY_IDS: ReadonlySet<string> = new Set([
+  'multiagent-coding',
+  'multiagent-verify-gates',
+]);
+
+/** Names produced by Toolbar/Rename family duplicate — used by cleanup script classification only. */
+export function isLibraryDuplicateCopy(flow: Pick<VisualFlow, 'name'>): boolean {
+  const name = String(flow.name || '').trim();
+  return /\s\(copy\)(?:\s*\(copy\))*$/i.test(name);
+}
 
 export interface FlowCatalog {
   flows: VisualFlow[];
@@ -204,6 +211,19 @@ export function listBundledFlows(): VisualFlow[] {
     .filter(isVisualFlow)
     .map(cloneFlow)
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * One bundled flow by id, or null. Consumers that resolve a flow by id
+ * (subflow pin sync) must check here BEFORE fetching from the gateway:
+ * bundled-only flows (multiagent-verify-gates, the entity family) are not in
+ * gateway visualflow storage and used to 404 on every canvas render.
+ */
+export function getBundledFlow(flowId: string | null | undefined): VisualFlow | null {
+  const fid = String(flowId || '').trim();
+  if (!fid) return null;
+  const found = Object.values(bundledFlowModules).filter(isVisualFlow).find((f) => f.id === fid);
+  return found ? cloneFlow(found) : null;
 }
 
 export function getBundledRunTarget(flowId: string | null | undefined): PublishedBundleTarget | null {

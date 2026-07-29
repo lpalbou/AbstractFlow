@@ -12,9 +12,10 @@ import { Handle, Position, NodeProps, useEdges, useReactFlow, useUpdateNodeInter
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import type { FlowNodeData, JsonValue, Pin, PinType, VisualFlow } from '../../types/flow';
+import { getBundledFlow } from '../../utils/bundledFlows';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
-import { PinExpressionChip, PinExpressionEditor, libraryCallName } from '../pins/PinExpressionControl';
+import { PinExpressionChip, PinExpressionEditor, maskStringLiterals } from '../pins/PinExpressionControl';
 import { collectDeclaredVarNames } from '../../utils/preflight';
 import { hasSecretLikeValue } from '../../utils/flowAuthoringCommands';
 import { useFlowStore } from '../../hooks/useFlow';
@@ -1230,16 +1231,31 @@ export const BaseNode = memo(function BaseNode({
     if (!isSubflowNode) return;
     const subflowId = typeof data.subflowId === 'string' ? data.subflowId.trim() : '';
     if (!subflowId) return;
-    if (!gatewayReadiness.operations.save.ready || !visualflowItemEndpoint) return;
 
     const syncKey = `${id}:${subflowId}`;
     if (subflowPinsSyncedRef.current === syncKey) return;
+
+    // Edge-aware sync: an in-use one-object node must never be rewritten
+    // (adversary P1-2); edges come from the store snapshot — the sync is a
+    // one-shot per node+subflowId, no reactivity needed.
+    const syncOpts = { nodeId: id, edges: useFlowStore.getState().edges };
+
+    // Bundled-only subflows (multiagent-verify-gates, the entity family) are
+    // not in gateway visualflow storage — resolve them locally, no HTTP.
+    const bundled = getBundledFlow(subflowId);
+    if (bundled) {
+      const patch = subflowPinPatchForSelectedFlow(data, bundled, syncOpts);
+      if (patch) updateNodeData(id, patch);
+      subflowPinsSyncedRef.current = syncKey;
+      return;
+    }
+    if (!gatewayReadiness.operations.save.ready || !visualflowItemEndpoint) return;
 
     let cancelled = false;
     gatewayJson<VisualFlow>(gatewayPath(visualflowItemEndpoint, { flow_id: subflowId }))
       .then((flow) => {
         if (cancelled) return;
-        const patch = subflowPinPatchForSelectedFlow(data, flow);
+        const patch = subflowPinPatchForSelectedFlow(data, flow, syncOpts);
         if (patch) updateNodeData(id, patch);
         subflowPinsSyncedRef.current = syncKey;
       })
@@ -5566,7 +5582,29 @@ export const BaseNode = memo(function BaseNode({
                 }
 
                   if (controls.length === 0) return null;
-                  return <div className="pin-inline-controls nodrag">{controls}</div>;
+                  // An expression REPLACES the pin's resolved value — the
+                  // default editor stays live-looking only if the expression
+                  // actually reads `value` (UX adversary P1-4). Otherwise dim
+                  // it: still clickable (defaults matter on old runtimes and
+                  // as the skew belt), but visibly not the source of truth.
+                  const expressionShadowsDefault =
+                    typeof pinExpression === 'string' &&
+                    pinExpression.trim().length > 0 &&
+                    !/\bvalue\b/.test(maskStringLiterals(pinExpression));
+                  return (
+                    <div
+                      className={clsx(
+                        'pin-inline-controls',
+                        'nodrag',
+                        expressionShadowsDefault && 'pin-default-shadowed'
+                      )}
+                      title={expressionShadowsDefault
+                        ? 'Replaced by the ƒx expression (the default only applies on runtimes without expressions)'
+                        : undefined}
+                    >
+                      {controls}
+                    </div>
+                  );
                 })()}
               </div>
 
@@ -5732,42 +5770,10 @@ export const BaseNode = memo(function BaseNode({
           </div>
         )}
 
-        {/* Docked function bindings (proposal_6): pins bound to library
-            functions surface as a footer strip on the consumer card, so the
-            logic feeding a node is readable without opening anything.
-            Click = open that pin's expression editor. */}
-        {(() => {
-          const exprs = data.pinExpressions;
-          if (!exprs || fxLibraryNames.length === 0) return null;
-          const docked = Object.entries(exprs)
-            .map(([pinId, expr]) => ({
-              pinId,
-              fnName: libraryCallName(typeof expr === 'string' ? expr : undefined, fxLibraryNames),
-              expr: typeof expr === 'string' ? expr : '',
-            }))
-            .filter((d) => d.fnName);
-          if (docked.length === 0) return null;
-          return (
-            <div className="fx-docked nodrag">
-              {docked.map((d) => (
-                <button
-                  key={d.pinId}
-                  type="button"
-                  className="fx-docked-row"
-                  title={`${d.expr}\n(click to edit binding)`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFxEditingPin(d.pinId);
-                  }}
-                >
-                  <span className="fx-glyph">ƒ</span>
-                  <span className="fx-docked-name">{d.fnName}</span>
-                  <span className="fx-docked-pin">→ {d.pinId}</span>
-                </button>
-              ))}
-            </div>
-          );
-        })()}
+        {/* The docked function-binding footer strip (proposal_6) was REMOVED
+            (UX adversary P1-1): a bound pin already renders the ƒ name chip
+            on its row plus the condition preview — a third rendering of the
+            same fact was decoration, not information. */}
       </div>
       </div>
 

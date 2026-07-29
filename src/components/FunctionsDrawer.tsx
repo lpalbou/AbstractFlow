@@ -15,7 +15,18 @@ import type { FlowFunction } from '../types/flow';
  * loud refusal, never a silently broken expression).
  */
 
-const KIND_OPTIONS = ['checker', 'shaper', 'parser', 'composer', 'other'] as const;
+const KIND_OPTIONS = ['checker', 'shaper', 'parser', 'composer', 'formatter', 'other'] as const;
+
+// Plain-words legend for the kind tags (UX adversary P1-3: an unexplained
+// tag is jargon). Rendered as the tag's tooltip; clicking a tag filters.
+const KIND_HINTS: Record<string, string> = {
+  checker: 'answers a yes/no law from state',
+  shaper: 'folds a result into the state object',
+  parser: 'reads structure out of raw output',
+  composer: 'builds a value (prompt, command, text)',
+  formatter: 'formats one value for embedding',
+  other: 'helper',
+};
 
 function functionParams(fn: FlowFunction): string {
   // Find the def's argument list by matching parens with depth — a naive
@@ -196,14 +207,14 @@ export function FunctionsDrawer() {
             <input
               type="text"
               value={editor.name}
-              placeholder="build_again"
+              placeholder="my_helper"
               onChange={(e) => setEditor({ ...editor, name: e.target.value, error: null })}
             />
           </label>
           <label className="functions-field">
             <span>Kind</span>
             <select value={editor.kind} onChange={(e) => setEditor({ ...editor, kind: e.target.value })}>
-              <option value="">(none)</option>
+              <option value="">(optional)</option>
               {KIND_OPTIONS.map((k) => (
                 <option key={k} value={k}>
                   {k}
@@ -277,7 +288,29 @@ export function FunctionsDrawer() {
                   <span className="functions-row-name">{fn.name}</span>
                   <span className="functions-row-params">({functionParams(fn)})</span>
                 </span>
-                {fn.kind ? <span className="functions-kind-tag">{fn.kind}</span> : null}
+                {fn.kind ? (
+                  // A span with its own click (nested buttons are invalid
+                  // HTML): tag = filter, tooltip = plain-words legend.
+                  <span
+                    className="functions-kind-tag functions-kind-tag-filter"
+                    role="button"
+                    tabIndex={0}
+                    title={`${KIND_HINTS[fn.kind] || 'helper'} — click to filter by "${fn.kind}"`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQuery((prev) => (prev === fn.kind ? '' : fn.kind || ''));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setQuery((prev) => (prev === fn.kind ? '' : fn.kind || ''));
+                      }
+                    }}
+                  >
+                    {fn.kind}
+                  </span>
+                ) : null}
                 <span className={clsx('functions-used-tag', sites.length === 0 && 'unused')}>
                   used {sites.length}
                 </span>

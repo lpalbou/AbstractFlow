@@ -1300,6 +1300,18 @@
   opacity: 0.85;
   pointer-events: auto;
 }
+/* Discoverability (UX adversary P0): the ONLY entry point to expressions
+   must not require hovering the exact pin row — hovering anywhere on the
+   node dims-in every ƒx affordance, the pin-row hover then brightens the
+   one under the pointer. Persistent chips on every pin were rejected as
+   clutter (the operator's remove-not-add doctrine). :where() zeroes this
+   rule's ancestor specificity so the .pin-row:hover brighten above always
+   wins on the hovered row (wave-B verifier P2-2: a plain selector tied at
+   (0,3,0) and won by source order, capping row hover at 0.4). */
+:where(.react-flow__node:hover) .fx-ghost {
+  opacity: 0.4;
+  pointer-events: auto;
+}
 /* Keyboard parity with the hover reveal: a focused ghost must be visible
    (an invisible focus stop is a keyboard trap — Tab could land here and
    Enter would activate a control the user cannot see). Plain :focus, not
@@ -1481,45 +1493,17 @@
   font-weight: 600;
 }
 
-/* Docked function bindings (proposal_6): a footer strip on the consumer
-   card listing each `ƒ function → pin` binding. */
-.fx-docked {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 2px 6px 6px;
-  padding-top: 4px;
-  border-top: 1px dashed rgba(235, 180, 67, 0.25);
+/* (fx-docked footer strip removed — UX adversary P1-1: the pin-row ƒ chip
+   plus the condition preview already carry the binding; a third rendering
+   was decoration.) */
+
+/* Default editor visibly demoted when an expression replaces the pin value
+   (it stays interactive: defaults are the old-runtime skew belt). */
+.pin-inline-controls.pin-default-shadowed {
+  opacity: 0.35;
 }
-.fx-docked-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 6px;
-  border: 1px solid rgba(235, 180, 67, 0.35);
-  border-radius: 6px;
-  background: rgba(28, 24, 40, 0.85);
-  color: #ebb443;
-  font-size: 9.5px;
-  cursor: pointer;
-  text-align: left;
-}
-.fx-docked-row:hover {
-  background: rgba(235, 180, 67, 0.14);
-}
-.fx-docked-row .fx-glyph {
-  font-size: 9px;
-  font-style: italic;
-  font-weight: 700;
-}
-.fx-docked-name {
-  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
-  font-weight: 600;
-  color: rgba(235, 200, 140, 0.95);
-}
-.fx-docked-pin {
-  color: rgba(200, 200, 220, 0.55);
-  font-size: 9px;
+.pin-inline-controls.pin-default-shadowed:hover {
+  opacity: 0.75;
 }
 
 /* Promote-to-function panel inside the expression editor (frame_4). */

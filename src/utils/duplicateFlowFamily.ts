@@ -89,6 +89,7 @@ export interface DuplicateFamilyIO {
     nodes: VisualNode[];
     edges: VisualFlow['edges'];
     entryNode?: VisualFlow['entryNode'];
+    functions?: VisualFlow['functions'];
   }) => Promise<VisualFlow>;
   /** PUT updated nodes onto an existing flow (reference remap phase). */
   updateFlowNodes: (flowId: string, flow: VisualFlow, nodes: VisualNode[]) => Promise<VisualFlow>;
@@ -149,6 +150,11 @@ export async function duplicateFlowFamily(options: {
         nodes: source.nodes,
         edges: source.edges,
         entryNode: source.entryNode,
+        // The function library travels with the copy — a duplicate without
+        // it is preflight-dead (every call an unknown name; adversary P0-2).
+        ...(Array.isArray(source.functions) && source.functions.length
+          ? { functions: source.functions }
+          : {}),
       });
       idMap.set(source.id, created.id);
       createdBySource.set(source.id, created);

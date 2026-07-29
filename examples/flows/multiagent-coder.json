@@ -1,6 +1,6 @@
 {
   "id": "multiagent-coder",
-  "name": "Multi-agent coder",
+  "name": "Multi-agent coder — chat entry (runs pipeline)",
   "description": "Chat-agent entrypoint for the multi-agent coding pipeline (scouts -> plan -> gates -> build/verify loop -> docs -> PR -> merge). Defaults to gating_mode=wait: interactive clients answer TWO ask_user gates (plan approval, merge approval). Unattended clients must send gating_mode=auto and input_data._runtime.tool_policy = {\"auto_approve_tools\": [\"execute_command\"]} (or drive approvals externally). workspace_root resolves from the session workspace var or input_data; an empty workspace is refused at preflight (this workflow writes files and runs git).",
   "interfaces": [
     "abstractcode.agent.v1"
@@ -10,8 +10,8 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -900,
-        "y": 0
+        "x": 0.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -54,12 +54,18 @@
             "id": "gating_mode",
             "label": "gating_mode",
             "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
           }
         ],
         "pinDefaults": {
           "prompt": "",
           "workspace_root": "",
-          "gating_mode": "wait"
+          "gating_mode": "wait",
+          "browser_probe_available": true
         }
       },
       "label": null,
@@ -72,8 +78,8 @@
       "id": "map_input",
       "type": "code",
       "position": {
-        "x": -560,
-        "y": 0
+        "x": 480.0,
+        "y": -372.0
       },
       "data": {
         "nodeType": "code",
@@ -95,6 +101,11 @@
             "id": "gating_mode",
             "label": "gating_mode",
             "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
           },
           {
             "id": "provider",
@@ -133,7 +144,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "p = str(prompt or \"\").strip()\nws = str(workspace_root or \"\").strip()\ng = str(gating_mode or \"wait\").strip().lower()\nif g not in (\"wait\", \"auto\"):\n    g = \"wait\"\nbuilt = {\n    \"request\": p,\n    \"workspace_root\": ws,\n    \"provider\": provider,\n    \"model\": model,\n    \"gating_mode\": g,\n    \"browser_probe_available\": False,\n}\nreturn {\"built\": built}"
+        "codeBody": "p = str(prompt or \"\").strip()\nws = str(workspace_root or \"\").strip()\ng = str(gating_mode or \"wait\").strip().lower()\nif g not in (\"wait\", \"auto\"):\n    g = \"wait\"\n# browser_probe rides through as a DECLARED pin defaulting TRUE (code-tui\n# c5871: the tool is registered on the shipped gateway and bounded; the\n# old hardcoded False made every report claim static-only verification).\n# A probe-less gateway sends browser_probe_available=false.\nprobe = True if browser_probe_available is None else bool(browser_probe_available)\nbuilt = {\n    \"request\": p,\n    \"workspace_root\": ws,\n    \"provider\": provider,\n    \"model\": model,\n    \"gating_mode\": g,\n    \"browser_probe_available\": probe,\n}\nreturn {\"built\": built}"
       },
       "label": null,
       "icon": null,
@@ -145,8 +156,8 @@
       "id": "build",
       "type": "subflow",
       "position": {
-        "x": -220,
-        "y": 0
+        "x": 480.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "subflow",
@@ -180,6 +191,11 @@
             "id": "output",
             "label": "output",
             "type": "object"
+          },
+          {
+            "id": "child_output",
+            "label": "child_output",
+            "type": "object"
           }
         ],
         "pinDefaults": {
@@ -197,8 +213,8 @@
       "id": "meta_obj",
       "type": "make_object",
       "position": {
-        "x": 500,
-        "y": 40
+        "x": 960.0,
+        "y": -320.0
       },
       "data": {
         "nodeType": "make_object",
@@ -239,8 +255,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 860,
-        "y": 0
+        "x": 960.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -324,6 +340,14 @@
       "animated": false
     },
     {
+      "id": "e-start-browser_probe_available-map_input-browser_probe_available",
+      "source": "start",
+      "sourceHandle": "browser_probe_available",
+      "target": "map_input",
+      "targetHandle": "browser_probe_available",
+      "animated": false
+    },
+    {
       "id": "e-start-provider-map_input-provider",
       "source": "start",
       "sourceHandle": "provider",
@@ -389,6 +413,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-27T00:24:00.958988+00:00",
-  "updated_at": "2026-07-27T00:24:00.958988+00:00"
+  "created_at": "2026-07-28T15:49:11.507023+00:00",
+  "updated_at": "2026-07-28T15:49:11.507023+00:00"
 }

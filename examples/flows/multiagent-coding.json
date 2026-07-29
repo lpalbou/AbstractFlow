@@ -1,6 +1,6 @@
 {
   "id": "multiagent-coding",
-  "name": "Multi-agent coding workflow",
+  "name": "Multi-agent coding — main pipeline (edit on canvas)",
   "description": "Scouts (code+web) -> planner -> plan gate -> backlog -> git branch -> [build -> lint -> selfcheck -> verify -> doc -> PR -> review gate]xN -> merge. Deterministic git/lint/PR/merge via the flow FUNCTION LIBRARY (see the Functions panel); two user gates (gating_mode=auto skips both; auto mode needs input_data._runtime.tool_policy auto-approving execute_command or an approving driver, else tool approvals park the run).",
   "interfaces": [
     "abstractcode.coding.v1"
@@ -10,8 +10,8 @@
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -2280,
-        "y": 0
+        "x": 0.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -109,8 +109,8 @@
       "id": "set_state0",
       "type": "set_var",
       "position": {
-        "x": -2000,
-        "y": 0
+        "x": 480.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "set_var",
@@ -145,7 +145,7 @@
           "name": "state"
         },
         "pinExpressions": {
-          "value": "mw_preflight(vars.get(\"request\"), vars.get(\"workspace_root\"), vars.get(\"gating_mode\", \"wait\"), vars.get(\"skills\", [\"coredoc\"]), (vars.get(\"_runtime\") or {}).get(\"skills_resolution\"), vars.get(\"max_plan_revisions\", 3), vars.get(\"max_fix_cycles\", 6), vars.get(\"max_review_rounds\", 2), vars.get(\"build_command\", \"\"), vars.get(\"run_command\", \"\"), vars.get(\"provider\"), vars.get(\"model\"), vars.get(\"browser_probe_available\", False))"
+          "value": "mw_preflight(vars)"
         }
       },
       "label": null,
@@ -158,8 +158,8 @@
       "id": "if_preflight",
       "type": "if",
       "position": {
-        "x": -1720,
-        "y": 0
+        "x": 960.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "if",
@@ -191,7 +191,7 @@
           }
         ],
         "pinExpressions": {
-          "condition": "vars.get(\"state\", {}).get(\"preflight_ok\", False)"
+          "condition": "vars.state.get(\"preflight_ok\", False)"
         }
       },
       "label": null,
@@ -204,8 +204,8 @@
       "id": "end_pre",
       "type": "on_flow_end",
       "position": {
-        "x": -1720,
-        "y": 260
+        "x": 1440.0,
+        "y": 440.0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -235,10 +235,66 @@
           }
         ],
         "outputs": [],
+        "pinDefaults": {
+          "success": false,
+          "stopped_reason": "preflight-failed"
+        },
         "pinExpressions": {
-          "report": "pre_report(vars.get(\"state\", {}))",
-          "success": "False",
-          "stopped_reason": "\"preflight-failed\""
+          "report": "pre_report(vars.state)"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gating_status",
+      "type": "answer_user",
+      "position": {
+        "x": 1440.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Gating mode",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "level": "message"
+        },
+        "pinExpressions": {
+          "message": "\"gating: \" + vars.state.get(\"gating_mode\", \"wait\")"
         }
       },
       "label": null,
@@ -251,8 +307,8 @@
       "id": "plan_while",
       "type": "while",
       "position": {
-        "x": -1440,
-        "y": 0
+        "x": 1920.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "while",
@@ -297,7 +353,7 @@
           "condition": false
         },
         "pinExpressions": {
-          "condition": "plan_again(vars.get(\"state\", {}))[\"condition\"]"
+          "condition": "not vars.state.get(\"accepted\") and vars.state.get(\"plan_revisions\", 0) < vars.state.get(\"max_plan_revisions\", 3)"
         }
       },
       "label": null,
@@ -310,8 +366,8 @@
       "id": "if_scout",
       "type": "if",
       "position": {
-        "x": -1440,
-        "y": -280
+        "x": 2400.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "if",
@@ -343,7 +399,7 @@
           }
         ],
         "pinExpressions": {
-          "condition": "plan_again(vars.get(\"state\", {}))[\"need_scout\"]"
+          "condition": "not (vars.state.get(\"scout_context\") or \"\").strip() or bool(vars.state.get(\"rescout\"))"
         }
       },
       "label": null,
@@ -356,8 +412,8 @@
       "id": "scout_code",
       "type": "agent",
       "position": {
-        "x": -1160,
-        "y": -420
+        "x": 2880.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "agent",
@@ -456,9 +512,9 @@
           "temperature": 0.2
         },
         "pinExpressions": {
-          "prompt": "scout_code_prompt(vars.get(\"state\", {}))",
-          "provider": "vars.get(\"provider\")",
-          "model": "vars.get(\"model\")"
+          "prompt": "scout_code_prompt(vars.state)",
+          "provider": "vars.state.get(\"provider\")",
+          "model": "vars.state.get(\"model\")"
         }
       },
       "label": null,
@@ -471,8 +527,8 @@
       "id": "scout_web",
       "type": "agent",
       "position": {
-        "x": -860,
-        "y": -420
+        "x": 3360.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "agent",
@@ -569,9 +625,9 @@
           "temperature": 0.2
         },
         "pinExpressions": {
-          "prompt": "scout_web_prompt(vars.get(\"state\", {}))",
-          "provider": "vars.get(\"provider\")",
-          "model": "vars.get(\"model\")"
+          "prompt": "scout_web_prompt(vars.state)",
+          "provider": "vars.state.get(\"provider\")",
+          "model": "vars.state.get(\"model\")"
         }
       },
       "label": null,
@@ -584,8 +640,8 @@
       "id": "scout_merge",
       "type": "code",
       "position": {
-        "x": -560,
-        "y": -480
+        "x": 3840.0,
+        "y": -320.0
       },
       "data": {
         "nodeType": "code",
@@ -616,18 +672,8 @@
         ],
         "outputs": [
           {
-            "id": "output",
-            "label": "output",
-            "type": "object"
-          },
-          {
-            "id": "success",
-            "label": "success",
-            "type": "boolean"
-          },
-          {
-            "id": "execution",
-            "label": "execution",
+            "id": "state",
+            "label": "state",
             "type": "object"
           }
         ],
@@ -637,7 +683,7 @@
         "functionName": "transform",
         "codeBody": "c = str(code_findings or \"\").strip()\nw = str(web_findings or \"\").strip()\nparts = []\nparts.append(\"## Code + documentation findings\\n\" + (c if c else \"(scout returned nothing) #FALLBACK\"))\nparts.append(\"## Internet findings\\n\" + (w if w else \"(scout returned nothing) #FALLBACK\"))\nblob = \"\\n\\n\".join(parts)\nif len(blob) > 12000:\n    blob = blob[:12000] + \"\\n\\n[...scout context truncated at 12000 chars #TRUNCATION]\"\ns = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\ns2[\"scout_context\"] = blob\nreturn {\"state\": s2}",
         "pinExpressions": {
-          "loop_state": "vars.get(\"state\", {})"
+          "loop_state": "vars.state"
         }
       },
       "label": null,
@@ -650,8 +696,8 @@
       "id": "set_state_scout",
       "type": "set_var",
       "position": {
-        "x": -560,
-        "y": -280
+        "x": 3840.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "set_var",
@@ -701,8 +747,8 @@
       "id": "planner",
       "type": "agent",
       "position": {
-        "x": -280,
-        "y": -420
+        "x": 4320.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "agent",
@@ -791,13 +837,46 @@
         "pinDefaults": {
           "tools": [],
           "max_iterations": 6,
-          "temperature": 0.2
+          "temperature": 0.2,
+          "resp_schema": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "risks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "title",
+              "goal",
+              "steps"
+            ]
+          }
         },
         "pinExpressions": {
-          "prompt": "planner_prompt(vars.get(\"state\", {}))[\"prompt\"]",
-          "resp_schema": "planner_prompt(vars.get(\"state\", {}))[\"schema\"]",
-          "provider": "vars.get(\"provider\")",
-          "model": "vars.get(\"model\")"
+          "prompt": "planner_prompt(vars.state)",
+          "provider": "vars.state.get(\"provider\")",
+          "model": "vars.state.get(\"model\")"
         }
       },
       "label": null,
@@ -810,8 +889,8 @@
       "id": "if_g1",
       "type": "if",
       "position": {
-        "x": 0,
-        "y": -420
+        "x": 4800.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "if",
@@ -843,7 +922,7 @@
           }
         ],
         "pinExpressions": {
-          "condition": "plan_again(vars.get(\"state\", {}))[\"wait_mode\"]"
+          "condition": "vars.state.get(\"wait_gating\", True)"
         }
       },
       "label": null,
@@ -856,8 +935,8 @@
       "id": "gate1",
       "type": "ask_user",
       "position": {
-        "x": 280,
-        "y": -520
+        "x": 5280.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "ask_user",
@@ -894,11 +973,14 @@
           }
         ],
         "pinDefaults": {
-          "prompt": "Approve the plan?"
+          "choices": [
+            "approve",
+            "revise",
+            "research"
+          ]
         },
         "pinExpressions": {
-          "prompt": "gate1_prompt(value)[\"prompt\"]",
-          "choices": "gate1_prompt(value)[\"choices\"]"
+          "prompt": "gate1_prompt(value)"
         }
       },
       "label": null,
@@ -911,8 +993,8 @@
       "id": "gate1_parse",
       "type": "code",
       "position": {
-        "x": 560,
-        "y": -640
+        "x": 5760.0,
+        "y": -320.0
       },
       "data": {
         "nodeType": "code",
@@ -943,18 +1025,8 @@
         ],
         "outputs": [
           {
-            "id": "output",
-            "label": "output",
-            "type": "object"
-          },
-          {
-            "id": "success",
-            "label": "success",
-            "type": "boolean"
-          },
-          {
-            "id": "execution",
-            "label": "execution",
+            "id": "state",
+            "label": "state",
             "type": "object"
           }
         ],
@@ -964,7 +1036,7 @@
         "functionName": "transform",
         "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\nresp = str(response or \"\").strip()\nlow = resp.lower()\npd = planner_data if isinstance(planner_data, dict) else {}\nif low.startswith(\"approve\") or low in (\"yes\", \"ok\", \"lgtm\"):\n    s2[\"accepted\"] = True\n    s2[\"plan\"] = pd\n    s2[\"title\"] = str(pd.get(\"title\") or \"\").strip()\n    s2[\"plan_feedback\"] = \"\"\n    s2[\"rescout\"] = False\nelse:\n    s2[\"accepted\"] = False\n    s2[\"plan_revisions\"] = int(s.get(\"plan_revisions\", 0) or 0) + 1\n    s2[\"plan_feedback\"] = resp if resp else \"(reviewer gave no comment; produce a better, more concrete plan)\"\n    # re-scout is the human's EXPLICIT choice (\"research: ...\"), never a tax\n    # on every plan revision (design A-R5).\n    s2[\"rescout\"] = low.startswith(\"research\")\nreturn {\"state\": s2}",
         "pinExpressions": {
-          "loop_state": "vars.get(\"state\", {})"
+          "loop_state": "vars.state"
         }
       },
       "label": null,
@@ -977,8 +1049,8 @@
       "id": "set_state_plan",
       "type": "set_var",
       "position": {
-        "x": 560,
-        "y": -420
+        "x": 5760.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "set_var",
@@ -1028,8 +1100,8 @@
       "id": "set_state_plan_auto",
       "type": "set_var",
       "position": {
-        "x": 280,
-        "y": -220
+        "x": 5280.0,
+        "y": 440.0
       },
       "data": {
         "nodeType": "set_var",
@@ -1064,7 +1136,7 @@
           "name": "state"
         },
         "pinExpressions": {
-          "value": "auto_accept_plan(vars.get(\"state\", {}), value)"
+          "value": "auto_accept_plan(vars.state, value)"
         }
       },
       "label": null,
@@ -1077,8 +1149,8 @@
       "id": "if_accepted",
       "type": "if",
       "position": {
-        "x": -1160,
-        "y": 260
+        "x": 2400.0,
+        "y": 440.0
       },
       "data": {
         "nodeType": "if",
@@ -1110,7 +1182,7 @@
           }
         ],
         "pinExpressions": {
-          "condition": "plan_accepted(vars.get(\"state\", {}))"
+          "condition": "vars.state.get(\"accepted\", False)"
         }
       },
       "label": null,
@@ -1123,8 +1195,8 @@
       "id": "backlog_write",
       "type": "write_file",
       "position": {
-        "x": -880,
-        "y": 260
+        "x": 2880.0,
+        "y": 518.0
       },
       "data": {
         "nodeType": "write_file",
@@ -1166,8 +1238,8 @@
           }
         ],
         "pinExpressions": {
-          "file_path": "backlog_fields(vars.get(\"state\", {}))[\"file_path\"]",
-          "content": "backlog_fields(vars.get(\"state\", {}))[\"content\"]"
+          "file_path": "\"docs/backlog/planned/\" + branch_slug(vars.state) + \".md\"",
+          "content": "backlog_body(vars.state)"
         }
       },
       "label": null,
@@ -1180,8 +1252,8 @@
       "id": "git_call",
       "type": "call_tool",
       "position": {
-        "x": -600,
-        "y": 260
+        "x": 3360.0,
+        "y": 518.0
       },
       "data": {
         "nodeType": "call_tool",
@@ -1233,7 +1305,7 @@
           ]
         },
         "pinExpressions": {
-          "tool_call": "compose_git_branch(vars.get(\"state\", {}))"
+          "tool_call": "compose_git_branch(vars.state)"
         }
       },
       "label": null,
@@ -1246,8 +1318,8 @@
       "id": "set_state_git",
       "type": "set_var",
       "position": {
-        "x": -320,
-        "y": 260
+        "x": 3840.0,
+        "y": 440.0
       },
       "data": {
         "nodeType": "set_var",
@@ -1282,7 +1354,7 @@
           "name": "state"
         },
         "pinExpressions": {
-          "value": "record_branch(vars.get(\"state\", {}), value)"
+          "value": "record_branch(vars.state, value)"
         }
       },
       "label": null,
@@ -1295,8 +1367,8 @@
       "id": "build_while",
       "type": "while",
       "position": {
-        "x": -40,
-        "y": 260
+        "x": 4320.0,
+        "y": 518.0
       },
       "data": {
         "nodeType": "while",
@@ -1341,7 +1413,7 @@
           "condition": false
         },
         "pinExpressions": {
-          "condition": "build_again(vars.get(\"state\", {}))"
+          "condition": "build_again(vars.state)"
         }
       },
       "label": null,
@@ -1354,8 +1426,8 @@
       "id": "cycle_status",
       "type": "answer_user",
       "position": {
-        "x": 100,
-        "y": 20
+        "x": 4800.0,
+        "y": 440.0
       },
       "data": {
         "nodeType": "answer_user",
@@ -1395,7 +1467,7 @@
           "level": "message"
         },
         "pinExpressions": {
-          "message": "\"build cycle \" + str((vars.get(\"state\", {}).get(\"fix_cycles\", 0) or 0) + 1) + \" of \" + str(vars.get(\"state\", {}).get(\"max_fix_cycles\", 6) or 6)"
+          "message": "\"build cycle \" + str((vars.state.get(\"fix_cycles\", 0) or 0) + 1) + \" of \" + str(vars.state.get(\"max_fix_cycles\", 6) or 6)"
         }
       },
       "label": null,
@@ -1408,8 +1480,8 @@
       "id": "builder",
       "type": "agent",
       "position": {
-        "x": 240,
-        "y": 140
+        "x": 5280.0,
+        "y": 760.0
       },
       "data": {
         "nodeType": "agent",
@@ -1509,9 +1581,10 @@
           "temperature": 0.2
         },
         "pinExpressions": {
-          "prompt": "builder_prompt(vars.get(\"state\", {}))",
-          "provider": "vars.get(\"provider\")",
-          "model": "vars.get(\"model\")"
+          "prompt": "builder_prompt(vars.state)",
+          "tools": "value + ([\"browser_probe\"] if vars.state.get(\"probe_ok\") else [])",
+          "provider": "vars.state.get(\"provider\")",
+          "model": "vars.state.get(\"model\")"
         }
       },
       "label": null,
@@ -1524,8 +1597,8 @@
       "id": "lint_call",
       "type": "call_tool",
       "position": {
-        "x": 540,
-        "y": 140
+        "x": 5760.0,
+        "y": 440.0
       },
       "data": {
         "nodeType": "call_tool",
@@ -1577,7 +1650,7 @@
           ]
         },
         "pinExpressions": {
-          "tool_call": "compose_lint(vars.get(\"state\", {}))"
+          "tool_call": "compose_lint(vars.state)"
         }
       },
       "label": null,
@@ -1590,8 +1663,8 @@
       "id": "selfcheck_call",
       "type": "call_tool",
       "position": {
-        "x": 820,
-        "y": 140
+        "x": 6240.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "call_tool",
@@ -1643,7 +1716,7 @@
           ]
         },
         "pinExpressions": {
-          "tool_call": "compose_selfcheck_refresh(vars.get(\"state\", {}))"
+          "tool_call": "compose_selfcheck_refresh(vars.state)"
         }
       },
       "label": null,
@@ -1656,8 +1729,8 @@
       "id": "commit_call",
       "type": "call_tool",
       "position": {
-        "x": 1100,
-        "y": 140
+        "x": 6720.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "call_tool",
@@ -1709,7 +1782,7 @@
           ]
         },
         "pinExpressions": {
-          "tool_call": "compose_commit(vars.get(\"state\", {}))"
+          "tool_call": "compose_commit(vars.state)"
         }
       },
       "label": null,
@@ -1722,8 +1795,8 @@
       "id": "verify",
       "type": "subflow",
       "position": {
-        "x": 1380,
-        "y": 140
+        "x": 7200.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "subflow",
@@ -1757,6 +1830,11 @@
             "id": "output",
             "label": "output",
             "type": "object"
+          },
+          {
+            "id": "child_output",
+            "label": "child_output",
+            "type": "object"
           }
         ],
         "pinDefaults": {
@@ -1764,7 +1842,7 @@
         },
         "subflowId": "multiagent-verify-gates",
         "pinExpressions": {
-          "input": "verify_input(vars.get(\"state\", {}))"
+          "input": "{'request': str((vars.state or {}).get('request') or ''), 'workspace_root': str((vars.state or {}).get('workspace_root') or ''), 'build_command': str((vars.state or {}).get('build_command') or ''), 'run_command': str((vars.state or {}).get('run_command') or ''), 'round_index': int((vars.state or {}).get('fix_cycles') or 0), 'provider': (vars.state or {}).get('provider'), 'model': (vars.state or {}).get('model')}"
         }
       },
       "label": null,
@@ -1777,8 +1855,8 @@
       "id": "next_state",
       "type": "code",
       "position": {
-        "x": 1660,
-        "y": 320
+        "x": 7680.0,
+        "y": -226.0
       },
       "data": {
         "nodeType": "code",
@@ -1819,18 +1897,8 @@
         ],
         "outputs": [
           {
-            "id": "output",
-            "label": "output",
-            "type": "object"
-          },
-          {
-            "id": "success",
-            "label": "success",
-            "type": "boolean"
-          },
-          {
-            "id": "execution",
-            "label": "execution",
+            "id": "state",
+            "label": "state",
             "type": "object"
           }
         ],
@@ -1838,11 +1906,11 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\nv = verify_verdict if isinstance(verify_verdict, dict) else {}\nall_passed = bool(v.get(\"all_passed\"))\nfails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\nfails = [str(x) for x in fails]\n# Verifier DEATH is not \"no failures\": when the verify child run dies, the\n# mapped output is None -> verdict {} with no all_passed key (adversary\n# finding: delivered != failed must survive verifier death).\nmeta = verify_meta if isinstance(verify_meta, dict) else {}\nif \"all_passed\" not in v:\n    all_passed = False\n    err = str(meta.get(\"error\") or \"verify child run died or returned no verdict\")\n    fails.append(\"verify: verdict missing - \" + err[:160] + \" (#FALLBACK)\")\n# ENVIRONMENT failures are not fixable by the builder: fail-soft to\n# \"delivered, not verifiable\" (coding-agent 0.2.2 precedent).\nenv_fails = v.get(\"environment_failures\") if isinstance(v.get(\"environment_failures\"), list) else []\nenv_fails = [str(x) for x in env_fails]\nmoved = []\nfor f in fails:\n    low = str(f).lower()\n    if (\"missing\" in low and \"executor\" in low) or (\"execution not available\" in low) or (\"not available in this environment\" in low):\n        moved.append(f)\nfor f in moved:\n    fails.remove(f)\n    env_fails.append(f)\nlint_res = lint_out if isinstance(lint_out, list) else []\nfor x in lint_res:\n    fails.append(\"lint: \" + str(x))\nif lint_res:\n    all_passed = False\n# normalized failure signature: drop volatile evidence tail (first \" - \"),\n# lowercase, strip STANDALONE digit runs (digits fused to identifiers kept).\nident = \"abcdefghijklmnopqrstuvwxyz_.\"\nnorm = []\nfor f in fails:\n    t = str(f).strip().lower()\n    d = t.find(\" - \")\n    if d >= 0:\n        t = t[:d]\n    out = \"\"\n    i = 0\n    n = len(t)\n    while i < n:\n        ch = t[i]\n        if \"0\" <= ch <= \"9\":\n            j = i\n            while j < n and \"0\" <= t[j] <= \"9\":\n                j = j + 1\n            before = t[i-1] if i > 0 else \"\"\n            after = t[j] if j < n else \"\"\n            if (before in ident) or (after in ident):\n                out = out + t[i:j]\n            i = j\n        else:\n            out = out + ch\n            i = i + 1\n    norm.append(out.strip())\nsig = \"|\".join(sorted(set(norm)))\nprev_sig = str(s.get(\"failure_signature\") or \"\")\nsame = int(s.get(\"same_signature_count\", 0) or 0)\nif sig and prev_sig and sig == prev_sig:\n    same = same + 1\nelse:\n    same = 0\nthis_cycle = int(s.get(\"fix_cycles\", 0) or 0) + 1\ns2[\"failure_signature\"] = sig\ns2[\"same_signature_count\"] = same\ns2[\"fix_cycles\"] = this_cycle\ns2[\"build_feedback\"] = \"\\n\".join(fails)\ns2[\"all_passed\"] = all_passed\ns2[\"last_verdict\"] = {\"all_passed\": all_passed, \"failures\": fails[:30],\n                      \"environment_failures\": env_fails[:15]}\n# environment-blocked: nothing fixable remains and the environment cannot\n# verify - stop the loop honestly instead of burning the remaining budget\nif env_fails and not fails and not all_passed:\n    s2[\"environment_blocked\"] = True\n# attempt memory: the repair prompt cites what the builder SAID it did last\n# cycle (coding-agent R1 lesson).\nbr = str(builder_response or \"\").strip()\nif br:\n    s2[\"last_attempt_summary\"] = br[-800:]\n# repair history: append one entry per FAILED cycle (cycle number, a short\n# summary of what the builder said it did, and the failure that remained), so\n# the next repair prompt shows the whole trail and the builder does not repeat\n# an approach that already failed. Append-only, capped at 24 entries.\nif not all_passed:\n    hist = s.get(\"repair_history\") if isinstance(s.get(\"repair_history\"), list) else []\n    hist = list(hist)\n    changed = br[:400] if br else \"(builder gave no summary)\"\n    failed_short = sig if sig else \"; \".join(fails[:3])\n    hist.append({\"cycle\": this_cycle, \"changed\": changed, \"failed\": failed_short[:300]})\n    if len(hist) > 24:\n        hist = hist[-24:]\n    s2[\"repair_history\"] = hist\n# auto mode: green means approved (no human gate by explicit operator choice)\nif all_passed and str(s.get(\"gating_mode\") or \"wait\") == \"auto\":\n    s2[\"approved\"] = True\nreturn {\"state\": s2}",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\nv = verify_verdict if isinstance(verify_verdict, dict) else {}\nall_passed = bool(v.get(\"all_passed\"))\nfails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\nfails = [str(x) for x in fails]\n# Verifier DEATH is not \"no failures\": when the verify child run dies, the\n# mapped output is None -> verdict {} with no all_passed key (adversary\n# finding: delivered != failed must survive verifier death).\nmeta = verify_meta if isinstance(verify_meta, dict) else {}\nif \"all_passed\" not in v:\n    all_passed = False\n    err = str(meta.get(\"error\") or \"verify child run died or returned no verdict\")\n    fails.append(\"verify: verdict missing - \" + err[:160] + \" (#FALLBACK)\")\n# ENVIRONMENT failures are not fixable by the builder: fail-soft to\n# \"delivered, not verifiable\" (coding-agent 0.2.2 precedent).\nenv_fails = v.get(\"environment_failures\") if isinstance(v.get(\"environment_failures\"), list) else []\nenv_fails = [str(x) for x in env_fails]\nmoved = []\nfor f in fails:\n    low = str(f).lower()\n    if (\"missing\" in low and \"executor\" in low) or (\"execution not available\" in low) or (\"not available in this environment\" in low):\n        moved.append(f)\nfor f in moved:\n    fails.remove(f)\n    env_fails.append(f)\nlint_res = lint_out if isinstance(lint_out, list) else []\nfor x in lint_res:\n    fails.append(\"lint: \" + str(x))\nif lint_res:\n    all_passed = False\n# normalized failure signature: drop volatile evidence tail (first \" - \"),\n# lowercase, strip STANDALONE digit runs (digits fused to identifiers kept).\nident = \"abcdefghijklmnopqrstuvwxyz_.\"\nnorm = []\nfor f in fails:\n    t = str(f).strip().lower()\n    d = t.find(\" - \")\n    if d >= 0:\n        t = t[:d]\n    out = \"\"\n    i = 0\n    n = len(t)\n    while i < n:\n        ch = t[i]\n        if \"0\" <= ch <= \"9\":\n            j = i\n            while j < n and \"0\" <= t[j] <= \"9\":\n                j = j + 1\n            before = t[i-1] if i > 0 else \"\"\n            after = t[j] if j < n else \"\"\n            if (before in ident) or (after in ident):\n                out = out + t[i:j]\n            i = j\n        else:\n            out = out + ch\n            i = i + 1\n    norm.append(out.strip())\nsig = \"|\".join(sorted(set(norm)))\nprev_sig = str(s.get(\"failure_signature\") or \"\")\nsame = int(s.get(\"same_signature_count\", 0) or 0)\nif sig and prev_sig and sig == prev_sig:\n    same = same + 1\nelse:\n    same = 0\nthis_cycle = int(s.get(\"fix_cycles\", 0) or 0) + 1\ns2[\"failure_signature\"] = sig\ns2[\"same_signature_count\"] = same\ns2[\"fix_cycles\"] = this_cycle\ns2[\"build_feedback\"] = \"\\n\".join(fails)\ns2[\"all_passed\"] = all_passed\ns2[\"last_verdict\"] = {\"all_passed\": all_passed, \"failures\": fails[:30],\n                      \"environment_failures\": env_fails[:15]}\n# environment-blocked: nothing fixable remains and the environment cannot\n# verify - stop the loop honestly instead of burning the remaining budget\nif env_fails and not fails and not all_passed:\n    s2[\"environment_blocked\"] = True\nbr = str(builder_response or \"\").strip()\n# repair history: append one entry per FAILED cycle (cycle number, a short\n# summary of what the builder said it did, and the failure that remained), so\n# the next repair prompt shows the whole trail and the builder does not repeat\n# an approach that already failed. Append-only, capped at 24 entries.\nif not all_passed:\n    hist = s.get(\"repair_history\") if isinstance(s.get(\"repair_history\"), list) else []\n    hist = list(hist)\n    changed = br[:400] if br else \"(builder gave no summary)\"\n    failed_short = sig if sig else \"; \".join(fails[:3])\n    hist.append({\"cycle\": this_cycle, \"changed\": changed, \"failed\": failed_short[:300]})\n    if len(hist) > 24:\n        hist = hist[-24:]\n    s2[\"repair_history\"] = hist\n# auto mode: green means approved (no human gate by explicit operator choice)\nif all_passed and str(s.get(\"gating_mode\") or \"wait\") == \"auto\":\n    s2[\"approved\"] = True\nreturn {\"state\": s2}",
         "pinExpressions": {
           "verify_verdict": "(value or {}).get(\"verdict\", {})",
           "lint_out": "parse_lint_residuals(value)",
-          "loop_state": "vars.get(\"state\", {})"
+          "loop_state": "vars.state"
         }
       },
       "label": null,
@@ -1855,8 +1923,8 @@
       "id": "set_state_build",
       "type": "set_var",
       "position": {
-        "x": 1660,
-        "y": 140
+        "x": 7680.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "set_var",
@@ -1906,8 +1974,8 @@
       "id": "if_green",
       "type": "if",
       "position": {
-        "x": 1940,
-        "y": 140
+        "x": 8160.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "if",
@@ -1939,7 +2007,7 @@
           }
         ],
         "pinExpressions": {
-          "condition": "tail_check(vars.get(\"state\", {}))[\"green\"]"
+          "condition": "vars.state.get(\"all_passed\", False)"
         }
       },
       "label": null,
@@ -1952,8 +2020,8 @@
       "id": "if_escalate",
       "type": "if",
       "position": {
-        "x": 1940,
-        "y": 420
+        "x": 8640.0,
+        "y": 518.0
       },
       "data": {
         "nodeType": "if",
@@ -1985,56 +2053,7 @@
           }
         ],
         "pinExpressions": {
-          "condition": "tail_check(vars.get(\"state\", {}))[\"escalate\"]"
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "set_state_noop",
-      "type": "set_var",
-      "position": {
-        "x": 2220,
-        "y": 500
-      },
-      "data": {
-        "nodeType": "set_var",
-        "label": "Iteration ends (red)",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#8E44AD",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "name",
-            "label": "name",
-            "type": "string"
-          },
-          {
-            "id": "value",
-            "label": "value",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          }
-        ],
-        "pinDefaults": {
-          "name": "state"
-        },
-        "pinExpressions": {
-          "value": "vars.get(\"state\", {})"
+          "condition": "tail_escalate(vars.state)"
         }
       },
       "label": null,
@@ -2047,8 +2066,8 @@
       "id": "doc",
       "type": "agent",
       "position": {
-        "x": 2220,
-        "y": 20
+        "x": 8640.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "agent",
@@ -2146,9 +2165,9 @@
           "temperature": 0.2
         },
         "pinExpressions": {
-          "prompt": "doc_prompt(vars.get(\"state\", {}))",
-          "provider": "vars.get(\"provider\")",
-          "model": "vars.get(\"model\")"
+          "prompt": "doc_prompt(vars.state)",
+          "provider": "vars.state.get(\"provider\")",
+          "model": "vars.state.get(\"model\")"
         }
       },
       "label": null,
@@ -2161,8 +2180,8 @@
       "id": "docguard_call",
       "type": "call_tool",
       "position": {
-        "x": 2520,
-        "y": 20
+        "x": 9120.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "call_tool",
@@ -2214,7 +2233,64 @@
           ]
         },
         "pinExpressions": {
-          "tool_call": "compose_doc_guard(vars.get(\"state\", {}))"
+          "tool_call": "compose_doc_guard(vars.state)"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "doc_drift",
+      "type": "code",
+      "position": {
+        "x": 9600.0,
+        "y": -200.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Doc drift check",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "guard_text",
+            "label": "guard_text",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\ns2 = dict(s)\ntxt = str(guard_text or \"\")\ndrifted = []\nfor ln in txt.split(\"\\n\"):\n    t = ln.strip()\n    if t.startswith(\"DOC_DRIFT \"):\n        drifted.append(t[10:])\nok = (\"DOC_GUARD_OK\" in txt) or (\"NO_SELFCHECK_TO_GUARD\" in txt and not drifted)\nif drifted:\n    ok = False\n    s2[\"all_passed\"] = False\n    s2[\"build_feedback\"] = (\"doc: the documentation pass modified verified source files: \" +\n                            \", \".join(drifted[:10]) +\n                            \" - restore or re-verify them and refresh SELFCHECK.md hashes\")\nreturn {\"ok\": ok, \"state\": s2}",
+        "pinExpressions": {
+          "guard_text": "text_of(value)",
+          "loop_state": "vars.state"
         }
       },
       "label": null,
@@ -2227,8 +2303,8 @@
       "id": "if_docok",
       "type": "if",
       "position": {
-        "x": 2800,
-        "y": 20
+        "x": 9600.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "if",
@@ -2258,10 +2334,7 @@
             "label": "false",
             "type": "execution"
           }
-        ],
-        "pinExpressions": {
-          "condition": "doc_drift(vars.get(\"state\", {}), value)[\"ok\"]"
-        }
+        ]
       },
       "label": null,
       "icon": null,
@@ -2273,8 +2346,8 @@
       "id": "set_state_docred",
       "type": "set_var",
       "position": {
-        "x": 2800,
-        "y": -200
+        "x": 10080.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "set_var",
@@ -2307,9 +2380,6 @@
         ],
         "pinDefaults": {
           "name": "state"
-        },
-        "pinExpressions": {
-          "value": "doc_drift(vars.get(\"state\", {}), value)[\"state\"]"
         }
       },
       "label": null,
@@ -2322,8 +2392,8 @@
       "id": "pr_write",
       "type": "write_file",
       "position": {
-        "x": 3080,
-        "y": 20
+        "x": 10080.0,
+        "y": 440.0
       },
       "data": {
         "nodeType": "write_file",
@@ -2364,9 +2434,11 @@
             "type": "workspace_file"
           }
         ],
+        "pinDefaults": {
+          "file_path": "PR.md"
+        },
         "pinExpressions": {
-          "file_path": "pr_fields(vars.get(\"state\", {}))[\"pr_path\"]",
-          "content": "pr_fields(vars.get(\"state\", {}))[\"pr_body\"]"
+          "content": "pr_body(vars.state)"
         }
       },
       "label": null,
@@ -2379,8 +2451,8 @@
       "id": "pr_call",
       "type": "call_tool",
       "position": {
-        "x": 3360,
-        "y": 20
+        "x": 10560.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "call_tool",
@@ -2432,7 +2504,7 @@
           ]
         },
         "pinExpressions": {
-          "tool_call": "pr_fields(vars.get(\"state\", {}))[\"gh_call\"]"
+          "tool_call": "compose_pr_push(vars.state)"
         }
       },
       "label": null,
@@ -2445,8 +2517,8 @@
       "id": "if_g2",
       "type": "if",
       "position": {
-        "x": 3640,
-        "y": 20
+        "x": 11040.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "if",
@@ -2478,7 +2550,7 @@
           }
         ],
         "pinExpressions": {
-          "condition": "tail_check(vars.get(\"state\", {}))[\"wait_mode\"]"
+          "condition": "vars.state.get(\"wait_gating\", True)"
         }
       },
       "label": null,
@@ -2491,8 +2563,8 @@
       "id": "gate2",
       "type": "ask_user",
       "position": {
-        "x": 3920,
-        "y": 100
+        "x": 11520.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "ask_user",
@@ -2528,12 +2600,10 @@
             "type": "string"
           }
         ],
-        "pinDefaults": {
-          "prompt": "Test the build; approve the merge?"
-        },
+        "pinDefaults": {},
         "pinExpressions": {
-          "prompt": "gate2_prompt(vars.get(\"state\", {}))[\"prompt\"]",
-          "choices": "gate2_prompt(vars.get(\"state\", {}))[\"choices\"]"
+          "prompt": "gate2_prompt(vars.state)",
+          "choices": "[\"approve\", \"request changes\"] if vars.state.get(\"all_passed\") else [\"stop\", \"guide repairs\"]"
         }
       },
       "label": null,
@@ -2546,8 +2616,8 @@
       "id": "set_state_g2",
       "type": "set_var",
       "position": {
-        "x": 4200,
-        "y": 100
+        "x": 12000.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "set_var",
@@ -2582,56 +2652,7 @@
           "name": "state"
         },
         "pinExpressions": {
-          "value": "parse_gate2(vars.get(\"state\", {}), value)"
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "set_state_g2auto",
-      "type": "set_var",
-      "position": {
-        "x": 3920,
-        "y": 320
-      },
-      "data": {
-        "nodeType": "set_var",
-        "label": "Auto mode: end iteration",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#8E44AD",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "name",
-            "label": "name",
-            "type": "string"
-          },
-          {
-            "id": "value",
-            "label": "value",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          }
-        ],
-        "pinDefaults": {
-          "name": "state"
-        },
-        "pinExpressions": {
-          "value": "vars.get(\"state\", {})"
+          "value": "parse_gate2(vars.state, value)"
         }
       },
       "label": null,
@@ -2644,8 +2665,8 @@
       "id": "if_approved",
       "type": "if",
       "position": {
-        "x": -40,
-        "y": 640
+        "x": 4800.0,
+        "y": 760.0
       },
       "data": {
         "nodeType": "if",
@@ -2677,7 +2698,7 @@
           }
         ],
         "pinExpressions": {
-          "condition": "approved_and_green(vars.get(\"state\", {}))"
+          "condition": "vars.state.get(\"approved\", False) and vars.state.get(\"all_passed\", False)"
         }
       },
       "label": null,
@@ -2690,8 +2711,8 @@
       "id": "merge_call",
       "type": "call_tool",
       "position": {
-        "x": 240,
-        "y": 640
+        "x": 5280.0,
+        "y": 1158.0
       },
       "data": {
         "nodeType": "call_tool",
@@ -2743,7 +2764,7 @@
           ]
         },
         "pinExpressions": {
-          "tool_call": "compose_merge(vars.get(\"state\", {}))"
+          "tool_call": "compose_merge(vars.state)"
         }
       },
       "label": null,
@@ -2756,8 +2777,8 @@
       "id": "set_state_merge",
       "type": "set_var",
       "position": {
-        "x": 520,
-        "y": 640
+        "x": 5760.0,
+        "y": 760.0
       },
       "data": {
         "nodeType": "set_var",
@@ -2792,7 +2813,68 @@
           "name": "state"
         },
         "pinExpressions": {
-          "value": "record_merge(vars.get(\"state\", {}), value)"
+          "value": "record_merge(vars.state, value)"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final_report",
+      "type": "code",
+      "position": {
+        "x": 6240.0,
+        "y": -200.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Final report",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "branch",
+            "label": "branch",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "s = loop_state if isinstance(loop_state, dict) else {}\naccepted = bool(s.get(\"accepted\"))\napproved = bool(s.get(\"approved\"))\nmerged = bool(s.get(\"merged\"))\npassed = bool(s.get(\"all_passed\"))\nstopped = bool(s.get(\"user_stopped\"))\nlast_g2 = str(s.get(\"last_gate2\") or \"\")\nbranch = str(s.get(\"branch\") or \"\")\nwarns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\nv = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\nfails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\nbf = str(s.get(\"build_feedback\") or \"\").strip()\nstalled = int(s.get(\"same_signature_count\", 0) or 0) >= 3\nenv_blocked = bool(s.get(\"environment_blocked\"))\nif not accepted:\n    reason = \"plan-not-accepted (plan revisions exhausted without approval)\"\nelif merged:\n    reason = \"approved-and-merged\"\nelif approved:\n    reason = \"approved-merge-failed\"\nelif env_blocked:\n    reason = \"delivered-not-verifiable (environment cannot run the verification steps)\"\nelif stopped:\n    reason = \"stopped-by-reviewer (run ended unmerged at the review gate)\"\nelif (last_g2 in (\"rejected\", \"escalated\")\n      and int(s.get(\"review_rounds\", 0) or 0) > int(s.get(\"max_review_rounds\", 2) or 2)):\n    reason = \"review-rounds-exhausted (last reviewer change requests unaddressed)\"\nelif passed:\n    reason = \"green-pending-approval\"\nelif stalled:\n    reason = \"stalled (same failures repeated; needs a different approach or human help)\"\nelse:\n    reason = \"stopped-open-failures (budgets exhausted)\"\nlines = [\"# Multi-agent coding workflow result\", \"\"]\nlines.append(\"Outcome: \" + reason)\nlines.append(\"Branch: \" + (branch if branch else \"(none)\"))\nlines.append(\"Gates: \" + (\"green\" if passed else \"not green\"))\nlines.append(\"Merged: \" + (\"yes\" if merged else \"no\"))\nlines.append(\"Plan revisions: \" + str(int(s.get(\"plan_revisions\", 0) or 0)) +\n             \" | fix cycles: \" + str(int(s.get(\"fix_cycles\", 0) or 0)) +\n             \" | review rounds: \" + str(int(s.get(\"review_rounds\", 0) or 0)))\nif not accepted:\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    pf = str(s.get(\"plan_feedback\") or \"\").strip()\n    lines.append(\"\")\n    lines.append(\"Last plan title: \" + (str(s.get(\"title\") or pd.get(\"title\") or \"\").strip() or \"(none)\"))\n    if pf:\n        lines.append(\"Last reviewer comments on the plan:\")\n        for ln in pf.split(\"\\n\")[:8]:\n            lines.append(\"  \" + ln)\nif reason.startswith(\"review-rounds-exhausted\") and bf:\n    lines.append(\"\")\n    lines.append(\"Unaddressed reviewer change requests:\")\n    for ln in bf.split(\"\\n\")[:10]:\n        lines.append(\"  \" + ln)\nif fails:\n    lines.append(\"\")\n    lines.append(\"Open failures:\")\n    for f in fails[:15]:\n        lines.append(\"- \" + str(f))\nenvf = v.get(\"environment_failures\") if isinstance(v.get(\"environment_failures\"), list) else []\nif envf:\n    lines.append(\"\")\n    lines.append(\"Environment (not fixable by the builder; artifacts delivered unverified):\")\n    for f in envf[:10]:\n        lines.append(\"- \" + str(f))\nif warns:\n    lines.append(\"\")\n    lines.append(\"Advisories:\")\n    for w in warns:\n        lines.append(\"- \" + str(w))\nreport = \"\\n\".join(lines)\nreturn {\"report\": report, \"success\": merged or (passed and approved),\n        \"stopped_reason\": reason, \"branch\": branch}",
+        "pinExpressions": {
+          "loop_state": "vars.state"
         }
       },
       "label": null,
@@ -2805,8 +2887,8 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 800,
-        "y": 640
+        "x": 6240.0,
+        "y": 440.0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -2840,13 +2922,7 @@
             "type": "string"
           }
         ],
-        "outputs": [],
-        "pinExpressions": {
-          "report": "final_report(vars.get(\"state\", {}))[\"report\"]",
-          "success": "final_report(vars.get(\"state\", {}))[\"success\"]",
-          "branch": "final_report(vars.get(\"state\", {}))[\"branch\"]",
-          "stopped_reason": "final_report(vars.get(\"state\", {}))[\"stopped_reason\"]"
-        }
+        "outputs": []
       },
       "label": null,
       "icon": null,
@@ -2881,9 +2957,17 @@
       "animated": false
     },
     {
-      "id": "e-if_preflight-true-plan_while-exec-in",
+      "id": "e-if_preflight-true-gating_status-exec-in",
       "source": "if_preflight",
       "sourceHandle": "true",
+      "target": "gating_status",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gating_status-exec-out-plan_while-exec-in",
+      "source": "gating_status",
+      "sourceHandle": "exec-out",
       "target": "plan_while",
       "targetHandle": "exec-in",
       "animated": false
@@ -2982,14 +3066,6 @@
       "sourceHandle": "data",
       "target": "gate1",
       "targetHandle": "prompt",
-      "animated": false
-    },
-    {
-      "id": "e-planner-data-gate1-choices",
-      "source": "planner",
-      "sourceHandle": "data",
-      "target": "gate1",
-      "targetHandle": "choices",
       "animated": false
     },
     {
@@ -3217,14 +3293,6 @@
       "animated": false
     },
     {
-      "id": "e-if_escalate-false-set_state_noop-exec-in",
-      "source": "if_escalate",
-      "sourceHandle": "false",
-      "target": "set_state_noop",
-      "targetHandle": "exec-in",
-      "animated": false
-    },
-    {
       "id": "e-if_green-true-doc-exec-in",
       "source": "if_green",
       "sourceHandle": "true",
@@ -3249,9 +3317,17 @@
       "animated": false
     },
     {
-      "id": "e-docguard_call-raw-if_docok-condition",
+      "id": "e-docguard_call-raw-doc_drift-guard_text",
       "source": "docguard_call",
       "sourceHandle": "raw",
+      "target": "doc_drift",
+      "targetHandle": "guard_text",
+      "animated": false
+    },
+    {
+      "id": "e-doc_drift-ok-if_docok-condition",
+      "source": "doc_drift",
+      "sourceHandle": "ok",
       "target": "if_docok",
       "targetHandle": "condition",
       "animated": false
@@ -3265,9 +3341,9 @@
       "animated": false
     },
     {
-      "id": "e-docguard_call-raw-set_state_docred-value",
-      "source": "docguard_call",
-      "sourceHandle": "raw",
+      "id": "e-doc_drift-state-set_state_docred-value",
+      "source": "doc_drift",
+      "sourceHandle": "state",
       "target": "set_state_docred",
       "targetHandle": "value",
       "animated": false
@@ -3321,14 +3397,6 @@
       "animated": false
     },
     {
-      "id": "e-if_g2-false-set_state_g2auto-exec-in",
-      "source": "if_g2",
-      "sourceHandle": "false",
-      "target": "set_state_g2auto",
-      "targetHandle": "exec-in",
-      "animated": false
-    },
-    {
       "id": "e-build_while-done-if_approved-exec-in",
       "source": "build_while",
       "sourceHandle": "done",
@@ -3375,11 +3443,43 @@
       "target": "end",
       "targetHandle": "exec-in",
       "animated": false
+    },
+    {
+      "id": "e-final_report-report-end-report",
+      "source": "final_report",
+      "sourceHandle": "report",
+      "target": "end",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-success-end-success",
+      "source": "final_report",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-branch-end-branch",
+      "source": "final_report",
+      "sourceHandle": "branch",
+      "target": "end",
+      "targetHandle": "branch",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-stopped_reason-end-stopped_reason",
+      "source": "final_report",
+      "sourceHandle": "stopped_reason",
+      "target": "end",
+      "targetHandle": "stopped_reason",
+      "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-27T00:24:00.954256+00:00",
-  "updated_at": "2026-07-27T00:24:00.954256+00:00",
+  "created_at": "2026-07-28T15:49:11.505031+00:00",
+  "updated_at": "2026-07-28T15:49:11.505031+00:00",
   "functions": [
     {
       "name": "text_of",
@@ -3388,22 +3488,22 @@
       "description": "Text from any tool-result envelope shape (recursive fold)."
     },
     {
+      "name": "shq",
+      "code": "def shq(s):\n    # Escape a value for embedding inside single quotes in a shell\n    # command ('...' + shq(x) + '...'). ONE copy: the same escape was\n    # inlined nine times across the command composers, and one\n    # divergent copy is a command injection on a path with a quote.\n    # None -> \"\" but falsy NON-None values keep their text (shq(0) is\n    # \"0\" - `s or \"\"` would erase it; wave-B adversary P2-3).\n    return (\"\" if s is None else str(s)).replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n",
+      "kind": "formatter",
+      "description": "Shell single-quote escape for command composers (one copy, nine call sites)."
+    },
+    {
       "name": "mw_preflight",
-      "code": "def mw_preflight(request, workspace_root, gating_mode, skills, skills_resolution,\n                 max_plan_revisions, max_fix_cycles, max_review_rounds,\n                 build_command, run_command, provider, model,\n                 browser_probe_available):\n    # Seeds the ONE loop-state object. CONFIG FOLDS IN HERE (request,\n    # workspace, budgets, commands, provider/model), so every later\n    # function reads (state) and call sites stay short.\n    req = str(request or \"\").strip()\n    ws = str(workspace_root or \"\").strip()\n    gating = str(gating_mode or \"wait\").strip().lower()\n    if gating not in (\"wait\", \"auto\"):\n        gating = \"wait\"\n    # skills_resolution is what the GATEWAY wrote after resolving\n    # input_data.skills - never a caller-attested pin (adversary F2).\n    sk = skills_resolution if isinstance(skills_resolution, dict) else {}\n    active = sk.get(\"active\") if isinstance(sk.get(\"active\"), list) else []\n    active = [str(x) for x in active]\n    need = skills if isinstance(skills, list) else []\n    need = [str(x) for x in need]\n    missing = []\n    for s in need:\n        if s not in active:\n            missing.append(s)\n    skills_degraded = len(missing) > 0\n    probe_ok = bool(browser_probe_available)\n    warnings = []\n    if skills_degraded:\n        warnings.append(\"preflight: skills not active on this host: \" + \", \".join(missing) + \" - doc step runs on prompt guidance alone (#FALLBACK)\")\n    if not probe_ok:\n        warnings.append(\"preflight: browser_probe not mounted - verify certifies STATIC gates only; the human gate is the runtime/playability oracle (#FALLBACK)\")\n    failures = []\n    if not req:\n        failures.append(\"preflight: empty request\")\n    if not ws:\n        failures.append(\"preflight: no workspace_root (this workflow writes files + runs git; it needs an explicit workspace)\")\n    ok = len(failures) == 0\n    return {\n        # -- config (immutable after seed) --\n        \"request\": req, \"workspace_root\": ws, \"gating_mode\": gating,\n        \"max_plan_revisions\": int(max_plan_revisions or 3),\n        # Default fix budget is 6 (operator request 2026-07-27): give the\n        # build loop room to converge by default; still overridable via\n        # the max_fix_cycles run-start pin.\n        \"max_fix_cycles\": int(max_fix_cycles or 6),\n        \"max_review_rounds\": int(max_review_rounds or 2),\n        \"build_command\": str(build_command or \"\"),\n        \"run_command\": str(run_command or \"\"),\n        \"provider\": provider, \"model\": model,\n        # -- preflight verdict (the door reads these once) --\n        \"preflight_ok\": ok, \"preflight_failures\": failures,\n        # -- loop state --\n        \"accepted\": False, \"approved\": False, \"merged\": False,\n        \"user_stopped\": False, \"last_gate2\": \"\",\n        \"plan_revisions\": 0, \"fix_cycles\": 0, \"review_rounds\": 0,\n        \"same_signature_count\": 0, \"failure_signature\": \"\",\n        \"plan_feedback\": \"\", \"build_feedback\": \"\", \"rescout\": False,\n        # repair_history: one entry per failed build cycle, in order,\n        # so the builder can see what it already tried and not repeat a\n        # failed approach. Each entry: {cycle, changed, failed}.\n        \"repair_history\": [],\n        \"skills_degraded\": skills_degraded, \"probe_ok\": probe_ok,\n        \"warnings\": warnings, \"scout_context\": \"\",\n        \"plan\": {}, \"title\": \"\", \"branch\": \"\", \"branch_slug\": \"\",\n        \"all_passed\": False, \"stopped_reason\": \"\", \"pr_path\": \"\",\n    }\n",
+      "code": "def mw_preflight(v):\n    # Seeds the ONE loop-state object from the run vars view (the\n    # whole `vars` rides in as v). CONFIG FOLDS IN HERE (request,\n    # workspace, budgets, commands, provider/model), so every later\n    # function reads (state), call sites stay short, and every input\n    # default lives in exactly ONE place - this function.\n    req = str(v.get(\"request\") or \"\").strip()\n    ws = str(v.get(\"workspace_root\") or \"\").strip()\n    gating = str(v.get(\"gating_mode\") or \"wait\").strip().lower()\n    if gating not in (\"wait\", \"auto\"):\n        gating = \"wait\"\n    # skills_resolution is what the GATEWAY wrote after resolving\n    # input_data.skills - never a caller-attested pin (adversary F2).\n    sk = (v.get(\"_runtime\") or {}).get(\"skills_resolution\")\n    sk = sk if isinstance(sk, dict) else {}\n    active = sk.get(\"active\") if isinstance(sk.get(\"active\"), list) else []\n    active = [str(x) for x in active]\n    need = v.get(\"skills\", [\"coredoc\"])\n    need = [str(x) for x in need] if isinstance(need, list) else []\n    missing = []\n    for s in need:\n        if s not in active:\n            missing.append(s)\n    skills_degraded = len(missing) > 0\n    probe_ok = bool(v.get(\"browser_probe_available\", False))\n    warnings = []\n    if skills_degraded:\n        warnings.append(\"preflight: skills not active on this host: \" + \", \".join(missing) + \" - doc step runs on prompt guidance alone (#FALLBACK)\")\n    if not probe_ok:\n        warnings.append(\"preflight: browser_probe not mounted - verify certifies STATIC gates only; the human gate is the runtime/playability oracle (#FALLBACK)\")\n    failures = []\n    if not req:\n        failures.append(\"preflight: empty request\")\n    if not ws:\n        failures.append(\"preflight: no workspace_root (this workflow writes files + runs git; it needs an explicit workspace)\")\n    ok = len(failures) == 0\n    return {\n        # -- config (immutable after seed) --\n        \"request\": req, \"workspace_root\": ws, \"gating_mode\": gating,\n        # wait_gating: the one derived gating fact both wait-mode `if`\n        # pins read (normalization lives here, never re-derived).\n        \"wait_gating\": gating == \"wait\",\n        \"max_plan_revisions\": int(v.get(\"max_plan_revisions\", 3) or 3),\n        # Default fix budget is 6 (operator request 2026-07-27): give the\n        # build loop room to converge by default; still overridable via\n        # the max_fix_cycles run-start pin.\n        \"max_fix_cycles\": int(v.get(\"max_fix_cycles\", 6) or 6),\n        \"max_review_rounds\": int(v.get(\"max_review_rounds\", 2) or 2),\n        \"build_command\": str(v.get(\"build_command\") or \"\"),\n        \"run_command\": str(v.get(\"run_command\") or \"\"),\n        \"provider\": v.get(\"provider\"), \"model\": v.get(\"model\"),\n        # -- preflight verdict (the door reads these once) --\n        \"preflight_ok\": ok, \"preflight_failures\": failures,\n        # -- loop state --\n        \"accepted\": False, \"approved\": False, \"merged\": False,\n        \"user_stopped\": False, \"last_gate2\": \"\",\n        \"plan_revisions\": 0, \"fix_cycles\": 0, \"review_rounds\": 0,\n        \"same_signature_count\": 0, \"failure_signature\": \"\",\n        \"plan_feedback\": \"\", \"build_feedback\": \"\", \"rescout\": False,\n        # repair_history: one entry per failed build cycle, in order,\n        # so the builder can see what it already tried and not repeat a\n        # failed approach. Each entry: {cycle, changed, failed}.\n        \"repair_history\": [],\n        \"skills_degraded\": skills_degraded, \"probe_ok\": probe_ok,\n        \"warnings\": warnings, \"scout_context\": \"\",\n        \"plan\": {}, \"title\": \"\", \"branch\": \"\", \"branch_slug\": \"\",\n        \"all_passed\": False,\n    }\n",
       "kind": "composer",
-      "description": "Seed state: fold config + preflight posture into the one loop-state object."
+      "description": "Seed state from the run vars view: config + preflight posture in one object."
     },
     {
       "name": "pre_report",
       "code": "def pre_report(state):\n    s = state if isinstance(state, dict) else {}\n    fails = s.get(\"preflight_failures\") if isinstance(s.get(\"preflight_failures\"), list) else []\n    lines = [\"# Multi-agent coding workflow: preflight failed\", \"\"]\n    for f in fails:\n        lines.append(\"- \" + str(f))\n    return \"\\n\".join(lines)\n",
       "kind": "composer",
       "description": "Refusal report for a failed preflight."
-    },
-    {
-      "name": "plan_again",
-      "code": "def plan_again(state):\n    s = state if isinstance(state, dict) else {}\n    accepted = bool(s.get(\"accepted\"))\n    revs = int(s.get(\"plan_revisions\", 0) or 0)\n    maxrev = int(s.get(\"max_plan_revisions\", 3) or 3)\n    wait_mode = str(s.get(\"gating_mode\") or \"wait\") == \"wait\"\n    # scouts run on the first pass and again only on an explicit\n    # \"research\" choice; cached scout context feeds plain plan\n    # revisions for free\n    need_scout = (not str(s.get(\"scout_context\") or \"\").strip()) or bool(s.get(\"rescout\"))\n    return {\"condition\": (not accepted) and (revs < maxrev),\n            \"wait_mode\": wait_mode, \"need_scout\": need_scout}\n",
-      "kind": "checker",
-      "description": "Plan-loop law: continue / need scouts / wait-mode."
     },
     {
       "name": "scout_code_prompt",
@@ -3419,15 +3519,15 @@
     },
     {
       "name": "planner_prompt",
-      "code": "def planner_prompt(state):\n    s = state if isinstance(state, dict) else {}\n    req = str(s.get(\"request\") or \"\").strip()\n    ctx = str(s.get(\"scout_context\") or \"\").strip()\n    fb = str(s.get(\"plan_feedback\") or \"\").strip()\n    extra = (\"\\n\\nThe reviewer sent the previous plan back with these comments; address every one:\\n\" + fb) if fb else \"\"\n    p = (\"You are the PLANNER. Do not write code; produce the plan only.\\n\\nRequest:\\n\" + req +\n         \"\\n\\nEngineered context from the two scouts (code + internet):\\n\" + ctx +\n         \"\\n\\nReturn JSON with: title (AT MOST 3 words, branch-name friendly), goal (one paragraph), \"\n         \"steps (ordered, concrete), files (paths you expect to create or change), risks (list).\" + extra)\n    schema = {\n        \"type\": \"object\",\n        \"properties\": {\n            \"title\": {\"type\": \"string\"},\n            \"goal\": {\"type\": \"string\"},\n            \"steps\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}},\n            \"files\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}},\n            \"risks\": {\"type\": \"array\", \"items\": {\"type\": \"string\"}},\n        },\n        \"required\": [\"title\", \"goal\", \"steps\"],\n    }\n    return {\"prompt\": p, \"schema\": schema}\n",
+      "code": "def planner_prompt(state):\n    s = state if isinstance(state, dict) else {}\n    req = str(s.get(\"request\") or \"\").strip()\n    ctx = str(s.get(\"scout_context\") or \"\").strip()\n    fb = str(s.get(\"plan_feedback\") or \"\").strip()\n    extra = (\"\\n\\nThe reviewer sent the previous plan back with these comments; address every one:\\n\" + fb) if fb else \"\"\n    return (\"You are the PLANNER. Do not write code; produce the plan only.\\n\\nRequest:\\n\" + req +\n            \"\\n\\nEngineered context from the two scouts (code + internet):\\n\" + ctx +\n            \"\\n\\nReturn JSON with: title (AT MOST 3 words, branch-name friendly), goal (one paragraph), \"\n            \"steps (ordered, concrete), files (paths you expect to create or change), risks (list).\" + extra)\n",
       "kind": "composer",
-      "description": "Planner prompt + structured-output schema."
+      "description": "Planner prompt (the response schema is a pin default on the planner node)."
     },
     {
       "name": "gate1_prompt",
-      "code": "def gate1_prompt(planner_data):\n    pd = planner_data if isinstance(planner_data, dict) else {}\n    title = str(pd.get(\"title\") or \"\").strip()\n    goal = str(pd.get(\"goal\") or \"\").strip()\n    steps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\n    lines = [\"PLAN for your approval.\", \"\", \"Title: \" + (title or \"(untitled)\"), \"\", goal, \"\", \"Steps:\"]\n    i = 1\n    for st in steps:\n        lines.append(str(i) + \". \" + str(st))\n        i = i + 1\n    lines.append(\"\")\n    lines.append(\"Reply 'approve' to build, 'research: <what to dig deeper>' to re-scout, or anything else as revision comments for the planner.\")\n    return {\"prompt\": \"\\n\".join(lines), \"choices\": [\"approve\", \"revise\", \"research\"]}\n",
+      "code": "def gate1_prompt(planner_data):\n    pd = planner_data if isinstance(planner_data, dict) else {}\n    title = str(pd.get(\"title\") or \"\").strip()\n    goal = str(pd.get(\"goal\") or \"\").strip()\n    steps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\n    lines = [\"PLAN for your approval.\", \"\", \"Title: \" + (title or \"(untitled)\"), \"\", goal, \"\", \"Steps:\"]\n    i = 1\n    for st in steps:\n        lines.append(str(i) + \". \" + str(st))\n        i = i + 1\n    lines.append(\"\")\n    lines.append(\"Reply 'approve' to build, 'research: <what to dig deeper>' to re-scout, or anything else as revision comments for the planner.\")\n    return \"\\n\".join(lines)\n",
       "kind": "composer",
-      "description": "Human plan-approval prompt from the planner's JSON."
+      "description": "Human plan-approval prompt from the planner's JSON (choices are a pin default)."
     },
     {
       "name": "auto_accept_plan",
@@ -3436,26 +3536,26 @@
       "description": "Auto-mode plan acceptance (rejects dead/empty plans)."
     },
     {
-      "name": "plan_accepted",
-      "code": "def plan_accepted(state):\n    s = state if isinstance(state, dict) else {}\n    return bool(s.get(\"accepted\"))\n",
-      "kind": "checker",
-      "description": "Was the plan accepted?"
+      "name": "branch_slug",
+      "code": "def branch_slug(state):\n    # Branch-name-friendly slug from the accepted plan's title. The one\n    # helper in this flow promoted for GENUINE reuse: compose_git_branch,\n    # record_branch and the backlog-path expression all call it.\n    s = state if isinstance(state, dict) else {}\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    title = str(pd.get(\"title\") or s.get(\"title\") or \"task\").strip().lower()\n    slug = \"\"\n    prev_dash = False\n    for ch in title:\n        if (\"a\" <= ch <= \"z\") or (\"0\" <= ch <= \"9\"):\n            slug = slug + ch\n            prev_dash = False\n        elif not prev_dash and slug:\n            slug = slug + \"-\"\n            prev_dash = True\n    slug = slug.strip(\"-\")[:40]\n    if not slug:\n        slug = \"task\"\n    return slug\n",
+      "kind": "composer",
+      "description": "Branch/backlog slug from the plan title (a-z 0-9 dashes, 40 max)."
     },
     {
-      "name": "backlog_fields",
-      "code": "def backlog_fields(state):\n    s = state if isinstance(state, dict) else {}\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    title = str(pd.get(\"title\") or s.get(\"title\") or \"task\").strip().lower()\n    slug = \"\"\n    prev_dash = False\n    for ch in title:\n        if (\"a\" <= ch <= \"z\") or (\"0\" <= ch <= \"9\"):\n            slug = slug + ch\n            prev_dash = False\n        elif not prev_dash and slug:\n            slug = slug + \"-\"\n            prev_dash = True\n    slug = slug.strip(\"-\")[:40]\n    if not slug:\n        slug = \"task\"\n    goal = str(pd.get(\"goal\") or \"\").strip()\n    steps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\n    files = pd.get(\"files\") if isinstance(pd.get(\"files\"), list) else []\n    risks = pd.get(\"risks\") if isinstance(pd.get(\"risks\"), list) else []\n    def bullets(xs):\n        out = \"\"\n        for x in xs:\n            out = out + \"- \" + str(x) + \"\\n\"\n        return out if out else \"- (none)\\n\"\n    body = (\"# \" + slug + \"\\n\\n- Status: planned\\n- Source: multi-agent coding workflow\\n\\n## Goal\\n\" +\n            (goal if goal else \"(none)\") + \"\\n\\n## Steps\\n\" + bullets(steps) +\n            \"\\n## Files\\n\" + bullets(files) + \"\\n## Risks\\n\" + bullets(risks))\n    return {\"slug\": slug, \"file_path\": \"docs/backlog/planned/\" + slug + \".md\", \"content\": body}\n",
+      "name": "backlog_body",
+      "code": "def backlog_body(state):\n    s = state if isinstance(state, dict) else {}\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    goal = str(pd.get(\"goal\") or \"\").strip()\n    steps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\n    files = pd.get(\"files\") if isinstance(pd.get(\"files\"), list) else []\n    risks = pd.get(\"risks\") if isinstance(pd.get(\"risks\"), list) else []\n    def bullets(xs):\n        out = \"\"\n        for x in xs:\n            out = out + \"- \" + str(x) + \"\\n\"\n        return out if out else \"- (none)\\n\"\n    return (\"# \" + branch_slug(s) + \"\\n\\n- Status: planned\\n- Source: multi-agent coding workflow\\n\\n## Goal\\n\" +\n            (goal if goal else \"(none)\") + \"\\n\\n## Steps\\n\" + bullets(steps) +\n            \"\\n## Files\\n\" + bullets(files) + \"\\n## Risks\\n\" + bullets(risks))\n",
       "kind": "composer",
-      "description": "Backlog item: slug + path + markdown body from the accepted plan."
+      "description": "Backlog item markdown body from the accepted plan."
     },
     {
       "name": "compose_git_branch",
-      "code": "def compose_git_branch(state):\n    s = state if isinstance(state, dict) else {}\n    slug = str(backlog_fields(s).get(\"slug\") or \"task\")\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    parent = ws.rstrip(\"/\").rsplit(\"/\", 1)[0] if \"/\" in ws.rstrip(\"/\") else \"/\"\n    parent_q = parent.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    # Branch FIRST, baseline-commit SECOND: the baseline (which sweeps\n    # any uncommitted user work via add -A) lands on the WORK branch,\n    # never on the user's current branch (adversary F7). A brand-new\n    # init has no commits, so checkout -b works there too.\n    cmd = (\n        \"export GIT_CEILING_DIRECTORIES='\" + parent_q + \"'; cd '\" + ws_q + \"' && \"\n        \"top=$(git rev-parse --show-toplevel 2>/dev/null || echo NONE); \"\n        \"if [ \\\"$top\\\" != \\\"$(pwd)\\\" ]; then git init -b main >/dev/null 2>&1 || git init >/dev/null 2>&1; fi; \"\n        \"git checkout -b '\" + slug + \"' 2>/dev/null || git checkout '\" + slug + \"' 2>/dev/null || true; \"\n        \"git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n        \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'baseline: pre-build workspace' >/dev/null 2>&1 || true; \"\n        \"git rev-parse --abbrev-ref HEAD\"\n    )\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-branch\"}\n",
+      "code": "def compose_git_branch(state):\n    s = state if isinstance(state, dict) else {}\n    slug = branch_slug(s)\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = shq(ws)\n    parent = ws.rstrip(\"/\").rsplit(\"/\", 1)[0] if \"/\" in ws.rstrip(\"/\") else \"/\"\n    parent_q = shq(parent)\n    # Branch FIRST, baseline-commit SECOND: the baseline (which sweeps\n    # any uncommitted user work via add -A) lands on the WORK branch,\n    # never on the user's current branch (adversary F7). A brand-new\n    # init has no commits, so checkout -b works there too.\n    cmd = (\n        \"export GIT_CEILING_DIRECTORIES='\" + parent_q + \"'; cd '\" + ws_q + \"' && \"\n        \"top=$(git rev-parse --show-toplevel 2>/dev/null || echo NONE); \"\n        \"if [ \\\"$top\\\" != \\\"$(pwd)\\\" ]; then git init -b main >/dev/null 2>&1 || git init >/dev/null 2>&1; fi; \"\n        \"git checkout -b '\" + slug + \"' 2>/dev/null || git checkout '\" + slug + \"' 2>/dev/null || true; \"\n        \"git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n        \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'baseline: pre-build workspace' >/dev/null 2>&1 || true; \"\n        \"git rev-parse --abbrev-ref HEAD\"\n    )\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-branch\"}\n",
       "kind": "composer",
       "description": "Tool call: init/branch/baseline-commit on the work branch."
     },
     {
       "name": "record_branch",
-      "code": "def record_branch(state, git_raw):\n    s = state if isinstance(state, dict) else {}\n    s2 = dict(s)\n    txt = text_of(git_raw).strip()\n    branch = txt.split(\"\\n\")[-1].strip() if txt else \"\"\n    slug = str(backlog_fields(s).get(\"slug\") or \"\")\n    s2[\"branch\"] = branch if branch else (slug or \"work\")\n    s2[\"branch_slug\"] = slug or str(s.get(\"branch_slug\") or \"\")\n    return s2\n",
+      "code": "def record_branch(state, git_raw):\n    s = state if isinstance(state, dict) else {}\n    s2 = dict(s)\n    txt = text_of(git_raw).strip()\n    branch = txt.split(\"\\n\")[-1].strip() if txt else \"\"\n    slug = branch_slug(s)\n    s2[\"branch\"] = branch if branch else (slug or \"work\")\n    s2[\"branch_slug\"] = slug or str(s.get(\"branch_slug\") or \"\")\n    return s2\n",
       "kind": "shaper",
       "description": "Fold the git-branch result into state (branch + slug)."
     },
@@ -3467,13 +3567,13 @@
     },
     {
       "name": "builder_prompt",
-      "code": "def builder_prompt(state):\n    s = state if isinstance(state, dict) else {}\n    req = str(s.get(\"request\") or \"\").strip()\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    goal = str(pd.get(\"goal\") or \"\").strip()\n    steps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\n    plan_txt = goal\n    i = 1\n    for st in steps:\n        plan_txt = plan_txt + \"\\n\" + str(i) + \". \" + str(st)\n        i = i + 1\n    bf = str(s.get(\"build_feedback\") or \"\").strip()\n    fix = int(s.get(\"fix_cycles\", 0) or 0)\n    # Build the repair history: every past failed cycle, in order, so\n    # the builder can see what it already tried and not repeat a failed\n    # approach. Show the last 8 to keep the prompt bounded; if there\n    # were more, say how many earlier ones are omitted.\n    hist = s.get(\"repair_history\") if isinstance(s.get(\"repair_history\"), list) else []\n    trail = \"\"\n    if hist:\n        shown = hist[-8:]\n        omitted = len(hist) - len(shown)\n        trail = \"\\n\\nRepair history so far (do not repeat an approach that already failed):\\n\"\n        if omitted > 0:\n            trail = trail + \"(\" + str(omitted) + \" earlier cycle(s) omitted)\\n\"\n        for h in shown:\n            hc = h if isinstance(h, dict) else {}\n            trail = (trail + \"- cycle \" + str(hc.get(\"cycle\")) + \": tried: \"\n                     + str(hc.get(\"changed\") or \"(no summary)\")[:220]\n                     + \" | still failed: \" + str(hc.get(\"failed\") or \"(unknown)\")[:180] + \"\\n\")\n    if fix == 0 and not bf:\n        return (\"You are the BUILDER. You are on a dedicated git branch; implement this plan fully.\\n\\nRequest:\\n\" + req +\n                \"\\n\\nPlan:\\n\" + plan_txt +\n                \"\\n\\nEngineering rules: bound every loop and traversal; before writing logic over data, read a sample and verify its shape; \"\n                \"prefer small verifiable functions; start EVERY source file with a 1-2 line header comment stating its purpose; \"\n                \"self-probe your artifact before finishing (open it, run it, or trace the entry path). \"\n                \"When done, write SELFCHECK.md: list each artifact with one line of evidence it works, and AFTER YOUR FINAL EDIT add one \"\n                \"'ARTIFACT-SHA256: <path> <sha>' line per artifact (compute with: shasum -a 256 <path>).\")\n    return (\"You are the BUILDER in REPAIR mode on the existing branch. Fix ONLY what the failures below name. \"\n            \"Read before editing; make the smallest change that fixes the named defect; do NOT rewrite whole files with write_file; re-probe after fixing.\\n\\n\"\n            \"Failures to fix:\\n\" + (bf if bf else \"(none recorded - re-verify your artifacts)\") +\n            trail +\n            \"\\n\\nAfter your FINAL edit, refresh SELFCHECK.md evidence and its ARTIFACT-SHA256 lines.\")\n",
+      "code": "def builder_prompt(state):\n    s = state if isinstance(state, dict) else {}\n    req = str(s.get(\"request\") or \"\").strip()\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    goal = str(pd.get(\"goal\") or \"\").strip()\n    steps = pd.get(\"steps\") if isinstance(pd.get(\"steps\"), list) else []\n    plan_txt = goal\n    i = 1\n    for st in steps:\n        plan_txt = plan_txt + \"\\n\" + str(i) + \". \" + str(st)\n        i = i + 1\n    bf = str(s.get(\"build_feedback\") or \"\").strip()\n    fix = int(s.get(\"fix_cycles\", 0) or 0)\n    # Build the repair history: every past failed cycle, in order, so\n    # the builder can see what it already tried and not repeat a failed\n    # approach. Show the last 8 to keep the prompt bounded; if there\n    # were more, say how many earlier ones are omitted.\n    hist = s.get(\"repair_history\") if isinstance(s.get(\"repair_history\"), list) else []\n    trail = \"\"\n    if hist:\n        shown = hist[-8:]\n        omitted = len(hist) - len(shown)\n        trail = \"\\n\\nRepair history so far (do not repeat an approach that already failed):\\n\"\n        if omitted > 0:\n            trail = trail + \"(\" + str(omitted) + \" earlier cycle(s) omitted)\\n\"\n        for h in shown:\n            hc = h if isinstance(h, dict) else {}\n            trail = (trail + \"- cycle \" + str(hc.get(\"cycle\")) + \": tried: \"\n                     + str(hc.get(\"changed\") or \"(no summary)\")[:220]\n                     + \" | still failed: \" + str(hc.get(\"failed\") or \"(unknown)\")[:180] + \"\\n\")\n    # Probe protocol (code-tui c5871, the 8-hour-hang lesson): the\n    # bounded browser_probe tool over hand-rolled server+headless\n    # scripts; port OWNERSHIP proven by a nonce round-trip (the\n    # incident's port WAS bound - by another process); explicit\n    # timeouts in SECONDS; failed checks exit nonzero. The tool is\n    # named ONLY when the host mounts it (probe_ok) - telling the\n    # builder to call an unmounted tool is a trap (wave-B P2-2).\n    if bool(s.get(\"probe_ok\")):\n        probe_rules = (\n            \"Probe protocol: use the browser_probe tool to check web artifacts (bounded, ~90s) - never hand-roll \"\n            \"'start a server then drive a headless browser' scripts. If you serve something on a port, prove the port \"\n            \"is YOURS before testing against it: put a nonce in the page and fetch it back (a plain bind or 200 check \"\n            \"is NOT enough - the port may be owned by another process). Bound EVERY long-running command with an \"\n            \"explicit timeout in SECONDS, and make every check exit nonzero on failure.\")\n    else:\n        probe_rules = (\n            \"Probe protocol: browser_probe is NOT available on this host - keep artifact checks static and bounded. \"\n            \"If you must check a served artifact, prove the port is YOURS first: put a nonce in the page and fetch it \"\n            \"back (a plain bind or 200 check is NOT enough - the port may be owned by another process), bound EVERY \"\n            \"long-running command with an explicit timeout in SECONDS, make every check exit nonzero on failure, and \"\n            \"never leave a server running in the background.\")\n    if fix == 0 and not bf:\n        return (\"You are the BUILDER. You are on a dedicated git branch; implement this plan fully.\\n\\nRequest:\\n\" + req +\n                \"\\n\\nPlan:\\n\" + plan_txt +\n                \"\\n\\nEngineering rules: bound every loop and traversal; before writing logic over data, read a sample and verify its shape; \"\n                \"prefer small verifiable functions; start EVERY source file with a 1-2 line header comment stating its purpose; \"\n                \"self-probe your artifact before finishing (open it, run it, or trace the entry path). \" + probe_rules + \" \"\n                \"When done, write SELFCHECK.md: list each artifact with one line of evidence it works, and AFTER YOUR FINAL EDIT add one \"\n                \"'ARTIFACT-SHA256: <path> <sha>' line per artifact (compute with: shasum -a 256 <path>).\")\n    return (\"You are the BUILDER in REPAIR mode on the existing branch. Fix ONLY what the failures below name. \"\n            \"Read before editing; make the smallest change that fixes the named defect; do NOT rewrite whole files with write_file; re-probe after fixing. \"\n            + probe_rules + \"\\n\\n\"\n            \"Failures to fix:\\n\" + (bf if bf else \"(none recorded - re-verify your artifacts)\") +\n            trail +\n            \"\\n\\nAfter your FINAL edit, refresh SELFCHECK.md evidence and its ARTIFACT-SHA256 lines.\")\n",
       "kind": "composer",
       "description": "Builder prompt: full build first cycle, targeted repair after (with repair history)."
     },
     {
       "name": "compose_lint",
-      "code": "def compose_lint(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    cmd = (\"cd '\" + ws_q + \"' && \"\n           \"(command -v ruff >/dev/null 2>&1 && ruff check --fix . 2>&1 | tail -5 || true); \"\n           \"(command -v prettier >/dev/null 2>&1 && prettier --write . 2>&1 | tail -5 || true); \"\n           \"echo LINT_DONE\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"lint-format\"}\n",
+      "code": "def compose_lint(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = shq(ws)\n    cmd = (\"cd '\" + ws_q + \"' && \"\n           \"(command -v ruff >/dev/null 2>&1 && ruff check --fix . 2>&1 | tail -5 || true); \"\n           \"(command -v prettier >/dev/null 2>&1 && prettier --write . 2>&1 | tail -5 || true); \"\n           \"echo LINT_DONE\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"lint-format\"}\n",
       "kind": "composer",
       "description": "Tool call: ruff --fix + prettier --write."
     },
@@ -3485,27 +3585,21 @@
     },
     {
       "name": "compose_selfcheck_refresh",
-      "code": "def compose_selfcheck_refresh(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    # Formatter may have rewritten bytes AFTER the builder hashed them;\n    # refresh the ARTIFACT-SHA256 lines deterministically so G5 binds\n    # to the shipped bytes (cycle-2 FATAL). Space-safe path handling:\n    # iterate whole lines, never word-split (adversary F5).\n    cmd = (\"cd '\" + ws_q + \"' && if [ -f SELFCHECK.md ]; then \"\n           \"grep '^ARTIFACT-SHA256:' SELFCHECK.md > .sc_lines.tmp 2>/dev/null || true; \"\n           \"grep -v '^ARTIFACT-SHA256:' SELFCHECK.md > SELFCHECK.md.tmp 2>/dev/null || true; \"\n           \"while IFS= read -r line; do \"\n           \"rest=${line#ARTIFACT-SHA256: }; f=${rest% *}; \"\n           \"if [ -f \\\"$f\\\" ]; then echo \\\"ARTIFACT-SHA256: $f $(shasum -a 256 \\\"$f\\\" | awk '{print $1}')\\\" >> SELFCHECK.md.tmp; fi; \"\n           \"done < .sc_lines.tmp; rm -f .sc_lines.tmp; \"\n           \"mv SELFCHECK.md.tmp SELFCHECK.md; echo REFRESHED; else echo NO_SELFCHECK; fi\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"selfcheck-refresh\"}\n",
+      "code": "def compose_selfcheck_refresh(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = shq(ws)\n    # Formatter may have rewritten bytes AFTER the builder hashed them;\n    # refresh the ARTIFACT-SHA256 lines deterministically so G5 binds\n    # to the shipped bytes (cycle-2 FATAL). Space-safe path handling:\n    # iterate whole lines, never word-split (adversary F5).\n    cmd = (\"cd '\" + ws_q + \"' && if [ -f SELFCHECK.md ]; then \"\n           \"grep '^ARTIFACT-SHA256:' SELFCHECK.md > .sc_lines.tmp 2>/dev/null || true; \"\n           \"grep -v '^ARTIFACT-SHA256:' SELFCHECK.md > SELFCHECK.md.tmp 2>/dev/null || true; \"\n           \"while IFS= read -r line; do \"\n           \"rest=${line#ARTIFACT-SHA256: }; f=${rest% *}; \"\n           \"if [ -f \\\"$f\\\" ]; then echo \\\"ARTIFACT-SHA256: $f $(shasum -a 256 \\\"$f\\\" | awk '{print $1}')\\\" >> SELFCHECK.md.tmp; fi; \"\n           \"done < .sc_lines.tmp; rm -f .sc_lines.tmp; \"\n           \"mv SELFCHECK.md.tmp SELFCHECK.md; echo REFRESHED; else echo NO_SELFCHECK; fi\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"selfcheck-refresh\"}\n",
       "kind": "composer",
       "description": "Tool call: refresh SELFCHECK.md ARTIFACT-SHA256 bindings."
     },
     {
       "name": "compose_commit",
-      "code": "def compose_commit(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    cmd = (\"cd '\" + ws_q + \"' && git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n           \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'build cycle' >/dev/null 2>&1 || true; echo COMMITTED\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-commit\"}\n",
+      "code": "def compose_commit(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = shq(ws)\n    cmd = (\"cd '\" + ws_q + \"' && git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n           \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'build cycle' >/dev/null 2>&1 || true; echo COMMITTED\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-commit\"}\n",
       "kind": "composer",
       "description": "Tool call: commit the build cycle."
     },
     {
-      "name": "verify_input",
-      "code": "def verify_input(state):\n    s = state if isinstance(state, dict) else {}\n    return {\n        \"request\": str(s.get(\"request\") or \"\"),\n        \"workspace_root\": str(s.get(\"workspace_root\") or \"\"),\n        \"build_command\": str(s.get(\"build_command\") or \"\"),\n        \"run_command\": str(s.get(\"run_command\") or \"\"),\n        \"round_index\": int(s.get(\"fix_cycles\", 0) or 0),\n        \"provider\": s.get(\"provider\"),\n        \"model\": s.get(\"model\"),\n    }\n",
-      "kind": "composer",
-      "description": "Input object for the mounted verify subflow."
-    },
-    {
-      "name": "tail_check",
-      "code": "def tail_check(state):\n    s = state if isinstance(state, dict) else {}\n    green = bool(s.get(\"all_passed\"))\n    wait_mode = str(s.get(\"gating_mode\") or \"wait\") == \"wait\"\n    env_blocked = bool(s.get(\"environment_blocked\"))\n    fix = int(s.get(\"fix_cycles\", 0) or 0)\n    maxfix = int(s.get(\"max_fix_cycles\", 6) or 6)\n    stalled = int(s.get(\"same_signature_count\", 0) or 0) >= 3\n    # In wait mode, a stuck build (out of fix cycles, or the same\n    # failure repeating, still not green) escalates to the human gate\n    # instead of ending silently. Auto mode never escalates. An\n    # environment block never escalates: no reviewer comment can fix a\n    # missing command runner.\n    escalate = wait_mode and (not green) and (not env_blocked) and (stalled or fix >= maxfix)\n    return {\"green\": green, \"wait_mode\": wait_mode, \"escalate\": escalate}\n",
+      "name": "tail_escalate",
+      "code": "def tail_escalate(state):\n    # In wait mode, a stuck build (out of fix cycles, or the same\n    # failure repeating, still not green) escalates to the human gate\n    # instead of ending silently. Auto mode never escalates. An\n    # environment block never escalates: no reviewer comment can fix a\n    # missing command runner.\n    s = state if isinstance(state, dict) else {}\n    stuck = (int(s.get(\"same_signature_count\", 0) or 0) >= 3\n             or int(s.get(\"fix_cycles\", 0) or 0) >= int(s.get(\"max_fix_cycles\", 6) or 6))\n    return (str(s.get(\"gating_mode\") or \"wait\") == \"wait\"\n            and not bool(s.get(\"all_passed\"))\n            and not bool(s.get(\"environment_blocked\"))\n            and stuck)\n",
       "kind": "checker",
-      "description": "Loop-tail law: green / wait-mode / escalate-to-human."
+      "description": "Stuck build in wait mode? Escalate to the human gate instead of ending silently."
     },
     {
       "name": "doc_prompt",
@@ -3515,27 +3609,27 @@
     },
     {
       "name": "compose_doc_guard",
-      "code": "def compose_doc_guard(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    # POSIX-safe: no process substitution (execute_command may run sh,\n    # not bash); a temp file keeps the drift flag in the same shell.\n    cmd = (\"cd '\" + ws_q + \"' && if [ -f SELFCHECK.md ]; then \"\n           \"grep '^ARTIFACT-SHA256:' SELFCHECK.md > .docguard.tmp 2>/dev/null || true; \"\n           \"drift=0; while IFS= read -r line; do \"\n           \"rest=${line#ARTIFACT-SHA256: }; sha=${rest##* }; f=${rest% *}; \"\n           \"if [ -f \\\"$f\\\" ]; then now=$(shasum -a 256 \\\"$f\\\" | awk '{print $1}'); \"\n           \"if [ \\\"$now\\\" != \\\"$sha\\\" ]; then echo \\\"DOC_DRIFT $f\\\"; drift=1; fi; \"\n           \"else echo \\\"DOC_DRIFT $f (deleted)\\\"; drift=1; fi; \"\n           \"done < .docguard.tmp; rm -f .docguard.tmp; \"\n           \"if [ $drift -eq 0 ]; then echo DOC_GUARD_OK; fi; \"\n           \"else echo NO_SELFCHECK_TO_GUARD; fi\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"doc-guard\"}\n",
+      "code": "def compose_doc_guard(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = shq(ws)\n    # POSIX-safe: no process substitution (execute_command may run sh,\n    # not bash); a temp file keeps the drift flag in the same shell.\n    cmd = (\"cd '\" + ws_q + \"' && if [ -f SELFCHECK.md ]; then \"\n           \"grep '^ARTIFACT-SHA256:' SELFCHECK.md > .docguard.tmp 2>/dev/null || true; \"\n           \"drift=0; while IFS= read -r line; do \"\n           \"rest=${line#ARTIFACT-SHA256: }; sha=${rest##* }; f=${rest% *}; \"\n           \"if [ -f \\\"$f\\\" ]; then now=$(shasum -a 256 \\\"$f\\\" | awk '{print $1}'); \"\n           \"if [ \\\"$now\\\" != \\\"$sha\\\" ]; then echo \\\"DOC_DRIFT $f\\\"; drift=1; fi; \"\n           \"else echo \\\"DOC_DRIFT $f (deleted)\\\"; drift=1; fi; \"\n           \"done < .docguard.tmp; rm -f .docguard.tmp; \"\n           \"if [ $drift -eq 0 ]; then echo DOC_GUARD_OK; fi; \"\n           \"else echo NO_SELFCHECK_TO_GUARD; fi\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"doc-guard\"}\n",
       "kind": "composer",
       "description": "Tool call: post-doc hash guard over SELFCHECK-bound artifacts."
     },
     {
-      "name": "doc_drift",
-      "code": "def doc_drift(state, guard_raw):\n    s = state if isinstance(state, dict) else {}\n    s2 = dict(s)\n    txt = text_of(guard_raw)\n    drifted = []\n    for ln in txt.split(\"\\n\"):\n        t = ln.strip()\n        if t.startswith(\"DOC_DRIFT \"):\n            drifted.append(t[10:])\n    ok = (\"DOC_GUARD_OK\" in txt) or (\"NO_SELFCHECK_TO_GUARD\" in txt and not drifted)\n    if drifted:\n        ok = False\n        s2[\"all_passed\"] = False\n        s2[\"build_feedback\"] = (\"doc: the documentation pass modified verified source files: \" +\n                                \", \".join(drifted[:10]) +\n                                \" - restore or re-verify them and refresh SELFCHECK.md hashes\")\n    return {\"ok\": ok, \"state\": s2, \"drifted\": drifted}\n",
-      "kind": "parser",
-      "description": "Did the doc pass touch verified source? (red iteration if so)"
+      "name": "pr_body",
+      "code": "def pr_body(state):\n    s = state if isinstance(state, dict) else {}\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    title = str(s.get(\"title\") or pd.get(\"title\") or \"work\").strip()\n    goal = str(pd.get(\"goal\") or \"\").strip()\n    branch = str(s.get(\"branch\") or s.get(\"branch_slug\") or \"work\")\n    v = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\n    warns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\n    lines = [\"# PR: \" + title, \"\", \"Branch: \" + branch, \"\", \"## Goal\", goal, \"\", \"## Verification\"]\n    lines.append(\"- gates: \" + (\"green\" if bool(v.get(\"all_passed\")) else \"NOT GREEN\"))\n    for w in warns:\n        lines.append(\"- advisory: \" + str(w))\n    return \"\\n\".join(lines)\n",
+      "kind": "composer",
+      "description": "PR.md markdown body (the PR.md path is a pin default)."
     },
     {
-      "name": "pr_fields",
-      "code": "def pr_fields(state):\n    s = state if isinstance(state, dict) else {}\n    pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n    title = str(s.get(\"title\") or pd.get(\"title\") or \"work\").strip()\n    goal = str(pd.get(\"goal\") or \"\").strip()\n    branch = str(s.get(\"branch\") or s.get(\"branch_slug\") or \"work\")\n    v = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\n    warns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\n    lines = [\"# PR: \" + title, \"\", \"Branch: \" + branch, \"\", \"## Goal\", goal, \"\", \"## Verification\"]\n    lines.append(\"- gates: \" + (\"green\" if bool(v.get(\"all_passed\")) else \"NOT GREEN\"))\n    for w in warns:\n        lines.append(\"- advisory: \" + str(w))\n    body = \"\\n\".join(lines)\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    branch_q = branch.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    # GIT_TERMINAL_PROMPT=0 + GIT_ASKPASS=true: a credentialed https\n    # remote must fail fast, never sit on a hidden credential prompt\n    # (adversary F6 - unattended runs).\n    cmd = (\"cd '\" + ws_q + \"' && export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true; \"\n           \"if git remote get-url origin >/dev/null 2>&1; then \"\n           \"if command -v gh >/dev/null 2>&1; then \"\n           \"git push -u origin '\" + branch_q + \"' 2>&1 | tail -2; \"\n           \"GH_PROMPT_DISABLED=1 gh pr create --fill --head '\" + branch_q + \"' 2>&1 | tail -2 || echo PR_EXISTS_OR_FAILED; \"\n           \"else echo GH_UNAVAILABLE_LOCAL_PR_MD_ONLY; fi; \"\n           \"else echo NO_REMOTE_LOCAL_PR_MD_ONLY; fi\")\n    return {\"pr_path\": \"PR.md\", \"pr_body\": body,\n            \"gh_call\": {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 120}, \"call_id\": \"pr-create\"}}\n",
+      "name": "compose_pr_push",
+      "code": "def compose_pr_push(state):\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = shq(ws)\n    branch = str(s.get(\"branch\") or s.get(\"branch_slug\") or \"work\")\n    branch_q = shq(branch)\n    # GIT_TERMINAL_PROMPT=0 + GIT_ASKPASS=true: a credentialed https\n    # remote must fail fast, never sit on a hidden credential prompt\n    # (adversary F6 - unattended runs).\n    cmd = (\"cd '\" + ws_q + \"' && export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true; \"\n           \"if git remote get-url origin >/dev/null 2>&1; then \"\n           \"if command -v gh >/dev/null 2>&1; then \"\n           \"git push -u origin '\" + branch_q + \"' 2>&1 | tail -2; \"\n           \"GH_PROMPT_DISABLED=1 gh pr create --fill --head '\" + branch_q + \"' 2>&1 | tail -2 || echo PR_EXISTS_OR_FAILED; \"\n           \"else echo GH_UNAVAILABLE_LOCAL_PR_MD_ONLY; fi; \"\n           \"else echo NO_REMOTE_LOCAL_PR_MD_ONLY; fi\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 120}, \"call_id\": \"pr-create\"}\n",
       "kind": "composer",
-      "description": "PR.md body + push/gh command (degrades honestly without remote)."
+      "description": "Tool call: push branch + gh pr create (degrades honestly without remote)."
     },
     {
       "name": "gate2_prompt",
-      "code": "def gate2_prompt(state):\n    # Gate-2 serves TWO cases, composed from state: green = merge\n    # approval; red = ESCALATION of a stuck build (G4 second half).\n    s = state if isinstance(state, dict) else {}\n    branch = str(s.get(\"branch\") or \"work\")\n    green = bool(s.get(\"all_passed\"))\n    v = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\n    fails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\n    warns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\n    rev = int(s.get(\"review_rounds\", 0) or 0)\n    maxrev = int(s.get(\"max_review_rounds\", 2) or 2)\n    fix = int(s.get(\"fix_cycles\", 0) or 0)\n    maxfix = int(s.get(\"max_fix_cycles\", 6) or 6)\n    stalled = int(s.get(\"same_signature_count\", 0) or 0) >= 3\n    lines = []\n    if green:\n        lines.append(\"REVIEW GATE: the build is green on branch '\" + branch + \"' and PR.md summarizes it.\")\n        lines.append(\"Test the artifact yourself now (the gates are static checks; runtime behavior is yours to judge).\")\n        choices = [\"approve\", \"request changes\"]\n    else:\n        # Say WHICH stop reason fired: the same failure repeating means\n        # more cycles alone will not help (the approach must change);\n        # running out of cycles just means it needs more room or a hint.\n        if stalled:\n            lines.append(\"BUILD STUCK on branch '\" + branch + \"': the SAME failure repeated \" + str(int(s.get(\"same_signature_count\", 0) or 0) + 1) + \" times in a row. More cycles alone will not help - the approach needs to change.\")\n        else:\n            lines.append(\"BUILD STUCK on branch '\" + branch + \"': used up the fix budget (\" + str(fix) + \" of \" + str(maxfix) + \" cycles) without going green.\")\n        lines.append(\"Open failures:\")\n        for f in fails[:12]:\n            lines.append(\"- \" + str(f))\n        lines.append(\"Comment to guide further repairs (this resets the fix budget), or reply 'stop' to end the run unmerged.\")\n        choices = [\"stop\", \"guide repairs\"]\n    for w in warns:\n        lines.append(\"- advisory: \" + str(w))\n    if rev >= maxrev:\n        lines.append(\"\")\n        lines.append(\"NOTE: this is the FINAL review round - a rejection ends the run unmerged.\")\n    lines.append(\"\")\n    if green:\n        lines.append(\"Reply 'approve' to merge into main, or anything else as CHANGE REQUESTS sent back to the builder.\")\n    return {\"prompt\": \"\\n\".join(lines), \"choices\": choices}\n",
+      "code": "def gate2_prompt(state):\n    # Gate-2 serves TWO cases, composed from state: green = merge\n    # approval; red = ESCALATION of a stuck build (G4 second half).\n    s = state if isinstance(state, dict) else {}\n    branch = str(s.get(\"branch\") or \"work\")\n    green = bool(s.get(\"all_passed\"))\n    v = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\n    fails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\n    warns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\n    rev = int(s.get(\"review_rounds\", 0) or 0)\n    maxrev = int(s.get(\"max_review_rounds\", 2) or 2)\n    fix = int(s.get(\"fix_cycles\", 0) or 0)\n    maxfix = int(s.get(\"max_fix_cycles\", 6) or 6)\n    stalled = int(s.get(\"same_signature_count\", 0) or 0) >= 3\n    lines = []\n    if green:\n        lines.append(\"REVIEW GATE: the build is green on branch '\" + branch + \"' and PR.md summarizes it.\")\n        lines.append(\"Test the artifact yourself now (the gates are static checks; runtime behavior is yours to judge).\")\n    else:\n        # Say WHICH stop reason fired: the same failure repeating means\n        # more cycles alone will not help (the approach must change);\n        # running out of cycles just means it needs more room or a hint.\n        if stalled:\n            lines.append(\"BUILD STUCK on branch '\" + branch + \"': the SAME failure repeated \" + str(int(s.get(\"same_signature_count\", 0) or 0) + 1) + \" times in a row. More cycles alone will not help - the approach needs to change.\")\n        else:\n            lines.append(\"BUILD STUCK on branch '\" + branch + \"': used up the fix budget (\" + str(fix) + \" of \" + str(maxfix) + \" cycles) without going green.\")\n        lines.append(\"Open failures:\")\n        for f in fails[:12]:\n            lines.append(\"- \" + str(f))\n        lines.append(\"Comment to guide further repairs (this resets the fix budget), or reply 'stop' to end the run unmerged.\")\n    for w in warns:\n        lines.append(\"- advisory: \" + str(w))\n    if rev >= maxrev:\n        lines.append(\"\")\n        lines.append(\"NOTE: this is the FINAL review round - a rejection ends the run unmerged.\")\n    lines.append(\"\")\n    if green:\n        lines.append(\"Reply 'approve' to merge into main, or anything else as CHANGE REQUESTS sent back to the builder.\")\n    return \"\\n\".join(lines)\n",
       "kind": "composer",
-      "description": "Merge-review / escalation prompt from state."
+      "description": "Merge-review / escalation prompt from state (choices are an inline conditional)."
     },
     {
       "name": "parse_gate2",
@@ -3544,14 +3638,8 @@
       "description": "Fold the reviewer's gate-2 answer into state."
     },
     {
-      "name": "approved_and_green",
-      "code": "def approved_and_green(state):\n    s = state if isinstance(state, dict) else {}\n    return bool(s.get(\"approved\")) and bool(s.get(\"all_passed\"))\n",
-      "kind": "checker",
-      "description": "Merge precondition: approved AND green."
-    },
-    {
       "name": "compose_merge",
-      "code": "def compose_merge(state):\n    # Merge success is proven by a POSITIVE sentinel (MERGED_OK), never\n    # by the absence of a failure token (adversary F4, proven on a\n    # trunk-default repo).\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = ws.replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    branch = str(s.get(\"branch\") or \"work\").replace(\"'\", \"'\" + \"\\\\\" + \"''\")\n    cmd = (\"cd '\" + ws_q + \"' && git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n           \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'final: docs + PR' >/dev/null 2>&1 || true; \"\n           \"if git checkout main 2>/dev/null || git checkout master 2>/dev/null; then \"\n           \"if git -c user.name='workflow' -c user.email='workflow@local' merge --no-ff '\" + branch + \"' -m 'merge: \" + branch + \"' 2>&1; then \"\n           \"echo MERGED_OK $(git rev-parse --abbrev-ref HEAD); \"\n           \"else git merge --abort 2>/dev/null; echo MERGE_CONFLICT_ABORTED; fi; \"\n           \"else echo NO_MAINLINE_BRANCH; fi\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-merge\"}\n",
+      "code": "def compose_merge(state):\n    # Merge success is proven by a POSITIVE sentinel (MERGED_OK), never\n    # by the absence of a failure token (adversary F4, proven on a\n    # trunk-default repo).\n    s = state if isinstance(state, dict) else {}\n    ws = str(s.get(\"workspace_root\") or \"\").strip()\n    ws_q = shq(ws)\n    branch = shq(s.get(\"branch\") or \"work\")\n    cmd = (\"cd '\" + ws_q + \"' && git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; \"\n           \"git -c user.name='workflow' -c user.email='workflow@local' commit -m 'final: docs + PR' >/dev/null 2>&1 || true; \"\n           \"if git checkout main 2>/dev/null || git checkout master 2>/dev/null; then \"\n           \"if git -c user.name='workflow' -c user.email='workflow@local' merge --no-ff '\" + branch + \"' -m 'merge: \" + branch + \"' 2>&1; then \"\n           \"echo MERGED_OK $(git rev-parse --abbrev-ref HEAD); \"\n           \"else git merge --abort 2>/dev/null; echo MERGE_CONFLICT_ABORTED; fi; \"\n           \"else echo NO_MAINLINE_BRANCH; fi\")\n    return {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd}, \"call_id\": \"git-merge\"}\n",
       "kind": "composer",
       "description": "Tool call: --no-ff merge with conflict abort + positive sentinel."
     },
@@ -3560,12 +3648,6 @@
       "code": "def record_merge(state, merge_raw):\n    s = state if isinstance(state, dict) else {}\n    s2 = dict(s)\n    txt = text_of(merge_raw)\n    merged_ok = \"MERGED_OK\" in txt\n    conflict = \"MERGE_CONFLICT_ABORTED\" in txt\n    no_mainline = \"NO_MAINLINE_BRANCH\" in txt\n    s2[\"merged\"] = merged_ok and bool(s.get(\"approved\"))\n    warns = s2.get(\"warnings\") if isinstance(s2.get(\"warnings\"), list) else []\n    warns = list(warns)\n    if conflict:\n        warns.append(\"merge: conflict - merge aborted; branch left unmerged (#FALLBACK)\")\n    elif no_mainline:\n        warns.append(\"merge: no main/master branch found - merge skipped; branch left unmerged (#FALLBACK)\")\n    elif not merged_ok:\n        warns.append(\"merge: no MERGED_OK confirmation in output - treating as unmerged (#FALLBACK)\")\n    s2[\"warnings\"] = warns\n    return s2\n",
       "kind": "shaper",
       "description": "Fold the merge result into state (positive sentinel only)."
-    },
-    {
-      "name": "final_report",
-      "code": "def final_report(state):\n    s = state if isinstance(state, dict) else {}\n    accepted = bool(s.get(\"accepted\"))\n    approved = bool(s.get(\"approved\"))\n    merged = bool(s.get(\"merged\"))\n    passed = bool(s.get(\"all_passed\"))\n    stopped = bool(s.get(\"user_stopped\"))\n    last_g2 = str(s.get(\"last_gate2\") or \"\")\n    branch = str(s.get(\"branch\") or \"\")\n    warns = s.get(\"warnings\") if isinstance(s.get(\"warnings\"), list) else []\n    v = s.get(\"last_verdict\") if isinstance(s.get(\"last_verdict\"), dict) else {}\n    fails = v.get(\"failures\") if isinstance(v.get(\"failures\"), list) else []\n    bf = str(s.get(\"build_feedback\") or \"\").strip()\n    stalled = int(s.get(\"same_signature_count\", 0) or 0) >= 3\n    env_blocked = bool(s.get(\"environment_blocked\"))\n    if not accepted:\n        reason = \"plan-not-accepted (plan revisions exhausted without approval)\"\n    elif merged:\n        reason = \"approved-and-merged\"\n    elif approved:\n        reason = \"approved-merge-failed\"\n    elif env_blocked:\n        reason = \"delivered-not-verifiable (environment cannot run the verification steps)\"\n    elif stopped:\n        reason = \"stopped-by-reviewer (run ended unmerged at the review gate)\"\n    elif (last_g2 in (\"rejected\", \"escalated\")\n          and int(s.get(\"review_rounds\", 0) or 0) > int(s.get(\"max_review_rounds\", 2) or 2)):\n        reason = \"review-rounds-exhausted (last reviewer change requests unaddressed)\"\n    elif passed:\n        reason = \"green-pending-approval\"\n    elif stalled:\n        reason = \"stalled (same failures repeated; needs a different approach or human help)\"\n    else:\n        reason = \"stopped-open-failures (budgets exhausted)\"\n    lines = [\"# Multi-agent coding workflow result\", \"\"]\n    lines.append(\"Outcome: \" + reason)\n    lines.append(\"Branch: \" + (branch if branch else \"(none)\"))\n    lines.append(\"Gates: \" + (\"green\" if passed else \"not green\"))\n    lines.append(\"Merged: \" + (\"yes\" if merged else \"no\"))\n    lines.append(\"Plan revisions: \" + str(int(s.get(\"plan_revisions\", 0) or 0)) +\n                 \" | fix cycles: \" + str(int(s.get(\"fix_cycles\", 0) or 0)) +\n                 \" | review rounds: \" + str(int(s.get(\"review_rounds\", 0) or 0)))\n    if not accepted:\n        pd = s.get(\"plan\") if isinstance(s.get(\"plan\"), dict) else {}\n        pf = str(s.get(\"plan_feedback\") or \"\").strip()\n        lines.append(\"\")\n        lines.append(\"Last plan title: \" + (str(s.get(\"title\") or pd.get(\"title\") or \"\").strip() or \"(none)\"))\n        if pf:\n            lines.append(\"Last reviewer comments on the plan:\")\n            for ln in pf.split(\"\\n\")[:8]:\n                lines.append(\"  \" + ln)\n    if reason.startswith(\"review-rounds-exhausted\") and bf:\n        lines.append(\"\")\n        lines.append(\"Unaddressed reviewer change requests:\")\n        for ln in bf.split(\"\\n\")[:10]:\n            lines.append(\"  \" + ln)\n    if fails:\n        lines.append(\"\")\n        lines.append(\"Open failures:\")\n        for f in fails[:15]:\n            lines.append(\"- \" + str(f))\n    envf = v.get(\"environment_failures\") if isinstance(v.get(\"environment_failures\"), list) else []\n    if envf:\n        lines.append(\"\")\n        lines.append(\"Environment (not fixable by the builder; artifacts delivered unverified):\")\n        for f in envf[:10]:\n            lines.append(\"- \" + str(f))\n    if warns:\n        lines.append(\"\")\n        lines.append(\"Advisories:\")\n        for w in warns:\n            lines.append(\"- \" + str(w))\n    report = \"\\n\".join(lines)\n    return {\"report\": report, \"success\": merged or (passed and approved),\n            \"stopped_reason\": reason, \"branch\": branch}\n",
-      "kind": "composer",
-      "description": "The run's terminal report + success/reason/branch."
     }
   ]
 }

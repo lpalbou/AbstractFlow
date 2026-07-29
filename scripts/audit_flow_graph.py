@@ -11,8 +11,8 @@ sure each workflow also has a clean layout of nodes"):
    whose outputs never reach an exec-reached node through data edges — dead
    weight that misleads readers.
 3. ORPHAN EDGE: an edge naming a missing node or pin (build-time defect).
-4. NODE OVERLAP: two node boxes intersecting (approximate box model:
-   width 300, height 90 + 26 * max(#inputs, #outputs) data pins).
+4. NODE OVERLAP: two node boxes intersecting (approximate box model aligned
+   with Canvas.tsx and wf_common: width 320, min height 220).
 
 Usage:
   python3 scripts/audit_flow_graph.py examples/flows/co-scientist.json [...]
@@ -29,11 +29,16 @@ from pathlib import Path
 
 TRIGGERS = {"on_flow_start", "on_user_request", "on_agent_message", "on_event"}
 
+# Match Canvas.tsx routing fallback and wf_common layout (320×220).
+CANVAS_MIN_WIDTH = 320.0
+CANVAS_MIN_HEIGHT = 220.0
+
 # The bundled/shipped catalog (mirrors src/utils/bundledFlows.ts globs).
 BUNDLED = [
     "deep-research.json", "deep-investigate.json", "deep-plan.json",
     "deep-render.json", "deep-review.json", "81795ea9.json", "15f19f7f.json",
     "coding-agent.json", "coder.json", "coding-verify-gates.json",
+    "multiagent-coding.json", "multiagent-coder.json", "multiagent-verify-gates.json",
     "adversarial-review.json", "structured-extract.json", "map-reduce.json",
     "co-scientist.json", "diagram-render.json",
     "meta-consensus.json", "meta-debate.json", "meta-reflect.json",
@@ -62,8 +67,8 @@ def node_box(node: dict) -> tuple[float, float, float, float]:
     data = node.get("data") or {}
     n_in = len([p for p in data.get("inputs") or [] if isinstance(p, dict) and p.get("type") != "execution"])
     n_out = len([p for p in data.get("outputs") or [] if isinstance(p, dict) and p.get("type") != "execution"])
-    height = 90.0 + 26.0 * max(n_in, n_out)
-    return (x, y, 300.0, height)
+    height = max(90.0 + 26.0 * max(n_in, n_out), CANVAS_MIN_HEIGHT)
+    return (x, y, CANVAS_MIN_WIDTH, height)
 
 
 def boxes_overlap(a: tuple, b: tuple) -> bool:

@@ -10,21 +10,23 @@ Design + adversary history: docs/backlog/proposed/0152_multiagent_coding_workflo
 (2 design cycles, 4 fable5 adversaries, 7 FATALs folded). Structural spine
 mirrors build_coding_agent_workflow.py.
 
-FUNCTION-LIBRARY MIGRATION (0.0.5, 2026-07-26 — the proposal_6 end-state):
-- All single-fold pure helpers moved into the FLOW FUNCTION LIBRARY
-  (flow-level `functions`, tier 2 of the expression redesign): named,
-  drawer-visible, reusable defs compiled once into the code-node sandbox.
-  Consumer pins CALL them via pin expressions (`build_again(vars.state)`),
-  so the canvas shows the EXECUTION SPINE — 33 pure code nodes became 3.
-- The three that stay as nodes are genuinely multi-wire folds (a pin holds
-  one wire): `Merge scout context` (2 agent responses), `Parse gate-1`
-  (gate response + planner data), `Fold verdict` (verify output + child
-  meta + builder response + lint raw).
-- CONFIG FOLDS INTO STATE ONCE: `mw_preflight` seeds run var `state` with
-  request/workspace_root/limits/commands/provider/model, so every function
-  downstream takes (state[, value]) and every call site stays short. The
-  old `mw.state` nested var is renamed to flat `state` (this builder owns
-  every read/write; expressions read `vars.get("state", {})`).
+THE BOUNDARY (0.0.8, 2026-07-27 — operator ruling): three tiers, one rule each.
+- INLINE EXPRESSION for anything a reader takes in at a glance: trivial
+  state reads (`vars.state.get("accepted", False)`), simple conditions,
+  one-line string builds. Never a function for a plain variable read —
+  "we already have get variable"; a name would only hide it.
+- LIBRARY FUNCTION only where there is ACTUAL LOGIC TO TEST or FORMATTING
+  TO DO: prompt composers, tool-command composers, parsers, state folders,
+  loop laws. Named, drawer-visible, testable, single-value returns.
+- CODE NODE where a computation has SEVERAL OUTPUTS consumed at different
+  points — fan-out is graph structure the canvas must show (`Final report`,
+  `Doc drift check`), plus the genuinely multi-wire folds (`Merge scout
+  context`, `Parse gate-1`, `Fold verdict`).
+- CONSTANTS are pin defaults (planner schema, gate-1 choices, PR.md path),
+  not computed values.
+- CONFIG FOLDS INTO STATE ONCE: `mw_preflight` seeds run var `state`, so
+  every helper takes (state[, value]) and call sites stay short; reads use
+  `vars.state` (attribute access; state always exists past the seed node).
 - Old-runtime skew: pre-expression runtimes read neither `functions` nor
   `pinExpressions`; expression-only pins fall to their defaults (falsy ->
   bounded refusal at preflight, empty report) — bounded-safe, and the
@@ -63,18 +65,37 @@ from wf_common import (
 )
 
 BUNDLE_ID = "multiagent-coding"
-# 0.0.7 (2026-07-27): live build-cycle progress line (operator "never a
-# surprise" request, relayed by code-tui c5833). A "build cycle N of M" status
-# fires at the top of each build cycle via an answer_user node, with a stable
-# leading token so a client strip renders it without reverse-engineering the
-# loop. N = cycles done + 1; M = the fix budget for this review round.
-# 0.0.6 (2026-07-27): operator-requested build-loop changes (code-tui c5829):
-# (1) default max_fix_cycles 3 -> 6 (overridable pin); (2) a cumulative repair
-# history {cycle, changed, failed} shown whole in the builder's repair prompt
-# (replaces the last-cycle-only summary); (3) the "same failure repeated" stop
-# raised 2 -> 3, and the review-gate message says WHICH reason stopped it.
+# 0.0.10 (2026-07-27): wave-B adversary P2 folds — the browser_probe grant
+# and the probe-protocol prompt now FOLLOW browser_probe_available (a
+# probe-less gateway no longer instructs the builder to call an unmounted
+# tool: the tools pin adds the probe conditionally on state.probe_ok, and
+# the prompt teaches the no-tool bounded protocol instead); shq keeps falsy
+# non-None text (shq(0) is "0").
+# 0.0.9 (2026-07-27): code-tui asks (commons c5871) folded on top of the
+# boundary cleanup: (1) a "gating: wait|auto" answer_user line right after
+# the preflight door so EVERY client sees the mode at run start; (2) bundle
+# metadata gains a structured `gating` marker (pin/values/default) for
+# catalog-level discoverability; (3) metadata.purpose corrected — it still
+# said "auto gating" for the wrapper while the real default is WAIT;
+# (4) browser_probe granted to the builder + the wrapper's hardcoded
+# browser_probe_available=False became a DECLARED pin defaulting true, and
+# the builder prompt teaches the probe protocol (port OWNERSHIP via nonce
+# round-trip, timeouts in SECONDS, nonzero exit on failure).
+# 0.0.8 (2026-07-27): the boundary cleanup (operator ruling + 3 adversary
+# reviews): trivial reads inlined (no function for a plain variable access),
+# multi-output dict bundles dissolved — `Final report` and `Doc drift check`
+# restored as code nodes with LABELED output pins (fan-out visible on the
+# canvas), prompt composers reshaped to single-value returns, constants
+# demoted to pin defaults (planner schema, gate-1 choices, PR.md). 31
+# functions -> 28, every one real logic or formatting.
+# 0.0.7 (2026-07-27): live build-cycle progress line ("build cycle N of M").
+# 0.0.6 (2026-07-27): fix budget 3 -> 6; cumulative repair history; stall
+# stop 2 -> 3 with named stop reason at the review gate.
 # 0.0.5 (2026-07-26): function-library migration — 33 pure code nodes -> 3.
-BUNDLE_VERSION = "0.0.7"
+# 0.0.11 (2026-07-28): operator layout pass — exec-depth auto-layout on the
+# coding root (33 node overlaps -> clean audit); bundle version bump is
+# load-bearing for immutable-by-sha catalog re-publish.
+BUNDLE_VERSION = "0.0.12"
 ROOT_FLOW_ID = "multiagent-coding"
 VERIFY_FLOW_ID = "multiagent-verify-gates"
 WRAPPER_FLOW_ID = "multiagent-coder"  # agent.v1 wrapper entrypoint (picker-visible)
@@ -97,8 +118,21 @@ AGENT_INTERFACE = "abstractcode.agent.v1"
 # sending gating_mode="auto" through the DECLARED wrapper pin - no repack.
 WRAPPER_GATING = "wait"
 
-# The one shared state read every downstream expression uses.
-S = 'vars.get("state", {})'
+# The one shared state read every downstream expression uses. Attribute
+# access (not vars.get): `state` ALWAYS exists past the seed node, and a
+# missing var should fail loudly naming itself, never dissolve into {}.
+S = "vars.state"
+
+# Inline dict for the mounted verify subflow input pin (replaces verify_input library fn).
+VERIFY_INPUT_EXPR = (
+    "{'request': str((" + S + " or {}).get('request') or ''), "
+    "'workspace_root': str((" + S + " or {}).get('workspace_root') or ''), "
+    "'build_command': str((" + S + " or {}).get('build_command') or ''), "
+    "'run_command': str((" + S + " or {}).get('run_command') or ''), "
+    "'round_index': int((" + S + " or {}).get('fix_cycles') or 0), "
+    "'provider': (" + S + " or {}).get('provider'), "
+    "'model': (" + S + " or {}).get('model')}"
+)
 
 
 # --- pin-expression forms (tier 1 migration, 2026-07-25) --------------------
@@ -171,9 +205,12 @@ def ask_user(node_id, label, x, y, *, prompt_default=""):
 # THE FLOW FUNCTION LIBRARY (tier 2). Same RestrictedPython sandbox as code
 # nodes: no imports, no chr(); string concatenation only. Functions can call
 # each other (one shared namespace): text_of is the shared tool-envelope
-# extractor (was FOUR inlined copies of _EXTRACT); compose_git_branch and
-# record_branch reuse backlog_fields for the slug.
-# Every returned dict is read by the calling pin expression: fn(S)["key"].
+# extractor (was FOUR inlined copies of _EXTRACT); compose_git_branch,
+# record_branch and backlog_body reuse branch_slug.
+# EVERY function returns ONE value (a prompt, a command object, a parsed
+# list, a folded state dict, a boolean law) — a plain variable read is never
+# a function (inline expressions do that), and anything with several outputs
+# is a code NODE with labeled pins (operator ruling 2026-07-27).
 # ===========================================================================
 
 FUNCTIONS = [
@@ -210,32 +247,43 @@ FUNCTIONS = [
             return "\n".join(parts)
     """, kind="parser", description="Text from any tool-result envelope shape (recursive fold)."),
 
+    fn("shq", r"""
+        def shq(s):
+            # Escape a value for embedding inside single quotes in a shell
+            # command ('...' + shq(x) + '...'). ONE copy: the same escape was
+            # inlined nine times across the command composers, and one
+            # divergent copy is a command injection on a path with a quote.
+            # None -> "" but falsy NON-None values keep their text (shq(0) is
+            # "0" - `s or ""` would erase it; wave-B adversary P2-3).
+            return ("" if s is None else str(s)).replace("'", "'" + "\\" + "''")
+    """, kind="formatter", description="Shell single-quote escape for command composers (one copy, nine call sites)."),
+
     fn("mw_preflight", r"""
-        def mw_preflight(request, workspace_root, gating_mode, skills, skills_resolution,
-                         max_plan_revisions, max_fix_cycles, max_review_rounds,
-                         build_command, run_command, provider, model,
-                         browser_probe_available):
-            # Seeds the ONE loop-state object. CONFIG FOLDS IN HERE (request,
+        def mw_preflight(v):
+            # Seeds the ONE loop-state object from the run vars view (the
+            # whole `vars` rides in as v). CONFIG FOLDS IN HERE (request,
             # workspace, budgets, commands, provider/model), so every later
-            # function reads (state) and call sites stay short.
-            req = str(request or "").strip()
-            ws = str(workspace_root or "").strip()
-            gating = str(gating_mode or "wait").strip().lower()
+            # function reads (state), call sites stay short, and every input
+            # default lives in exactly ONE place - this function.
+            req = str(v.get("request") or "").strip()
+            ws = str(v.get("workspace_root") or "").strip()
+            gating = str(v.get("gating_mode") or "wait").strip().lower()
             if gating not in ("wait", "auto"):
                 gating = "wait"
             # skills_resolution is what the GATEWAY wrote after resolving
             # input_data.skills - never a caller-attested pin (adversary F2).
-            sk = skills_resolution if isinstance(skills_resolution, dict) else {}
+            sk = (v.get("_runtime") or {}).get("skills_resolution")
+            sk = sk if isinstance(sk, dict) else {}
             active = sk.get("active") if isinstance(sk.get("active"), list) else []
             active = [str(x) for x in active]
-            need = skills if isinstance(skills, list) else []
-            need = [str(x) for x in need]
+            need = v.get("skills", ["coredoc"])
+            need = [str(x) for x in need] if isinstance(need, list) else []
             missing = []
             for s in need:
                 if s not in active:
                     missing.append(s)
             skills_degraded = len(missing) > 0
-            probe_ok = bool(browser_probe_available)
+            probe_ok = bool(v.get("browser_probe_available", False))
             warnings = []
             if skills_degraded:
                 warnings.append("preflight: skills not active on this host: " + ", ".join(missing) + " - doc step runs on prompt guidance alone (#FALLBACK)")
@@ -250,15 +298,18 @@ FUNCTIONS = [
             return {
                 # -- config (immutable after seed) --
                 "request": req, "workspace_root": ws, "gating_mode": gating,
-                "max_plan_revisions": int(max_plan_revisions or 3),
+                # wait_gating: the one derived gating fact both wait-mode `if`
+                # pins read (normalization lives here, never re-derived).
+                "wait_gating": gating == "wait",
+                "max_plan_revisions": int(v.get("max_plan_revisions", 3) or 3),
                 # Default fix budget is 6 (operator request 2026-07-27): give the
                 # build loop room to converge by default; still overridable via
                 # the max_fix_cycles run-start pin.
-                "max_fix_cycles": int(max_fix_cycles or 6),
-                "max_review_rounds": int(max_review_rounds or 2),
-                "build_command": str(build_command or ""),
-                "run_command": str(run_command or ""),
-                "provider": provider, "model": model,
+                "max_fix_cycles": int(v.get("max_fix_cycles", 6) or 6),
+                "max_review_rounds": int(v.get("max_review_rounds", 2) or 2),
+                "build_command": str(v.get("build_command") or ""),
+                "run_command": str(v.get("run_command") or ""),
+                "provider": v.get("provider"), "model": v.get("model"),
                 # -- preflight verdict (the door reads these once) --
                 "preflight_ok": ok, "preflight_failures": failures,
                 # -- loop state --
@@ -274,9 +325,9 @@ FUNCTIONS = [
                 "skills_degraded": skills_degraded, "probe_ok": probe_ok,
                 "warnings": warnings, "scout_context": "",
                 "plan": {}, "title": "", "branch": "", "branch_slug": "",
-                "all_passed": False, "stopped_reason": "", "pr_path": "",
+                "all_passed": False,
             }
-    """, kind="composer", description="Seed state: fold config + preflight posture into the one loop-state object."),
+    """, kind="composer", description="Seed state from the run vars view: config + preflight posture in one object."),
 
     fn("pre_report", r"""
         def pre_report(state):
@@ -287,21 +338,6 @@ FUNCTIONS = [
                 lines.append("- " + str(f))
             return "\n".join(lines)
     """, kind="composer", description="Refusal report for a failed preflight."),
-
-    fn("plan_again", r"""
-        def plan_again(state):
-            s = state if isinstance(state, dict) else {}
-            accepted = bool(s.get("accepted"))
-            revs = int(s.get("plan_revisions", 0) or 0)
-            maxrev = int(s.get("max_plan_revisions", 3) or 3)
-            wait_mode = str(s.get("gating_mode") or "wait") == "wait"
-            # scouts run on the first pass and again only on an explicit
-            # "research" choice; cached scout context feeds plain plan
-            # revisions for free
-            need_scout = (not str(s.get("scout_context") or "").strip()) or bool(s.get("rescout"))
-            return {"condition": (not accepted) and (revs < maxrev),
-                    "wait_mode": wait_mode, "need_scout": need_scout}
-    """, kind="checker", description="Plan-loop law: continue / need scouts / wait-mode."),
 
     fn("scout_code_prompt", r"""
         def scout_code_prompt(state):
@@ -334,23 +370,11 @@ FUNCTIONS = [
             ctx = str(s.get("scout_context") or "").strip()
             fb = str(s.get("plan_feedback") or "").strip()
             extra = ("\n\nThe reviewer sent the previous plan back with these comments; address every one:\n" + fb) if fb else ""
-            p = ("You are the PLANNER. Do not write code; produce the plan only.\n\nRequest:\n" + req +
-                 "\n\nEngineered context from the two scouts (code + internet):\n" + ctx +
-                 "\n\nReturn JSON with: title (AT MOST 3 words, branch-name friendly), goal (one paragraph), "
-                 "steps (ordered, concrete), files (paths you expect to create or change), risks (list)." + extra)
-            schema = {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "goal": {"type": "string"},
-                    "steps": {"type": "array", "items": {"type": "string"}},
-                    "files": {"type": "array", "items": {"type": "string"}},
-                    "risks": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["title", "goal", "steps"],
-            }
-            return {"prompt": p, "schema": schema}
-    """, kind="composer", description="Planner prompt + structured-output schema."),
+            return ("You are the PLANNER. Do not write code; produce the plan only.\n\nRequest:\n" + req +
+                    "\n\nEngineered context from the two scouts (code + internet):\n" + ctx +
+                    "\n\nReturn JSON with: title (AT MOST 3 words, branch-name friendly), goal (one paragraph), "
+                    "steps (ordered, concrete), files (paths you expect to create or change), risks (list)." + extra)
+    """, kind="composer", description="Planner prompt (the response schema is a pin default on the planner node)."),
 
     fn("gate1_prompt", r"""
         def gate1_prompt(planner_data):
@@ -365,8 +389,8 @@ FUNCTIONS = [
                 i = i + 1
             lines.append("")
             lines.append("Reply 'approve' to build, 'research: <what to dig deeper>' to re-scout, or anything else as revision comments for the planner.")
-            return {"prompt": "\n".join(lines), "choices": ["approve", "revise", "research"]}
-    """, kind="composer", description="Human plan-approval prompt from the planner's JSON."),
+            return "\n".join(lines)
+    """, kind="composer", description="Human plan-approval prompt from the planner's JSON (choices are a pin default)."),
 
     fn("auto_accept_plan", r"""
         def auto_accept_plan(state, planner_data):
@@ -393,14 +417,11 @@ FUNCTIONS = [
             return s2
     """, kind="shaper", description="Auto-mode plan acceptance (rejects dead/empty plans)."),
 
-    fn("plan_accepted", r"""
-        def plan_accepted(state):
-            s = state if isinstance(state, dict) else {}
-            return bool(s.get("accepted"))
-    """, kind="checker", description="Was the plan accepted?"),
-
-    fn("backlog_fields", r"""
-        def backlog_fields(state):
+    fn("branch_slug", r"""
+        def branch_slug(state):
+            # Branch-name-friendly slug from the accepted plan's title. The one
+            # helper in this flow promoted for GENUINE reuse: compose_git_branch,
+            # record_branch and the backlog-path expression all call it.
             s = state if isinstance(state, dict) else {}
             pd = s.get("plan") if isinstance(s.get("plan"), dict) else {}
             title = str(pd.get("title") or s.get("title") or "task").strip().lower()
@@ -416,6 +437,13 @@ FUNCTIONS = [
             slug = slug.strip("-")[:40]
             if not slug:
                 slug = "task"
+            return slug
+    """, kind="composer", description="Branch/backlog slug from the plan title (a-z 0-9 dashes, 40 max)."),
+
+    fn("backlog_body", r"""
+        def backlog_body(state):
+            s = state if isinstance(state, dict) else {}
+            pd = s.get("plan") if isinstance(s.get("plan"), dict) else {}
             goal = str(pd.get("goal") or "").strip()
             steps = pd.get("steps") if isinstance(pd.get("steps"), list) else []
             files = pd.get("files") if isinstance(pd.get("files"), list) else []
@@ -425,20 +453,19 @@ FUNCTIONS = [
                 for x in xs:
                     out = out + "- " + str(x) + "\n"
                 return out if out else "- (none)\n"
-            body = ("# " + slug + "\n\n- Status: planned\n- Source: multi-agent coding workflow\n\n## Goal\n" +
+            return ("# " + branch_slug(s) + "\n\n- Status: planned\n- Source: multi-agent coding workflow\n\n## Goal\n" +
                     (goal if goal else "(none)") + "\n\n## Steps\n" + bullets(steps) +
                     "\n## Files\n" + bullets(files) + "\n## Risks\n" + bullets(risks))
-            return {"slug": slug, "file_path": "docs/backlog/planned/" + slug + ".md", "content": body}
-    """, kind="composer", description="Backlog item: slug + path + markdown body from the accepted plan."),
+    """, kind="composer", description="Backlog item markdown body from the accepted plan."),
 
     fn("compose_git_branch", r"""
         def compose_git_branch(state):
             s = state if isinstance(state, dict) else {}
-            slug = str(backlog_fields(s).get("slug") or "task")
+            slug = branch_slug(s)
             ws = str(s.get("workspace_root") or "").strip()
-            ws_q = ws.replace("'", "'" + "\\" + "''")
+            ws_q = shq(ws)
             parent = ws.rstrip("/").rsplit("/", 1)[0] if "/" in ws.rstrip("/") else "/"
-            parent_q = parent.replace("'", "'" + "\\" + "''")
+            parent_q = shq(parent)
             # Branch FIRST, baseline-commit SECOND: the baseline (which sweeps
             # any uncommitted user work via add -A) lands on the WORK branch,
             # never on the user's current branch (adversary F7). A brand-new
@@ -461,7 +488,7 @@ FUNCTIONS = [
             s2 = dict(s)
             txt = text_of(git_raw).strip()
             branch = txt.split("\n")[-1].strip() if txt else ""
-            slug = str(backlog_fields(s).get("slug") or "")
+            slug = branch_slug(s)
             s2["branch"] = branch if branch else (slug or "work")
             s2["branch_slug"] = slug or str(s.get("branch_slug") or "")
             return s2
@@ -523,16 +550,38 @@ FUNCTIONS = [
                     trail = (trail + "- cycle " + str(hc.get("cycle")) + ": tried: "
                              + str(hc.get("changed") or "(no summary)")[:220]
                              + " | still failed: " + str(hc.get("failed") or "(unknown)")[:180] + "\n")
+            # Probe protocol (code-tui c5871, the 8-hour-hang lesson): the
+            # bounded browser_probe tool over hand-rolled server+headless
+            # scripts; port OWNERSHIP proven by a nonce round-trip (the
+            # incident's port WAS bound - by another process); explicit
+            # timeouts in SECONDS; failed checks exit nonzero. The tool is
+            # named ONLY when the host mounts it (probe_ok) - telling the
+            # builder to call an unmounted tool is a trap (wave-B P2-2).
+            if bool(s.get("probe_ok")):
+                probe_rules = (
+                    "Probe protocol: use the browser_probe tool to check web artifacts (bounded, ~90s) - never hand-roll "
+                    "'start a server then drive a headless browser' scripts. If you serve something on a port, prove the port "
+                    "is YOURS before testing against it: put a nonce in the page and fetch it back (a plain bind or 200 check "
+                    "is NOT enough - the port may be owned by another process). Bound EVERY long-running command with an "
+                    "explicit timeout in SECONDS, and make every check exit nonzero on failure.")
+            else:
+                probe_rules = (
+                    "Probe protocol: browser_probe is NOT available on this host - keep artifact checks static and bounded. "
+                    "If you must check a served artifact, prove the port is YOURS first: put a nonce in the page and fetch it "
+                    "back (a plain bind or 200 check is NOT enough - the port may be owned by another process), bound EVERY "
+                    "long-running command with an explicit timeout in SECONDS, make every check exit nonzero on failure, and "
+                    "never leave a server running in the background.")
             if fix == 0 and not bf:
                 return ("You are the BUILDER. You are on a dedicated git branch; implement this plan fully.\n\nRequest:\n" + req +
                         "\n\nPlan:\n" + plan_txt +
                         "\n\nEngineering rules: bound every loop and traversal; before writing logic over data, read a sample and verify its shape; "
                         "prefer small verifiable functions; start EVERY source file with a 1-2 line header comment stating its purpose; "
-                        "self-probe your artifact before finishing (open it, run it, or trace the entry path). "
+                        "self-probe your artifact before finishing (open it, run it, or trace the entry path). " + probe_rules + " "
                         "When done, write SELFCHECK.md: list each artifact with one line of evidence it works, and AFTER YOUR FINAL EDIT add one "
                         "'ARTIFACT-SHA256: <path> <sha>' line per artifact (compute with: shasum -a 256 <path>).")
             return ("You are the BUILDER in REPAIR mode on the existing branch. Fix ONLY what the failures below name. "
-                    "Read before editing; make the smallest change that fixes the named defect; do NOT rewrite whole files with write_file; re-probe after fixing.\n\n"
+                    "Read before editing; make the smallest change that fixes the named defect; do NOT rewrite whole files with write_file; re-probe after fixing. "
+                    + probe_rules + "\n\n"
                     "Failures to fix:\n" + (bf if bf else "(none recorded - re-verify your artifacts)") +
                     trail +
                     "\n\nAfter your FINAL edit, refresh SELFCHECK.md evidence and its ARTIFACT-SHA256 lines.")
@@ -542,7 +591,7 @@ FUNCTIONS = [
         def compose_lint(state):
             s = state if isinstance(state, dict) else {}
             ws = str(s.get("workspace_root") or "").strip()
-            ws_q = ws.replace("'", "'" + "\\" + "''")
+            ws_q = shq(ws)
             cmd = ("cd '" + ws_q + "' && "
                    "(command -v ruff >/dev/null 2>&1 && ruff check --fix . 2>&1 | tail -5 || true); "
                    "(command -v prettier >/dev/null 2>&1 && prettier --write . 2>&1 | tail -5 || true); "
@@ -596,7 +645,7 @@ FUNCTIONS = [
         def compose_selfcheck_refresh(state):
             s = state if isinstance(state, dict) else {}
             ws = str(s.get("workspace_root") or "").strip()
-            ws_q = ws.replace("'", "'" + "\\" + "''")
+            ws_q = shq(ws)
             # Formatter may have rewritten bytes AFTER the builder hashed them;
             # refresh the ARTIFACT-SHA256 lines deterministically so G5 binds
             # to the shipped bytes (cycle-2 FATAL). Space-safe path handling:
@@ -616,43 +665,27 @@ FUNCTIONS = [
         def compose_commit(state):
             s = state if isinstance(state, dict) else {}
             ws = str(s.get("workspace_root") or "").strip()
-            ws_q = ws.replace("'", "'" + "\\" + "''")
+            ws_q = shq(ws)
             cmd = ("cd '" + ws_q + "' && git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; "
                    "git -c user.name='workflow' -c user.email='workflow@local' commit -m 'build cycle' >/dev/null 2>&1 || true; echo COMMITTED")
             return {"name": "execute_command", "arguments": {"command": cmd}, "call_id": "git-commit"}
     """, kind="composer", description="Tool call: commit the build cycle."),
 
-    fn("verify_input", r"""
-        def verify_input(state):
-            s = state if isinstance(state, dict) else {}
-            return {
-                "request": str(s.get("request") or ""),
-                "workspace_root": str(s.get("workspace_root") or ""),
-                "build_command": str(s.get("build_command") or ""),
-                "run_command": str(s.get("run_command") or ""),
-                "round_index": int(s.get("fix_cycles", 0) or 0),
-                "provider": s.get("provider"),
-                "model": s.get("model"),
-            }
-    """, kind="composer", description="Input object for the mounted verify subflow."),
-
-    fn("tail_check", r"""
-        def tail_check(state):
-            s = state if isinstance(state, dict) else {}
-            green = bool(s.get("all_passed"))
-            wait_mode = str(s.get("gating_mode") or "wait") == "wait"
-            env_blocked = bool(s.get("environment_blocked"))
-            fix = int(s.get("fix_cycles", 0) or 0)
-            maxfix = int(s.get("max_fix_cycles", 6) or 6)
-            stalled = int(s.get("same_signature_count", 0) or 0) >= 3
+    fn("tail_escalate", r"""
+        def tail_escalate(state):
             # In wait mode, a stuck build (out of fix cycles, or the same
             # failure repeating, still not green) escalates to the human gate
             # instead of ending silently. Auto mode never escalates. An
             # environment block never escalates: no reviewer comment can fix a
             # missing command runner.
-            escalate = wait_mode and (not green) and (not env_blocked) and (stalled or fix >= maxfix)
-            return {"green": green, "wait_mode": wait_mode, "escalate": escalate}
-    """, kind="checker", description="Loop-tail law: green / wait-mode / escalate-to-human."),
+            s = state if isinstance(state, dict) else {}
+            stuck = (int(s.get("same_signature_count", 0) or 0) >= 3
+                     or int(s.get("fix_cycles", 0) or 0) >= int(s.get("max_fix_cycles", 6) or 6))
+            return (str(s.get("gating_mode") or "wait") == "wait"
+                    and not bool(s.get("all_passed"))
+                    and not bool(s.get("environment_blocked"))
+                    and stuck)
+    """, kind="checker", description="Stuck build in wait mode? Escalate to the human gate instead of ending silently."),
 
     fn("doc_prompt", r"""
         def doc_prompt(state):
@@ -679,7 +712,7 @@ FUNCTIONS = [
         def compose_doc_guard(state):
             s = state if isinstance(state, dict) else {}
             ws = str(s.get("workspace_root") or "").strip()
-            ws_q = ws.replace("'", "'" + "\\" + "''")
+            ws_q = shq(ws)
             # POSIX-safe: no process substitution (execute_command may run sh,
             # not bash); a temp file keeps the drift flag in the same shell.
             cmd = ("cd '" + ws_q + "' && if [ -f SELFCHECK.md ]; then "
@@ -695,28 +728,8 @@ FUNCTIONS = [
             return {"name": "execute_command", "arguments": {"command": cmd}, "call_id": "doc-guard"}
     """, kind="composer", description="Tool call: post-doc hash guard over SELFCHECK-bound artifacts."),
 
-    fn("doc_drift", r"""
-        def doc_drift(state, guard_raw):
-            s = state if isinstance(state, dict) else {}
-            s2 = dict(s)
-            txt = text_of(guard_raw)
-            drifted = []
-            for ln in txt.split("\n"):
-                t = ln.strip()
-                if t.startswith("DOC_DRIFT "):
-                    drifted.append(t[10:])
-            ok = ("DOC_GUARD_OK" in txt) or ("NO_SELFCHECK_TO_GUARD" in txt and not drifted)
-            if drifted:
-                ok = False
-                s2["all_passed"] = False
-                s2["build_feedback"] = ("doc: the documentation pass modified verified source files: " +
-                                        ", ".join(drifted[:10]) +
-                                        " - restore or re-verify them and refresh SELFCHECK.md hashes")
-            return {"ok": ok, "state": s2, "drifted": drifted}
-    """, kind="parser", description="Did the doc pass touch verified source? (red iteration if so)"),
-
-    fn("pr_fields", r"""
-        def pr_fields(state):
+    fn("pr_body", r"""
+        def pr_body(state):
             s = state if isinstance(state, dict) else {}
             pd = s.get("plan") if isinstance(s.get("plan"), dict) else {}
             title = str(s.get("title") or pd.get("title") or "work").strip()
@@ -728,10 +741,16 @@ FUNCTIONS = [
             lines.append("- gates: " + ("green" if bool(v.get("all_passed")) else "NOT GREEN"))
             for w in warns:
                 lines.append("- advisory: " + str(w))
-            body = "\n".join(lines)
+            return "\n".join(lines)
+    """, kind="composer", description="PR.md markdown body (the PR.md path is a pin default)."),
+
+    fn("compose_pr_push", r"""
+        def compose_pr_push(state):
+            s = state if isinstance(state, dict) else {}
             ws = str(s.get("workspace_root") or "").strip()
-            ws_q = ws.replace("'", "'" + "\\" + "''")
-            branch_q = branch.replace("'", "'" + "\\" + "''")
+            ws_q = shq(ws)
+            branch = str(s.get("branch") or s.get("branch_slug") or "work")
+            branch_q = shq(branch)
             # GIT_TERMINAL_PROMPT=0 + GIT_ASKPASS=true: a credentialed https
             # remote must fail fast, never sit on a hidden credential prompt
             # (adversary F6 - unattended runs).
@@ -742,9 +761,8 @@ FUNCTIONS = [
                    "GH_PROMPT_DISABLED=1 gh pr create --fill --head '" + branch_q + "' 2>&1 | tail -2 || echo PR_EXISTS_OR_FAILED; "
                    "else echo GH_UNAVAILABLE_LOCAL_PR_MD_ONLY; fi; "
                    "else echo NO_REMOTE_LOCAL_PR_MD_ONLY; fi")
-            return {"pr_path": "PR.md", "pr_body": body,
-                    "gh_call": {"name": "execute_command", "arguments": {"command": cmd, "timeout": 120}, "call_id": "pr-create"}}
-    """, kind="composer", description="PR.md body + push/gh command (degrades honestly without remote)."),
+            return {"name": "execute_command", "arguments": {"command": cmd, "timeout": 120}, "call_id": "pr-create"}
+    """, kind="composer", description="Tool call: push branch + gh pr create (degrades honestly without remote)."),
 
     fn("gate2_prompt", r"""
         def gate2_prompt(state):
@@ -765,7 +783,6 @@ FUNCTIONS = [
             if green:
                 lines.append("REVIEW GATE: the build is green on branch '" + branch + "' and PR.md summarizes it.")
                 lines.append("Test the artifact yourself now (the gates are static checks; runtime behavior is yours to judge).")
-                choices = ["approve", "request changes"]
             else:
                 # Say WHICH stop reason fired: the same failure repeating means
                 # more cycles alone will not help (the approach must change);
@@ -778,7 +795,6 @@ FUNCTIONS = [
                 for f in fails[:12]:
                     lines.append("- " + str(f))
                 lines.append("Comment to guide further repairs (this resets the fix budget), or reply 'stop' to end the run unmerged.")
-                choices = ["stop", "guide repairs"]
             for w in warns:
                 lines.append("- advisory: " + str(w))
             if rev >= maxrev:
@@ -787,8 +803,8 @@ FUNCTIONS = [
             lines.append("")
             if green:
                 lines.append("Reply 'approve' to merge into main, or anything else as CHANGE REQUESTS sent back to the builder.")
-            return {"prompt": "\n".join(lines), "choices": choices}
-    """, kind="composer", description="Merge-review / escalation prompt from state."),
+            return "\n".join(lines)
+    """, kind="composer", description="Merge-review / escalation prompt from state (choices are an inline conditional)."),
 
     fn("parse_gate2", r"""
         def parse_gate2(state, response):
@@ -821,12 +837,6 @@ FUNCTIONS = [
             return s2
     """, kind="shaper", description="Fold the reviewer's gate-2 answer into state."),
 
-    fn("approved_and_green", r"""
-        def approved_and_green(state):
-            s = state if isinstance(state, dict) else {}
-            return bool(s.get("approved")) and bool(s.get("all_passed"))
-    """, kind="checker", description="Merge precondition: approved AND green."),
-
     fn("compose_merge", r"""
         def compose_merge(state):
             # Merge success is proven by a POSITIVE sentinel (MERGED_OK), never
@@ -834,8 +844,8 @@ FUNCTIONS = [
             # trunk-default repo).
             s = state if isinstance(state, dict) else {}
             ws = str(s.get("workspace_root") or "").strip()
-            ws_q = ws.replace("'", "'" + "\\" + "''")
-            branch = str(s.get("branch") or "work").replace("'", "'" + "\\" + "''")
+            ws_q = shq(ws)
+            branch = shq(s.get("branch") or "work")
             cmd = ("cd '" + ws_q + "' && git -c user.name='workflow' -c user.email='workflow@local' add -A >/dev/null 2>&1; "
                    "git -c user.name='workflow' -c user.email='workflow@local' commit -m 'final: docs + PR' >/dev/null 2>&1 || true; "
                    "if git checkout main 2>/dev/null || git checkout master 2>/dev/null; then "
@@ -867,89 +877,32 @@ FUNCTIONS = [
             return s2
     """, kind="shaper", description="Fold the merge result into state (positive sentinel only)."),
 
-    fn("final_report", r"""
-        def final_report(state):
-            s = state if isinstance(state, dict) else {}
-            accepted = bool(s.get("accepted"))
-            approved = bool(s.get("approved"))
-            merged = bool(s.get("merged"))
-            passed = bool(s.get("all_passed"))
-            stopped = bool(s.get("user_stopped"))
-            last_g2 = str(s.get("last_gate2") or "")
-            branch = str(s.get("branch") or "")
-            warns = s.get("warnings") if isinstance(s.get("warnings"), list) else []
-            v = s.get("last_verdict") if isinstance(s.get("last_verdict"), dict) else {}
-            fails = v.get("failures") if isinstance(v.get("failures"), list) else []
-            bf = str(s.get("build_feedback") or "").strip()
-            stalled = int(s.get("same_signature_count", 0) or 0) >= 3
-            env_blocked = bool(s.get("environment_blocked"))
-            if not accepted:
-                reason = "plan-not-accepted (plan revisions exhausted without approval)"
-            elif merged:
-                reason = "approved-and-merged"
-            elif approved:
-                reason = "approved-merge-failed"
-            elif env_blocked:
-                reason = "delivered-not-verifiable (environment cannot run the verification steps)"
-            elif stopped:
-                reason = "stopped-by-reviewer (run ended unmerged at the review gate)"
-            elif (last_g2 in ("rejected", "escalated")
-                  and int(s.get("review_rounds", 0) or 0) > int(s.get("max_review_rounds", 2) or 2)):
-                reason = "review-rounds-exhausted (last reviewer change requests unaddressed)"
-            elif passed:
-                reason = "green-pending-approval"
-            elif stalled:
-                reason = "stalled (same failures repeated; needs a different approach or human help)"
-            else:
-                reason = "stopped-open-failures (budgets exhausted)"
-            lines = ["# Multi-agent coding workflow result", ""]
-            lines.append("Outcome: " + reason)
-            lines.append("Branch: " + (branch if branch else "(none)"))
-            lines.append("Gates: " + ("green" if passed else "not green"))
-            lines.append("Merged: " + ("yes" if merged else "no"))
-            lines.append("Plan revisions: " + str(int(s.get("plan_revisions", 0) or 0)) +
-                         " | fix cycles: " + str(int(s.get("fix_cycles", 0) or 0)) +
-                         " | review rounds: " + str(int(s.get("review_rounds", 0) or 0)))
-            if not accepted:
-                pd = s.get("plan") if isinstance(s.get("plan"), dict) else {}
-                pf = str(s.get("plan_feedback") or "").strip()
-                lines.append("")
-                lines.append("Last plan title: " + (str(s.get("title") or pd.get("title") or "").strip() or "(none)"))
-                if pf:
-                    lines.append("Last reviewer comments on the plan:")
-                    for ln in pf.split("\n")[:8]:
-                        lines.append("  " + ln)
-            if reason.startswith("review-rounds-exhausted") and bf:
-                lines.append("")
-                lines.append("Unaddressed reviewer change requests:")
-                for ln in bf.split("\n")[:10]:
-                    lines.append("  " + ln)
-            if fails:
-                lines.append("")
-                lines.append("Open failures:")
-                for f in fails[:15]:
-                    lines.append("- " + str(f))
-            envf = v.get("environment_failures") if isinstance(v.get("environment_failures"), list) else []
-            if envf:
-                lines.append("")
-                lines.append("Environment (not fixable by the builder; artifacts delivered unverified):")
-                for f in envf[:10]:
-                    lines.append("- " + str(f))
-            if warns:
-                lines.append("")
-                lines.append("Advisories:")
-                for w in warns:
-                    lines.append("- " + str(w))
-            report = "\n".join(lines)
-            return {"report": report, "success": merged or (passed and approved),
-                    "stopped_reason": reason, "branch": branch}
-    """, kind="composer", description="The run's terminal report + success/reason/branch."),
 ]
 
 
+# The planner's structured-output schema is a CONSTANT — it rides the
+# resp_schema pin as a plain default, never a computed value.
+PLANNER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "goal": {"type": "string"},
+        "steps": {"type": "array", "items": {"type": "string"}},
+        "files": {"type": "array", "items": {"type": "string"}},
+        "risks": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["title", "goal", "steps"],
+}
+
+
 # ===========================================================================
-# The THREE code bodies that stay as canvas nodes: genuinely multi-wire folds
-# (a pin holds one wire; these each need 2+ producer wires).
+# The FIVE code bodies that stay as canvas nodes. Three are multi-wire folds
+# (a pin holds one wire; these each need 2+ producer wires). Two are
+# multi-OUTPUT decisions (Final report, Doc drift check): several results
+# consumed at different points — that fan-out is graph structure the canvas
+# must show, so each output is a LABELED PIN with its own wire (operator
+# ruling 2026-07-27; the 0.0.5 migration had hidden them in dict-returning
+# functions re-read per pin).
 # ===========================================================================
 
 SCOUT_MERGE_CODE = r"""
@@ -1067,11 +1020,7 @@ s2["last_verdict"] = {"all_passed": all_passed, "failures": fails[:30],
 # verify - stop the loop honestly instead of burning the remaining budget
 if env_fails and not fails and not all_passed:
     s2["environment_blocked"] = True
-# attempt memory: the repair prompt cites what the builder SAID it did last
-# cycle (coding-agent R1 lesson).
 br = str(builder_response or "").strip()
-if br:
-    s2["last_attempt_summary"] = br[-800:]
 # repair history: append one entry per FAILED cycle (cycle number, a short
 # summary of what the builder said it did, and the failure that remained), so
 # the next repair prompt shows the whole trail and the builder does not repeat
@@ -1091,9 +1040,110 @@ if all_passed and str(s.get("gating_mode") or "wait") == "auto":
 return {"state": s2}
 """.strip()
 
+# Doc drift check: ONE parse, TWO consequences (route + state write) at two
+# different execution points. guard_text arrives pre-extracted (the pin
+# expression `text_of(value)` unwraps the tool envelope on the wire).
+DOC_DRIFT_CODE = r"""
+s = loop_state if isinstance(loop_state, dict) else {}
+s2 = dict(s)
+txt = str(guard_text or "")
+drifted = []
+for ln in txt.split("\n"):
+    t = ln.strip()
+    if t.startswith("DOC_DRIFT "):
+        drifted.append(t[10:])
+ok = ("DOC_GUARD_OK" in txt) or ("NO_SELFCHECK_TO_GUARD" in txt and not drifted)
+if drifted:
+    ok = False
+    s2["all_passed"] = False
+    s2["build_feedback"] = ("doc: the documentation pass modified verified source files: " +
+                            ", ".join(drifted[:10]) +
+                            " - restore or re-verify them and refresh SELFCHECK.md hashes")
+return {"ok": ok, "state": s2}
+""".strip()
+
+# Final report: one fold of terminal state into FOUR results (report, success,
+# stopped_reason, branch), each a labeled pin wired to the end node.
+FINAL_REPORT_CODE = r"""
+s = loop_state if isinstance(loop_state, dict) else {}
+accepted = bool(s.get("accepted"))
+approved = bool(s.get("approved"))
+merged = bool(s.get("merged"))
+passed = bool(s.get("all_passed"))
+stopped = bool(s.get("user_stopped"))
+last_g2 = str(s.get("last_gate2") or "")
+branch = str(s.get("branch") or "")
+warns = s.get("warnings") if isinstance(s.get("warnings"), list) else []
+v = s.get("last_verdict") if isinstance(s.get("last_verdict"), dict) else {}
+fails = v.get("failures") if isinstance(v.get("failures"), list) else []
+bf = str(s.get("build_feedback") or "").strip()
+stalled = int(s.get("same_signature_count", 0) or 0) >= 3
+env_blocked = bool(s.get("environment_blocked"))
+if not accepted:
+    reason = "plan-not-accepted (plan revisions exhausted without approval)"
+elif merged:
+    reason = "approved-and-merged"
+elif approved:
+    reason = "approved-merge-failed"
+elif env_blocked:
+    reason = "delivered-not-verifiable (environment cannot run the verification steps)"
+elif stopped:
+    reason = "stopped-by-reviewer (run ended unmerged at the review gate)"
+elif (last_g2 in ("rejected", "escalated")
+      and int(s.get("review_rounds", 0) or 0) > int(s.get("max_review_rounds", 2) or 2)):
+    reason = "review-rounds-exhausted (last reviewer change requests unaddressed)"
+elif passed:
+    reason = "green-pending-approval"
+elif stalled:
+    reason = "stalled (same failures repeated; needs a different approach or human help)"
+else:
+    reason = "stopped-open-failures (budgets exhausted)"
+lines = ["# Multi-agent coding workflow result", ""]
+lines.append("Outcome: " + reason)
+lines.append("Branch: " + (branch if branch else "(none)"))
+lines.append("Gates: " + ("green" if passed else "not green"))
+lines.append("Merged: " + ("yes" if merged else "no"))
+lines.append("Plan revisions: " + str(int(s.get("plan_revisions", 0) or 0)) +
+             " | fix cycles: " + str(int(s.get("fix_cycles", 0) or 0)) +
+             " | review rounds: " + str(int(s.get("review_rounds", 0) or 0)))
+if not accepted:
+    pd = s.get("plan") if isinstance(s.get("plan"), dict) else {}
+    pf = str(s.get("plan_feedback") or "").strip()
+    lines.append("")
+    lines.append("Last plan title: " + (str(s.get("title") or pd.get("title") or "").strip() or "(none)"))
+    if pf:
+        lines.append("Last reviewer comments on the plan:")
+        for ln in pf.split("\n")[:8]:
+            lines.append("  " + ln)
+if reason.startswith("review-rounds-exhausted") and bf:
+    lines.append("")
+    lines.append("Unaddressed reviewer change requests:")
+    for ln in bf.split("\n")[:10]:
+        lines.append("  " + ln)
+if fails:
+    lines.append("")
+    lines.append("Open failures:")
+    for f in fails[:15]:
+        lines.append("- " + str(f))
+envf = v.get("environment_failures") if isinstance(v.get("environment_failures"), list) else []
+if envf:
+    lines.append("")
+    lines.append("Environment (not fixable by the builder; artifacts delivered unverified):")
+    for f in envf[:10]:
+        lines.append("- " + str(f))
+if warns:
+    lines.append("")
+    lines.append("Advisories:")
+    for w in warns:
+        lines.append("- " + str(w))
+report = "\n".join(lines)
+return {"report": report, "success": merged or (passed and approved),
+        "stopped_reason": reason, "branch": branch}
+""".strip()
+
 
 def build_root() -> dict:
-    f = base_flow(ROOT_FLOW_ID, "Multi-agent coding workflow",
+    f = base_flow(ROOT_FLOW_ID, "Multi-agent coding — main pipeline (edit on canvas)",
                   "Scouts (code+web) -> planner -> plan gate -> backlog -> git branch -> "
                   "[build -> lint -> selfcheck -> verify -> doc -> PR -> review gate]xN -> merge. "
                   "Deterministic git/lint/PR/merge via the flow FUNCTION LIBRARY (see the "
@@ -1105,18 +1155,9 @@ def build_root() -> dict:
     N = f["nodes"]
     E = f["edges"]
 
-    # The one long call: seed state from flow inputs (defaults mirror the
-    # start pins' defaults exactly - absent input means the same value the
-    # old wire delivered).
-    seed_expr = (
-        'mw_preflight(vars.get("request"), vars.get("workspace_root"), '
-        'vars.get("gating_mode", "wait"), vars.get("skills", ["coredoc"]), '
-        '(vars.get("_runtime") or {}).get("skills_resolution"), '
-        'vars.get("max_plan_revisions", 3), vars.get("max_fix_cycles", 6), '
-        'vars.get("max_review_rounds", 2), vars.get("build_command", ""), '
-        'vars.get("run_command", ""), vars.get("provider"), vars.get("model"), '
-        'vars.get("browser_probe_available", False))'
-    )
+    # Seed state from the whole run-vars view: one argument, every input
+    # default lives inside mw_preflight (one source, no mirrored 13-arg call).
+    seed_expr = "mw_preflight(vars)"
 
     # ---------------- nodes ----------------
     N.append(node("start", "on_flow_start", "Coding request", -2280, 0,
@@ -1152,9 +1193,22 @@ def build_root() -> dict:
                   inputs=[EXEC_IN, pin("report", "report", "string"),
                           pin("success", "success", "boolean"),
                           pin("stopped_reason", "stopped_reason", "string")],
-                  pin_expressions={"report": "pre_report(" + S + ")",
-                                   "success": "False",
-                                   "stopped_reason": '"preflight-failed"'}))
+                  pin_defaults={"success": False,
+                                "stopped_reason": "preflight-failed"},
+                  pin_expressions={"report": "pre_report(" + S + ")"}))
+
+    # Run-start gating line (code-tui c5871): the FIRST user-visible line of
+    # every run names the mode — "gating: wait" or "gating: auto" — so any
+    # client renders it without knowing this workflow's shape. Stable prefix,
+    # same contract as the "build cycle N of M" line.
+    N.append(W.with_expressions(
+        node("gating_status", "answer_user", "Gating mode", -1580, -200,
+             inputs=[EXEC_IN, pin("message", "message", "string"),
+                     pin("level", "level", "string")],
+             outputs=[EXEC_OUT, pin("message", "message", "string")],
+             pin_defaults={"level": "message"},
+             extra={"icon": "&#x1F4AC;", "headerColor": "#9B59B6"}),
+        {"message": '"gating: " + ' + S + '.get("gating_mode", "wait")'}))
 
     # ---- L1: plan loop ----
     # Loop conditions carry the expression AND a FALSE pin default: on a
@@ -1167,56 +1221,64 @@ def build_root() -> dict:
     plan_while["data"]["pinDefaults"]["condition"] = False
     N.append(W.with_expressions(
         plan_while,
-        {"condition": "plan_again(" + S + ')["condition"]'}))
+        {"condition": "not " + S + '.get("accepted") and '
+                      + S + '.get("plan_revisions", 0) < ' + S + '.get("max_plan_revisions", 3)'}))
+    # scouts run on the first pass and again only on an explicit "research"
+    # choice; cached scout context feeds plain plan revisions for free
     N.append(W.with_expressions(
         if_node("if_scout", "Need scouting?", -1440, -280),
-        {"condition": "plan_again(" + S + ')["need_scout"]'}))
+        {"condition": "not (" + S + '.get("scout_context") or "").strip() or bool(' + S + '.get("rescout"))'}))
     N.append(W.with_expressions(
         agent_node("scout_code", "Scout: code+docs", -1160, -420,
                    pin_defaults={"tools": ["read_file", "list_files", "search_files",
                                            "skim_files", "skim_folders", "analyze_code"],
                                  "max_iterations": 12, "temperature": 0.2}),
         {"prompt": "scout_code_prompt(" + S + ")",
-         "provider": 'vars.get("provider")', "model": 'vars.get("model")'}))
+         "provider": S + '.get("provider")', "model": S + '.get("model")'}))
     N.append(W.with_expressions(
         agent_node("scout_web", "Scout: internet", -860, -420,
                    pin_defaults={"tools": ["web_search", "fetch_url", "skim_websearch", "skim_url"],
                                  "max_iterations": 12, "temperature": 0.2}),
         {"prompt": "scout_web_prompt(" + S + ")",
-         "provider": 'vars.get("provider")', "model": 'vars.get("model")'}))
+         "provider": S + '.get("provider")', "model": S + '.get("model")'}))
     N.append(W.with_expressions(
         code_node("scout_merge", "Merge scout context", SCOUT_MERGE_CODE, -560, -480,
                   [pin("code_findings", "code_findings", "string"),
                    pin("web_findings", "web_findings", "string"),
-                   pin("loop_state", "loop_state", "object")]),
+                   pin("loop_state", "loop_state", "object")],
+                  outputs=[pin("state", "state", "object")]),
         {"loop_state": S}))
     N.append(set_var("set_state_scout", "Cache scout context", STATE_VAR, -560, -280))
     N.append(W.with_expressions(
         agent_node("planner", "Planner", -280, -420,
-                   pin_defaults={"tools": [], "max_iterations": 6, "temperature": 0.2}),
-        {"prompt": "planner_prompt(" + S + ')["prompt"]',
-         "resp_schema": "planner_prompt(" + S + ')["schema"]',
-         "provider": 'vars.get("provider")', "model": 'vars.get("model")'}))
+                   pin_defaults={"tools": [], "max_iterations": 6, "temperature": 0.2,
+                                 # the structured-output schema is a constant,
+                                 # not a computed value
+                                 "resp_schema": PLANNER_SCHEMA}),
+        {"prompt": "planner_prompt(" + S + ")",
+         "provider": S + '.get("provider")', "model": S + '.get("model")'}))
     N.append(W.with_expressions(
         if_node("if_g1", "Wait mode?", 0, -420),
-        {"condition": "plan_again(" + S + ')["wait_mode"]'}))
-    # gate1's prompt/choices are COMPUTED from the planner's data by the
-    # gate1_prompt library function (the planner dict rides the pin wire as
-    # `value`). Wiring planner.data straight into ask_user.prompt would show
-    # the raw dict repr with no choices, and a dead planner ({} — falsy) would
-    # fail the whole run at the ask_user "requires payload.prompt" guard
-    # instead of recycling through the bounded revision loop (migration
-    # adversary F1). Same expression shape as gate2.
-    N.append(W.with_expressions(
-        ask_user("gate1", "GATE 1: approve plan?", 280, -520,
-                 prompt_default="Approve the plan?"),
-        {"prompt": "gate1_prompt(value)[\"prompt\"]",
-         "choices": "gate1_prompt(value)[\"choices\"]"}))
+        {"condition": S + '.get("wait_gating", True)'}))
+    # gate1's prompt is COMPOSED from the planner's data by the gate1_prompt
+    # library function (the planner dict rides the pin wire as `value`).
+    # Wiring planner.data straight into ask_user.prompt would show the raw
+    # dict repr, and a dead planner ({} — falsy) would fail the whole run at
+    # the ask_user "requires payload.prompt" guard instead of recycling
+    # through the bounded revision loop (migration adversary F1). The
+    # choices are a constant pin default.
+    gate1 = ask_user("gate1", "GATE 1: approve plan?", 280, -520)
+    # The prompt is ALWAYS composed by the expression (a dead planner still
+    # yields a non-empty prompt), so a literal prompt default is unreachable.
+    gate1["data"]["pinDefaults"].pop("prompt", None)
+    gate1["data"]["pinDefaults"]["choices"] = ["approve", "revise", "research"]
+    N.append(W.with_expressions(gate1, {"prompt": "gate1_prompt(value)"}))
     N.append(W.with_expressions(
         code_node("gate1_parse", "Parse gate-1", GATE1_PARSE_CODE, 560, -640,
                   [pin("response", "response", "string"),
                    pin("loop_state", "loop_state", "object"),
-                   pin("planner_data", "planner_data", "object")]),
+                   pin("planner_data", "planner_data", "object")],
+                  outputs=[pin("state", "state", "object")]),
         {"loop_state": S}))
     N.append(set_var("set_state_plan", "Record decision", STATE_VAR, 560, -420))
     # auto mode: deterministic accept - the fold is a library function; the
@@ -1232,11 +1294,11 @@ def build_root() -> dict:
     # ---- accepted? -> backlog + git ----
     N.append(W.with_expressions(
         if_node("if_accepted", "Accepted?", -1160, 260),
-        {"condition": "plan_accepted(" + S + ")"}))
+        {"condition": S + '.get("accepted", False)'}))
     N.append(W.with_expressions(
         write_file_node("backlog_write", "Write planned item", -880, 260),
-        {"file_path": "backlog_fields(" + S + ')["file_path"]',
-         "content": "backlog_fields(" + S + ')["content"]'}))
+        {"file_path": '"docs/backlog/planned/" + branch_slug(' + S + ') + ".md"',
+         "content": "backlog_body(" + S + ")"}))
     N.append(W.with_expressions(
         call_tool("git_call", "Git init+branch", ["execute_command"], -600, 260),
         {"tool_call": "compose_git_branch(" + S + ")"}))
@@ -1269,14 +1331,21 @@ def build_root() -> dict:
              extra={"icon": "&#x1F4AC;", "headerColor": "#9B59B6"}),
         {"message": ('"build cycle " + str((' + S + '.get("fix_cycles", 0) or 0) + 1) '
                      '+ " of " + str(' + S + '.get("max_fix_cycles", 6) or 6)')}))
+    # browser_probe (code-tui c5871): the bounded registered probe replaces
+    # hand-rolled server+headless scripts that hung a live run for 8 hours.
+    # Granted ONLY when the host mounts it (probe_ok) — the tools pin carries
+    # the conditional; the pin DEFAULT stays the probe-less base list (skew
+    # belt: a pre-expression runtime grants the safe set).
+    builder_base_tools = ["read_file", "write_file", "edit_file",
+                          "list_files", "search_files", "analyze_code",
+                          "execute_command"]
     N.append(W.with_expressions(
         agent_node("builder", "Builder", 240, 140,
-                   pin_defaults={"tools": ["read_file", "write_file", "edit_file",
-                                           "list_files", "search_files", "analyze_code",
-                                           "execute_command"],
+                   pin_defaults={"tools": builder_base_tools,
                                  "max_iterations": 40, "temperature": 0.2}),
         {"prompt": "builder_prompt(" + S + ")",
-         "provider": 'vars.get("provider")', "model": 'vars.get("model")'}))
+         "tools": ("value + ([\"browser_probe\"] if " + S + '.get("probe_ok") else [])'),
+         "provider": S + '.get("provider")', "model": S + '.get("model")'}))
     N.append(W.with_expressions(
         call_tool("lint_call", "Lint + format (fix)", ["execute_command"], 540, 140),
         {"tool_call": "compose_lint(" + S + ")"}))
@@ -1288,7 +1357,7 @@ def build_root() -> dict:
         {"tool_call": "compose_commit(" + S + ")"}))
     N.append(W.with_expressions(
         subflow_node("verify", "Test: mounted gates", VERIFY_FLOW_ID, 1380, 140),
-        {"input": "verify_input(" + S + ")"}))
+        {"input": VERIFY_INPUT_EXPR}))
     # Fold verdict is a genuinely multi-wire node: verify output + child meta
     # + builder response + lint raw. Its lint_out pin extracts residuals from
     # the raw lint envelope via the library (`parse_lint_residuals(value)`);
@@ -1299,7 +1368,8 @@ def build_root() -> dict:
                    pin("verify_meta", "verify_meta", "object"),
                    pin("builder_response", "builder_response", "string"),
                    pin("lint_out", "lint_out", "array"),
-                   pin("loop_state", "loop_state", "object")]),
+                   pin("loop_state", "loop_state", "object")],
+                  outputs=[pin("state", "state", "object")]),
         {"verify_verdict": field_expr("verdict", "{}"),
          "lint_out": "parse_lint_residuals(value)",
          "loop_state": S}))
@@ -1308,52 +1378,61 @@ def build_root() -> dict:
     # ---- loop tail: green -> doc -> guard -> PR -> gate2 / escalate / red ----
     N.append(W.with_expressions(
         if_node("if_green", "Gates green?", 1940, 140),
-        {"condition": "tail_check(" + S + ')["green"]'}))
+        {"condition": S + '.get("all_passed", False)'}))
+    # if_escalate's FALSE branch is deliberately unwired: a red iteration with
+    # no escalation simply ends (an unwired branch inside an active while
+    # completes the iteration cleanly — same mechanism the dangling exec-outs
+    # of the set_state nodes rely on). The old identity-write set_var here
+    # was a no-op node.
     N.append(W.with_expressions(
         if_node("if_escalate", "Stuck: ask human?", 1940, 420),
-        {"condition": "tail_check(" + S + ')["escalate"]'}))
-    N.append(node("set_state_noop", "set_var", "Iteration ends (red)", 2220, 500,
-                  inputs=[EXEC_IN, pin("name", "name", "string"),
-                          pin("value", "value", "object")],
-                  outputs=[EXEC_OUT],
-                  pin_defaults={"name": STATE_VAR},
-                  pin_expressions={"value": S},
-                  extra={"icon": "&#x1F4E5;", "headerColor": "#8E44AD"}))
+        {"condition": "tail_escalate(" + S + ")"}))
     N.append(W.with_expressions(
         agent_node("doc", "Documenter", 2220, 20,
                    pin_defaults={"tools": ["read_file", "write_file", "edit_file",
                                            "list_files", "search_files"],
                                  "max_iterations": 15, "temperature": 0.2}),
         {"prompt": "doc_prompt(" + S + ")",
-         "provider": 'vars.get("provider")', "model": 'vars.get("model")'}))
+         "provider": S + '.get("provider")', "model": S + '.get("model")'}))
     N.append(W.with_expressions(
         call_tool("docguard_call", "Doc guard (hash check)", ["execute_command"], 2520, 20),
         {"tool_call": "compose_doc_guard(" + S + ")"}))
+    # Doc drift check: one parse, two labeled outputs at two execution points
+    # (ok -> route, state -> red write). A code node so the fan-out is VISIBLE
+    # wiring, not a function re-read behind two pins.
     N.append(W.with_expressions(
-        if_node("if_docok", "Source untouched?", 2800, 20),
-        {"condition": 'doc_drift(' + S + ', value)["ok"]'}))
-    N.append(node("set_state_docred", "set_var", "Doc broke it (red)", 2800, -200,
+        code_node("doc_drift", "Doc drift check", DOC_DRIFT_CODE, 2660, -200,
+                  [pin("guard_text", "guard_text", "string"),
+                   pin("loop_state", "loop_state", "object")],
+                  outputs=[pin("ok", "ok", "boolean"),
+                           pin("state", "state", "object")]),
+        {"guard_text": "text_of(value)", "loop_state": S}))
+    N.append(if_node("if_docok", "Source untouched?", 2800, 20))
+    N.append(node("set_state_docred", "set_var", "Doc broke it (red)", 2800, -400,
                   inputs=[EXEC_IN, pin("name", "name", "string"),
                           pin("value", "value", "object")],
                   outputs=[EXEC_OUT],
                   pin_defaults={"name": STATE_VAR},
-                  pin_expressions={"value": 'doc_drift(' + S + ', value)["state"]'},
                   extra={"icon": "&#x1F4E5;", "headerColor": "#8E44AD"}))
-    N.append(W.with_expressions(
-        write_file_node("pr_write", "Write PR.md", 3080, 20),
-        {"file_path": "pr_fields(" + S + ')["pr_path"]',
-         "content": "pr_fields(" + S + ')["pr_body"]'}))
+    pr_write = write_file_node("pr_write", "Write PR.md", 3080, 20)
+    pr_write["data"].setdefault("pinDefaults", {})["file_path"] = "PR.md"
+    N.append(W.with_expressions(pr_write, {"content": "pr_body(" + S + ")"}))
     N.append(W.with_expressions(
         call_tool("pr_call", "Push + PR (if remote)", ["execute_command"], 3360, 20),
-        {"tool_call": "pr_fields(" + S + ')["gh_call"]'}))
+        {"tool_call": "compose_pr_push(" + S + ")"}))
     N.append(W.with_expressions(
         if_node("if_g2", "Wait mode?", 3640, 20),
-        {"condition": "tail_check(" + S + ')["wait_mode"]'}))
+        {"condition": S + '.get("wait_gating", True)'}))
+    gate2 = ask_user("gate2", "GATE 2: approve merge?", 3920, 100)
+    gate2["data"]["pinDefaults"].pop("prompt", None)  # always composed (see gate1)
     N.append(W.with_expressions(
-        ask_user("gate2", "GATE 2: approve merge?", 3920, 100,
-                 prompt_default="Test the build; approve the merge?"),
-        {"prompt": "gate2_prompt(" + S + ')["prompt"]',
-         "choices": "gate2_prompt(" + S + ')["choices"]'}))
+        gate2,
+        {"prompt": "gate2_prompt(" + S + ")",
+         "choices": '["approve", "request changes"] if ' + S + '.get("all_passed") else ["stop", "guide repairs"]'}))
+    # if_g2's FALSE branch (auto mode) is deliberately unwired: green in auto
+    # mode was already auto-approved by the verdict fold, so the iteration
+    # just ends and the loop condition exits. The old identity-write set_var
+    # here was a no-op node.
     N.append(node("set_state_g2", "set_var", "Record review", 4200, 100,
                   inputs=[EXEC_IN, pin("name", "name", "string"),
                           pin("value", "value", "object")],
@@ -1361,18 +1440,11 @@ def build_root() -> dict:
                   pin_defaults={"name": STATE_VAR},
                   pin_expressions={"value": "parse_gate2(" + S + ", value)"},
                   extra={"icon": "&#x1F4E5;", "headerColor": "#8E44AD"}))
-    N.append(node("set_state_g2auto", "set_var", "Auto mode: end iteration", 3920, 320,
-                  inputs=[EXEC_IN, pin("name", "name", "string"),
-                          pin("value", "value", "object")],
-                  outputs=[EXEC_OUT],
-                  pin_defaults={"name": STATE_VAR},
-                  pin_expressions={"value": S},
-                  extra={"icon": "&#x1F4E5;", "headerColor": "#8E44AD"}))
 
     # ---- post-loop: merge + report ----
     N.append(W.with_expressions(
         if_node("if_approved", "Merge?", -40, 640),
-        {"condition": "approved_and_green(" + S + ")"}))
+        {"condition": S + '.get("approved", False) and ' + S + '.get("all_passed", False)'}))
     N.append(W.with_expressions(
         call_tool("merge_call", "Merge --no-ff to main", ["execute_command"], 240, 640),
         {"tool_call": "compose_merge(" + S + ")"}))
@@ -1383,17 +1455,21 @@ def build_root() -> dict:
                   pin_defaults={"name": STATE_VAR},
                   pin_expressions={"value": "record_merge(" + S + ", value)"},
                   extra={"icon": "&#x1F4E5;", "headerColor": "#8E44AD"}))
+    # Final report: ONE fold, FOUR labeled outputs wired to the end node —
+    # the fan-out is visible graph structure (multi-output helpers are nodes).
+    N.append(W.with_expressions(
+        code_node("final_report", "Final report", FINAL_REPORT_CODE, 520, 860,
+                  [pin("loop_state", "loop_state", "object")],
+                  outputs=[pin("report", "report", "string"),
+                           pin("success", "success", "boolean"),
+                           pin("stopped_reason", "stopped_reason", "string"),
+                           pin("branch", "branch", "string")]),
+        {"loop_state": S}))
     N.append(node("end", "on_flow_end", "Result", 800, 640,
                   inputs=[EXEC_IN, pin("report", "report", "string"),
                           pin("success", "success", "boolean"),
                           pin("branch", "branch", "string"),
-                          pin("stopped_reason", "stopped_reason", "string")],
-                  pin_expressions={
-                      "report": "final_report(" + S + ')["report"]',
-                      "success": "final_report(" + S + ')["success"]',
-                      "branch": "final_report(" + S + ')["branch"]',
-                      "stopped_reason": "final_report(" + S + ')["stopped_reason"]',
-                  }))
+                          pin("stopped_reason", "stopped_reason", "string")]))
 
     # ---------------- edges ----------------
     def ex(a, b, *, src="exec-out", dst="exec-in"):
@@ -1407,8 +1483,9 @@ def build_root() -> dict:
     ex("set_state0", "if_preflight")
     ex("if_preflight", "end_pre", src="false")
 
-    # L1 plan loop
-    ex("if_preflight", "plan_while", src="true")
+    # L1 plan loop (through the run-start gating line)
+    ex("if_preflight", "gating_status", src="true")
+    ex("gating_status", "plan_while")
     ex("plan_while", "if_scout", src="loop")
     ex("if_scout", "scout_code", src="true")
     ex("if_scout", "planner", src="false")
@@ -1419,11 +1496,11 @@ def build_root() -> dict:
     data("scout_merge", "state", "set_state_scout", "value")
     ex("set_state_scout", "planner")
     ex("planner", "if_g1")
-    # wait mode: human gate. planner.data rides the prompt+choices wires so
-    # the gate1_prompt(value) expressions on those pins see it as `value`.
+    # wait mode: human gate. planner.data rides the prompt wire so the
+    # gate1_prompt(value) expression sees it as `value`; choices are a
+    # constant pin default.
     ex("if_g1", "gate1", src="true")
     data("planner", "data", "gate1", "prompt")
-    data("planner", "data", "gate1", "choices")
     ex("gate1", "set_state_plan")
     data("gate1", "response", "gate1_parse", "response")
     data("planner", "data", "gate1_parse", "planner_data")
@@ -1462,20 +1539,22 @@ def build_root() -> dict:
     ex("set_state_build", "if_green")
     ex("if_green", "if_escalate", src="false")
     ex("if_escalate", "gate2", src="true")
-    ex("if_escalate", "set_state_noop", src="false")
+    # if_escalate false: unwired — red iteration ends, loop re-evaluates
     ex("if_green", "doc", src="true")
     ex("doc", "docguard_call")
     ex("docguard_call", "if_docok")
-    data("docguard_call", "raw", "if_docok", "condition")
+    # one parse, two labeled consequences: ok routes, state carries the red fold
+    data("docguard_call", "raw", "doc_drift", "guard_text")
+    data("doc_drift", "ok", "if_docok", "condition")
     ex("if_docok", "set_state_docred", src="false")
-    data("docguard_call", "raw", "set_state_docred", "value")
+    data("doc_drift", "state", "set_state_docred", "value")
     ex("if_docok", "pr_write", src="true")
     ex("pr_write", "pr_call")
     ex("pr_call", "if_g2")
     ex("if_g2", "gate2", src="true")
     ex("gate2", "set_state_g2")
     data("gate2", "response", "set_state_g2", "value")
-    ex("if_g2", "set_state_g2auto", src="false")
+    # if_g2 false (auto mode): unwired — iteration ends, loop exits on approval
 
     # post-loop: merge decision
     ex("build_while", "if_approved", src="done")
@@ -1484,7 +1563,13 @@ def build_root() -> dict:
     data("merge_call", "raw", "set_state_merge", "value")
     ex("set_state_merge", "end")
     ex("if_approved", "end", src="false")
+    # terminal fold: four labeled results, four visible wires
+    data("final_report", "report", "end", "report")
+    data("final_report", "success", "end", "success")
+    data("final_report", "branch", "end", "branch")
+    data("final_report", "stopped_reason", "end", "stopped_reason")
 
+    W.apply_flow_layout(f)
     write_json(FLOWS_DIR / f"{ROOT_FLOW_ID}.json", f)
     return f
 
@@ -1531,7 +1616,7 @@ def build_verify_copy() -> dict:
     """Drift-pinned copy of coding-verify-gates as multiagent-verify-gates."""
     src = json.loads((FLOWS_DIR / "coding-verify-gates.json").read_text())
     src["id"] = VERIFY_FLOW_ID
-    src["name"] = "Multi-agent verify gates (pinned copy of coding-verify-gates)"
+    src["name"] = "Multi-agent verify gates — embedded subflow (auto-managed)"
     _collapse_read_verdict(src)
     write_json(FLOWS_DIR / f"{VERIFY_FLOW_ID}.json", src)
     return src
@@ -1551,13 +1636,18 @@ WRAPPER_MAP_CODE = (
     "g = str(gating_mode or \"" + WRAPPER_GATING + "\").strip().lower()\n"
     "if g not in (\"wait\", \"auto\"):\n"
     "    g = \"" + WRAPPER_GATING + "\"\n"
+    "# browser_probe rides through as a DECLARED pin defaulting TRUE (code-tui\n"
+    "# c5871: the tool is registered on the shipped gateway and bounded; the\n"
+    "# old hardcoded False made every report claim static-only verification).\n"
+    "# A probe-less gateway sends browser_probe_available=false.\n"
+    "probe = True if browser_probe_available is None else bool(browser_probe_available)\n"
     "built = {\n"
     "    \"request\": p,\n"
     "    \"workspace_root\": ws,\n"
     "    \"provider\": provider,\n"
     "    \"model\": model,\n"
     "    \"gating_mode\": g,\n"
-    "    \"browser_probe_available\": False,\n"
+    "    \"browser_probe_available\": probe,\n"
     "}\n"
     "return {\"built\": built}"
 )
@@ -1567,7 +1657,7 @@ def build_wrapper() -> dict:
     """agent.v1 wrapper (mirrors `coder`): {prompt} -> multiagent-coding root
     -> {response, success, meta}. This is the entrypoint that appears in the
     app agent-workflow picker; the strict coding.v1 root does not (by design)."""
-    f = base_flow(WRAPPER_FLOW_ID, "Multi-agent coder",
+    f = base_flow(WRAPPER_FLOW_ID, "Multi-agent coder — chat entry (runs pipeline)",
                   "Chat-agent entrypoint for the multi-agent coding pipeline (scouts -> "
                   "plan -> gates -> build/verify loop -> docs -> PR -> merge). Defaults "
                   "to gating_mode=wait: interactive clients answer TWO ask_user gates "
@@ -1588,13 +1678,16 @@ def build_wrapper() -> dict:
                            # input-first resolution picks these up from run
                            # vars/input_data; defaults keep the contract honest
                            pin("workspace_root", "workspace_root", "string"),
-                           pin("gating_mode", "gating_mode", "string")],
+                           pin("gating_mode", "gating_mode", "string"),
+                           pin("browser_probe_available", "browser_probe_available", "boolean")],
                   pin_defaults={"prompt": "", "workspace_root": "",
-                                "gating_mode": WRAPPER_GATING}))
+                                "gating_mode": WRAPPER_GATING,
+                                "browser_probe_available": True}))
     N.append(code_node("map_input", "Map prompt -> request", WRAPPER_MAP_CODE, -560, 0,
                        [pin("prompt", "prompt", "string"),
                         pin("workspace_root", "workspace_root", "string"),
                         pin("gating_mode", "gating_mode", "string"),
+                        pin("browser_probe_available", "browser_probe_available", "boolean"),
                         pin("provider", "provider", "provider_text"),
                         pin("model", "model", "model")]))
     N.append(subflow_node("build", "Run multi-agent coding", ROOT_FLOW_ID, -220, 0))
@@ -1626,6 +1719,7 @@ def build_wrapper() -> dict:
     E.append(edge("start", "prompt", "map_input", "prompt"))
     E.append(edge("start", "workspace_root", "map_input", "workspace_root"))
     E.append(edge("start", "gating_mode", "map_input", "gating_mode"))
+    E.append(edge("start", "browser_probe_available", "map_input", "browser_probe_available"))
     E.append(edge("start", "provider", "map_input", "provider"))
     E.append(edge("start", "model", "map_input", "model"))
     E.append(edge("map_input", "built", "build", "input"))
@@ -1636,14 +1730,38 @@ def build_wrapper() -> dict:
     E.append(edge("build", "output", "meta_obj", "stopped_reason"))
     E.append(edge("meta_obj", "result", "end", "meta"))
 
+    W.apply_flow_layout(f)
     write_json(FLOWS_DIR / f"{WRAPPER_FLOW_ID}.json", f)
     return f
+
+
+def _assert_seed_precedes_state_reads(flow: dict) -> None:
+    """Structural pin (correctness-adversary blind spot 5): every `vars.state`
+    expression evaluates strictly AFTER the seed node ran. Enforced by shape:
+    the start node's ONLY exec successor is set_state0, so every downstream
+    node passes through the seed. A future exec-reorder that breaks this
+    fails the BUILD, not a live run with a KeyError."""
+    start_exec = [e for e in flow["edges"]
+                  if e["source"] == "start" and e.get("sourceHandle") == "exec-out"]
+    if len(start_exec) != 1 or start_exec[0]["target"] != "set_state0":
+        raise AssertionError(
+            f"seed-before-reads broken: start exec edges {[(e['target']) for e in start_exec]} "
+            "(must be exactly [set_state0] — vars.state expressions assume the seed ran)")
+    for n in flow["nodes"]:
+        if n["id"] in ("start", "set_state0"):
+            exprs = n["data"].get("pinExpressions") or {}
+            for pin_id, expr in exprs.items():
+                if "vars.state" in str(expr):
+                    raise AssertionError(
+                        f"seed-before-reads broken: {n['id']}.{pin_id} reads vars.state "
+                        "before/at the seed node")
 
 
 def main() -> int:
     verify = build_verify_copy()
     root = build_root()
     wrapper = build_wrapper()
+    _assert_seed_precedes_state_reads(root)
     ok = True
     for fid, flow in ((ROOT_FLOW_ID, root), (VERIFY_FLOW_ID, verify), (WRAPPER_FLOW_ID, wrapper)):
         problems = validate_edges(flow)
@@ -1652,6 +1770,17 @@ def main() -> int:
             print(f"EDGE PROBLEMS ({fid}):")
             for p in problems:
                 print("  " + p)
+    if not ok:
+        return 1
+    for fid, flow in ((ROOT_FLOW_ID, root), (VERIFY_FLOW_ID, verify), (WRAPPER_FLOW_ID, wrapper)):
+        overlaps = W.layout_overlap_findings(flow)
+        if overlaps:
+            ok = False
+            print(f"LAYOUT OVERLAPS ({fid}): {len(overlaps)}")
+            for finding in overlaps[:10]:
+                print("  " + finding)
+            if len(overlaps) > 10:
+                print(f"  ... and {len(overlaps) - 10} more")
     if not ok:
         return 1
     pure = [n for n in root["nodes"]
@@ -1689,8 +1818,15 @@ def main() -> int:
                 "purpose": ("14-step multi-agent coding pipeline: scouts(code+web) -> planner -> "
                             "plan gate -> backlog -> git branch -> [build -> lint -> selfcheck -> "
                             "mounted verify -> doc guard -> PR -> review gate]xN -> deterministic merge. "
-                            "Dual-interface: coding.v1 strict root (gated, request/workspace_root in) + "
-                            "agent.v1 wrapper 'multiagent-coder' (prompt in, auto gating, picker-visible)."),
+                            "Dual-interface: coding.v1 strict root (request/workspace_root in) + "
+                            "agent.v1 wrapper 'multiagent-coder' (prompt in, picker-visible). Both "
+                            "default to gating_mode=wait (two human gates); send gating_mode=auto "
+                            "for unattended runs."),
+                # Catalog-level gating discoverability (code-tui c5871): a
+                # client detects that this workflow is gating-capable from the
+                # catalog entry instead of matching the bundle id by name.
+                "gating": {"pin": "gating_mode", "values": ["wait", "auto"],
+                           "default": WRAPPER_GATING},
                 "outputs": ["report", "success", "branch", "stopped_reason"],
                 "auto_mode_requirement": ("unattended runs must auto-approve gated tools: send "
                                           "input_data._runtime.tool_policy = {\"auto_approve_tools\": "

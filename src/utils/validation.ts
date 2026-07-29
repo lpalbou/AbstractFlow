@@ -122,7 +122,21 @@ export function validateConnection(
     if (sourceAlreadyConnected) return false;
   }
 
-  if (!areTypesCompatible(sourcePin.type, targetPin.type)) return false;
+  // A target pin carrying a pin EXPRESSION accepts a wire of ANY data type:
+  // the wire only feeds the expression's `value` and the expression is the
+  // adapter (the canonical fx pattern — `planner.data(object) → gate1.prompt
+  // (string)` with `gate1_prompt(value)`). Without this, the load-time edge
+  // filter silently DROPPED such in-use edges: 63/68 edges rendered, Run was
+  // blocked by false "reads 'value' but the pin has no wire" positives, and
+  // the next save persisted the loss (wave-B live verifier P1-A). Execution
+  // pins are exempt — expressions never ride exec pins.
+  const targetExpression =
+    sourcePin.type !== 'execution' && targetPin.type !== 'execution'
+      ? targetNode.data.pinExpressions?.[connection.targetHandle]
+      : undefined;
+  const expressionAdapts = typeof targetExpression === 'string' && targetExpression.trim().length > 0;
+
+  if (!expressionAdapts && !areTypesCompatible(sourcePin.type, targetPin.type)) return false;
   return !getArtifactConnectionError(sourceNode.data, sourcePin, targetNode.data, targetPin);
 }
 

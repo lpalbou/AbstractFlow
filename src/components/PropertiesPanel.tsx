@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
+import { getBundledFlow } from '../utils/bundledFlows';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import { useFlowStore } from '../hooks/useFlow';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
@@ -1212,14 +1213,26 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (!node || node.data.nodeType !== 'subflow') return;
     const subflowId = node.data.subflowId;
     if (!subflowId) return;
-    if (!gatewayReadiness.operations.save.ready || !visualflowItemEndpoint) return;
 
     const syncKey = `${node.id}:${subflowId}`;
     if (lastSyncedSubflowPins.current === syncKey) return;
 
+    // Edge-aware sync (adversary P1-2): never rewrite an in-use one-object node.
+    const syncOpts = { nodeId: node.id, edges: useFlowStore.getState().edges };
+
+    // Bundled-only subflows are not in gateway storage — resolve locally first.
+    const bundled = getBundledFlow(subflowId);
+    if (bundled) {
+      const patch = subflowPinPatchForSelectedFlow(node.data, bundled, syncOpts);
+      if (patch) updateNodeData(node.id, patch);
+      lastSyncedSubflowPins.current = syncKey;
+      return;
+    }
+    if (!gatewayReadiness.operations.save.ready || !visualflowItemEndpoint) return;
+
     gatewayJson<VisualFlow>(gatewayPath(visualflowItemEndpoint, { flow_id: subflowId }))
       .then((flow: VisualFlow) => {
-        const patch = subflowPinPatchForSelectedFlow(node.data, flow);
+        const patch = subflowPinPatchForSelectedFlow(node.data, flow, syncOpts);
         if (patch) updateNodeData(node.id, patch);
 
         lastSyncedSubflowPins.current = syncKey;

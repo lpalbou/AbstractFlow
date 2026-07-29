@@ -45,6 +45,10 @@ interface FlowState {
   // fits the view. Nonce lets the same node be re-focused on repeated clicks.
   focusNodeRequest: { nodeId: string; nonce: number } | null;
 
+  // "Fit the whole flow into view" request (bumped by loadFlow so every
+  // freshly loaded flow starts fitted, regardless of the previous camera).
+  fitViewRequest: { nonce: number } | null;
+
   // Execution state
   executingNodeId: string | null;
   isRunning: boolean;
@@ -341,6 +345,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   selectedNode: null,
   selectedEdge: null,
   focusNodeRequest: null,
+  fitViewRequest: null,
   executingNodeId: null,
   isRunning: false,
   execView: false,
@@ -2682,7 +2687,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       ...(flowFunctions.length ? { functions: flowFunctions } : {}),
     };
 
-    set({
+    set((state) => ({
       flowId: flow.id,
       draftInstanceId: newDraftInstanceId(),
       flowName: flow.name,
@@ -2692,13 +2697,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowFunctions,
       selectedNode: null,
       selectedEdge: null,
+      // Always fit the camera to a freshly loaded flow — a zoomed-in camera
+      // from the previous session answers nothing about the new graph (UX
+      // adversary P1-5: fit-on-load was session-dependent).
+      fitViewRequest: { nonce: (state.fitViewRequest?.nonce || 0) + 1 },
       // A freshly loaded document starts a new timeline — undoing into the
       // PREVIOUS flow's graph would be nonsensical.
       past: [],
       future: [],
       _historyLastKey: null,
       _historyLastAt: 0,
-    });
+    }));
     return loadedFlow;
   },
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AfChip } from '@abstractframework/ui-kit';
 import type { VisualFlow } from '../types/flow';
+import { BUNDLED_COMPOSED_ONLY_IDS } from '../utils/bundledFlows';
 import {
   KNOWN_INTERFACES,
   buildFlowFamilyIndex,
@@ -118,7 +119,10 @@ export function FlowLibraryModal({
   const bundledRunTargetIdSet = useMemo(() => new Set(bundledRunTargetIds || []), [bundledRunTargetIds]);
 
   const allFlows = useMemo(() => (Array.isArray(flows) ? flows : []), [flows]);
-  const familyIndex = useMemo(() => buildFlowFamilyIndex(allFlows), [allFlows]);
+  const familyIndex = useMemo(
+    () => buildFlowFamilyIndex(allFlows, { composedOnlyIds: BUNDLED_COMPOSED_ONLY_IDS }),
+    [allFlows]
+  );
   const flowById = useMemo(() => new Map(allFlows.map((flow) => [flow.id, flow])), [allFlows]);
   // Same-name collisions are real in live libraries (saved iteration copies):
   // surface the short id so "three deep-research" is self-explanatory.

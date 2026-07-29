@@ -4,6 +4,7 @@ import {
   isExecutableFlow,
   refMultiplicity,
   type FlowFamilyIndex,
+  type FlowFamilyIndexOptions,
 } from './flowFamilies';
 
 /**
@@ -49,6 +50,7 @@ export interface LibraryRowsOptions {
   viewMode: LibraryViewMode;
   sortMode: LibrarySortMode;
   expandedIds: ReadonlySet<string>;
+  familyIndexOptions?: FlowFamilyIndexOptions;
 }
 
 function safeLower(value: unknown): string {
@@ -224,5 +226,5 @@ export function buildLibraryRows(
 
 /** Convenience: index + rows in one call (memoize per input identity in the UI). */
 export function libraryRowsFor(flows: VisualFlow[], options: LibraryRowsOptions): LibraryRowsResult {
-  return buildLibraryRows(flows, buildFlowFamilyIndex(flows), options);
+  return buildLibraryRows(flows, buildFlowFamilyIndex(flows, options.familyIndexOptions), options);
 }

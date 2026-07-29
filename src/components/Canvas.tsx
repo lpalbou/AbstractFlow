@@ -717,6 +717,25 @@ function CanvasBody() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNodeRequest?.nonce]);
 
+  // Fit the camera to every freshly loaded flow (UX adversary P1-5: a stale
+  // zoomed camera from the previous session answered nothing about the new
+  // graph). Deferred one tick so React Flow has the new nodes measured.
+  const fitViewRequest = useFlowStore((s) => s.fitViewRequest);
+  useEffect(() => {
+    if (!fitViewRequest) return;
+    const inst = reactFlowInstance.current;
+    if (!inst) return;
+    const timer = window.setTimeout(() => {
+      try {
+        inst.fitView({ padding: 0.15, duration: 250, maxZoom: DEFAULT_ZOOM });
+      } catch {
+        // best-effort; ignore
+      }
+    }, 50);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitViewRequest?.nonce]);
+
   const minimapNodeColor = useCallback((node: Node<FlowNodeData>): string => {
     const data = node.data as FlowNodeData;
     return data?.headerColor || '#71819a';

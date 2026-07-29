@@ -219,8 +219,49 @@ export function defaultSubflowPinPatch(data: FlowNodeData): Pick<FlowNodeData, '
 
 export function subflowPinPatchForSelectedFlow(
   data: FlowNodeData,
-  flow: VisualFlow
+  flow: VisualFlow,
+  opts?: {
+    nodeId?: string;
+    edges?: Array<{
+      source: string;
+      sourceHandle?: string | null;
+      target: string;
+      targetHandle?: string | null;
+    }>;
+  }
 ): Pick<FlowNodeData, 'inputs' | 'outputs'> | null {
+  // Generator-built flows use the ONE-OBJECT convention: a single `input`
+  // object pin (the runtime maps its keys by name onto the child's start
+  // fields) and one `output` pin collecting the end fields. When that shape
+  // is IN USE (an expression composes `input`, or edges ride input/output),
+  // it is valid as-is — rewriting it to per-field interface pins orphans
+  // every wire on the node (persistence adversary P1-2: a family copy
+  // rendered 60 of its 69 persisted edges after the sync fired). A
+  // template-fresh node (same shape, nothing attached) still syncs — that
+  // is the palette flow the interface sync exists for.
+  const dataInputIds = (data.inputs || []).filter((p) => p.type !== 'execution').map((p) => p.id);
+  const dataOutputIds = (data.outputs || []).filter((p) => p.type !== 'execution').map((p) => p.id);
+  const usesObjectConvention =
+    dataInputIds.includes('input') &&
+    dataOutputIds.includes('output') &&
+    dataInputIds.every((id) => id === 'input' || id === 'inherit_context' || id === 'inheritContext');
+  if (usesObjectConvention) {
+    const exprs = data.pinExpressions;
+    const inputExpression =
+      exprs && typeof exprs === 'object' ? (exprs as Record<string, unknown>).input : undefined;
+    const hasInputExpression = typeof inputExpression === 'string' && inputExpression.trim().length > 0;
+    const nid = opts?.nodeId;
+    const carriesEdge = Boolean(
+      nid &&
+        (opts?.edges || []).some(
+          (e) =>
+            (e.target === nid && e.targetHandle === 'input') ||
+            (e.source === nid && e.sourceHandle === 'output')
+        )
+    );
+    if (hasInputExpression || carriesEdge) return null;
+  }
+
   const start = findFlowStartNode(flow);
   const end = findFlowEndNode(flow);
 

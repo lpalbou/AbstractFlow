@@ -89,6 +89,36 @@ function ids(pins: { id: string }[]): string[] {
 }
 
 describe('subflow pin derivation', () => {
+  it('never rewrites an IN-USE one-object-convention node (expression or wired input/output)', () => {
+    // Generator-built flows compose `input` via a pin expression and wire
+    // `output` onward; the interface sync must leave that shape alone
+    // (persistence adversary P1-2: the rewrite orphaned 9 edges on a family
+    // copy). A template-fresh node with the same pins still syncs below.
+    const data = nodeData('subflow');
+    const withExpression = {
+      ...data,
+      pinExpressions: {
+        input:
+          "{'request': str((vars.state or {}).get('request') or ''), 'workspace_root': str((vars.state or {}).get('workspace_root') or ''), 'build_command': str((vars.state or {}).get('build_command') or ''), 'run_command': str((vars.state or {}).get('run_command') or ''), 'round_index': int((vars.state or {}).get('fix_cycles') or 0), 'provider': (vars.state or {}).get('provider'), 'model': (vars.state or {}).get('model')}",
+      },
+    } as FlowNodeData;
+    expect(subflowPinPatchForSelectedFlow(withExpression, childFlow())).toBeNull();
+
+    const wired = nodeData('subflow');
+    expect(
+      subflowPinPatchForSelectedFlow(wired, childFlow(), {
+        nodeId: 'verify',
+        edges: [{ source: 'verify', sourceHandle: 'output', target: 'next', targetHandle: 'in' }],
+      })
+    ).toBeNull();
+
+    // Template-fresh (same pin shape, nothing attached): the sync applies.
+    const fresh = nodeData('subflow');
+    expect(
+      subflowPinPatchForSelectedFlow(fresh, childFlow(), { nodeId: 'verify', edges: [] })
+    ).not.toBeNull();
+  });
+
   it('keeps subflow control pins while replacing child data pins from the selected flow', () => {
     const parent = nodeData('subflow');
     const patch = subflowPinPatchForSelectedFlow(parent, childFlow());
@@ -109,7 +139,9 @@ describe('subflow pin derivation', () => {
     const patch = defaultSubflowPinPatch(parent);
 
     expect(ids(patch.inputs)).toEqual(['exec-in', 'inherit_context', 'input']);
-    expect(ids(patch.outputs)).toEqual(['exec-out', 'output']);
+    // child_output is the runtime-provided child-death metadata pin (its
+    // absence made the load filter drop wires from it — wave-B P1-A).
+    expect(ids(patch.outputs)).toEqual(['exec-out', 'output', 'child_output']);
   });
 
   it('normalizes saved flow list responses for node and panel selectors', () => {

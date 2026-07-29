@@ -169,13 +169,18 @@ def llm_node(node_id, label, x, y, *, pin_defaults=None):
                 pin_defaults=defaults)
 
 
-def code_node(node_id, label, code_body, x, y, inputs, output_type="object"):
+def code_node(node_id, label, code_body, x, y, inputs, output_type="object", outputs=None):
+    """Pure code node. By default it exposes the generic output/success/execution
+    trio; pass `outputs` to declare NAMED result pins instead (the runtime maps
+    a dict return onto edges by key, and declared pins make that fan-out
+    VISIBLE on the canvas — multi-output folds are graph structure)."""
     return node(
         node_id, "code", label, x, y,
         inputs=[*inputs, pin("permissions", "permissions", "string")],
-        outputs=[pin("output", "output", output_type),
-                 pin("success", "success", "boolean"),
-                 pin("execution", "execution", "object")],
+        outputs=list(outputs) if outputs else [
+            pin("output", "output", output_type),
+            pin("success", "success", "boolean"),
+            pin("execution", "execution", "object")],
         pin_defaults={"permissions": "sandbox"},
         extra={"functionName": "transform", "codeBody": code_body},
     )
@@ -233,11 +238,15 @@ def get_node(node_id, key, default, x, y):
 def subflow_node(node_id, label, flow_id, x, y):
     """deep-research subflow convention: one `input` object in, one `output`
     object out; the runtime maps input keys to the child's on_flow_start
-    fields by name and collects on_flow_end fields into output."""
+    fields by name and collects on_flow_end fields into output.
+    `child_output` is RUNTIME-PROVIDED (None on a healthy child;
+    {success: false, error} when the child run DIES) — declared so wires
+    from it survive the editor's load-time pin-existence check."""
     return node(node_id, "subflow", label, x, y,
                 inputs=[EXEC_IN, pin("inherit_context", "inherit_context", "boolean"),
                         pin("input", "input", "object")],
-                outputs=[EXEC_OUT, pin("output", "output", "object")],
+                outputs=[EXEC_OUT, pin("output", "output", "object"),
+                         pin("child_output", "child_output", "object")],
                 pin_defaults={"inherit_context": False},
                 extra={"subflowId": flow_id})
 
@@ -587,6 +596,160 @@ def entity_tools_execute_node(node_id, label, x, y, *, pin_defaults=None):
                          pin("notices", "notices", "array"),
                          pin("success", "success", "boolean")],
                 pin_defaults=pin_defaults)
+
+
+# Layout constants — match Canvas.tsx min node box (320×220); audit uses the same model.
+CANVAS_MIN_WIDTH = 320.0
+CANVAS_MIN_HEIGHT = 220.0
+NODE_WIDTH = CANVAS_MIN_WIDTH
+COLUMN_GAP_X = 160.0
+NODE_GAP_Y = 100.0
+EXEC_BRANCH_LANE_GAP_Y = 120.0
+_BRANCH_HANDLES = frozenset({"done", "false"})
+_LAYOUT_TRIGGERS = {"on_flow_start", "on_user_request", "on_agent_message", "on_event"}
+
+
+def _layout_node_height(node: dict[str, Any]) -> float:
+    data = node.get("data") or {}
+    n_in = len([p for p in data.get("inputs") or [] if p.get("type") != "execution"])
+    n_out = len([p for p in data.get("outputs") or [] if p.get("type") != "execution"])
+    return max(90.0 + 26.0 * max(n_in, n_out), CANVAS_MIN_HEIGHT)
+
+
+def _layout_has_exec(node: dict[str, Any]) -> bool:
+    data = node.get("data") or {}
+    for key in ("inputs", "outputs"):
+        for pin in data.get(key) or []:
+            if isinstance(pin, dict) and pin.get("type") == "execution":
+                return True
+    return False
+
+
+def apply_flow_layout(flow: dict[str, Any]) -> None:
+    """Assign left-to-right positions from exec depth (zero-overlap audit model).
+
+    Exec nodes receive a column from longest-path BFS off trigger nodes.
+    Pure (non-exec) helpers share the column of their nearest downstream
+    exec consumer and stack above the exec lane within that column.
+    """
+    nodes = {n["id"]: n for n in flow["nodes"]}
+    edges = flow.get("edges") or []
+    exec_edges: list[tuple[str, str, str]] = []
+    data_successors: dict[str, list[str]] = {}
+    for edge in edges:
+        target_handle = str(edge.get("targetHandle") or "")
+        source_handle = str(edge.get("sourceHandle") or "")
+        if target_handle == "exec-in":
+            exec_edges.append((edge["source"], edge["target"], source_handle))
+            continue
+        if source_handle in ("exec-out", "true", "false", "loop", "done"):
+            continue
+        data_successors.setdefault(edge["source"], []).append(edge["target"])
+
+    depth: dict[str, int] = {}
+    lane: dict[str, int] = {}
+    for node_id, node in nodes.items():
+        if (node.get("data") or {}).get("nodeType") in _LAYOUT_TRIGGERS:
+            depth[node_id] = 0
+            lane[node_id] = 0
+    changed = True
+    while changed:
+        changed = False
+        for source_id, target_id, source_handle in exec_edges:
+            if source_id not in depth:
+                continue
+            next_depth = depth[source_id] + 1
+            next_lane = 1 if source_handle in _BRANCH_HANDLES else lane.get(source_id, 0)
+            if depth.get(target_id, -1) < next_depth:
+                depth[target_id] = next_depth
+                lane[target_id] = next_lane
+                changed = True
+            elif depth.get(target_id, -1) == next_depth and lane.get(target_id, 0) < next_lane:
+                lane[target_id] = next_lane
+                changed = True
+
+    for _ in range(len(nodes)):
+        for node_id, node in nodes.items():
+            if node_id in depth or _layout_has_exec(node):
+                continue
+            consumer_depths = [
+                depth[consumer_id]
+                for consumer_id in data_successors.get(node_id, [])
+                if consumer_id in depth
+            ]
+            if consumer_depths:
+                best_depth = min(consumer_depths)
+                depth[node_id] = best_depth
+                consumers_at_depth = [
+                    consumer_id
+                    for consumer_id in data_successors.get(node_id, [])
+                    if depth.get(consumer_id) == best_depth
+                ]
+                if consumers_at_depth:
+                    lane[node_id] = min(lane.get(consumer_id, 0) for consumer_id in consumers_at_depth)
+
+    fallback = max(depth.values()) if depth else 0
+    for node_id, node in nodes.items():
+        if node_id not in depth:
+            depth[node_id] = fallback
+        lane.setdefault(node_id, 0)
+
+    by_depth: dict[int, list[str]] = {}
+    for node_id, column in depth.items():
+        by_depth.setdefault(column, []).append(node_id)
+
+    def _place_lane(column_ids: list[str], lane_index: int, x_pos: float, y_base: float) -> float:
+        lane_ids = [node_id for node_id in column_ids if lane.get(node_id, 0) == lane_index]
+        exec_ids = sorted(
+            [node_id for node_id in lane_ids if _layout_has_exec(nodes[node_id])],
+            key=lambda node_id: float((nodes[node_id].get("position") or {}).get("y", 0.0)),
+        )
+        pure_ids = sorted(
+            [node_id for node_id in lane_ids if not _layout_has_exec(nodes[node_id])],
+            key=lambda node_id: float((nodes[node_id].get("position") or {}).get("y", 0.0)),
+        )
+        y = y_base
+        for node_id in reversed(pure_ids):
+            y -= _layout_node_height(nodes[node_id]) + NODE_GAP_Y
+            nodes[node_id]["position"] = {"x": x_pos, "y": y}
+        y = y_base
+        for node_id in exec_ids:
+            nodes[node_id]["position"] = {"x": x_pos, "y": y}
+            y += _layout_node_height(nodes[node_id]) + NODE_GAP_Y
+        return y
+
+    x = 0.0
+    for column_index in sorted(by_depth.keys()):
+        column_ids = by_depth[column_index]
+        lane0_bottom = _place_lane(column_ids, 0, x, 0.0)
+        _place_lane(column_ids, 1, x, lane0_bottom + EXEC_BRANCH_LANE_GAP_Y)
+        x += NODE_WIDTH + COLUMN_GAP_X
+
+
+def layout_overlap_findings(flow: dict[str, Any]) -> list[str]:
+    """Return overlap pairs using the same box model as audit_flow_graph.py."""
+    nodes = flow.get("nodes") or []
+    boxes: dict[str, tuple[float, float, float, float]] = {}
+    for node in nodes:
+        node_id = node["id"]
+        pos = node.get("position") or {}
+        x = float(pos.get("x") or 0.0)
+        y = float(pos.get("y") or 0.0)
+        data = node.get("data") or {}
+        n_in = len([p for p in data.get("inputs") or [] if p.get("type") != "execution"])
+        n_out = len([p for p in data.get("outputs") or [] if p.get("type") != "execution"])
+        height = max(90.0 + 26.0 * max(n_in, n_out), CANVAS_MIN_HEIGHT)
+        boxes[node_id] = (x, y, NODE_WIDTH, height)
+    findings: list[str] = []
+    node_ids = list(boxes.keys())
+    for index, left_id in enumerate(node_ids):
+        left = boxes[left_id]
+        for right_id in node_ids[index + 1:]:
+            right = boxes[right_id]
+            if (left[0] < right[0] + right[2] and right[0] < left[0] + left[2]
+                    and left[1] < right[1] + right[3] and right[1] < left[1] + left[3]):
+                findings.append(f"OVERLAP {left_id} <-> {right_id}")
+    return findings
 
 
 def write_json(path: Path, data: dict[str, Any]) -> None:

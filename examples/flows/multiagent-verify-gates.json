@@ -1,6 +1,6 @@
 {
   "id": "multiagent-verify-gates",
-  "name": "Multi-agent verify gates (pinned copy of coding-verify-gates)",
+  "name": "Multi-agent verify gates — embedded subflow (auto-managed)",
   "description": "Verification gates for coding runs: deterministic delivery + web-integration checks over list_files/read_file ground truth run first (no LLM), then a browser_probe execution gate for web entrypoints (fail-closed: missing executors are environment failures, never passes), then the independent verifier agent for builds/matches. Returns a structured verdict with fixable failures separated from environment failures. Reusable as a subflow.",
   "interfaces": [],
   "nodes": [

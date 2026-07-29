@@ -11,6 +11,9 @@ export type RunPreflightIssue = {
   nodeId: string;
   nodeLabel: string;
   message: string;
+  /** 'warning' issues are ADVISORY: shown in the panel, never blocking Run.
+   * Absent = blocking (the historical behavior for definite defects). */
+  severity?: 'warning';
 };
 
 export type RunPreflightOptions = {
@@ -260,13 +263,14 @@ export function computeRunPreflightIssues(
   const flowFunctions = Array.isArray(options.flowFunctions) ? options.flowFunctions : [];
   const functionNames = new Set(flowFunctions.map((f) => f.name));
 
-  const push = (node: Node<FlowNodeData>, message: string) => {
+  const push = (node: Node<FlowNodeData>, message: string, severity?: 'warning') => {
     const label = isNonEmptyString(node.data.label) ? node.data.label.trim() : node.id;
     issues.push({
       id: `${node.id}:${message}`,
       nodeId: node.id,
       nodeLabel: label,
       message,
+      ...(severity ? { severity } : {}),
     });
   };
 
@@ -348,7 +352,12 @@ export function computeRunPreflightIssues(
         if (declaredVars.size > 0) {
           for (const name of varReadsInExpression(expr)) {
             if (!declaredVars.has(name)) {
-              push(n, `Expression on '${pinId}' reads vars.${name} — no set_var/start pin declares it (it may still arrive at run time)`);
+              // ADVISORY, not a blocker: the message itself admits the var
+              // may legitimately arrive at run time (input_data, a parent
+              // run, _runtime seeding) — an uncertain heuristic must never
+              // hard-block the Run button (persistence adversary P2-b; the
+              // 2026-06-10 unsatisfiable-preflight class).
+              push(n, `Expression on '${pinId}' reads vars.${name} — no set_var/start pin declares it (it may still arrive at run time)`, 'warning');
             }
           }
         }

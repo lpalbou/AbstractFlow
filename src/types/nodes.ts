@@ -327,6 +327,13 @@ const CORE_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'output', label: 'output', type: 'object' },
+      {
+        id: 'child_output',
+        label: 'child_output',
+        type: 'object',
+        description:
+          'RUNTIME-PROVIDED child metadata: null while the child run is healthy; {success: false, error} when the child run dies. Wire it to fold child death honestly instead of reading a silent empty output.',
+      },
     ],
     category: 'core',
   },
@@ -2902,6 +2909,21 @@ export function mergePinDocsFromTemplate(
       !existingOutputs.some((pin) => pin.type === 'execution');
     const templateInputsById = new Map(templateData.inputs.map((p) => [p.id, p] as const));
     const templateOutputsById = new Map(templateData.outputs.map((p) => [p.id, p] as const));
+    // AUTHOR-SHAPED pin sets get no template backfill: a generator/host-built
+    // code node that declares its own data pins (custom inputs like
+    // `loop_state`, or LABELED result outputs like `report`/`branch`) chose
+    // its surface deliberately — appending the template's `input`/`output`/
+    // `success`/`execution` pins renders dead handles nobody wired and
+    // persists them on the next save. Backfill only applies while the pin set
+    // is still template-shaped (every existing id is a template id) — the
+    // legacy-flow repair this merge exists for. `permissions` is exempt from
+    // the shape test (every code node carries it).
+    const authorShapedInputs = existingInputs.some(
+      (pin) => pin.type !== 'execution' && pin.id !== 'permissions' && !templateInputsById.has(pin.id)
+    );
+    const authorShapedOutputs = existingOutputs.some(
+      (pin) => pin.type !== 'execution' && !templateOutputsById.has(pin.id)
+    );
     const seenInputs = new Set<string>();
     const inputs = existingInputs.map((pin) => {
       seenInputs.add(pin.id);
@@ -2911,6 +2933,7 @@ export function mergePinDocsFromTemplate(
     for (const templatePin of templateData.inputs) {
       if (seenInputs.has(templatePin.id)) continue;
       if (isPureCodeNode && templatePin.type === 'execution') continue;
+      if (authorShapedInputs && templatePin.type !== 'execution' && templatePin.id !== 'permissions') continue;
       inputs.push(templatePin);
     }
     const seen = new Set<string>();
@@ -2922,6 +2945,7 @@ export function mergePinDocsFromTemplate(
     for (const templatePin of templateData.outputs) {
       if (seen.has(templatePin.id)) continue;
       if (isPureCodeNode && templatePin.type === 'execution') continue;
+      if (authorShapedOutputs && templatePin.type !== 'execution') continue;
       outputs.push(templatePin);
     }
     const nextDefaults = { ...(data.pinDefaults || {}) };
