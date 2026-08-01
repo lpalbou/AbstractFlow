@@ -97,9 +97,14 @@ export function FunctionsDrawer() {
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
 
+  // Usage counts SIBLING FUNCTION calls as well as pin expressions: helpers
+  // share one namespace, so a helper called by 7 other helpers (`shq`) is
+  // used — it used to read "used 0" and land in the "unused" badge.
   const usage = useMemo(() => {
     const map = new Map<string, ReturnType<typeof findFunctionCallSites>>();
-    for (const fn of flowFunctions) map.set(fn.name, findFunctionCallSites(nodes, fn.name));
+    for (const fn of flowFunctions) {
+      map.set(fn.name, findFunctionCallSites(nodes, fn.name, flowFunctions));
+    }
     return map;
   }, [nodes, flowFunctions]);
 
@@ -180,7 +185,10 @@ export function FunctionsDrawer() {
         </h3>
         <div className="functions-drawer-actions">
           {unusedCount > 0 ? (
-            <span className="functions-unused-badge" title="Functions no pin expression calls yet">
+            <span
+              className="functions-unused-badge"
+              title="Functions nothing calls yet — no pin expression and no other function"
+            >
               {unusedCount} unused
             </span>
           ) : null}
@@ -323,20 +331,39 @@ export function FunctionsDrawer() {
                   <div className="functions-usedby">
                     <div className="functions-usedby-title">Used by</div>
                     {sites.length === 0 ? (
-                      <div className="functions-usedby-empty">No pin expression calls this yet.</div>
+                      <div className="functions-usedby-empty">
+                        Nothing calls this yet — no pin expression and no other function.
+                      </div>
                     ) : (
-                      sites.map((site) => (
-                        <button
-                          key={`${site.nodeId}:${site.pinId}`}
-                          type="button"
-                          className="functions-usedby-row"
-                          onClick={() => jumpToNode(site.nodeId)}
-                          title={site.expression}
-                        >
-                          <span className="functions-usedby-node">{site.nodeLabel}</span>
-                          <span className="functions-usedby-pin">· {site.pinId}</span>
-                        </button>
-                      ))
+                      sites.map((site) =>
+                        // A sibling-function caller has no node to pan to:
+                        // render it as a drawer row that opens that function.
+                        site.kind === 'function' ? (
+                          <button
+                            key={`fn:${site.nodeLabel}`}
+                            type="button"
+                            className="functions-usedby-row"
+                            onClick={() => setExpanded(site.nodeLabel)}
+                            title={site.expression}
+                          >
+                            <span className="functions-usedby-node">
+                              <span className="fx-glyph">ƒ</span> {site.nodeLabel}
+                            </span>
+                            <span className="functions-usedby-pin">· function</span>
+                          </button>
+                        ) : (
+                          <button
+                            key={`${site.nodeId}:${site.pinId}`}
+                            type="button"
+                            className="functions-usedby-row"
+                            onClick={() => jumpToNode(site.nodeId)}
+                            title={site.expression}
+                          >
+                            <span className="functions-usedby-node">{site.nodeLabel}</span>
+                            <span className="functions-usedby-pin">· {site.pinId}</span>
+                          </button>
+                        )
+                      )
                     )}
                   </div>
                   {rowError[fn.name] ? <div className="functions-error">{rowError[fn.name]}</div> : null}

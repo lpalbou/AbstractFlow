@@ -1,0 +1,596 @@
+{
+  "id": "ralph-coder",
+  "name": "Ralph coder — chat entry (same prompt, fresh context)",
+  "description": "Chat-agent entrypoint for the Ralph coding loop (no agent node). Every cycle re-sends the same task to a fresh session; memory is PLAN.md/PROGRESS.md in the workspace; completion is decided by a deterministic check (verify command exit 0 + completion marker), never by the model's claim. Defaults to gating_mode=wait: an interactive client answers ONE ask_user gate once the check passes, and can steer any cycle with the gateway's inject_guidance command. Unattended clients send gating_mode=auto and input_data._runtime.tool_policy = {\"auto_approve_max_risk_rank\": 2, \"auto_approve_tools\": [\"execute_command\", \"read_file\", \"write_file\", \"edit_file\", \"list_files\", \"search_files\", \"analyze_code\", \"browser_probe\"]}. workspace_root is required — an empty workspace is refused at the door.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Prompt",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "max_steps_per_cycle",
+            "label": "max_steps_per_cycle",
+            "type": "number"
+          },
+          {
+            "id": "warm_entries",
+            "label": "warm_entries",
+            "type": "number"
+          },
+          {
+            "id": "plan_file",
+            "label": "plan_file",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "done_marker",
+            "label": "done_marker",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "",
+          "workspace_root": "",
+          "gating_mode": "wait",
+          "browser_probe_available": true,
+          "verify_command": "",
+          "max_cycles": 8,
+          "max_steps_per_cycle": 16,
+          "warm_entries": 3,
+          "plan_file": "PLAN.md",
+          "progress_file": "PROGRESS.md",
+          "done_marker": "DONE:"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "build",
+      "type": "subflow",
+      "position": {
+        "x": 480.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Run the ralph loop",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "max_steps_per_cycle",
+            "label": "max_steps_per_cycle",
+            "type": "number"
+          },
+          {
+            "id": "warm_entries",
+            "label": "warm_entries",
+            "type": "number"
+          },
+          {
+            "id": "plan_file",
+            "label": "plan_file",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "done_marker",
+            "label": "done_marker",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "child_output",
+            "label": "child_output",
+            "type": "object"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "cycles_used",
+            "label": "cycles_used",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "ralph-coding"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "answer",
+      "type": "code",
+      "position": {
+        "x": 960.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose answer",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "child_success",
+            "label": "child_success",
+            "type": "boolean"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "cycles_used",
+            "label": "cycles_used",
+            "type": "number"
+          },
+          {
+            "id": "child_result",
+            "label": "child_result",
+            "type": "object"
+          },
+          {
+            "id": "died_text",
+            "label": "died_text",
+            "type": "string"
+          },
+          {
+            "id": "unknown_error_text",
+            "label": "unknown_error_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "died_text": "The ralph coding run did not finish: {{error}}\n\nThe workspace and its progress file hold whatever the completed cycles did; the run's own trace holds the failing step.",
+          "unknown_error_text": "the child run ended without producing a report"
+        },
+        "functionName": "transform",
+        "codeBody": "rep = report if isinstance(report, str) else \"\"\nok = bool(child_success)\ndied = child_result if isinstance(child_result, dict) else {}\nif not rep.strip():\n    err = str(died.get(\"error\") or \"\").strip()\n    rep = str(died_text or \"\").replace(\n        \"{{error}}\", err if err else str(unknown_error_text or \"\"))\n    ok = False\nreturn {\n    \"response\": rep,\n    \"ok\": ok,\n    \"meta\": {\"branch\": \"\",\n             \"stopped_reason\": stopped_reason if isinstance(stopped_reason, str) else \"\",\n             \"cycles_used\": cycles_used if isinstance(cycles_used, (int, float)) else 0,\n             \"orchestration\": \"ralph\"},\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1440.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {
+          "response": "",
+          "success": false,
+          "meta": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-build-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "build",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-build-exec-out-answer-exec-in",
+      "source": "build",
+      "sourceHandle": "exec-out",
+      "target": "answer",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-answer-exec-out-end-exec-in",
+      "source": "answer",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-build-request",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "build",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-build-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "build",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-gating_mode-build-gating_mode",
+      "source": "start",
+      "sourceHandle": "gating_mode",
+      "target": "build",
+      "targetHandle": "gating_mode",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-build-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "build",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-build-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "build",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-browser_probe_available-build-browser_probe_available",
+      "source": "start",
+      "sourceHandle": "browser_probe_available",
+      "target": "build",
+      "targetHandle": "browser_probe_available",
+      "animated": false
+    },
+    {
+      "id": "e-start-verify_command-build-verify_command",
+      "source": "start",
+      "sourceHandle": "verify_command",
+      "target": "build",
+      "targetHandle": "verify_command",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_cycles-build-max_cycles",
+      "source": "start",
+      "sourceHandle": "max_cycles",
+      "target": "build",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_steps_per_cycle-build-max_steps_per_cycle",
+      "source": "start",
+      "sourceHandle": "max_steps_per_cycle",
+      "target": "build",
+      "targetHandle": "max_steps_per_cycle",
+      "animated": false
+    },
+    {
+      "id": "e-start-warm_entries-build-warm_entries",
+      "source": "start",
+      "sourceHandle": "warm_entries",
+      "target": "build",
+      "targetHandle": "warm_entries",
+      "animated": false
+    },
+    {
+      "id": "e-start-plan_file-build-plan_file",
+      "source": "start",
+      "sourceHandle": "plan_file",
+      "target": "build",
+      "targetHandle": "plan_file",
+      "animated": false
+    },
+    {
+      "id": "e-start-progress_file-build-progress_file",
+      "source": "start",
+      "sourceHandle": "progress_file",
+      "target": "build",
+      "targetHandle": "progress_file",
+      "animated": false
+    },
+    {
+      "id": "e-start-done_marker-build-done_marker",
+      "source": "start",
+      "sourceHandle": "done_marker",
+      "target": "build",
+      "targetHandle": "done_marker",
+      "animated": false
+    },
+    {
+      "id": "e-build-report-answer-report",
+      "source": "build",
+      "sourceHandle": "report",
+      "target": "answer",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-build-success-answer-child_success",
+      "source": "build",
+      "sourceHandle": "success",
+      "target": "answer",
+      "targetHandle": "child_success",
+      "animated": false
+    },
+    {
+      "id": "e-build-stopped_reason-answer-stopped_reason",
+      "source": "build",
+      "sourceHandle": "stopped_reason",
+      "target": "answer",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-build-cycles_used-answer-cycles_used",
+      "source": "build",
+      "sourceHandle": "cycles_used",
+      "target": "answer",
+      "targetHandle": "cycles_used",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-answer-child_result",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "answer",
+      "targetHandle": "child_result",
+      "animated": false
+    },
+    {
+      "id": "e-answer-response-end-response",
+      "source": "answer",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-answer-ok-end-success",
+      "source": "answer",
+      "sourceHandle": "ok",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-answer-meta-end-meta",
+      "source": "answer",
+      "sourceHandle": "meta",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-08-01T16:06:00.967843+00:00",
+  "updated_at": "2026-08-01T16:06:00.967843+00:00"
+}

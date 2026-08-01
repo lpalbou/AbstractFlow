@@ -81,12 +81,38 @@ from wf_common import (  # noqa: E402
     AGENT_INTERFACE,
     EXEC_IN, EXEC_OUT, pin, node, edge, base_flow, start_node, end_node,
     llm_node, code_node, get_var, set_var, while_node, get_node,
-    subflow_node, memory_recall_node, memory_commit_node, memory_form_node,
+    subflow_node as _shared_subflow_node, memory_recall_node, memory_commit_node, memory_form_node,
     memory_appraise_node, diary_write_node, memory_consolidate_node,
     memory_probe_node, life_query_node, memory_tend_node,
     entity_tools_query_node, entity_tools_execute_node, with_expressions,
     write_json, validate_edges, pack_bundle, compile_check,
 )
+def subflow_node(node_id, label, flow_id, x, y):
+    """wf_common.subflow_node MINUS the declared `child_output` OUTPUT PIN
+    (adversary find 2026-08-01, during the honest-failure-episodes rebuild):
+    the visual executor collects EVERY declared non-exec output pin except
+    `output` into effect_config.output_pins
+    (visual/executor.py, `elif type_str == "subflow"`), and the compiler's
+    start_subworkflow result spread then OVERWRITES
+    current["child_output"] with result_value.get("child_output") — None —
+    whenever the resume payload's output dict lacks a "result" wrapper
+    (compiler.py `out_pins` loop skips only "output" by name). That
+    silently severs the DEATH CHANNEL this family's guards route on:
+    rounds_guard/turn_guard read child_output.success is False, so a DEAD
+    child reads healthy, degraded stays 0, and the P0-1 fabricated-silence
+    bug returns (measured: entity_life_smoke scenario 2 went red on the
+    first rebuild after wf_common started declaring the pin, 2026-07-30).
+    The 0.0.17 byte shape — child_output WIRED but not declared — loads and
+    runs everywhere today, so the entity family keeps it until the runtime
+    spread skips child_output by name (that fix is runtime's lane)."""
+    n = _shared_subflow_node(node_id, label, flow_id, x, y)
+    n["data"]["outputs"] = [
+        p for p in n["data"]["outputs"]
+        if not (isinstance(p, dict) and p.get("id") == "child_output")
+    ]
+    return n
+
+
 from entity_flow_code import (  # noqa: E402
     CHAT_DEGRADED_CODE, CHAT_STATE_CODE, CLOSE_PREP_CODE, DAY_END_CODE,
     DRIVE_CUE_CODE, ELECTIONS_CODE, EPISODE_CODE, GATE_CODE,
@@ -114,13 +140,18 @@ ROUNDS_ID = "entity-tool-rounds"
 GOODBYE_ID = "entity-goodbye"
 
 BUNDLE_ID = "entity-life"
+# 0.0.18 (2026-08-01): honest failure episodes — a moment that ended without
+# words (empty completion) or whose rounds child died now forms a LABELED
+# failed-moment episode (degraded + moment_error in attrs; no "I said:"
+# attribution, no "(I stayed silent)") instead of depositing fabricated
+# chosen-silence into the append-only graph. See CHANGELOG.md.
 # 0.0.17 (2026-07-26): pin-expression migration — 50 single-consumer accessor
 # nodes (get/get_var) collapsed into consumer pin expressions across the family
 # (master 75->49; goodbye/chat/cognition-turn/visit/work/personal also); behavior
 # identical (both entity smokes green). Version bump because 0.0.16 shipped the
 # pre-migration bytes. This bundle now REQUIRES a pin-expression runtime
 # (metadata.min_runtime below; enforcement gate is gateway's lane, backlog 0154).
-BUNDLE_VERSION = "0.0.17"
+BUNDLE_VERSION = "0.0.18"
 # Version history: CHANGELOG.md (entity-life entries) — the per-version
 # ledger moved there 2026-07-25 (cleanup adversary P1-2: the header-comment
 # practice bloated this file AND silently stopped at 0.0.11 while five
@@ -326,10 +357,21 @@ def build_cognition_turn() -> dict:
                                   pin_defaults={"op": "appraise", "scope": "self"}))
 
     N.append(memory_commit_node("deposit", "Deposit the usage trail", 1300, 460))
-    N.append(code_node("episode_prep", "Shape the episode", EPISODE_CODE, 1560, 160,
-                       [pin("stimulus", "stimulus", "string"), pin("clean_reply", "clean_reply", "string"),
-                        pin("phase", "phase", "string"), pin("turn_id", "turn_id", "string"),
-                        pin("participants", "participants", "array")]))
+    # HONEST FAILURE EPISODES (adversary fix 2026-08-01): the same two
+    # degradation signals the fold sees reach the episode too — a dead
+    # rounds child or a moment that ended without words forms a LABELED
+    # failed-moment episode, never a false "(I stayed silent)" memory
+    # (the P0-1 guard fixed the dead-child half; the empty-completion half
+    # still deposited fabricated silence until this wire).
+    N.append(with_expressions(
+        code_node("episode_prep", "Shape the episode", EPISODE_CODE, 1560, 160,
+                  [pin("stimulus", "stimulus", "string"), pin("clean_reply", "clean_reply", "string"),
+                   pin("phase", "phase", "string"), pin("turn_id", "turn_id", "string"),
+                   pin("participants", "participants", "array"),
+                   pin("guard_died", "guard_died", "number"),
+                   pin("guard_error", "guard_error", "string"),
+                   pin("ended_silent", "ended_silent", "number")]),
+        {"ended_silent": field_expr("silent", "0")}))
     N.append(memory_form_node("episode", "The episode forms (turn -> graph)", 1560, 460,
                               pin_defaults={"scope": "life"}))
 
@@ -449,6 +491,10 @@ def build_cognition_turn() -> dict:
     E.append(edge("setup", "phase", "episode_prep", "phase"))
     E.append(edge("setup", "turn_id", "episode_prep", "turn_id"))
     E.append(edge("start", "participants", "episode_prep", "participants"))
+    # The honesty signals mirror the fold's wiring exactly (one truth).
+    E.append(edge("rounds_guard", "died", "episode_prep", "guard_died"))
+    E.append(edge("rounds_guard", "error", "episode_prep", "guard_error"))
+    E.append(edge("turn", "output", "episode_prep", "ended_silent"))
 
     E.append(edge("episode_prep", "records", "episode", "records"))
     E.append(edge("setup", "turn_id", "episode", "turn_id"))

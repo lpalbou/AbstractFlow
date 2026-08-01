@@ -1,0 +1,5228 @@
+{
+  "id": "react-coding",
+  "name": "React coder — llm_call + tool loop (edit on canvas)",
+  "description": "Hand-wired ReAct coding loop: no agent node. Each cycle drains the steer inbox (`_runtime.inbox`) into the next prompt, prints a progress line, calls the model with tools declared, executes the tool calls it asks for and folds the observations into an ACCUMULATING transcript. Stops when the model answers without tool calls (wait mode asks a human first) or when the cycle budget runs out; an optional verify_command is run deterministically at the end and decides `passed`.",
+  "interfaces": [
+    "abstractcode.coding.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Coding request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "request": "",
+          "workspace_root": "",
+          "gating_mode": "wait",
+          "max_cycles": 12,
+          "verify_command": "",
+          "browser_probe_available": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "preflight",
+      "type": "code",
+      "position": {
+        "x": 480.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Preflight",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "empty_request_text",
+            "label": "empty_request_text",
+            "type": "string"
+          },
+          {
+            "id": "no_workspace_text",
+            "label": "no_workspace_text",
+            "type": "string"
+          },
+          {
+            "id": "refusal_header_text",
+            "label": "refusal_header_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "empty_request_text": "no coding request was provided (send `prompt` on the agent wrapper, or `request` on the root)",
+          "no_workspace_text": "no workspace_root was provided; this workflow reads and writes real files, so it refuses to run against an unknown directory",
+          "refusal_header_text": "REFUSED AT THE DOOR — the react coding loop did not start:"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nmode = str(gating_mode or \"wait\").strip().lower()\ntry:\n    budget = int(max_cycles or 0)\nexcept Exception:\n    budget = 0\nif budget < 1:\n    budget = 1\nif budget > 40:\n    budget = 40\nverify = str(verify_command or \"\").strip()\nproblems = []\nif not req:\n    problems.append(str(empty_request_text or \"\"))\nif not ws:\n    problems.append(str(no_workspace_text or \"\"))\nok = len(problems) == 0\nlines = []\nif not ok:\n    lines.append(str(refusal_header_text or \"\"))\n    for p in problems:\n        lines.append(\"- \" + p)\nreturn {\n    \"updates\": {\n        \"preflight_ok\": ok,\n        \"wait_gating\": mode != \"auto\",\n        \"request\": req,\n        \"workspace_root\": ws,\n        \"verify_command\": verify,\n        \"has_verify\": len(verify) > 0,\n        \"probe_ok\": bool(browser_probe_available),\n        \"max_cycles\": budget,\n        \"cycle\": 0,\n        \"done\": False,\n        \"transcript\": \"\",\n        \"steering_notes\": \"\",\n        \"steer_seen\": 0,\n        \"steer_new\": 0,\n        \"last_action\": \"\",\n        \"final_response\": \"\",\n        \"stopped_reason\": \"\",\n        \"verified\": False,\n        \"verify_text\": \"\",\n    },\n    \"report\": \"\\n\".join(lines),\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "seed_vars",
+      "type": "set_vars",
+      "position": {
+        "x": 960.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Seed run variables",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "updates": {
+            "preflight_ok": false,
+            "wait_gating": true,
+            "request": "",
+            "workspace_root": "",
+            "verify_command": "",
+            "has_verify": false,
+            "probe_ok": false,
+            "max_cycles": 12,
+            "cycle": 0,
+            "done": false,
+            "transcript": "",
+            "steering_notes": "",
+            "steer_seen": 0,
+            "steer_new": 0,
+            "last_action": "",
+            "final_response": "",
+            "stopped_reason": "",
+            "verified": false,
+            "verify_text": ""
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_preflight",
+      "type": "if",
+      "position": {
+        "x": 1440.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Preflight ok?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_preflight_condition",
+      "type": "get_var",
+      "position": {
+        "x": 1285.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get preflight_ok",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "preflight_ok",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end_pre",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1920.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Refused (preflight)",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "branch",
+            "label": "branch",
+            "type": "string"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "cycles_used",
+            "label": "cycles_used",
+            "type": "number"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {
+          "passed": false,
+          "success": false,
+          "branch": "",
+          "stopped_reason": "preflight-failed",
+          "cycles_used": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gating_line",
+      "type": "code",
+      "position": {
+        "x": 1920.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose gating line",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "wait_gating",
+            "label": "wait_gating",
+            "type": "boolean"
+          },
+          {
+            "id": "line_text",
+            "label": "line_text",
+            "type": "string"
+          },
+          {
+            "id": "wait_word",
+            "label": "wait_word",
+            "type": "string"
+          },
+          {
+            "id": "auto_word",
+            "label": "auto_word",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "line_text": "gating: {{mode}}",
+          "wait_word": "wait",
+          "auto_word": "auto"
+        },
+        "functionName": "transform",
+        "codeBody": "word = str(wait_word or \"\") if bool(wait_gating) else str(auto_word or \"\")\nreturn {\"message\": str(line_text or \"\").replace(\"{{mode}}\", word)}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gating_line_wait_gating",
+      "type": "get_var",
+      "position": {
+        "x": 1765.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get wait_gating",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "wait_gating",
+          "default": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gating_status",
+      "type": "answer_user",
+      "position": {
+        "x": 2400.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Gating mode",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "level": "message"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "loop",
+      "type": "while",
+      "position": {
+        "x": 2880.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "REACT LOOP",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": false
+        },
+        "pinExpressions": {
+          "condition": "not vars.done and vars.cycle < vars.max_cycles"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold",
+      "type": "code",
+      "position": {
+        "x": 3360.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Drain steer inbox",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inbox",
+            "label": "inbox",
+            "type": "array"
+          },
+          {
+            "id": "steer_seen",
+            "label": "steer_seen",
+            "type": "number"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "steer_new",
+            "label": "steer_new",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "items = inbox if isinstance(inbox, list) else []\nseen = int(steer_seen or 0)\nif seen > len(items):\n    seen = 0\nnotes = str(steering_notes or \"\")\nadded = 0\nfor m in items[seen:]:\n    text = \"\"\n    if isinstance(m, dict):\n        c = m.get(\"content\")\n        text = str(c) if c is not None else \"\"\n    else:\n        text = str(m or \"\")\n    text = text.strip()\n    if text:\n        notes = notes + (\"\\n\" if notes else \"\") + \"- \" + text\n        added = added + 1\n# CARRY (0.1.1): a steer caught by the LATE drain at the end of the previous\n# cycle is already folded into the notes, but this cycle's progress line has\n# not announced it yet. Carrying the pending count means the line still says\n# \"steering applied\" on the cycle that actually acts on it; the count is\n# cleared once the cycle's own fold runs.\nreturn {\"updates\": {\"steering_notes\": notes, \"steer_seen\": len(items),\n                    \"steer_new\": added + int(steer_new or 0)}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold_inbox",
+      "type": "get_var",
+      "position": {
+        "x": 3205.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get _runtime.inbox",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "_runtime.inbox",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold_steer_seen",
+      "type": "get_var",
+      "position": {
+        "x": 3205.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_seen",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_seen",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 3205.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold_steer_new",
+      "type": "get_var",
+      "position": {
+        "x": 3205.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_new",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_new",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_steer",
+      "type": "set_vars",
+      "position": {
+        "x": 3840.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Apply steering",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line",
+      "type": "code",
+      "position": {
+        "x": 4320.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose cycle line",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "steer_new",
+            "label": "steer_new",
+            "type": "number"
+          },
+          {
+            "id": "last_action",
+            "label": "last_action",
+            "type": "string"
+          },
+          {
+            "id": "line_text",
+            "label": "line_text",
+            "type": "string"
+          },
+          {
+            "id": "start_word",
+            "label": "start_word",
+            "type": "string"
+          },
+          {
+            "id": "steer_word",
+            "label": "steer_word",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "line_text": "react cycle {{n}} of {{max}}: {{note}}",
+          "start_word": "reasoning",
+          "steer_word": "steering applied — "
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(cycle or 0) + 1\nmx = int(max_cycles or 0)\nnote = str(last_action or \"\").strip()\nif not note:\n    note = str(start_word or \"\")\nif int(steer_new or 0) > 0:\n    note = str(steer_word or \"\") + note\nmsg = str(line_text or \"\")\nmsg = msg.replace(\"{{n}}\", str(n)).replace(\"{{max}}\", str(mx)).replace(\"{{note}}\", note)\nreturn {\"message\": msg}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line_max_cycles",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get max_cycles",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "max_cycles",
+          "default": 12
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line_steer_new",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_new",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_new",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line_last_action",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get last_action",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "last_action",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_status",
+      "type": "answer_user",
+      "position": {
+        "x": 4800.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Cycle progress",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "level": "message"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose",
+      "type": "code",
+      "position": {
+        "x": 5280.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose cycle prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "transcript",
+            "label": "transcript",
+            "type": "string"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "probe_ok",
+            "label": "probe_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "task_text",
+            "label": "task_text",
+            "type": "string"
+          },
+          {
+            "id": "verify_hint",
+            "label": "verify_hint",
+            "type": "string"
+          },
+          {
+            "id": "probe_hint",
+            "label": "probe_hint",
+            "type": "string"
+          },
+          {
+            "id": "steering_header",
+            "label": "steering_header",
+            "type": "string"
+          },
+          {
+            "id": "transcript_header",
+            "label": "transcript_header",
+            "type": "string"
+          },
+          {
+            "id": "first_cycle_text",
+            "label": "first_cycle_text",
+            "type": "string"
+          },
+          {
+            "id": "closing_text",
+            "label": "closing_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "task_text": "# CODING TASK\n{{request}}\n\nWORKSPACE ROOT: {{workspace}}\nCYCLE {{cycle}} of {{max}}.",
+          "verify_hint": "A verification command is configured for this task: `{{verify}}`. Run it yourself before you declare the task done — the flow runs it independently at the end, and a red run is reported as a failure whatever your final message says.",
+          "probe_hint": "The `browser_probe` tool is mounted: use it to load a page you produced and read back console errors and DOM facts instead of guessing. Give it a timeout in SECONDS and a port you own.",
+          "steering_header": "# OPERATOR STEERING (live — these arrived while you were working; they amend the task)",
+          "transcript_header": "# ACTION TRACE (your tool calls and their observations, earlier cycles of this run)",
+          "first_cycle_text": "This is the first cycle: nothing has been done yet. Start by looking at the workspace.",
+          "closing_text": "Decide your next step now. Either call tools, or — if the task is complete — answer with your final report as plain text and make no tool calls."
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(cycle or 0) + 1\nmx = int(max_cycles or 0)\nhead = str(task_text or \"\")\nhead = head.replace(\"{{request}}\", str(request or \"\"))\nhead = head.replace(\"{{workspace}}\", str(workspace_root or \"\"))\nhead = head.replace(\"{{cycle}}\", str(n)).replace(\"{{max}}\", str(mx))\nparts = [head]\nverify = str(verify_command or \"\").strip()\nif verify:\n    parts.append(str(verify_hint or \"\").replace(\"{{verify}}\", verify))\nif bool(probe_ok):\n    parts.append(str(probe_hint or \"\"))\nnotes = str(steering_notes or \"\").strip()\nif notes:\n    parts.append(str(steering_header or \"\") + \"\\n\" + notes)\ntrace = str(transcript or \"\").strip()\nif trace:\n    parts.append(str(transcript_header or \"\") + \"\\n\" + trace)\nelse:\n    parts.append(str(first_cycle_text or \"\"))\nparts.append(str(closing_text or \"\"))\nreturn {\"prompt\": \"\\n\\n\".join(parts)}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose_request",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get request",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "request",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose_workspace_root",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get workspace_root",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "workspace_root",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose_transcript",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get transcript",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "transcript",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 148.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose_max_cycles",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 174.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get max_cycles",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "max_cycles",
+          "default": 12
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose_verify_command",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 200.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get verify_command",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "verify_command",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_compose_probe_ok",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 226.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get probe_ok",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "probe_ok",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "react_llm",
+      "type": "llm_call",
+      "position": {
+        "x": 5760.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "REASON + ACT",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files",
+            "analyze_code",
+            "execute_command",
+            "browser_probe"
+          ],
+          "system": "You are a coding agent working directly in a real workspace. You run in CYCLES: think briefly, then either call tools or finish.\n\nRules:\n- Every change to the workspace happens through a TOOL CALL. Never claim an edit you did not make.\n- Read before you write: inspect the files you are about to change.\n- Prefer small, verifiable steps. After a change, run or check it when a command is available.\n- The ACTION TRACE below is your own history in this run; it is the only memory you carry between cycles.\n- OPERATOR STEERING outranks your current plan: when it appears, apply it before continuing.\n- When the task is complete, reply WITHOUT tool calls: a short report of what you changed, which files, and how it was checked. That reply ends the run.",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "llm_provider",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get provider",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "provider",
+          "default": null
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "llm_model",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get model",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "model",
+          "default": null
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "has_calls",
+      "type": "has_tools",
+      "position": {
+        "x": 6240.0,
+        "y": -320.0
+      },
+      "data": {
+        "nodeType": "has_tools",
+        "label": "Wants tools?",
+        "icon": "&#x1F50D;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "route",
+      "type": "if",
+      "position": {
+        "x": 6240.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Act or conclude",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "act",
+      "type": "tool_calls",
+      "position": {
+        "x": 6720.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "EXECUTE TOOL CALLS",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files",
+            "analyze_code",
+            "execute_command",
+            "browser_probe"
+          ]
+        },
+        "effectConfig": {
+          "allowed_tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files",
+            "analyze_code",
+            "execute_command",
+            "browser_probe"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "calls_json",
+      "type": "stringify_json",
+      "position": {
+        "x": 7200.0,
+        "y": -640.0
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Calls to text",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "mode": "minified"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "obs_text",
+      "type": "format_tool_results",
+      "position": {
+        "x": 7200.0,
+        "y": -320.0
+      },
+      "data": {
+        "nodeType": "format_tool_results",
+        "label": "Observations",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold",
+      "type": "code",
+      "position": {
+        "x": 7200.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold cycle into transcript",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "transcript",
+            "label": "transcript",
+            "type": "string"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "thought",
+            "label": "thought",
+            "type": "string"
+          },
+          {
+            "id": "calls_text",
+            "label": "calls_text",
+            "type": "string"
+          },
+          {
+            "id": "observations",
+            "label": "observations",
+            "type": "string"
+          },
+          {
+            "id": "entry_text",
+            "label": "entry_text",
+            "type": "string"
+          },
+          {
+            "id": "trim_marker",
+            "label": "trim_marker",
+            "type": "string"
+          },
+          {
+            "id": "max_chars",
+            "label": "max_chars",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "entry_text": "--- cycle {{n}} ---\nTHOUGHT: {{thought}}\nACTIONS: {{calls}}\nOBSERVATIONS:\n{{obs}}",
+          "trim_marker": "[...earlier cycles trimmed to keep the context bounded...]\n",
+          "max_chars": 24000
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(cycle or 0) + 1\nentry = str(entry_text or \"\")\nentry = entry.replace(\"{{n}}\", str(n))\nentry = entry.replace(\"{{thought}}\", str(thought or \"\").strip())\nentry = entry.replace(\"{{calls}}\", str(calls_text or \"\"))\nentry = entry.replace(\"{{obs}}\", str(observations or \"\"))\ntrace = str(transcript or \"\")\ntrace = trace + (\"\\n\" if trace else \"\") + entry\ntry:\n    cap = int(max_chars or 0)\nexcept Exception:\n    cap = 0\nif cap > 0 and len(trace) > cap:\n    trace = str(trim_marker or \"\") + trace[len(trace) - cap:]\nsummary = str(calls_text or \"\").strip()\nif len(summary) > 160:\n    summary = summary[:160]\nreturn {\"updates\": {\"transcript\": trace, \"cycle\": n, \"last_action\": summary, \"steer_new\": 0}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold_transcript",
+      "type": "get_var",
+      "position": {
+        "x": 7045.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get transcript",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "transcript",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 7045.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_cycle",
+      "type": "set_vars",
+      "position": {
+        "x": 7680.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save cycle",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late",
+      "type": "code",
+      "position": {
+        "x": 6720.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Drain steer inbox (late)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inbox",
+            "label": "inbox",
+            "type": "array"
+          },
+          {
+            "id": "steer_seen",
+            "label": "steer_seen",
+            "type": "number"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "items = inbox if isinstance(inbox, list) else []\nseen = int(steer_seen or 0)\nif seen > len(items):\n    seen = 0\nnotes = str(steering_notes or \"\")\nadded = 0\nfor m in items[seen:]:\n    text = \"\"\n    if isinstance(m, dict):\n        c = m.get(\"content\")\n        text = str(c) if c is not None else \"\"\n    else:\n        text = str(m or \"\")\n    text = text.strip()\n    if text:\n        notes = notes + (\"\\n\" if notes else \"\") + \"- \" + text\n        added = added + 1\nreturn {\"updates\": {\"steering_notes\": notes, \"steer_seen\": len(items), \"steer_new\": added}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late_inbox",
+      "type": "get_var",
+      "position": {
+        "x": 6565.0,
+        "y": 484.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get _runtime.inbox",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "_runtime.inbox",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late_steer_seen",
+      "type": "get_var",
+      "position": {
+        "x": 6565.0,
+        "y": 510.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_seen",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_seen",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 6565.0,
+        "y": 536.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_steer_late",
+      "type": "set_vars",
+      "position": {
+        "x": 7200.0,
+        "y": 544.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Apply late steering",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_gate",
+      "type": "if",
+      "position": {
+        "x": 7680.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Human review?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_gate_condition",
+      "type": "get_var",
+      "position": {
+        "x": 7525.0,
+        "y": 484.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get wait_gating",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "wait_gating",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_prompt",
+      "type": "code",
+      "position": {
+        "x": 8160.0,
+        "y": 120.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose review question",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "prompt_text",
+            "label": "prompt_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "prompt_text": "The coding agent believes the task is done after {{cycles}} cycle(s).\n\n{{summary}}\n\nReply 'accept' to finish, or describe what still needs to change (your words are fed straight into the next cycle as operator steering)."
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(cycle or 0) + 1\ntext = str(prompt_text or \"\")\ntext = text.replace(\"{{cycles}}\", str(n))\ntext = text.replace(\"{{summary}}\", str(response or \"\").strip())\nreturn {\"prompt\": text}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_prompt_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 190.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate",
+      "type": "ask_user",
+      "position": {
+        "x": 8640.0,
+        "y": 120.0
+      },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "GATE: accept the finish claim?",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_fold",
+      "type": "code",
+      "position": {
+        "x": 9120.0,
+        "y": 120.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold reviewer answer",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "string"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "transcript",
+            "label": "transcript",
+            "type": "string"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "reject_entry_text",
+            "label": "reject_entry_text",
+            "type": "string"
+          },
+          {
+            "id": "empty_answer_text",
+            "label": "empty_answer_text",
+            "type": "string"
+          },
+          {
+            "id": "accept_reason",
+            "label": "accept_reason",
+            "type": "string"
+          },
+          {
+            "id": "revise_reason",
+            "label": "revise_reason",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "reject_entry_text": "--- reviewer rejected the finish claim ---\n{{answer}}",
+          "empty_answer_text": "#FALLBACK the model stopped calling tools but returned no final report; the workspace holds whatever the earlier cycles changed. The action trace in this run is the record.",
+          "accept_reason": "accepted-by-user",
+          "revise_reason": "user-revision"
+        },
+        "functionName": "transform",
+        "codeBody": "ans = str(answer or \"\").strip()\nresp = str(response or \"\").strip()\nn = int(cycle or 0) + 1\nlow = ans.lower()\naccepted = (not low) or low.startswith(\"accept\") or low.startswith(\"approve\") or low == \"ok\" or low == \"yes\"\nif accepted:\n    if not resp:\n        resp = str(empty_answer_text or \"\")\n    return {\"updates\": {\"final_response\": resp, \"done\": True, \"cycle\": n,\n                        \"stopped_reason\": str(accept_reason or \"\"), \"steer_new\": 0}}\nnotes = str(steering_notes or \"\")\nnotes = notes + (\"\\n\" if notes else \"\") + \"- \" + ans\ntrace = str(transcript or \"\")\nentry = str(reject_entry_text or \"\").replace(\"{{answer}}\", ans)\ntrace = trace + (\"\\n\" if trace else \"\") + entry\nreturn {\"updates\": {\"steering_notes\": notes, \"transcript\": trace, \"cycle\": n,\n                    \"done\": False, \"stopped_reason\": str(revise_reason or \"\"), \"steer_new\": 1}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_fold_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 8965.0,
+        "y": 216.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_fold_transcript",
+      "type": "get_var",
+      "position": {
+        "x": 8965.0,
+        "y": 242.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get transcript",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "transcript",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_fold_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 8965.0,
+        "y": 268.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_gate",
+      "type": "set_vars",
+      "position": {
+        "x": 9600.0,
+        "y": 120.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save review outcome",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "auto_done",
+      "type": "code",
+      "position": {
+        "x": 8160.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Finish (auto mode)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "steer_new",
+            "label": "steer_new",
+            "type": "number"
+          },
+          {
+            "id": "transcript",
+            "label": "transcript",
+            "type": "string"
+          },
+          {
+            "id": "stop_reason",
+            "label": "stop_reason",
+            "type": "string"
+          },
+          {
+            "id": "steer_reason",
+            "label": "steer_reason",
+            "type": "string"
+          },
+          {
+            "id": "steer_entry_text",
+            "label": "steer_entry_text",
+            "type": "string"
+          },
+          {
+            "id": "empty_answer_text",
+            "label": "empty_answer_text",
+            "type": "string"
+          },
+          {
+            "id": "empty_reason",
+            "label": "empty_reason",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "stop_reason": "model-stopped",
+          "steer_reason": "steered-after-claim",
+          "steer_entry_text": "--- cycle {{n}}: the model claimed the task was complete ---\n{{claim}}\nOPERATOR STEERING arrived at that moment, so the run continues: apply it.",
+          "empty_answer_text": "#FALLBACK the model stopped calling tools but returned no final report; the workspace holds whatever the earlier cycles changed. The action trace in this run is the record.",
+          "empty_reason": "model-stopped-empty"
+        },
+        "functionName": "transform",
+        "codeBody": "resp = str(response or \"\").strip()\nn = int(cycle or 0) + 1\nreason = str(stop_reason or \"\")\nif not resp:\n    resp = str(empty_answer_text or \"\")\n    reason = str(empty_reason or \"\")\nif int(steer_new or 0) > 0:\n    entry = str(steer_entry_text or \"\").replace(\"{{n}}\", str(n)).replace(\"{{claim}}\", resp)\n    trace = str(transcript or \"\")\n    trace = trace + (\"\\n\" if trace else \"\") + entry\n    # steer_new is NOT cleared here: the next cycle's progress line still owes\n    # the operator the \"steering applied\" word, and the top fold carries it.\n    return {\"updates\": {\"final_response\": resp, \"done\": False, \"cycle\": n,\n                        \"transcript\": trace, \"stopped_reason\": str(steer_reason or \"\")}}\nreturn {\"updates\": {\"final_response\": resp, \"done\": True, \"cycle\": n,\n                    \"stopped_reason\": reason, \"steer_new\": 0}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "auto_done_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 510.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "auto_done_steer_new",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 536.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_new",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_new",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "auto_done_transcript",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 562.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get transcript",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "transcript",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_done",
+      "type": "set_vars",
+      "position": {
+        "x": 8640.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save final answer",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_verify",
+      "type": "if",
+      "position": {
+        "x": 3360.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Verify command set?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_verify_condition",
+      "type": "get_var",
+      "position": {
+        "x": 3205.0,
+        "y": 484.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get has_verify",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "has_verify",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify_cmd",
+      "type": "code",
+      "position": {
+        "x": 3840.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose verify command",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws_q = shq(str(workspace_root or \"\").strip())\ncmd = (\"cd '\" + ws_q + \"' && ( \" + str(verify_command or \"true\") + \" ) \"\n       \"> .react_verify.log 2>&1; echo \\\"VERIFY_EXIT=$?\\\"; \"\n       \"tail -n 40 .react_verify.log 2>/dev/null\")\nreturn {\"tool_call\": {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 300},\n                      \"call_id\": \"react-verify\"}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify_cmd_workspace_root",
+      "type": "get_var",
+      "position": {
+        "x": 3685.0,
+        "y": 484.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get workspace_root",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "workspace_root",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify_cmd_verify_command",
+      "type": "get_var",
+      "position": {
+        "x": 3685.0,
+        "y": 510.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get verify_command",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "verify_command",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify_call",
+      "type": "call_tool",
+      "position": {
+        "x": 4320.0,
+        "y": 518.0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Run verification",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify_fold",
+      "type": "code",
+      "position": {
+        "x": 4800.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Read verification result",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "txt = text_of(result)\ntail = txt[-2000:] if len(txt) > 2000 else txt\nreturn {\"updates\": {\"verified\": \"VERIFY_EXIT=0\" in txt, \"verify_text\": tail}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_verify",
+      "type": "set_vars",
+      "position": {
+        "x": 5280.0,
+        "y": 726.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save verification",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report",
+      "type": "code",
+      "position": {
+        "x": 5760.0,
+        "y": 492.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Final report",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "final_response",
+            "label": "final_response",
+            "type": "string"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "done_flag",
+            "label": "done_flag",
+            "type": "boolean"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "has_verify",
+            "label": "has_verify",
+            "type": "boolean"
+          },
+          {
+            "id": "verified",
+            "label": "verified",
+            "type": "boolean"
+          },
+          {
+            "id": "verify_text",
+            "label": "verify_text",
+            "type": "string"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "fallback_text",
+            "label": "fallback_text",
+            "type": "string"
+          },
+          {
+            "id": "budget_reason",
+            "label": "budget_reason",
+            "type": "string"
+          },
+          {
+            "id": "verify_ok_text",
+            "label": "verify_ok_text",
+            "type": "string"
+          },
+          {
+            "id": "verify_fail_text",
+            "label": "verify_fail_text",
+            "type": "string"
+          },
+          {
+            "id": "steering_summary_text",
+            "label": "steering_summary_text",
+            "type": "string"
+          },
+          {
+            "id": "footer_text",
+            "label": "footer_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "stopped",
+            "label": "stopped",
+            "type": "string"
+          },
+          {
+            "id": "cycles",
+            "label": "cycles",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "fallback_text": "#FALLBACK the cycle budget ({{max}}) was exhausted before the model declared the task complete. Work from the finished cycles is still in the workspace; re-run to continue from there.",
+          "budget_reason": "budget-exhausted",
+          "verify_ok_text": "VERIFICATION: the configured command exited 0.\n{{tail}}",
+          "verify_fail_text": "VERIFICATION FAILED: the configured command did not exit 0.\n{{tail}}",
+          "steering_summary_text": "OPERATOR STEERING APPLIED DURING THIS RUN:",
+          "footer_text": "— react loop: {{cycles}} of {{max}} cycles used, stopped_reason={{stopped}}"
+        },
+        "functionName": "transform",
+        "codeBody": "final = str(final_response or \"\").strip()\nn = int(cycle or 0)\nmx = int(max_cycles or 0)\nstopped = str(stopped_reason or \"\")\nfinished = bool(done_flag)\nif not final:\n    final = str(fallback_text or \"\").replace(\"{{max}}\", str(mx))\n    finished = False\n    stopped = str(budget_reason or \"\")\nif not finished and not stopped:\n    stopped = str(budget_reason or \"\")\nhas_v = bool(has_verify)\npassed = bool(verified) if has_v else finished\nlines = [final]\nif has_v:\n    line = str(verify_ok_text or \"\") if bool(verified) else str(verify_fail_text or \"\")\n    lines.append(line.replace(\"{{tail}}\", str(verify_text or \"\")))\nnotes = str(steering_notes or \"\").strip()\nif notes:\n    lines.append(str(steering_summary_text or \"\") + \"\\n\" + notes)\nfoot = str(footer_text or \"\")\nfoot = foot.replace(\"{{cycles}}\", str(n)).replace(\"{{max}}\", str(mx)).replace(\"{{stopped}}\", stopped)\nlines.append(foot)\nreturn {\"report\": \"\\n\\n\".join(lines), \"passed\": passed, \"ok\": passed,\n        \"stopped\": stopped, \"cycles\": n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_final_response",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 536.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get final_response",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "final_response",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 562.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_max_cycles",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 588.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get max_cycles",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "max_cycles",
+          "default": 12
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_done_flag",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 614.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get done",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "done",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_stopped_reason",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 640.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get stopped_reason",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "stopped_reason",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_has_verify",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 666.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get has_verify",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "has_verify",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_verified",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 692.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get verified",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "verified",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_verify_text",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 718.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get verify_text",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "verify_text",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 5605.0,
+        "y": 744.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 6240.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Report",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "branch",
+            "label": "branch",
+            "type": "string"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "cycles_used",
+            "label": "cycles_used",
+            "type": "number"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {
+          "report": "",
+          "passed": false,
+          "success": false,
+          "branch": "",
+          "stopped_reason": "",
+          "cycles_used": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-request-preflight-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "preflight",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-preflight-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "preflight",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-gating_mode-preflight-gating_mode",
+      "source": "start",
+      "sourceHandle": "gating_mode",
+      "target": "preflight",
+      "targetHandle": "gating_mode",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_cycles-preflight-max_cycles",
+      "source": "start",
+      "sourceHandle": "max_cycles",
+      "target": "preflight",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-start-verify_command-preflight-verify_command",
+      "source": "start",
+      "sourceHandle": "verify_command",
+      "target": "preflight",
+      "targetHandle": "verify_command",
+      "animated": false
+    },
+    {
+      "id": "e-start-browser_probe_available-preflight-browser_probe_available",
+      "source": "start",
+      "sourceHandle": "browser_probe_available",
+      "target": "preflight",
+      "targetHandle": "browser_probe_available",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-updates-seed_vars-updates",
+      "source": "preflight",
+      "sourceHandle": "updates",
+      "target": "seed_vars",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-if_preflight_condition-value-if_preflight-condition",
+      "source": "if_preflight_condition",
+      "sourceHandle": "value",
+      "target": "if_preflight",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-report-end_pre-report",
+      "source": "preflight",
+      "sourceHandle": "report",
+      "target": "end_pre",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-gating_line_wait_gating-value-gating_line-wait_gating",
+      "source": "gating_line_wait_gating",
+      "sourceHandle": "value",
+      "target": "gating_line",
+      "targetHandle": "wait_gating",
+      "animated": false
+    },
+    {
+      "id": "e-gating_line-message-gating_status-message",
+      "source": "gating_line",
+      "sourceHandle": "message",
+      "target": "gating_status",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold_inbox-value-steer_fold-inbox",
+      "source": "steer_fold_inbox",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "inbox",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold_steer_seen-value-steer_fold-steer_seen",
+      "source": "steer_fold_steer_seen",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "steer_seen",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold_steering_notes-value-steer_fold-steering_notes",
+      "source": "steer_fold_steering_notes",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold_steer_new-value-steer_fold-steer_new",
+      "source": "steer_fold_steer_new",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "steer_new",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold-updates-set_steer-updates",
+      "source": "steer_fold",
+      "sourceHandle": "updates",
+      "target": "set_steer",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line_cycle-value-cycle_line-cycle",
+      "source": "cycle_line_cycle",
+      "sourceHandle": "value",
+      "target": "cycle_line",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line_max_cycles-value-cycle_line-max_cycles",
+      "source": "cycle_line_max_cycles",
+      "sourceHandle": "value",
+      "target": "cycle_line",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line_steer_new-value-cycle_line-steer_new",
+      "source": "cycle_line_steer_new",
+      "sourceHandle": "value",
+      "target": "cycle_line",
+      "targetHandle": "steer_new",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line_last_action-value-cycle_line-last_action",
+      "source": "cycle_line_last_action",
+      "sourceHandle": "value",
+      "target": "cycle_line",
+      "targetHandle": "last_action",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line-message-cycle_status-message",
+      "source": "cycle_line",
+      "sourceHandle": "message",
+      "target": "cycle_status",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose_request-value-prompt_compose-request",
+      "source": "prompt_compose_request",
+      "sourceHandle": "value",
+      "target": "prompt_compose",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose_workspace_root-value-prompt_compose-workspace_root",
+      "source": "prompt_compose_workspace_root",
+      "sourceHandle": "value",
+      "target": "prompt_compose",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose_transcript-value-prompt_compose-transcript",
+      "source": "prompt_compose_transcript",
+      "sourceHandle": "value",
+      "target": "prompt_compose",
+      "targetHandle": "transcript",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose_steering_notes-value-prompt_compose-steering_notes",
+      "source": "prompt_compose_steering_notes",
+      "sourceHandle": "value",
+      "target": "prompt_compose",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose_cycle-value-prompt_compose-cycle",
+      "source": "prompt_compose_cycle",
+      "sourceHandle": "value",
+      "target": "prompt_compose",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose_max_cycles-value-prompt_compose-max_cycles",
+      "source": "prompt_compose_max_cycles",
+      "sourceHandle": "value",
+      "target": "prompt_compose",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose_verify_command-value-prompt_compose-verify_command",
+      "source": "prompt_compose_verify_command",
+      "sourceHandle": "value",
+      "target": "prompt_compose",
+      "targetHandle": "verify_command",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose_probe_ok-value-prompt_compose-probe_ok",
+      "source": "prompt_compose_probe_ok",
+      "sourceHandle": "value",
+      "target": "prompt_compose",
+      "targetHandle": "probe_ok",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose-prompt-react_llm-prompt",
+      "source": "prompt_compose",
+      "sourceHandle": "prompt",
+      "target": "react_llm",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-llm_provider-value-react_llm-provider",
+      "source": "llm_provider",
+      "sourceHandle": "value",
+      "target": "react_llm",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-llm_model-value-react_llm-model",
+      "source": "llm_model",
+      "sourceHandle": "value",
+      "target": "react_llm",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-react_llm-tool_calls-has_calls-array",
+      "source": "react_llm",
+      "sourceHandle": "tool_calls",
+      "target": "has_calls",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "e-has_calls-result-route-condition",
+      "source": "has_calls",
+      "sourceHandle": "result",
+      "target": "route",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-react_llm-tool_calls-act-tool_calls",
+      "source": "react_llm",
+      "sourceHandle": "tool_calls",
+      "target": "act",
+      "targetHandle": "tool_calls",
+      "animated": false
+    },
+    {
+      "id": "e-react_llm-tool_calls-calls_json-value",
+      "source": "react_llm",
+      "sourceHandle": "tool_calls",
+      "target": "calls_json",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-act-results-obs_text-results",
+      "source": "act",
+      "sourceHandle": "results",
+      "target": "obs_text",
+      "targetHandle": "results",
+      "animated": false
+    },
+    {
+      "id": "e-react_llm-response-fold-thought",
+      "source": "react_llm",
+      "sourceHandle": "response",
+      "target": "fold",
+      "targetHandle": "thought",
+      "animated": false
+    },
+    {
+      "id": "e-calls_json-result-fold-calls_text",
+      "source": "calls_json",
+      "sourceHandle": "result",
+      "target": "fold",
+      "targetHandle": "calls_text",
+      "animated": false
+    },
+    {
+      "id": "e-obs_text-result-fold-observations",
+      "source": "obs_text",
+      "sourceHandle": "result",
+      "target": "fold",
+      "targetHandle": "observations",
+      "animated": false
+    },
+    {
+      "id": "e-fold_transcript-value-fold-transcript",
+      "source": "fold_transcript",
+      "sourceHandle": "value",
+      "target": "fold",
+      "targetHandle": "transcript",
+      "animated": false
+    },
+    {
+      "id": "e-fold_cycle-value-fold-cycle",
+      "source": "fold_cycle",
+      "sourceHandle": "value",
+      "target": "fold",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-fold-updates-set_cycle-updates",
+      "source": "fold",
+      "sourceHandle": "updates",
+      "target": "set_cycle",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late_inbox-value-steer_late-inbox",
+      "source": "steer_late_inbox",
+      "sourceHandle": "value",
+      "target": "steer_late",
+      "targetHandle": "inbox",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late_steer_seen-value-steer_late-steer_seen",
+      "source": "steer_late_steer_seen",
+      "sourceHandle": "value",
+      "target": "steer_late",
+      "targetHandle": "steer_seen",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late_steering_notes-value-steer_late-steering_notes",
+      "source": "steer_late_steering_notes",
+      "sourceHandle": "value",
+      "target": "steer_late",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late-updates-set_steer_late-updates",
+      "source": "steer_late",
+      "sourceHandle": "updates",
+      "target": "set_steer_late",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-if_gate_condition-value-if_gate-condition",
+      "source": "if_gate_condition",
+      "sourceHandle": "value",
+      "target": "if_gate",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-react_llm-response-gate_prompt-response",
+      "source": "react_llm",
+      "sourceHandle": "response",
+      "target": "gate_prompt",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt_cycle-value-gate_prompt-cycle",
+      "source": "gate_prompt_cycle",
+      "sourceHandle": "value",
+      "target": "gate_prompt",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt-prompt-gate-prompt",
+      "source": "gate_prompt",
+      "sourceHandle": "prompt",
+      "target": "gate",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-gate-response-gate_fold-answer",
+      "source": "gate",
+      "sourceHandle": "response",
+      "target": "gate_fold",
+      "targetHandle": "answer",
+      "animated": false
+    },
+    {
+      "id": "e-react_llm-response-gate_fold-response",
+      "source": "react_llm",
+      "sourceHandle": "response",
+      "target": "gate_fold",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-gate_fold_cycle-value-gate_fold-cycle",
+      "source": "gate_fold_cycle",
+      "sourceHandle": "value",
+      "target": "gate_fold",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-gate_fold_transcript-value-gate_fold-transcript",
+      "source": "gate_fold_transcript",
+      "sourceHandle": "value",
+      "target": "gate_fold",
+      "targetHandle": "transcript",
+      "animated": false
+    },
+    {
+      "id": "e-gate_fold_steering_notes-value-gate_fold-steering_notes",
+      "source": "gate_fold_steering_notes",
+      "sourceHandle": "value",
+      "target": "gate_fold",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-gate_fold-updates-set_gate-updates",
+      "source": "gate_fold",
+      "sourceHandle": "updates",
+      "target": "set_gate",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-react_llm-response-auto_done-response",
+      "source": "react_llm",
+      "sourceHandle": "response",
+      "target": "auto_done",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done_cycle-value-auto_done-cycle",
+      "source": "auto_done_cycle",
+      "sourceHandle": "value",
+      "target": "auto_done",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done_steer_new-value-auto_done-steer_new",
+      "source": "auto_done_steer_new",
+      "sourceHandle": "value",
+      "target": "auto_done",
+      "targetHandle": "steer_new",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done_transcript-value-auto_done-transcript",
+      "source": "auto_done_transcript",
+      "sourceHandle": "value",
+      "target": "auto_done",
+      "targetHandle": "transcript",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done-updates-set_done-updates",
+      "source": "auto_done",
+      "sourceHandle": "updates",
+      "target": "set_done",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-if_verify_condition-value-if_verify-condition",
+      "source": "if_verify_condition",
+      "sourceHandle": "value",
+      "target": "if_verify",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-verify_cmd_workspace_root-value-verify_cmd-workspace_root",
+      "source": "verify_cmd_workspace_root",
+      "sourceHandle": "value",
+      "target": "verify_cmd",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-verify_cmd_verify_command-value-verify_cmd-verify_command",
+      "source": "verify_cmd_verify_command",
+      "sourceHandle": "value",
+      "target": "verify_cmd",
+      "targetHandle": "verify_command",
+      "animated": false
+    },
+    {
+      "id": "e-verify_cmd-tool_call-verify_call-tool_call",
+      "source": "verify_cmd",
+      "sourceHandle": "tool_call",
+      "target": "verify_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-verify_call-raw-verify_fold-result",
+      "source": "verify_call",
+      "sourceHandle": "raw",
+      "target": "verify_fold",
+      "targetHandle": "result",
+      "animated": false
+    },
+    {
+      "id": "e-verify_fold-updates-set_verify-updates",
+      "source": "verify_fold",
+      "sourceHandle": "updates",
+      "target": "set_verify",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-report_final_response-value-report-final_response",
+      "source": "report_final_response",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "final_response",
+      "animated": false
+    },
+    {
+      "id": "e-report_cycle-value-report-cycle",
+      "source": "report_cycle",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-report_max_cycles-value-report-max_cycles",
+      "source": "report_max_cycles",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-report_done_flag-value-report-done_flag",
+      "source": "report_done_flag",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "done_flag",
+      "animated": false
+    },
+    {
+      "id": "e-report_stopped_reason-value-report-stopped_reason",
+      "source": "report_stopped_reason",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-report_has_verify-value-report-has_verify",
+      "source": "report_has_verify",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "has_verify",
+      "animated": false
+    },
+    {
+      "id": "e-report_verified-value-report-verified",
+      "source": "report_verified",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "verified",
+      "animated": false
+    },
+    {
+      "id": "e-report_verify_text-value-report-verify_text",
+      "source": "report_verify_text",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "verify_text",
+      "animated": false
+    },
+    {
+      "id": "e-report_steering_notes-value-report-steering_notes",
+      "source": "report_steering_notes",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-report-report-end-report",
+      "source": "report",
+      "sourceHandle": "report",
+      "target": "end",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-report-passed-end-passed",
+      "source": "report",
+      "sourceHandle": "passed",
+      "target": "end",
+      "targetHandle": "passed",
+      "animated": false
+    },
+    {
+      "id": "e-report-ok-end-success",
+      "source": "report",
+      "sourceHandle": "ok",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-report-stopped-end-stopped_reason",
+      "source": "report",
+      "sourceHandle": "stopped",
+      "target": "end",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-report-cycles-end-cycles_used",
+      "source": "report",
+      "sourceHandle": "cycles",
+      "target": "end",
+      "targetHandle": "cycles_used",
+      "animated": false
+    },
+    {
+      "id": "e-start-exec-out-preflight-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "preflight",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-exec-out-seed_vars-exec-in",
+      "source": "preflight",
+      "sourceHandle": "exec-out",
+      "target": "seed_vars",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-seed_vars-exec-out-if_preflight-exec-in",
+      "source": "seed_vars",
+      "sourceHandle": "exec-out",
+      "target": "if_preflight",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_preflight-false-end_pre-exec-in",
+      "source": "if_preflight",
+      "sourceHandle": "false",
+      "target": "end_pre",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_preflight-true-gating_line-exec-in",
+      "source": "if_preflight",
+      "sourceHandle": "true",
+      "target": "gating_line",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gating_line-exec-out-gating_status-exec-in",
+      "source": "gating_line",
+      "sourceHandle": "exec-out",
+      "target": "gating_status",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gating_status-exec-out-loop-exec-in",
+      "source": "gating_status",
+      "sourceHandle": "exec-out",
+      "target": "loop",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-loop-loop-steer_fold-exec-in",
+      "source": "loop",
+      "sourceHandle": "loop",
+      "target": "steer_fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold-exec-out-set_steer-exec-in",
+      "source": "steer_fold",
+      "sourceHandle": "exec-out",
+      "target": "set_steer",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-set_steer-exec-out-cycle_line-exec-in",
+      "source": "set_steer",
+      "sourceHandle": "exec-out",
+      "target": "cycle_line",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line-exec-out-cycle_status-exec-in",
+      "source": "cycle_line",
+      "sourceHandle": "exec-out",
+      "target": "cycle_status",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_status-exec-out-prompt_compose-exec-in",
+      "source": "cycle_status",
+      "sourceHandle": "exec-out",
+      "target": "prompt_compose",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_compose-exec-out-react_llm-exec-in",
+      "source": "prompt_compose",
+      "sourceHandle": "exec-out",
+      "target": "react_llm",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-react_llm-exec-out-route-exec-in",
+      "source": "react_llm",
+      "sourceHandle": "exec-out",
+      "target": "route",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-route-true-act-exec-in",
+      "source": "route",
+      "sourceHandle": "true",
+      "target": "act",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-act-exec-out-fold-exec-in",
+      "source": "act",
+      "sourceHandle": "exec-out",
+      "target": "fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-fold-exec-out-set_cycle-exec-in",
+      "source": "fold",
+      "sourceHandle": "exec-out",
+      "target": "set_cycle",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-route-false-steer_late-exec-in",
+      "source": "route",
+      "sourceHandle": "false",
+      "target": "steer_late",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late-exec-out-set_steer_late-exec-in",
+      "source": "steer_late",
+      "sourceHandle": "exec-out",
+      "target": "set_steer_late",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-set_steer_late-exec-out-if_gate-exec-in",
+      "source": "set_steer_late",
+      "sourceHandle": "exec-out",
+      "target": "if_gate",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_gate-true-gate_prompt-exec-in",
+      "source": "if_gate",
+      "sourceHandle": "true",
+      "target": "gate_prompt",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt-exec-out-gate-exec-in",
+      "source": "gate_prompt",
+      "sourceHandle": "exec-out",
+      "target": "gate",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate-exec-out-gate_fold-exec-in",
+      "source": "gate",
+      "sourceHandle": "exec-out",
+      "target": "gate_fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate_fold-exec-out-set_gate-exec-in",
+      "source": "gate_fold",
+      "sourceHandle": "exec-out",
+      "target": "set_gate",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_gate-false-auto_done-exec-in",
+      "source": "if_gate",
+      "sourceHandle": "false",
+      "target": "auto_done",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done-exec-out-set_done-exec-in",
+      "source": "auto_done",
+      "sourceHandle": "exec-out",
+      "target": "set_done",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-loop-done-if_verify-exec-in",
+      "source": "loop",
+      "sourceHandle": "done",
+      "target": "if_verify",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_verify-true-verify_cmd-exec-in",
+      "source": "if_verify",
+      "sourceHandle": "true",
+      "target": "verify_cmd",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-verify_cmd-exec-out-verify_call-exec-in",
+      "source": "verify_cmd",
+      "sourceHandle": "exec-out",
+      "target": "verify_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-verify_call-exec-out-verify_fold-exec-in",
+      "source": "verify_call",
+      "sourceHandle": "exec-out",
+      "target": "verify_fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-verify_fold-exec-out-set_verify-exec-in",
+      "source": "verify_fold",
+      "sourceHandle": "exec-out",
+      "target": "set_verify",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-set_verify-exec-out-report-exec-in",
+      "source": "set_verify",
+      "sourceHandle": "exec-out",
+      "target": "report",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_verify-false-report-exec-in",
+      "source": "if_verify",
+      "sourceHandle": "false",
+      "target": "report",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-report-exec-out-end-exec-in",
+      "source": "report",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-31T12:58:22.667629+00:00",
+  "updated_at": "2026-07-31T12:58:22.667629+00:00"
+}

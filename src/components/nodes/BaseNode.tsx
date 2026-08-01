@@ -8,7 +8,7 @@
 
 import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Handle, Position, NodeProps, useEdges, useReactFlow, useUpdateNodeInternals } from 'reactflow';
+import { Handle, Position, NodeProps, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import type { FlowNodeData, JsonValue, Pin, PinType, VisualFlow } from '../../types/flow';
@@ -16,7 +16,16 @@ import { getBundledFlow } from '../../utils/bundledFlows';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { PinExpressionChip, PinExpressionEditor, maskStringLiterals } from '../pins/PinExpressionControl';
+import { useFoldedReadsForNode } from '../../hooks/foldedGettersContext';
+import { isFoldedReadActive } from '../../utils/foldedGetters';
 import { collectDeclaredVarNames } from '../../utils/preflight';
+import {
+  isToolsAllowlistExplicitlyEmpty,
+  resolveConfiguredTools,
+  toolsPinPlaceholder,
+  toolsWriteTarget,
+  type ToolsPinKind,
+} from '../../utils/agentToolsPin';
 import { hasSecretLikeValue } from '../../utils/flowAuthoringCommands';
 import { useFlowStore } from '../../hooks/useFlow';
 import { useModels, useProviders } from '../../hooks/useProviders';
@@ -201,6 +210,17 @@ function isMediaCatalogRequestKey(request: MediaCatalogRequest | null, key: stri
   return Boolean(request && mediaCatalogRequestKey(request.scope, request) === key);
 }
 
+/**
+ * Middle-ellipsis preserving the TAIL: a variable read is discriminated by its
+ * last segment (`plan.goal` vs `plan.steps`), so truncation must never eat it.
+ */
+function middleEllipsis(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const tail = Math.min(12, Math.max(6, Math.floor(max / 2)));
+  const head = max - tail - 1;
+  return `${text.slice(0, head)}…${text.slice(text.length - tail)}`;
+}
+
 function firstConfigString(...values: unknown[]): string {
   for (const value of values) {
     const raw = typeof value === 'string' ? value.trim() : '';
@@ -364,11 +384,14 @@ const ToolsAllowlistInline = memo(function ToolsAllowlistInline({
   tools,
   toolOptions,
   loading,
+  // an allowlist configured EMPTY must not read the same as one never set
+  emptyIsConfigured = false,
   onChange,
 }: {
   tools: string[];
   toolOptions: Array<{ value: string; label: string }>;
   loading: boolean;
+  emptyIsConfigured?: boolean;
   onChange: (next: string[]) => void;
 }) {
   return (
@@ -378,7 +401,7 @@ const ToolsAllowlistInline = memo(function ToolsAllowlistInline({
         <AfMultiSelect
           variant="pin"
           values={tools}
-          placeholder={loading ? 'Loading…' : 'Select…'}
+          placeholder={loading ? 'Loading…' : emptyIsConfigured ? 'No tools' : 'Select…'}
           options={toolOptions}
           disabled={loading}
           loading={loading}
@@ -725,13 +748,21 @@ export const BaseNode = memo(function BaseNode({
   }, [data.nodeType]);
 
   const { executingNodeId, disconnectPin, updateNodeData, setNodes, recentNodeIds, loopProgressByNodeId } = useFlowStore();
+  // Render-fold (0156 Stage 1): reads folded onto this node's pin rows.
+  const foldedReads = useFoldedReadsForNode(id);
   const flowId = useFlowStore((s) => s.flowId);
   const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
   const isRecent = Boolean(recentNodeIds && (recentNodeIds as Record<string, true>)[id]);
   const connectionPreview = data.connectionPreview;
-  const edges = useEdges();
-  const { setEdges } = useReactFlow();
+  // Document truth, NOT `useEdges()`: React Flow's hook returns the CANVAS
+  // projection (exec view / 0156 fold `hidden` flags, routing metadata), and
+  // `useReactFlow().setEdges` writes whatever it is handed straight back as a
+  // `reset` change that replaces the whole edge list. Editing a pin through
+  // that path used to stamp `hidden: true` onto every folded read's wire — in
+  // the saved document. The store's edges and setter keep both sides honest.
+  const edges = useFlowStore((s) => s.edges);
+  const setEdges = useFlowStore((s) => s.setEdges);
   const updateNodeInternals = useUpdateNodeInternals();
 
   const isTriggerNode = isEntryNodeType(data.nodeType);
@@ -739,6 +770,21 @@ export const BaseNode = memo(function BaseNode({
   const isLlmNode = data.nodeType === 'llm_call';
   const isAgentNode = data.nodeType === 'agent';
   const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var';
+  /**
+   * A configured Get Variable renders as a compact chip (Blueprint's
+   * `CompactNodeTitle` posture): the auto-label already reads `Get <name>`, so
+   * the name dropdown and the unset `default` row are pure duplication at rest.
+   * They reveal on hover/selection, so inline editing is never lost.
+   *
+   * This is the load-bearing ergonomic fix, not cosmetics: a getter used to
+   * occupy the same 320×220 layout cell as an Agent node, which made reading
+   * one field expensive enough that authors reached for a pin expression
+   * instead — and an expression is a dependency the canvas cannot draw.
+   */
+  const isCompactGetter =
+    data.nodeType === 'get_var' &&
+    typeof data.pinDefaults?.name === 'string' &&
+    data.pinDefaults.name.trim().length > 0;
   const isCodeNode = data.nodeType === 'code';
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [showJsonLiteralEditor, setShowJsonLiteralEditor] = useState(false);
@@ -2836,45 +2882,30 @@ export const BaseNode = memo(function BaseNode({
     setToolParametersTool(tool);
   }, [data.inputs, id, isToolParametersNode, selectedToolParametersTool, setToolParametersTool]);
 
-  const selectedTools = useMemo(() => {
-    if (isAgentNode) {
-      const raw = data.agentConfig?.tools;
-      if (!Array.isArray(raw)) return [];
-      const cleaned = raw
-        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-        .map((t) => t.trim());
-      return Array.from(new Set(cleaned));
-    }
+  // Which store holds this node's allowlist (agent/llm/allowlist/subflow).
+  const toolsPinKind: ToolsPinKind | null = isAgentNode
+    ? 'agent'
+    : isLlmNode
+      ? 'llm'
+      : isToolsAllowlistNode
+        ? 'tools_allowlist'
+        : subflowHasToolsPin
+          ? 'subflow'
+          : null;
 
-    if (isLlmNode) {
-      const raw = data.effectConfig?.tools;
-      if (!Array.isArray(raw)) return [];
-      const cleaned = raw
-        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-        .map((t) => t.trim());
-      return Array.from(new Set(cleaned));
-    }
+  const selectedTools = useMemo(
+    () => (toolsPinKind ? resolveConfiguredTools(toolsPinKind, data) : []),
+    [data, toolsPinKind]
+  );
 
-    if (isToolsAllowlistNode) {
-      const raw = data.literalValue;
-      if (!Array.isArray(raw)) return [];
-      const cleaned = raw
-        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-        .map((t) => t.trim());
-      return Array.from(new Set(cleaned));
-    }
-
-    if (subflowHasToolsPin) {
-      const raw = pinDefaults.tools;
-      if (!Array.isArray(raw)) return [];
-      const cleaned = raw
-        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-        .map((t) => t.trim());
-      return Array.from(new Set(cleaned));
-    }
-
-    return [];
-  }, [data.agentConfig?.tools, data.effectConfig?.tools, data.literalValue, isAgentNode, isLlmNode, isToolsAllowlistNode, pinDefaults.tools, subflowHasToolsPin]);
+  // An EMPTY allowlist is a real configuration ("this agent gets no tools" —
+  // the planner's posture) and the runtime honours it as such. It must never
+  // render identically to UNSET, or an author reads "Select…" and re-picks
+  // tools the flow deliberately withheld.
+  const toolsExplicitlyEmpty = useMemo(
+    () => (toolsPinKind ? isToolsAllowlistExplicitlyEmpty(toolsPinKind, data) : false),
+    [data, toolsPinKind]
+  );
 
   const selectedProviderModels = useMemo(() => {
     if (!isProviderModelsNode) return [];
@@ -3318,6 +3349,16 @@ export const BaseNode = memo(function BaseNode({
       const unique = Array.from(new Set(cleaned));
 
       if (isAgentNode) {
+        // Write where the RUNTIME reads. Once a node carries a `tools` pin
+        // default, that value wins over agentConfig at execution time, so
+        // writing the author's pick to agentConfig would leave the canvas
+        // showing one allowlist and the agent running another. Empty stays an
+        // EMPTY ARRAY here, never a delete: on a pin-default-authored agent
+        // "no tools" is the configuration, not the absence of one.
+        if (toolsWriteTarget('agent', data) === 'pinDefaults') {
+          updateNodeData(id, { pinDefaults: { ...(data.pinDefaults || {}), tools: unique } });
+          return;
+        }
         const prev = data.agentConfig || {};
         updateNodeData(id, { agentConfig: { ...prev, tools: unique.length > 0 ? unique : undefined } });
         return;
@@ -3744,8 +3785,8 @@ export const BaseNode = memo(function BaseNode({
           return { ...p, id: nextId, label: `Then ${nextIdx}` };
         });
 
-      setEdges((currentEdges) =>
-        currentEdges
+      setEdges(
+        edges
           .filter((edge) => !(edge.source === id && edge.sourceHandle === pinId))
           .map((edge) => {
             if (edge.source !== id || !edge.sourceHandle) return edge;
@@ -3756,7 +3797,7 @@ export const BaseNode = memo(function BaseNode({
       );
       updateNodeData(id, { outputs: nextOutputs });
     },
-    [data.outputs, id, isParallelLike, isSequenceLike, setEdges, updateNodeData]
+    [data.outputs, edges, id, isParallelLike, isSequenceLike, setEdges, updateNodeData]
   );
 
   const addSwitchCasePin = useCallback(
@@ -3846,6 +3887,7 @@ export const BaseNode = memo(function BaseNode({
         className={clsx(
           'flow-node',
           `flow-node--${data.nodeType}`,
+          isCompactGetter && 'flow-node--compact-getter',
           selected && 'selected',
           isExecuting && 'executing',
           isRecent && !isExecuting && 'recent',
@@ -4149,6 +4191,7 @@ export const BaseNode = memo(function BaseNode({
             tools={selectedTools}
             toolOptions={toolOptions}
             loading={toolsQuery.isLoading}
+            emptyIsConfigured={toolsExplicitlyEmpty}
             onChange={setNodeTools}
           />
         )}
@@ -4245,6 +4288,12 @@ export const BaseNode = memo(function BaseNode({
           {inputData.map((pin) => {
             const feedback = connectionPreview?.inputs?.[pin.id];
             const pinExpression = data.pinExpressions?.[pin.id];
+            const foldedRead = foldedReads?.get(pin.id);
+            const foldedReadActive = isFoldedReadActive(
+              foldedRead,
+              executingNodeId,
+              recentNodeIds as Record<string, true> | null | undefined
+            );
             return (
             <Fragment key={pin.id}>
               <div
@@ -4252,11 +4301,14 @@ export const BaseNode = memo(function BaseNode({
                   'pin-row',
                   'input',
                   pinExpression && 'pin-computed',
+                  foldedRead && 'pin-folded-read',
+                  foldedReadActive && 'pin-folded-read--active',
                   feedback?.status === 'valid' && 'pin-feedback-valid',
                   feedback?.status === 'invalid' && 'pin-feedback-invalid'
                 )}
                 aria-invalid={feedback?.status === 'invalid' ? true : undefined}
                 data-connection-feedback={feedback?.status}
+                data-pin-id={pin.id}
                 title={feedback?.message || undefined}
               >
                 <AfTooltip content={pin.description} delayMs={700} priority={2}>
@@ -4279,6 +4331,34 @@ export const BaseNode = memo(function BaseNode({
                     <span className="pin-label">{pin.label}</span>
                   </span>
                 </AfTooltip>
+                {foldedRead ? (
+                  <AfTooltip
+                    priority={3}
+                    content={`Reads variable “${foldedRead.varName}”${
+                      foldedRead.defaultValue !== undefined
+                        ? ` (default: ${JSON.stringify(foldedRead.defaultValue)})`
+                        : ''
+                    } — click to reveal the Get Variable node`}
+                  >
+                    <button
+                      type="button"
+                      className="folded-read-pill nodrag"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Reveal + select the folded getter (jump-to-counterpart):
+                        // selection un-hides the node card and its wire. It must
+                        // be a REAL selection (`node.selected`), not just the
+                        // panel pointer — otherwise the revealed card carries no
+                        // selection ring and Delete/Backspace, which React Flow
+                        // routes by `node.selected`, silently does nothing.
+                        useFlowStore.getState().selectNodeById(foldedRead.getterId);
+                      }}
+                    >
+                      <span className="folded-read-pill-icon" aria-hidden="true">&#x1F4E5;</span>
+                      <span className="folded-read-pill-name">{middleEllipsis(foldedRead.varName, 22)}</span>
+                    </button>
+                  </AfTooltip>
+                ) : null}
                 <PinExpressionChip
                   pinLabel={pin.label || pin.id}
                   expression={pinExpression}
@@ -5547,7 +5627,9 @@ export const BaseNode = memo(function BaseNode({
 	                      key="tools"
                       variant="pin"
                       values={selectedTools}
-                      placeholder={toolsQuery.isLoading ? 'Loading…' : 'Select…'}
+                      placeholder={toolsPinPlaceholder(toolsPinKind ?? 'agent', data, {
+                        loading: toolsQuery.isLoading,
+                      })}
                       options={toolOptions}
                       disabled={toolsQuery.isLoading}
                       loading={toolsQuery.isLoading}

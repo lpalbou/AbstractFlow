@@ -16,6 +16,7 @@ import {
 import type { FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
+import { computeFoldedGetters } from '../utils/foldedGetters';
 import { inferEntryNode, isRouteOverrideEdge, routeKey as buildRouteKey, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from '../utils/visualFlowCompat';
 import {
@@ -60,6 +61,14 @@ interface FlowState {
 
   // Condensed execution view (show only exec-linked nodes + exec edges)
   execView: boolean;
+
+  /**
+   * Render-fold of single-consumer Get Variable nodes (0156 Stage 1): folded
+   * getters draw as pills on their consumer's pin row instead of node cards.
+   * Presentation-only — the document keeps the nodes and edges. Default ON;
+   * the toolbar toggle reveals every read as a drawn node again.
+   */
+  foldReads: boolean;
 
   // Preflight validation (before starting a run)
   preflightIssues: Array<{ id: string; nodeId: string; nodeLabel: string; message: string }>;
@@ -111,6 +120,13 @@ interface FlowState {
   deleteEdge: (edgeId: string) => void;
   disconnectPin: (nodeId: string, handleId: string, isInput: boolean) => void;
   setSelectedNode: (node: Node<FlowNodeData> | null) => void;
+  /**
+   * Select a node BY ID exactly as a canvas click would: the React Flow
+   * `selected` flag is set on the node (selection ring, Delete key, marquee
+   * semantics) as well as the panel pointer. `setSelectedNode` only moves the
+   * panel pointer, which is not enough for anything keyboard-driven.
+   */
+  selectNodeById: (nodeId: string | null) => void;
   setSelectedEdge: (edge: Edge | null) => void;
   /** Ask the canvas to pan/zoom to a node (used by the Functions drawer). */
   requestFocusNode: (nodeId: string) => void;
@@ -123,6 +139,7 @@ interface FlowState {
   undo: () => void;
   redo: () => void;
   setExecView: (enabled: boolean) => void;
+  setFoldReads: (enabled: boolean) => void;
   setExecutingNodeId: (nodeId: string | null) => void;
   setIsRunning: (running: boolean) => void;
   resetExecutionDecorations: () => void;
@@ -248,17 +265,37 @@ export function normalizeFlowFunctions(raw: unknown): FlowFunction[] {
   return out;
 }
 
+export interface FunctionCallSite {
+  /** `pin` = a node's pin expression calls it; `function` = a SIBLING function does. */
+  kind: 'pin' | 'function';
+  /** Node id for `pin` sites; '' for `function` sites (nothing to pan to). */
+  nodeId: string;
+  /** Node label for `pin` sites; the CALLER's function name for `function` sites. */
+  nodeLabel: string;
+  /** Pin id for `pin` sites; '' for `function` sites. */
+  pinId: string;
+  /** The full expression (`pin`) or the calling source line (`function`). */
+  expression: string;
+}
+
 /**
- * Find pin expressions that reference a function name as a CALL
- * (`name(...)`). Used for delete-refusal and used-by listings. A word-boundary
- * call-site scan (not a full parse) — matches the runtime's failure honesty:
- * a missed exotic reference fails loudly at build time anyway.
+ * Find every CALL site of a function name — pin expressions AND sibling
+ * function bodies (the shared library namespace lets functions call each
+ * other, so a helper called only by other helpers is USED).
+ *
+ * Scanning only pin expressions was a real defect: `multiagent-coding`'s
+ * `shq` is called by 7 sibling functions and by no pin, so the drawer read
+ * "used 0" + "1 unused", delete-refusal let it be removed (orphaning all 7)
+ * and rename silently orphaned them too. A word-boundary call-shape scan
+ * (not a full parse) — matches the runtime's failure honesty: a missed
+ * exotic reference fails loudly at build time anyway.
  */
 export function findFunctionCallSites(
   nodes: Node<FlowNodeData>[],
-  name: string
-): Array<{ nodeId: string; nodeLabel: string; pinId: string; expression: string }> {
-  const sites: Array<{ nodeId: string; nodeLabel: string; pinId: string; expression: string }> = [];
+  name: string,
+  functions?: FlowFunction[]
+): FunctionCallSite[] {
+  const sites: FunctionCallSite[] = [];
   if (!name) return sites;
   const re = new RegExp(`(^|[^\\w.])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`);
   for (const node of nodes) {
@@ -268,12 +305,29 @@ export function findFunctionCallSites(
       if (typeof expr !== 'string') continue;
       if (re.test(expr)) {
         sites.push({
+          kind: 'pin',
           nodeId: node.id,
           nodeLabel: String(node.data?.label || node.id),
           pinId,
           expression: expr,
         });
       }
+    }
+  }
+  for (const fn of functions || []) {
+    // A function never counts as its own call site: `def shq(...)` and any
+    // recursive call inside `shq` are self-references, not uses.
+    if (!fn || fn.name === name || typeof fn.code !== 'string') continue;
+    for (const line of fn.code.split('\n')) {
+      if (!re.test(line)) continue;
+      sites.push({
+        kind: 'function',
+        nodeId: '',
+        nodeLabel: fn.name,
+        pinId: '',
+        expression: line.trim(),
+      });
+      break; // one row per calling function, not per call
     }
   }
   return sites;
@@ -309,6 +363,87 @@ export function renameFunctionCallSites(
     }
     return changed ? { ...node, data: { ...node.data, pinExpressions: nextExprs } } : node;
   });
+}
+
+/**
+ * Rewrite `from`(…) → `to`(…) inside SIBLING function bodies. Functions share
+ * one compiled namespace, so a rename that only touches pin expressions
+ * orphans every function-to-function caller (`shq`'s 7 callers). The renamed
+ * function's own entry is skipped: its body is rewritten by the editor (the
+ * `def <name>(` match is validated on save), and touching it here would
+ * mangle a recursive call the author deliberately kept.
+ */
+export function renameFunctionCallsInFunctions(
+  functions: FlowFunction[],
+  from: string,
+  to: string
+): FlowFunction[] {
+  if (!from || !to || from === to) return functions;
+  const re = new RegExp(`(^|[^\\w.])(${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(\\s*\\()`, 'g');
+  return functions.map((fn) => {
+    if (!fn || fn.name === to || typeof fn.code !== 'string') return fn;
+    re.lastIndex = 0;
+    if (!re.test(fn.code)) return fn;
+    re.lastIndex = 0;
+    return { ...fn, code: fn.code.replace(re, (_all, pre, _name, tail) => `${pre}${to}${tail}`) };
+  });
+}
+
+/**
+ * `hidden` is a RENDER projection owned by the canvas (exec view, and the 0156
+ * fold) — it is never document truth, and zero of the 176 shipped flows carry
+ * it. React Flow's `useReactFlow().setNodes/setEdges` helpers re-emit the
+ * DISPLAYED collection as `reset` changes, and `applyChanges` replaces the
+ * whole collection with those items; an unrelated edit made through them would
+ * otherwise stamp the canvas's `hidden: true` flags onto the store and, from
+ * there, into the saved flow. Strip it on the way in.
+ */
+function stripRenderProjection<T extends { hidden?: boolean }>(
+  items: T[],
+  changes: { type: string }[]
+): T[] {
+  if (!changes.some((c) => c.type === 'reset' || c.type === 'add')) return items;
+  let changed = false;
+  const next = items.map((item) => {
+    if (!item || !('hidden' in item)) return item;
+    changed = true;
+    const { hidden: _hidden, ...rest } = item;
+    return rest as T;
+  });
+  return changed ? next : items;
+}
+
+/**
+ * Render-fold delete cascade (0156 Stage 1).
+ *
+ * A folded read is drawn ON its consumer's pin row — the author never sees a
+ * separate card for it. Deleting the consumer must therefore take the reads
+ * drawn on it: otherwise every fold becomes a dangling `get_var` with zero
+ * edges that pops back into view (unfolded) in an unreadable pile at the
+ * deleted consumer's gutter — 19 stacked cards on `final_report`, each 78px
+ * tall docked 26px apart, all runtime-dead.
+ *
+ * The cascade is provably conservative: a getter is added only when it is
+ * FOLDED (single consumer, no incoming edges) and that single consumer is
+ * already being removed, so its edge count after the delete would be zero.
+ * When the fold is off — or in exec view — the chips are visible cards, the
+ * author is deleting exactly what they can see, and nothing cascades.
+ */
+function withFoldedReadsOfRemoved(
+  state: Pick<FlowState, 'nodes' | 'edges' | 'foldReads' | 'execView'>,
+  removedNodeIds: string[]
+): string[] {
+  if (removedNodeIds.length === 0) return removedNodeIds;
+  const folded = computeFoldedGetters(state.nodes, state.edges, state.foldReads && !state.execView);
+  if (folded.byGetter.size === 0) return removedNodeIds;
+  const removed = new Set(removedNodeIds);
+  const cascaded: string[] = [];
+  for (const read of folded.byGetter.values()) {
+    if (!removed.has(read.consumerId) || removed.has(read.getterId)) continue;
+    removed.add(read.getterId);
+    cascaded.push(read.getterId);
+  }
+  return cascaded.length === 0 ? removedNodeIds : [...removedNodeIds, ...cascaded];
 }
 
 function getSelection(state: Pick<FlowState, 'nodes' | 'selectedNode'>): Node<FlowNodeData>[] {
@@ -349,6 +484,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   executingNodeId: null,
   isRunning: false,
   execView: false,
+  foldReads: true,
   recentNodeIds: {},
   recentEdgeIds: {},
   loopProgressByNodeId: {},
@@ -405,11 +541,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // callers (adversary P1-6). Delete refuses while called; rename is
     // delete+create from the call sites' view, so it gets the same care —
     // here by rewriting rather than refusing (the friendlier resolution).
+    // SIBLING BODIES count as call sites: functions share one namespace, so
+    // renaming `shq` must rewrite the 7 helpers that call it, not just pins.
     let nextNodes = s.nodes;
+    let nextFunctions = next;
     if (previousName && previousName !== name) {
       nextNodes = renameFunctionCallSites(s.nodes, previousName, name);
+      nextFunctions = renameFunctionCallsInFunctions(next, previousName, name);
     }
-    set({ flowFunctions: next, nodes: nextNodes });
+    set({ flowFunctions: nextFunctions, nodes: nextNodes });
     return null;
   },
 
@@ -436,13 +576,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const s = get();
     const target = (name || '').trim();
     if (!s.flowFunctions.some((f) => f.name === target)) return `No function named '${target}'`;
-    const sites = findFunctionCallSites(s.nodes, target);
+    // Sibling functions count: deleting a helper that only OTHER functions
+    // call (multiagent-coding's `shq`, 7 callers, 0 pins) used to succeed
+    // silently and orphan every caller at the next compile.
+    const sites = findFunctionCallSites(s.nodes, target, s.flowFunctions);
     if (sites.length > 0) {
       const where = sites
         .slice(0, 3)
-        .map((x) => `${x.nodeLabel}.${x.pinId}`)
+        .map((x) => (x.kind === 'function' ? `ƒ ${x.nodeLabel}` : `${x.nodeLabel}.${x.pinId}`))
         .join(', ');
-      return `'${target}' is still used by ${sites.length} pin${sites.length > 1 ? 's' : ''} (${where}${sites.length > 3 ? ', …' : ''}) — remove those expressions first`;
+      const pins = sites.filter((x) => x.kind === 'pin').length;
+      const noun = pins === sites.length ? 'pin' : pins === 0 ? 'function' : 'caller';
+      return `'${target}' is still used by ${sites.length} ${noun}${sites.length > 1 ? 's' : ''} (${where}${sites.length > 3 ? ', …' : ''}) — remove those callers first`;
     }
     get()._captureHistory();
     set({ flowFunctions: s.flowFunctions.filter((f) => f.name !== target) });
@@ -504,9 +649,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // React Flow change handlers
   onNodesChange: (changes) => {
     const state = get();
-    const removedNodeIds = changes
+    const directlyRemovedIds = changes
       .filter((c) => c.type === 'remove')
       .map((c) => c.id);
+    // Deleting a consumer takes the reads folded onto its pin rows with it.
+    const removedNodeIds = withFoldedReadsOfRemoved(state, directlyRemovedIds);
+    const cascadedChanges: NodeChange[] = removedNodeIds
+      .slice(directlyRemovedIds.length)
+      .map((id) => ({ type: 'remove', id }));
+    const effectiveChanges = cascadedChanges.length > 0 ? [...changes, ...cascadedChanges] : changes;
 
     // History: a node removal (keyboard Delete) is a discrete step; a drag
     // gesture coalesces its per-frame position changes into one baseline
@@ -522,7 +673,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       get()._captureHistory('drag');
     }
 
-    const updatedNodes = applyNodeChanges(changes, state.nodes);
+    const updatedNodes = stripRenderProjection(
+      applyNodeChanges(effectiveChanges, state.nodes),
+      effectiveChanges
+    );
 
     // Keep PropertiesPanel selection in sync with ReactFlow's `node.selected` flags.
     // This avoids "double click to select" glitches when a click becomes a tiny drag,
@@ -586,7 +740,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       get()._captureHistory();
     }
 
-    const updatedEdges = applyEdgeChanges(changes, state.edges);
+    const updatedEdges = stripRenderProjection(applyEdgeChanges(changes, state.edges), changes);
 
     // Keep PropertiesPanel selection in sync with ReactFlow's `edge.selected` flags.
     const selectedEdges = updatedEdges.filter((e) => Boolean((e as any).selected));
@@ -738,16 +892,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
   },
 
-  // Delete a node
+  // Delete a node (plus the reads folded onto its pin rows — see
+  // withFoldedReadsOfRemoved).
   deleteNode: (nodeId) => {
+    const state = get();
+    const removed = new Set(withFoldedReadsOfRemoved(state, [nodeId]));
     get()._captureHistory();
     set({
-      nodes: get().nodes.filter((n) => n.id !== nodeId),
-      edges: get().edges.filter(
-        (e) => e.source !== nodeId && e.target !== nodeId
-      ),
+      nodes: state.nodes.filter((n) => !removed.has(n.id)),
+      edges: state.edges.filter((e) => !removed.has(e.source) && !removed.has(e.target)),
       selectedNode:
-        get().selectedNode?.id === nodeId ? null : get().selectedNode,
+        state.selectedNode && removed.has(state.selectedNode.id) ? null : state.selectedNode,
     });
   },
 
@@ -786,6 +941,22 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Selection
   setSelectedNode: (node) => set({ selectedNode: node, selectedEdge: null }),
+  selectNodeById: (nodeId) => {
+    const state = get();
+    const target = nodeId ? state.nodes.find((n) => n.id === nodeId) || null : null;
+    // `Boolean(...)`, not `===`: a node that has never been selected carries
+    // `selected: undefined`, which is not `=== false`, so the strict form
+    // rewrote EVERY node object on the first call and re-rendered the whole
+    // canvas to change one selection flag.
+    const nodes = state.nodes.map((n) =>
+      isNodeSelected(n) === (n.id === target?.id) ? n : { ...n, selected: n.id === target?.id }
+    );
+    set({
+      nodes,
+      selectedNode: target ? nodes.find((n) => n.id === target.id) || null : null,
+      selectedEdge: null,
+    });
+  },
   setSelectedEdge: (edge) => set({ selectedEdge: edge, selectedNode: null }),
   requestFocusNode: (nodeId) =>
     set((state) => ({
@@ -951,6 +1122,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Execution state
   setExecView: (enabled) => set({ execView: Boolean(enabled) }),
+  setFoldReads: (enabled) => set({ foldReads: Boolean(enabled) }),
   setExecutingNodeId: (nodeId) => set({ executingNodeId: nodeId }),
   setIsRunning: (running) =>
     set({ isRunning: running, executingNodeId: running ? null : null }),

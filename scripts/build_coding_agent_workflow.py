@@ -31,7 +31,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.2.4.flow"
+BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.2.6.flow"
 
 AGENT_INTERFACE = "abstractcode.agent.v1"
 
@@ -222,6 +222,37 @@ def _if(node_id, label, x, y):
                  outputs=[_pin("true", "true", "execution"),
                           _pin("false", "false", "execution")],
                  extra={"icon": "&#x2753;", "headerColor": "#F39C12"})
+
+
+# --- the STEERING + PROGRESS lane (0.2.5, 2026-07-31) ----------------------
+# Added so this family meets the same interactive bar as the new hand-wired
+# loop coders (react-coder / ralph-coder): a run must be steerable while it
+# runs, and it must SAY where it is. Deliberately additive — the round loop,
+# the gates and the report band are untouched.
+
+
+def _exec_code_node(node_id, label, code_body, x, y, inputs, outputs, pin_defaults=None):
+    """Code node ON the exec lane with NAMED outputs.
+
+    The exec wrapper rewrites `success`/`output`/`result`/`error`/`execution`
+    on the node's record, so named result pins must avoid those five (the
+    wf_common rule, restated here because this generator predates it)."""
+    defaults = {"permissions": "sandbox"}
+    defaults.update(pin_defaults or {})
+    return _node(node_id, "code", label, x, y,
+                 inputs=[EXEC_IN, *inputs, _pin("permissions", "permissions", "string")],
+                 outputs=[EXEC_OUT, *outputs],
+                 pin_defaults=defaults,
+                 extra={"functionName": "transform", "codeBody": code_body})
+
+
+def _answer_user(node_id, label, x, y):
+    return _node(node_id, "answer_user", label, x, y,
+                 inputs=[EXEC_IN, _pin("message", "message", "string"),
+                         _pin("level", "level", "string")],
+                 outputs=[EXEC_OUT, _pin("message", "message", "string")],
+                 pin_defaults={"level": "message"},
+                 extra={"icon": "&#x1F4AC;", "headerColor": "#9B59B6"})
 
 
 # --------------------------------------------------------------------------
@@ -1088,6 +1119,16 @@ return {
 # classifies a structured {ok: false} probe result as a tool failure and the
 # (result, success) pins then carry only an error string — the structured
 # payload (page_errors, diag, stage) survives at raw.results[0].output.
+#
+# TWO ACCEPTED SHAPES (drift fix 2026-07-30, operator-reported): the gate used
+# to understand ONLY a structured dict at results[0].output, so a host whose
+# abstractcore returns browser_probe's PASS/FAIL REPORT STRING (the shipped
+# shape for every version before the {rendered, ok, stage, ...} contract)
+# looked identical to "the tool is not mounted" — a real, successful, page-
+# rendering probe was reported as `web execution gate unavailable ... :
+# executed` (the trailing token being `mode`, since results[0].error was
+# empty). The gate now reads the TEXT shape too, and every remaining
+# unavailable message names WHICH branch fired.
 GATE3_CODE = """
 g0 = gate0_out or {}
 web = bool(g0.get("web_class"))
@@ -1098,6 +1139,27 @@ first = results[0] if isinstance(results, list) and results else None
 first = first if isinstance(first, dict) else {}
 output = first.get("output")
 r = output if isinstance(output, dict) else {}
+# TEXT shape: the probe's own report, either as the whole output (older
+# abstractcore) or under `rendered` beside the structured fields (current).
+# The ❌-prefixed refusals/install hints never reach `output` at all - the
+# executor's error heuristic moves them to results[0].error - so the error
+# string is part of the text channel.
+report = output if isinstance(output, str) else str(r.get("rendered") or "")
+if not r and not report.strip():
+    report = str(first.get("error") or "")
+if not r and report.strip():
+    lines = [ln.strip() for ln in report.splitlines() if ln.strip()]
+    head = lines[0] if lines else ""
+    p_errs = [ln[10:].strip() for ln in lines if ln.startswith("[uncaught]")]
+    c_errs = [ln[7:].strip() for ln in lines if ln.startswith("[error]")]
+    if head.startswith("Browser probe: PASS"):
+        r = {"ok": True, "stage": "report", "page_errors": p_errs, "console_errors": c_errs}
+    elif head.startswith("Browser probe: FAIL"):
+        r = {"ok": False, "stage": "report", "error": head, "page_errors": p_errs, "console_errors": c_errs}
+    elif "Missing dependency" in head or "Browser binary missing" in head or "could not run" in head:
+        # playwright/chromium absent, or the worker never launched: the
+        # builder cannot fix the host - environment, not a code defect.
+        r = {"ok": False, "stage": "no-executor", "error": head}
 ran = mode == "executed" and len(r) > 0
 stage = str(r.get("stage") or "")
 diag = r.get("diag") or {}
@@ -1105,29 +1167,49 @@ failures = []
 env_failures = []
 warnings = []
 rnd = int(round_index or 0)
+if web and stage == "report":
+    warnings.append("probe: this host's browser_probe returns its text report only - the gate read the PASS/FAIL verdict and the page/console errors, but canvas-liveness diag (blank/partial render detection) is unavailable (#FALLBACK)")
 if web:
     entry = str(g0.get("entrypoint") or "the web entrypoint")
     if not ran:
-        detail = str(first.get("error") or mode or "no result")
-        env_failures.append("web execution gate unavailable: browser_probe did not run (tool missing, refused, or returned no structured result): " + detail[:200])
+        # Name the branch. "tool missing, refused, or returned no structured
+        # result" cost the operator a debugging cycle precisely because it
+        # named all three at once.
+        err = str(first.get("error") or "").strip()
+        low = err.lower()
+        if mode != "executed":
+            env_failures.append("web execution gate REFUSED: the browser_probe call never executed (tool-call mode '" + (mode or "none") + "'). An unattended run must send input_data._runtime.tool_policy.auto_approve_tools including \\"browser_probe\\"; the auto_approve_max_risk_rank ceiling cannot cover it (browser_probe is model_controlled_destination, which always asks by name)")
+        elif not isinstance(results, list) or not results:
+            env_failures.append("web execution gate UNAVAILABLE: the probe node returned no tool result at all (mode=executed, results=[]) - either the tool_call object was never composed (flow wiring) or the executor dropped the call. Check GET /api/gateway/discovery/tools for browser_probe")
+        elif "not found" in low or "unknown tool" in low or "not registered" in low:
+            env_failures.append("web execution gate UNAVAILABLE: browser_probe is NOT MOUNTED in this host's tool registry (\\"" + err[:140] + "\\"). Enable abstractcore's `web` toolset; verify with GET /api/gateway/discovery/tools")
+        elif "not allowed" in low or "denied" in low or "blocked" in low or "approval" in low:
+            env_failures.append("web execution gate REFUSED: the browser_probe call was blocked by tool policy (\\"" + err[:140] + "\\"). Grant it via input_data._runtime.tool_policy.auto_approve_tools, or answer the approval wait")
+        elif err:
+            env_failures.append("web execution gate FAILED: browser_probe returned an error instead of a result: " + err[:200])
+        else:
+            env_failures.append("web execution gate UNREADABLE: browser_probe RAN but returned a result this gate cannot parse - neither a structured payload nor a 'Browser probe: PASS/FAIL' report. First 200 chars: " + report[:200].replace("\\n", " "))
     elif stage == "no-executor":
         env_failures.append("no browser executor available on this host to run " + entry + ": " + str(r.get("error") or "no engine"))
-    elif not bool(r.get("ok")):
+    else:
+        # Page-level errors are DEFECTS whether or not the probe's own verdict
+        # passed (fix 2026-07-30): the gate calls the probe with
+        # require_nonblank=false, so a page whose script dies on a syntax error
+        # still navigates and still reports "Browser probe: PASS". Harvesting
+        # these only under `not ok` let exactly that class through as
+        # "executes".
         for e in (r.get("page_errors") or [])[:8]:
-            failures.append("execute(web): page error in " + entry + ": " + str(e))
+            failures.append("execute(web): uncaught exception in " + entry + ": " + str(e))
         for e in (r.get("console_errors") or [])[:4]:
             failures.append("execute(web): console error in " + entry + ": " + str(e))
-        for e in (r.get("failed_requests") or [])[:6]:
-            failures.append("execute(web): failed resource load: " + str(e) + " — a referenced asset is missing or misnamed")
-        if not failures:
-            failures.append("execute(web): browser probe failed at stage " + (stage or "?") + ": " + str(r.get("error") or "unknown"))
-    else:
         # World-side dangling-asset catch (closes what G1's parser deliberately
         # skips: css url(), srcset, dynamic imports): a failed LOCAL load is a
         # real defect even when the page survives it. Cross-origin blocks are
         # reported separately by the probe (blocked_requests) and stay quiet.
         for e in (r.get("failed_requests") or [])[:6]:
             failures.append("execute(web): failed resource load: " + str(e) + " — a referenced asset is missing or misnamed")
+        if not bool(r.get("ok")) and not failures:
+            failures.append("execute(web): browser probe failed at stage " + (stage or "?") + ": " + str(r.get("error") or "unknown"))
     if web and ran and stage != "no-executor" and bool(r.get("ok")) and not failures:
         has_canvas = bool(diag.get("has_canvas"))
         nb = int(diag.get("non_blank_samples") or 0)
@@ -1207,7 +1289,7 @@ return {
         "failures": failures,
         "environment_failures": [],
         "warnings": [str(w) for w in (g3.get("warnings") or [])],
-        "summary": "web execution gate failed: " + "; ".join(failures)[:400],
+        "summary": "web execution gate failed: " + "; ".join(failures),
         "artifacts": [entry] if entry else [],
         "gate_source": "deterministic+probe",
         "probe": {"engine": str(g3.get("engine") or ""), "stage": str(g3.get("stage") or ""), "diag": g3.get("diag") or {}},
@@ -1241,7 +1323,7 @@ warnings = [str(w) for w in (g5.get("warnings") or [])]
 failed = len(failures) > 0
 entry = str(g0.get("entrypoint") or "")
 arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])][:5]
-summary = "deterministic gates failed before verification: " + "; ".join(failures)[:400] if failed else "deterministic gates passed"
+summary = "deterministic gates failed before verification: " + "; ".join(failures) if failed else "deterministic gates passed"
 return {
     "failed": failed,
     "verdict": {
@@ -1462,6 +1544,61 @@ return {
 }
 """.strip()
 
+# --- 0.2.5: the steer drain + the per-round progress line -------------------
+# THE STEER HOOK. `Runtime.steer()` (the gateway's `inject_guidance` command)
+# appends to the steer sidecar; the run's own tick drains pending messages
+# into `_runtime.inbox` at the next iteration boundary. This node reads that
+# inbox at the TOP OF EVERY ROUND and folds unseen messages into `cg.steering`,
+# which the builder prompt carries into the round it is about to run.
+#
+# Dedup is a run-owned WATERMARK (`cg.steer_seen` = how many inbox entries
+# this loop has consumed) — the loop NEVER mutates `_runtime.inbox`, so the
+# runtime stays its single writer. The shrink guard covers a host that resets
+# the inbox itself (the abstractagent loops clear theirs): a smaller inbox
+# than the watermark means a fresh list, not messages to skip forever.
+STEER_FOLD_CODE = """
+items = inbox if isinstance(inbox, list) else []
+seen = int(steer_seen or 0)
+if seen > len(items):
+    seen = 0
+notes = str(steering or "")
+added = 0
+for m in items[seen:]:
+    text = ""
+    if isinstance(m, dict):
+        c = m.get("content")
+        text = str(c) if c is not None else ""
+    else:
+        text = str(m or "")
+    text = text.strip()
+    if text:
+        notes = notes + ("\\n" if notes else "") + "- " + text
+        added = added + 1
+return {"steering": notes, "seen": len(items), "fresh": added}
+""".strip()
+
+# One run-visible line per round, same contract shape as the multiagent
+# pipeline's "build cycle N of M" (a stable prefix any client can render
+# without knowing this workflow). The sentence and both case words are
+# editable pin defaults with {{slots}}.
+ROUND_LINE_CODE = """
+state = loop_state or {}
+n = int(state.get("rounds_completed", 0) or 0) + 1
+mx = max(1, int(max_rounds or 1))
+mode = str(state.get("mode") or "")
+if not mode:
+    mode = "build" if n == 1 else "repair"
+note = mode
+if int(fresh_steers or 0) > 0:
+    note = str(steer_word or "") + note
+msg = str(line_text or "")
+msg = msg.replace("{{n}}", str(n)).replace("{{max}}", str(mx)).replace("{{note}}", note)
+return {"message": msg}
+""".strip()
+
+ROUND_LINE_TEXT = "coding round {{n}} of {{max}}: {{note}}"
+ROUND_STEER_WORD = "steering applied — "
+
 # Build the builder's prompt from the request + loop state. 0.2.4 (memgraph
 # forensics, ARCHITECTURE.md §5 R1/R5): the prompt now BRANCHES on
 # loop_state.mode —
@@ -1497,6 +1634,16 @@ rebuild = completed > 0 and mode == "rebuild"
 parts = []
 parts.append("# Coding task")
 parts.append(req)
+# LIVE OPERATOR STEERING (0.2.5): messages the host queued through
+# `inject_guidance` / `Runtime.steer()` while this run was already going.
+# Placed immediately under the task because that is what they amend, and
+# BEFORE the repair/rebuild blocks so a steer can redirect a repair round.
+steer = str(steering or "").strip()
+if steer:
+    parts.append("")
+    parts.append("# OPERATOR STEERING (live — arrived while this run was working; it amends the task above)")
+    parts.append(steer)
+    parts.append("Apply it before continuing with the round's own instructions.")
 if ws:
     parts.append("")
     parts.append("Work inside the workspace root: " + ws)
@@ -1669,7 +1816,17 @@ if web:
     parts.append("Artifact class: web. Entrypoint: " + entry + ". Reference integrity already checked.")
     if bool(g3.get("ran")):
         diag = g3.get("diag") or {}
-        probe_line = "A browser probe already EXECUTED the entrypoint world-side (engine: " + str(g3.get("engine") or "?") + "; loaded ok: " + str(bool(g3.get("probe_ok"))) + "; canvas present: " + str(bool(diag.get("has_canvas"))) + "; non-blank samples: " + str(diag.get("non_blank_samples")) + "). Its result decides the executes gate and will override whatever you report there. Do not try to execute the page yourself."
+        # THREE-STATE, never fabricated (workflow-bench forensics 2026-08-01):
+        # on hosts where browser_probe returns a text report, GATE3 ships NO
+        # diag — and bool(diag.get("has_canvas")) minted "canvas present:
+        # False" as world-side truth. multi-1 cycles 3/5/6 and multi-3 cycles
+        # 4/5/6 burned their round budgets repairing that nonexistent defect
+        # while the probe's own text said "Visual elements (canvas/svg): 1".
+        # Missing evidence is UNKNOWN; unknown never decides a gate.
+        if diag:
+            probe_line = "A browser probe already EXECUTED the entrypoint world-side (engine: " + str(g3.get("engine") or "?") + "; loaded ok: " + str(bool(g3.get("probe_ok"))) + "; canvas present: " + str(bool(diag.get("has_canvas"))) + "; non-blank samples: " + str(diag.get("non_blank_samples")) + "). Its result decides the executes gate and will override whatever you report there. Do not try to execute the page yourself."
+        else:
+            probe_line = "A browser probe already EXECUTED the entrypoint world-side (engine: " + str(g3.get("engine") or "?") + "; loaded ok: " + str(bool(g3.get("probe_ok"))) + "; canvas liveness: UNKNOWN (text-only probe — no pixel diagnostics on this host; do NOT treat canvas absence as a fact; judge presence from file contents and the probe text). The load result decides the executes gate. Do not try to execute the page yourself."
         parts.append(probe_line)
 else:
     parts.append("Artifact class: non-web (no .html entrypoint detected).")
@@ -1845,9 +2002,9 @@ else:
     same = 0
 # R1: the builder's own account of what it did (truncated ~800 chars); an
 # empty report keeps the previous summary rather than erasing the memory.
+# ADR-0026: the builder's own account flows whole — clipping it at 800 chars
+# erased exactly the "what I tried" detail the next round needed.
 summary_txt = str(builder_report or "").strip()
-if len(summary_txt) > 800:
-    summary_txt = summary_txt[:800] + "..."
 if not summary_txt:
     summary_txt = str(prev.get("last_attempt_summary") or "")
 # R2: gate score + best-round tracking (monotone max; ties keep the earlier
@@ -2455,12 +2612,45 @@ def build_root_flow() -> dict[str, Any]:
                     _pin("max_rounds", "max_rounds", "number")]),
         _while("rounds", "Verify-gated build rounds", -1120, 0),
         # --- loop body ---
+        # 0.2.5 STEERING + PROGRESS (the interactive bar the loop coders set):
+        # every round starts by draining the steer inbox and saying where it
+        # is, then builds. Nothing below this block changed.
+        # Laid out on their OWN lane (y=1220, below the report band): this
+        # generator places nodes by hand, so a new block gets a free row
+        # rather than the auto-layout the newer families use.
+        _get_var("get_inbox", "_runtime.inbox", [], -2260, 1220),
+        _get_var("get_steer_seen", "cg.steer_seen", 0, -2260, 1500),
+        _get_var("get_steering", "cg.steering", "", -1880, 1220),
+        _exec_code_node("steer_fold", "Drain steer inbox", STEER_FOLD_CODE, -1500, 1220,
+                        [_pin("inbox", "inbox", "array"),
+                         _pin("steer_seen", "steer_seen", "number"),
+                         _pin("steering", "steering", "string")],
+                        [_pin("steering", "steering", "string"),
+                         _pin("seen", "seen", "number"),
+                         _pin("fresh", "fresh", "number")]),
+        _set_var("set_steering", "Persist steering notes", "cg.steering", -1120, 1220),
+        _set_var("set_steer_seen", "Persist steer watermark", "cg.steer_seen", -740, 1220),
+        _exec_code_node("round_line", "Compose round line", ROUND_LINE_CODE, -360, 1220,
+                        [_pin("loop_state", "loop_state", "object"),
+                         _pin("max_rounds", "max_rounds", "number"),
+                         _pin("fresh_steers", "fresh_steers", "number"),
+                         _pin("line_text", "line_text", "string"),
+                         _pin("steer_word", "steer_word", "string")],
+                        [_pin("message", "message", "string")],
+                        pin_defaults={"line_text": ROUND_LINE_TEXT,
+                                      "steer_word": ROUND_STEER_WORD}),
+        _answer_user("round_status", "Round progress", 20, 1220),
         _get_var("get_state_body", "cg.loop_state",
                  {"rounds_completed": 0, "all_passed": False, "failures": []}, -1120, -300),
         _code_node("builder_prompt", "Compose builder prompt", BUILDER_PROMPT_CODE, -740, -300,
                    [_pin("request", "request", "string"),
                     _pin("workspace_root", "workspace_root", "string"),
-                    _pin("loop_state", "loop_state", "object")],
+                    _pin("loop_state", "loop_state", "object"),
+                    # 0.2.5: the live steering the round must honour. Read
+                    # from the var the fold above just wrote, so it is fresh
+                    # for THIS round (get_var is volatile, re-pulled at the
+                    # builder's resolution — strictly after set_steering).
+                    _pin("steering", "steering", "string")],
                    output_type="string"),
         # R5: mode-shaped agent budget (build/rebuild=30, repair=12), wired
         # into builder.max_iterations from a code output; the pin default
@@ -2534,7 +2724,9 @@ def build_root_flow() -> dict[str, Any]:
         _get("get_open_failures", "open_failures", [], 400, 900),
         _get("get_artifacts", "artifacts", [], 780, 900),
         _get("get_delivered", "delivered", False, 1160, 420),
-        _get("get_success", "success", False, 1160, 620),
+        # y 620 -> 660: the two boxes overlapped by 20px (a get node is 220
+        # tall), the one layout defect the audit had always reported here.
+        _get("get_success", "success", False, 1160, 660),
         _node("end", "on_flow_end", "Finish", 1160, 900,
               inputs=[EXEC_IN,
                       _pin("report", "report", "string"),
@@ -2557,7 +2749,27 @@ def build_root_flow() -> dict[str, Any]:
         # after-loop lane routes through the R2 restore decision, multi-entry
         # on final_list — exec edges only, data pins stay single-source)
         _edge("start", "exec-out", "rounds", "exec-in", animated=True),
-        _edge("rounds", "loop", "builder", "exec-in", animated=True),
+        # 0.2.5: the round opens with the steer drain + the progress line, then
+        # the builder runs exactly as before.
+        _edge("rounds", "loop", "steer_fold", "exec-in", animated=True),
+        _edge("steer_fold", "exec-out", "set_steering", "exec-in", animated=True),
+        _edge("set_steering", "exec-out", "set_steer_seen", "exec-in", animated=True),
+        _edge("set_steer_seen", "exec-out", "round_line", "exec-in", animated=True),
+        _edge("round_line", "exec-out", "round_status", "exec-in", animated=True),
+        _edge("round_status", "exec-out", "builder", "exec-in", animated=True),
+        # steer drain wiring
+        _edge("get_inbox", "value", "steer_fold", "inbox"),
+        _edge("get_steer_seen", "value", "steer_fold", "steer_seen"),
+        _edge("get_steering", "value", "steer_fold", "steering"),
+        _edge("steer_fold", "steering", "set_steering", "value"),
+        _edge("steer_fold", "seen", "set_steer_seen", "value"),
+        # progress line wiring
+        _edge("get_state_body", "value", "round_line", "loop_state"),
+        _edge("start", "max_rounds", "round_line", "max_rounds"),
+        _edge("steer_fold", "fresh", "round_line", "fresh_steers"),
+        _edge("round_line", "message", "round_status", "message"),
+        # the round's live steering reaches the builder's prompt
+        _edge("get_steering", "value", "builder_prompt", "steering"),
         _edge("builder", "exec-out", "verify", "exec-in", animated=True),
         _edge("verify", "exec-out", "snapshot_call", "exec-in", animated=True),
         _edge("snapshot_call", "exec-out", "set_state", "exec-in", animated=True),
@@ -2850,7 +3062,18 @@ def main() -> int:
         # execute_command via call_tool (snapshot/restore/hash) — same
         # approve posture the builder/verifier already need; graceful
         # #FALLBACK degradation, never a round failure.
-        bundle_version="0.2.4",
+        # 0.2.5 = INTERACTIVE BAR (operator directive 2026-07-31, the loop-
+        # coder wave). Additive only — the round loop, the gates and the
+        # report band are untouched. Two hooks the family lacked while the
+        # new hand-wired loop coders (react-coder/ralph-coder) shipped with
+        # them: (a) STEERING — every round drains `_runtime.inbox` (the
+        # gateway's inject_guidance / Runtime.steer channel) into `cg.steering`
+        # behind a run-owned watermark (`cg.steer_seen`, never mutating the
+        # runtime's inbox) and the builder prompt carries it directly under
+        # the task; (b) PROGRESS — one `answer_user` line per round
+        # ("coding round N of M: <mode>"), the stable-prefix contract the
+        # multiagent pipeline's "build cycle N of M" already gives clients.
+        bundle_version="0.2.6",
         flows_dir=FLOWS_DIR,
         entrypoints=["coding-agent", "coder"],
         default_entrypoint="coding-agent",
@@ -2858,6 +3081,12 @@ def main() -> int:
             "family": "coding-agent",
             "purpose": "recursive coding agent with deterministic delivery/integration gates + independent build/execute/match verification (fail-closed executes) and specific-failure reprompting; dual-interface (coding.v1 strict entrypoint + agent.v1 chat entrypoint with inferred gates)",
             "outputs": ["report", "passed", "delivered", "success", "rounds_used", "open_failures", "artifacts"],
+            # Steering + progress discoverability at catalog level (0.2.5),
+            # same shape the react/ralph bundles declare.
+            "steering": {"channel": "inject_guidance", "var": "_runtime.inbox",
+                         "applied": "at every round boundary, deduped by the run-owned "
+                                    "cg.steer_seen watermark, folded into the builder prompt"},
+            "progress_line": "coding round N of M",
         },
     )
     print(f"Wrote {len(flows)} flows to {FLOWS_DIR}")

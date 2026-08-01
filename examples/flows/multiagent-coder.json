@@ -1,7 +1,7 @@
 {
   "id": "multiagent-coder",
   "name": "Multi-agent coder — chat entry (runs pipeline)",
-  "description": "Chat-agent entrypoint for the multi-agent coding pipeline (scouts -> plan -> gates -> build/verify loop -> docs -> PR -> merge). Defaults to gating_mode=wait: interactive clients answer TWO ask_user gates (plan approval, merge approval). Unattended clients must send gating_mode=auto and input_data._runtime.tool_policy = {\"auto_approve_tools\": [\"execute_command\"]} (or drive approvals externally). workspace_root resolves from the session workspace var or input_data; an empty workspace is refused at preflight (this workflow writes files and runs git).",
+  "description": "Chat-agent entrypoint for the multi-agent coding pipeline (scouts -> plan -> gates -> build/verify loop -> docs -> PR -> merge). Defaults to gating_mode=wait: interactive clients answer TWO ask_user gates (plan approval, merge approval). Unattended clients must send gating_mode=auto and input_data._runtime.tool_policy = {\"auto_approve_max_risk_rank\": 2, \"auto_approve_tools\": [\"execute_command\", \"list_files\", \"read_file\", \"browser_probe\"]} (or drive approvals externally): the rank ceiling auto-approves the agents' read/skim tools, the names cover the pipeline's call_tool steps. workspace_root resolves from the session workspace var or input_data; an empty workspace is refused at preflight (this workflow writes files and runs git).",
   "interfaces": [
     "abstractcode.agent.v1"
   ],
@@ -75,84 +75,6 @@
       "outputs": []
     },
     {
-      "id": "map_input",
-      "type": "code",
-      "position": {
-        "x": 480.0,
-        "y": -372.0
-      },
-      "data": {
-        "nodeType": "code",
-        "label": "Map prompt -> request",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#9B59B6",
-        "inputs": [
-          {
-            "id": "prompt",
-            "label": "prompt",
-            "type": "string"
-          },
-          {
-            "id": "workspace_root",
-            "label": "workspace_root",
-            "type": "string"
-          },
-          {
-            "id": "gating_mode",
-            "label": "gating_mode",
-            "type": "string"
-          },
-          {
-            "id": "browser_probe_available",
-            "label": "browser_probe_available",
-            "type": "boolean"
-          },
-          {
-            "id": "provider",
-            "label": "provider",
-            "type": "provider_text"
-          },
-          {
-            "id": "model",
-            "label": "model",
-            "type": "model"
-          },
-          {
-            "id": "permissions",
-            "label": "permissions",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "output",
-            "label": "output",
-            "type": "object"
-          },
-          {
-            "id": "success",
-            "label": "success",
-            "type": "boolean"
-          },
-          {
-            "id": "execution",
-            "label": "execution",
-            "type": "object"
-          }
-        ],
-        "pinDefaults": {
-          "permissions": "sandbox"
-        },
-        "functionName": "transform",
-        "codeBody": "p = str(prompt or \"\").strip()\nws = str(workspace_root or \"\").strip()\ng = str(gating_mode or \"wait\").strip().lower()\nif g not in (\"wait\", \"auto\"):\n    g = \"wait\"\n# browser_probe rides through as a DECLARED pin defaulting TRUE (code-tui\n# c5871: the tool is registered on the shipped gateway and bounded; the\n# old hardcoded False made every report claim static-only verification).\n# A probe-less gateway sends browser_probe_available=false.\nprobe = True if browser_probe_available is None else bool(browser_probe_available)\nbuilt = {\n    \"request\": p,\n    \"workspace_root\": ws,\n    \"provider\": provider,\n    \"model\": model,\n    \"gating_mode\": g,\n    \"browser_probe_available\": probe,\n}\nreturn {\"built\": built}"
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "build",
       "type": "subflow",
       "position": {
@@ -176,9 +98,34 @@
             "type": "boolean"
           },
           {
-            "id": "input",
-            "label": "input",
-            "type": "object"
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
           }
         ],
         "outputs": [
@@ -196,6 +143,26 @@
             "id": "child_output",
             "label": "child_output",
             "type": "object"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "branch",
+            "label": "branch",
+            "type": "string"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
           }
         ],
         "pinDefaults": {
@@ -210,18 +177,33 @@
       "outputs": []
     },
     {
-      "id": "meta_obj",
-      "type": "make_object",
+      "id": "answer",
+      "type": "code",
       "position": {
         "x": 960.0,
-        "y": -320.0
+        "y": 0.0
       },
       "data": {
-        "nodeType": "make_object",
-        "label": "Build meta",
-        "icon": "{}",
-        "headerColor": "#3498DB",
+        "nodeType": "code",
+        "label": "Compose answer",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
         "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "child_success",
+            "label": "child_success",
+            "type": "boolean"
+          },
           {
             "id": "branch",
             "label": "branch",
@@ -231,19 +213,57 @@
             "id": "stopped_reason",
             "label": "stopped_reason",
             "type": "string"
+          },
+          {
+            "id": "child_result",
+            "label": "child_result",
+            "type": "object"
+          },
+          {
+            "id": "died_text",
+            "label": "died_text",
+            "type": "string"
+          },
+          {
+            "id": "unknown_error_text",
+            "label": "unknown_error_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
           }
         ],
         "outputs": [
           {
-            "id": "result",
-            "label": "result",
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
             "type": "object"
           }
         ],
-        "pinExpressions": {
-          "branch": "(value or {}).get(\"branch\", \"\")",
-          "stopped_reason": "(value or {}).get(\"stopped_reason\", \"\")"
-        }
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "died_text": "The multi-agent coding run did not finish: {{error}}\n\nNothing was merged. The run's own trace holds the failing step; re-run once the cause is addressed.",
+          "unknown_error_text": "the child run ended without producing a report"
+        },
+        "functionName": "transform",
+        "codeBody": "# A declared subflow pin only carries a field the child RETURNED. A child that\n# dies never reaches an on_flow_end, so report/branch/stopped_reason arrive as\n# None. Floor them here, and say what happened instead of answering \"\".\nrep = report if isinstance(report, str) else \"\"\nok = bool(child_success)\ndied = child_result if isinstance(child_result, dict) else {}\nif not rep.strip():\n    err = str(died.get(\"error\") or \"\").strip()\n    rep = str(died_text or \"\").replace(\n        \"{{error}}\", err if err else str(unknown_error_text or \"\"))\n    ok = False\nreturn {\n    \"response\": rep,\n    \"ok\": ok,\n    \"meta\": {\"branch\": branch if isinstance(branch, str) else \"\",\n             \"stopped_reason\": stopped_reason if isinstance(stopped_reason, str) else \"\"},\n}"
       },
       "label": null,
       "icon": null,
@@ -255,7 +275,7 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 960.0,
+        "x": 1440.0,
         "y": 0.0
       },
       "data": {
@@ -286,9 +306,10 @@
           }
         ],
         "outputs": [],
-        "pinExpressions": {
-          "response": "(value or {}).get(\"report\", \"\")",
-          "success": "(value or {}).get(\"success\", False)"
+        "pinDefaults": {
+          "response": "",
+          "success": false,
+          "meta": {}
         }
       },
       "label": null,
@@ -308,111 +329,135 @@
       "animated": false
     },
     {
-      "id": "e-build-exec-out-end-exec-in",
+      "id": "e-build-exec-out-answer-exec-in",
       "source": "build",
+      "sourceHandle": "exec-out",
+      "target": "answer",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-answer-exec-out-end-exec-in",
+      "source": "answer",
       "sourceHandle": "exec-out",
       "target": "end",
       "targetHandle": "exec-in",
       "animated": false
     },
     {
-      "id": "e-start-prompt-map_input-prompt",
+      "id": "e-start-prompt-build-request",
       "source": "start",
       "sourceHandle": "prompt",
-      "target": "map_input",
-      "targetHandle": "prompt",
+      "target": "build",
+      "targetHandle": "request",
       "animated": false
     },
     {
-      "id": "e-start-workspace_root-map_input-workspace_root",
+      "id": "e-start-workspace_root-build-workspace_root",
       "source": "start",
       "sourceHandle": "workspace_root",
-      "target": "map_input",
+      "target": "build",
       "targetHandle": "workspace_root",
       "animated": false
     },
     {
-      "id": "e-start-gating_mode-map_input-gating_mode",
+      "id": "e-start-gating_mode-build-gating_mode",
       "source": "start",
       "sourceHandle": "gating_mode",
-      "target": "map_input",
+      "target": "build",
       "targetHandle": "gating_mode",
       "animated": false
     },
     {
-      "id": "e-start-browser_probe_available-map_input-browser_probe_available",
-      "source": "start",
-      "sourceHandle": "browser_probe_available",
-      "target": "map_input",
-      "targetHandle": "browser_probe_available",
-      "animated": false
-    },
-    {
-      "id": "e-start-provider-map_input-provider",
+      "id": "e-start-provider-build-provider",
       "source": "start",
       "sourceHandle": "provider",
-      "target": "map_input",
+      "target": "build",
       "targetHandle": "provider",
       "animated": false
     },
     {
-      "id": "e-start-model-map_input-model",
+      "id": "e-start-model-build-model",
       "source": "start",
       "sourceHandle": "model",
-      "target": "map_input",
+      "target": "build",
       "targetHandle": "model",
       "animated": false
     },
     {
-      "id": "e-map_input-built-build-input",
-      "source": "map_input",
-      "sourceHandle": "built",
+      "id": "e-start-browser_probe_available-build-browser_probe_available",
+      "source": "start",
+      "sourceHandle": "browser_probe_available",
       "target": "build",
-      "targetHandle": "input",
+      "targetHandle": "browser_probe_available",
       "animated": false
     },
     {
-      "id": "e-build-output-end-response",
+      "id": "e-build-report-answer-report",
+      "source": "build",
+      "sourceHandle": "report",
+      "target": "answer",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-build-success-answer-child_success",
+      "source": "build",
+      "sourceHandle": "success",
+      "target": "answer",
+      "targetHandle": "child_success",
+      "animated": false
+    },
+    {
+      "id": "e-build-branch-answer-branch",
+      "source": "build",
+      "sourceHandle": "branch",
+      "target": "answer",
+      "targetHandle": "branch",
+      "animated": false
+    },
+    {
+      "id": "e-build-stopped_reason-answer-stopped_reason",
+      "source": "build",
+      "sourceHandle": "stopped_reason",
+      "target": "answer",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-answer-child_result",
       "source": "build",
       "sourceHandle": "output",
+      "target": "answer",
+      "targetHandle": "child_result",
+      "animated": false
+    },
+    {
+      "id": "e-answer-response-end-response",
+      "source": "answer",
+      "sourceHandle": "response",
       "target": "end",
       "targetHandle": "response",
       "animated": false
     },
     {
-      "id": "e-build-output-end-success",
-      "source": "build",
-      "sourceHandle": "output",
+      "id": "e-answer-ok-end-success",
+      "source": "answer",
+      "sourceHandle": "ok",
       "target": "end",
       "targetHandle": "success",
       "animated": false
     },
     {
-      "id": "e-build-output-meta_obj-branch",
-      "source": "build",
-      "sourceHandle": "output",
-      "target": "meta_obj",
-      "targetHandle": "branch",
-      "animated": false
-    },
-    {
-      "id": "e-build-output-meta_obj-stopped_reason",
-      "source": "build",
-      "sourceHandle": "output",
-      "target": "meta_obj",
-      "targetHandle": "stopped_reason",
-      "animated": false
-    },
-    {
-      "id": "e-meta_obj-result-end-meta",
-      "source": "meta_obj",
-      "sourceHandle": "result",
+      "id": "e-answer-meta-end-meta",
+      "source": "answer",
+      "sourceHandle": "meta",
       "target": "end",
       "targetHandle": "meta",
       "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-28T15:49:11.507023+00:00",
-  "updated_at": "2026-07-28T15:49:11.507023+00:00"
+  "created_at": "2026-08-01T16:06:02.137757+00:00",
+  "updated_at": "2026-08-01T16:06:02.137757+00:00"
 }

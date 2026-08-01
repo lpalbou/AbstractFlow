@@ -5,6 +5,7 @@
 import type { Node, Connection, Edge } from 'reactflow';
 import type { FlowNodeData, PinType } from '../types/flow';
 import { artifactPinTypesCompatible, getArtifactConnectionError } from './mediaArtifacts';
+import { computeFoldedGetters } from './foldedGetters';
 
 function routeKey(sourceNodeId: string, sourceHandle: string): string {
   return `${sourceNodeId}::${sourceHandle || 'exec-out'}`;
@@ -274,6 +275,29 @@ export function areTypesCompatible(
 }
 
 /**
+ * Describe the wire already occupying a data pin.
+ *
+ * A read folded onto the pin row (0156) has NO wire on the canvas — refusing
+ * the second feed with a bare node id would point the author at something they
+ * cannot see. Name the variable and say where it is drawn; keep the node id so
+ * the authoring assistant can still act on it.
+ */
+function describeExistingFeed(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  existing: Edge
+): string {
+  const source = nodes.find((n) => n.id === existing.source);
+  const rawName = source?.data?.nodeType === 'get_var' ? source.data.pinDefaults?.name : undefined;
+  const varName = typeof rawName === 'string' ? rawName.trim() : '';
+  if (!varName) return ` (from ${existing.source}.${existing.sourceHandle})`;
+  const folded = computeFoldedGetters(nodes, edges, true).byGetter.has(existing.source);
+  return folded
+    ? ` — the read pill on this pin row already feeds it variable '${varName}' (Get Variable node ${existing.source})`
+    : ` (from ${existing.source}.${existing.sourceHandle}, reads variable '${varName}')`;
+}
+
+/**
  * Get a human-readable description of why a connection is invalid.
  */
 export function getConnectionError(
@@ -333,7 +357,7 @@ export function getConnectionError(
       const existing = edges.find(
         (e) => e.target === connection.target && e.targetHandle === connection.targetHandle && edgeData(e).routeOverride !== true
       );
-      const from = existing ? ` (from ${existing.source}.${existing.sourceHandle})` : '';
+      const from = existing ? describeExistingFeed(nodes, edges, existing) : '';
       return `Input pin '${connection.targetHandle}' already connected${from}`;
     }
   }

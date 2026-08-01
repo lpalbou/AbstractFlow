@@ -35,6 +35,8 @@ import {
   type ConnectionDragEndpoint,
 } from '../utils/connectionPreview';
 import { computeExecSubgraph } from '../utils/execView';
+import { computeFoldedGetters } from '../utils/foldedGetters';
+import { FoldedGettersContext } from '../hooks/foldedGettersContext';
 
 import { roundedPolylinePath, routeOrthogonal, type RouteRect } from '../utils/edgeRouting';
 
@@ -277,6 +279,7 @@ function CanvasBody() {
     selectedNode,
     executingNodeId,
     execView,
+    foldReads,
     recentNodeIds,
     recentEdgeIds,
     onNodesChange,
@@ -297,6 +300,35 @@ function CanvasBody() {
   const execSubgraph = useMemo(
     () => (execView ? computeExecSubgraph(nodes, edges) : null),
     [execView, nodes, edges]
+  );
+
+  // Render-fold (0156 Stage 1): single-consumer getters draw as pills on their
+  // consumer's pin row; the node card and its wire are hidden. Document
+  // unchanged — the fold is derived, so nothing can drift. A SELECTED folded
+  // getter stays revealed (jump-to-counterpart, marquee honesty); exec view
+  // already hides every getter, so the fold is moot there.
+  //
+  // `nodes` changes identity on every drag frame, so this recomputes per frame.
+  // MEASURED at 0.024ms/call on the largest shipped flow (multiagent-coding,
+  // 161 nodes / 228 edges) — 0.14% of a 60fps frame, and the same memo chain
+  // below already walks every node and edge to build routing rects. A
+  // structural memo key would cost another O(N+E) pass per frame to compute,
+  // i.e. the same class, so there is nothing to buy. Left plain on purpose.
+  const foldedGetters = useMemo(
+    () => computeFoldedGetters(nodes, edges, foldReads && !execView),
+    [nodes, edges, foldReads, execView]
+  );
+  const revealedGetterIds = useMemo(() => {
+    const revealed = new Set<string>();
+    for (const node of nodes) {
+      if (node.selected && foldedGetters.byGetter.has(node.id)) revealed.add(node.id);
+    }
+    if (selectedNode && foldedGetters.byGetter.has(selectedNode.id)) revealed.add(selectedNode.id);
+    return revealed;
+  }, [nodes, selectedNode, foldedGetters]);
+  const isNodeFoldedAway = useCallback(
+    (nodeId: string) => foldedGetters.byGetter.has(nodeId) && !revealedGetterIds.has(nodeId),
+    [foldedGetters, revealedGetterIds]
   );
 
   // Hidden elements cannot stay selected: the properties panel and delete
@@ -777,9 +809,14 @@ function CanvasBody() {
   // otherwise conditional/control nodes would light up branches that are not taken.
   const baseStyledEdges = useMemo(() => {
     const nodeRectsById = new Map<string, RouteRect>();
+    const getterNodeIds = new Set<string>();
     for (const node of nodes) {
-      // Hidden nodes (exec view) must not act as routing obstacles.
+      if (node.data?.nodeType === 'get_var') getterNodeIds.add(node.id);
+    }
+    for (const node of nodes) {
+      // Hidden nodes (exec view, folded getters) must not act as routing obstacles.
       if (execSubgraph && !execSubgraph.nodeIds.has(node.id)) continue;
+      if (isNodeFoldedAway(node.id)) continue;
       const measured = (node as any).measured || {};
       const width = Number(node.width || measured.width || 320);
       const height = Number(node.height || measured.height || 220);
@@ -794,6 +831,11 @@ function CanvasBody() {
     return edges.map((e) => {
       // Exec view hides data edges entirely; only execution edges remain.
       if (execSubgraph && !execSubgraph.edgeIds.has(e.id)) {
+        return e.hidden ? e : { ...e, hidden: true };
+      }
+      // Render-fold: a folded getter's wire is drawn as a pill on the consumer
+      // pin row instead. Revealing the getter (selection) restores the wire.
+      if (foldedGetters.edgeIds.has(e.id) && isNodeFoldedAway(e.source)) {
         return e.hidden ? e : { ...e, hidden: true };
       }
       const sourceHandle = e.sourceHandle || '';
@@ -811,9 +853,17 @@ function CanvasBody() {
         .split(/\s+/)
         .filter(Boolean)
         .filter((c) => c !== 'exec-recent' && c !== 'exec-active');
-      const cleanParts = parts.filter((c) => c !== 'exec-base' && c !== 'route-override');
+      const cleanParts = parts.filter(
+        (c) => c !== 'exec-base' && c !== 'route-override' && c !== 'var-edge'
+      );
       const nextPartsBase = isExecEdge ? [...cleanParts, 'exec-base'] : cleanParts;
-      const nextParts = isRouteOverride ? [...nextPartsBase, 'route-override'] : nextPartsBase;
+      const nextPartsRoute = isRouteOverride ? [...nextPartsBase, 'route-override'] : nextPartsBase;
+      // Variable wires render de-emphasised at rest (full weight on hover /
+      // selection — see nodes.css). Parity rule (0156): a read is never LESS
+      // visible in one spelling than another; folded reads show a pill, drawn
+      // reads show a faint-but-present wire.
+      const isVarEdge = getterNodeIds.has(e.source);
+      const nextParts = isVarEdge ? [...nextPartsRoute, 'var-edge'] : nextPartsRoute;
       const nextClassName = nextParts.length > 0 ? nextParts.join(' ') : undefined;
 
       // ---- style ---------------------------------------------------------
@@ -875,7 +925,7 @@ function CanvasBody() {
       if (!classChanged && !styleChanged && !zIndexChanged && !typeChanged && !dataChanged && !e.hidden) return e;
       return { ...e, className: nextClassName, style: nextStyle, zIndex: nextZIndex, type: nextType, data: nextData, hidden: false };
     });
-  }, [edges, execSubgraph, nodes, pinTypesByNodeId]);
+  }, [edges, execSubgraph, foldedGetters, isNodeFoldedAway, nodes, pinTypesByNodeId]);
 
   const decoratedEdges = useMemo(() => {
     const hasRecent = Boolean(recentEdgeIds && Object.keys(recentEdgeIds).length > 0);
@@ -893,15 +943,22 @@ function CanvasBody() {
   // all other nodes are hidden. Store nodes keep their original type, so
   // switching back restores the full rendering and layout.
   const displayNodes = useMemo(() => {
-    if (!execSubgraph) return nodes;
-    return nodes.map((node) =>
-      execSubgraph.nodeIds.has(node.id)
-        ? { ...node, type: 'execView' }
-        : node.hidden
-          ? node
-          : { ...node, hidden: true }
-    );
-  }, [execSubgraph, nodes]);
+    if (execSubgraph) {
+      return nodes.map((node) =>
+        execSubgraph.nodeIds.has(node.id)
+          ? { ...node, type: 'execView' }
+          : node.hidden
+            ? node
+            : { ...node, hidden: true }
+      );
+    }
+    if (foldedGetters.byGetter.size === 0) return nodes;
+    // Render-fold: folded getters draw as pills on their consumer's pin row;
+    // the node card is hidden until revealed by selection. The projection maps
+    // fresh copies — store nodes never carry `hidden`, so unfolding is just
+    // this memo recomputing.
+    return nodes.map((node) => (isNodeFoldedAway(node.id) ? { ...node, hidden: true } : node));
+  }, [execSubgraph, foldedGetters, isNodeFoldedAway, nodes]);
 
   const previewNodes = useMemo(() => {
     if (!activeConnection) return displayNodes;
@@ -933,6 +990,7 @@ function CanvasBody() {
       onLostPointerCapture={handleCanvasPointerReleaseCapture}
       onContextMenuCapture={() => resetCanvasInteraction(undefined, { forceConnectionCancel: true })}
     >
+        <FoldedGettersContext.Provider value={foldedGetters}>
         <ReactFlow
           nodes={previewNodes}
           edges={decoratedEdges}
@@ -1014,6 +1072,7 @@ function CanvasBody() {
             </>
           )}
         </ReactFlow>
+        </FoldedGettersContext.Provider>
         {nodes.length === 0 ? (
           <div className="canvas-empty-state" aria-hidden="true">
             <div className="canvas-empty-title">Start your flow</div>

@@ -104,6 +104,13 @@ while (Date.now() < deadline) {
     // subworkflow waits auto-resolve when the child completes; never force-resume
     if (w.reason === 'subworkflow') continue;
     const wk = w.wait_key || '';
+    // Dedup by (run, wait_key). Correct since 2026-08-01: the runtime mints
+    // ONE durable key per approval instance
+    // (`tool_approval:{run}:{node}:{effect_identity}`). Before that an agent
+    // node reused `tool_calls:{run}:{node}` for every round, so this exact
+    // line answered approval #1 and then parked the run forever on #2.
+    // Keep the dedup: it is the idempotency measure, and it now doubles as a
+    // regression detector.
     const key = `${rid}:${wk}`;
     if (answered.has(key)) continue;
     const isApproval = String(wk).startsWith('tool_approval') ||

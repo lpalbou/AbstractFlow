@@ -1738,9 +1738,19 @@ const VARIABLE_NODES: NodeTemplate[] = [
     type: 'get_var',
     icon: '&#x1F4E5;', // Reuse "inbox tray" as a getter-ish icon
     label: 'Get Variable',
-    description: 'Read a variable from workflow state by name.',
+    description:
+      'Read a variable from workflow state by name. Supports dotted paths (state.provider); default is returned when the path is missing.',
     headerColor: '#16A085', // Teal
-    inputs: [{ id: 'name', label: 'name', type: 'string' }],
+    inputs: [
+      { id: 'name', label: 'name', type: 'string' },
+      // The runtime has always honoured `default` (executor.py _create_get_var_handler
+      // reads it off the resolved payload), but the template never declared the pin —
+      // so a getter dropped from the palette could not express the second argument of
+      // `vars.x.get(key, fallback)` and silently resolved to None on a missing path.
+      // On a boolean control pin (`wait_gating`) that flips a gate from shown to
+      // skipped, which is why every trivial-read expression had to stay an expression.
+      { id: 'default', label: 'default', type: 'any', description: 'Value used when the path is missing.' },
+    ],
     outputs: [{ id: 'value', label: 'value', type: 'any' }],
     category: 'variables',
   },

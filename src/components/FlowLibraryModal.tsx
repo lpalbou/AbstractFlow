@@ -600,10 +600,19 @@ export function FlowLibraryModal({
 
         <div className="flow-library-body">
           <div className="flow-library-list" ref={listRef}>
+            {/* A banner, not a replacement: the bundled examples below load from
+              * a static glob and stay usable during a gateway outage. Blanking
+              * the list would also hide them, and saying nothing would make the
+              * user's own saved flows look deleted. */}
+            {error ? (
+              <div className="flow-library-empty error-text">
+                Could not load your saved flows
+                {error instanceof Error && error.message ? `: ${error.message}` : ''}. They are still on the
+                Gateway — reconnect and refresh. Bundled examples are listed below.
+              </div>
+            ) : null}
             {isLoading ? (
               <div className="flow-library-empty">Loading flows…</div>
-            ) : error ? (
-              <div className="flow-library-empty error-text">Failed to load flows</div>
             ) : rows.length === 0 ? (
               <div className="flow-library-empty">
                 <div className="flow-library-empty-title">No flows found</div>
@@ -886,34 +895,6 @@ export function FlowLibraryModal({
                       Cancel
                     </button>
                   </div>
-                ) : !selectedFlowReadonly ? (
-                  <div className="flow-library-preview-actions">
-                    <button
-                      type="button"
-                      className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
-                      onClick={handleDelete}
-                      title={
-                        isDeleteConfirm
-                          ? 'Click again to confirm delete'
-                          : selectedUsedBy.length > 0
-                            ? `Delete flow — used by ${selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}`
-                            : 'Delete flow'
-                      }
-                    >
-                      {isDeleteConfirm
-                        ? selectedUsedBy.length > 0
-                          ? `Confirm — breaks ${selectedUsedBy.length} parent${selectedUsedBy.length === 1 ? '' : 's'}`
-                          : 'Confirm Delete'
-                        : 'Delete'}
-                    </button>
-                    {isDeleteConfirm && selectedUsedBy.length > 0 ? (
-                      <div className="flow-library-delete-warning">
-                        Deleting breaks the subflow reference in:{' '}
-                        {selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}. Those workflows will
-                        fail to run or publish until re-wired.
-                      </div>
-                    ) : null}
-                  </div>
                 ) : null}
               </>
             ) : (
@@ -926,6 +907,13 @@ export function FlowLibraryModal({
             enable once a workflow is selected (operator ask 2026-07-20 — the
             in-preview actions scrolled below the fold on long descriptions). */}
         <div className="modal-actions flow-library-actions">
+          {isDeleteConfirm && selectedUsedBy.length > 0 ? (
+            <div className="flow-library-delete-warning">
+              Deleting breaks the subflow reference in:{' '}
+              {selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}. Those workflows will
+              fail to run or publish until re-wired.
+            </div>
+          ) : null}
           <button type="button" className="modal-button cancel" onClick={onClose}>
             Cancel
           </button>
@@ -964,6 +952,31 @@ export function FlowLibraryModal({
             }
           >
             Duplicate
+          </button>
+          <button
+            type="button"
+            className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
+            onClick={handleDelete}
+            disabled={!selectedFlow || isEditing || selectedFlowReadonly}
+            title={
+              !selectedFlow
+                ? 'Select a workflow first'
+                : isEditing
+                  ? 'Finish the current edit first'
+                  : selectedFlowReadonly
+                    ? 'Bundled workflows are read-only and cannot be deleted'
+                    : isDeleteConfirm
+                      ? 'Click again to confirm delete'
+                      : selectedUsedBy.length > 0
+                        ? `Delete flow — used by ${selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}`
+                        : 'Delete flow'
+            }
+          >
+            {isDeleteConfirm
+              ? selectedUsedBy.length > 0
+                ? `Confirm — breaks ${selectedUsedBy.length} parent${selectedUsedBy.length === 1 ? '' : 's'}`
+                : 'Confirm Delete'
+              : 'Delete'}
           </button>
           <button
             type="button"

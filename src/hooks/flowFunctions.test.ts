@@ -66,6 +66,53 @@ describe('upsertFlowFunction rename (P1-6)', () => {
   });
 });
 
+describe('function-to-function call sites (shq defect)', () => {
+  // multiagent-coding's `shq` is called by 7 sibling functions and by no pin
+  // expression. Scanning pins only reported "used 0" + a "1 unused" badge,
+  // let Delete orphan all 7, and let rename orphan them silently.
+  const shq = { name: 'shq', code: 'def shq(v):\n    return "\'" + str(v) + "\'"\n' };
+  const caller = {
+    name: 'compose_lint',
+    code: 'def compose_lint(state):\n    return {"cmd": "cd " + shq(state.get("root"))}\n',
+  };
+
+  it('counts a sibling function body as a call site', () => {
+    const sites = findFunctionCallSites([], 'shq', [shq, caller]);
+    expect(sites).toHaveLength(1);
+    expect(sites[0].kind).toBe('function');
+    expect(sites[0].nodeLabel).toBe('compose_lint');
+    // Its own def line is never a self-use.
+    expect(findFunctionCallSites([], 'shq', [shq])).toHaveLength(0);
+  });
+
+  it('refuses to delete a function only other functions call', () => {
+    const store = useFlowStore.getState();
+    store.upsertFlowFunction(shq);
+    store.upsertFlowFunction(caller);
+    const err = useFlowStore.getState().removeFlowFunction('shq');
+    expect(err).toMatch(/still used by/);
+    expect(useFlowStore.getState().flowFunctions).toHaveLength(2);
+  });
+
+  it('renaming rewrites sibling function bodies too', () => {
+    const store = useFlowStore.getState();
+    store.upsertFlowFunction(shq);
+    store.upsertFlowFunction(caller);
+    const err = useFlowStore
+      .getState()
+      .upsertFlowFunction(
+        { name: 'shell_quote', code: 'def shell_quote(v):\n    return "\'" + str(v) + "\'"\n' },
+        { previousName: 'shq' }
+      );
+    expect(err).toBeNull();
+    const fns = useFlowStore.getState().flowFunctions;
+    const composed = fns.find((f) => f.name === 'compose_lint')!;
+    expect(composed.code).toContain('shell_quote(state.get("root"))');
+    expect(composed.code).not.toContain('shq(');
+    expect(findFunctionCallSites([], 'shell_quote', fns)).toHaveLength(1);
+  });
+});
+
 describe('removeFlowFunction refusal (verified-good, kept pinned)', () => {
   it('refuses while a pin expression still calls it', () => {
     const store = useFlowStore.getState();

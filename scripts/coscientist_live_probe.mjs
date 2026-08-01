@@ -35,7 +35,7 @@ const MAX_CYCLES = Number(process.argv[3] || 2);
 const NUM_HYP = Number(process.argv[4] || 4);
 // Bundle version is configurable (env COSCI_VERSION) so a rebuild-and-rerun
 // does not silently execute a stale bundle — the stale-bundle lesson.
-const VERSION = process.env.COSCI_VERSION || '0.1.16';
+const VERSION = process.env.COSCI_VERSION || '0.2.0';
 
 const start = await j(`${GATEWAY}/api/gateway/runs/start`, {
   method: 'POST',
@@ -58,39 +58,53 @@ const runId = start.run_id || start.runId;
 note(`run ${runId} started (goal="${GOAL.slice(0, 60)}", cycles=${MAX_CYCLES})`);
 
 const approved = new Set();
-async function autoApprove(rid) {
-  try {
-    const kids = await j(`${GATEWAY}/api/gateway/runs?parent_run_id=${rid}&limit=50`, { headers: H }).catch(() => ({}));
-    const runs = [{ run_id: rid }, ...((kids.items || kids.runs || kids || []) || [])];
-    for (const r of runs) {
-      const cid = r.run_id || r.runId;
-      if (!cid) continue;
-      const s = await j(`${GATEWAY}/api/gateway/runs/${cid}`, { headers: H }).catch(() => null);
-      const w = s && (s.waiting || s.wait);
-      if (!w) continue;
-      const wk = w.wait_key || w.key || '';
-      const isApproval = String(wk).startsWith('tool_approval') || (w.details && w.details.mode === 'approval_required');
-      const k = `${cid}:${wk}`;
-      if (isApproval && wk && !approved.has(k)) {
+// Only READ-ONLY web tools are auto-approved: every one is a fetch the
+// workflow itself issues as part of its literature grounding.
+const SAFE_TOOLS = new Set(['fetch_url', 'web_search', 'skim_url', 'skim_websearch']);
+
+// RECURSIVE (2026-07-31, measured live): the investigation subflow does not
+// raise the tool-approval wait itself - its researcher AGENT spawns a
+// react-agent sub-run and the wait lives THERE, a grandchild of the root. The
+// old one-level walk therefore never saw it and every unattended run stalled
+// at `waiting@ground` until the poller timed out. Walk the parent_run_id chain
+// to the leaves.
+async function autoApprove(rid, depth = 0) {
+  if (depth > 4) return;
+  let s;
+  try { s = await j(`${GATEWAY}/api/gateway/runs/${rid}`, { headers: H }); } catch { return; }
+  const w = s && (s.waiting || s.wait);
+  if (w) {
+    const wk = String(w.wait_key || w.key || '');
+    const k = `${rid}:${wk}`;
+    const isApproval = wk.startsWith('tool_approval') || (w.details && w.details.mode === 'approval_required');
+    if (isApproval && wk && !approved.has(k)) {
+      const calls = ((w.details || {}).tool_calls || []).map((c) => c.name);
+      const unsafe = calls.filter((n) => !SAFE_TOOLS.has(n));
+      if (unsafe.length) {
+        note(`REFUSING to auto-approve non-web tool(s): ${unsafe.join(',')} on ${rid.slice(0, 8)}`);
+      } else {
         // The real route is POST /api/gateway/commands (run_id in the BODY);
-        // /runs/{id}/command does not exist — earlier runs never noticed
-        // because web tools are safe-auto-approve and no approval wait ever
-        // actually fired until execute_command entered the flow (2026-07-20).
-        // Mark approved only AFTER the POST succeeds so transient failures
-        // retry on the next poll instead of wedging the wait.
+        // /runs/{id}/command does not exist. Mark approved only AFTER the POST
+        // succeeds so transient failures retry on the next poll.
         try {
           await j(`${GATEWAY}/api/gateway/commands`, {
             method: 'POST', headers: H,
-            body: JSON.stringify({ command_id: `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`, run_id: cid, type: 'resume', payload: { wait_key: wk, payload: { approved: true, auto_approved: true } } }),
+            body: JSON.stringify({ command_id: `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`, run_id: rid, type: 'resume', payload: { wait_key: wk, payload: { approved: true, auto_approved: true } } }),
           });
           approved.add(k);
-          note(`auto-approved ${wk} on ${cid.slice(0, 8)}`);
+          note(`auto-approved ${calls.join(',') || wk} on ${rid.slice(0, 8)} (depth ${depth})`);
         } catch (e) {
           note(`approve failed (will retry): ${String(e).slice(0, 120)}`);
         }
       }
     }
-  } catch { /* best effort */ }
+  }
+  let kids;
+  try { kids = await j(`${GATEWAY}/api/gateway/runs?parent_run_id=${rid}&limit=50`, { headers: H }); } catch { return; }
+  for (const r of (kids.items || kids.runs || [])) {
+    const cid = r.run_id || r.runId || r.id;
+    if (cid && cid !== rid) await autoApprove(cid, depth + 1);
+  }
 }
 
 const deadline = Date.now() + 30 * 60_000;

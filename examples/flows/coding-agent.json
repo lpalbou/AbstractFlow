@@ -236,6 +236,433 @@
       "outputs": []
     },
     {
+      "id": "get_inbox",
+      "type": "get_var",
+      "position": {
+        "x": -2260,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get _runtime.inbox",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "_runtime.inbox",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_steer_seen",
+      "type": "get_var",
+      "position": {
+        "x": -2260,
+        "y": 1500
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cg.steer_seen",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cg.steer_seen",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_steering",
+      "type": "get_var",
+      "position": {
+        "x": -1880,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cg.steering",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cg.steering",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold",
+      "type": "code",
+      "position": {
+        "x": -1500,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Drain steer inbox",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inbox",
+            "label": "inbox",
+            "type": "array"
+          },
+          {
+            "id": "steer_seen",
+            "label": "steer_seen",
+            "type": "number"
+          },
+          {
+            "id": "steering",
+            "label": "steering",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "steering",
+            "label": "steering",
+            "type": "string"
+          },
+          {
+            "id": "seen",
+            "label": "seen",
+            "type": "number"
+          },
+          {
+            "id": "fresh",
+            "label": "fresh",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "items = inbox if isinstance(inbox, list) else []\nseen = int(steer_seen or 0)\nif seen > len(items):\n    seen = 0\nnotes = str(steering or \"\")\nadded = 0\nfor m in items[seen:]:\n    text = \"\"\n    if isinstance(m, dict):\n        c = m.get(\"content\")\n        text = str(c) if c is not None else \"\"\n    else:\n        text = str(m or \"\")\n    text = text.strip()\n    if text:\n        notes = notes + (\"\\n\" if notes else \"\") + \"- \" + text\n        added = added + 1\nreturn {\"steering\": notes, \"seen\": len(items), \"fresh\": added}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_steering",
+      "type": "set_var",
+      "position": {
+        "x": -1120,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Persist steering notes",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cg.steering"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_steer_seen",
+      "type": "set_var",
+      "position": {
+        "x": -740,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Persist steer watermark",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cg.steer_seen"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "round_line",
+      "type": "code",
+      "position": {
+        "x": -360,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose round line",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "fresh_steers",
+            "label": "fresh_steers",
+            "type": "number"
+          },
+          {
+            "id": "line_text",
+            "label": "line_text",
+            "type": "string"
+          },
+          {
+            "id": "steer_word",
+            "label": "steer_word",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "line_text": "coding round {{n}} of {{max}}: {{note}}",
+          "steer_word": "steering applied — "
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\nn = int(state.get(\"rounds_completed\", 0) or 0) + 1\nmx = max(1, int(max_rounds or 1))\nmode = str(state.get(\"mode\") or \"\")\nif not mode:\n    mode = \"build\" if n == 1 else \"repair\"\nnote = mode\nif int(fresh_steers or 0) > 0:\n    note = str(steer_word or \"\") + note\nmsg = str(line_text or \"\")\nmsg = msg.replace(\"{{n}}\", str(n)).replace(\"{{max}}\", str(mx)).replace(\"{{note}}\", note)\nreturn {\"message\": msg}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "round_status",
+      "type": "answer_user",
+      "position": {
+        "x": 20,
+        "y": 1220
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Round progress",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "level": "message"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "get_state_body",
       "type": "get_var",
       "position": {
@@ -310,6 +737,11 @@
             "type": "object"
           },
           {
+            "id": "steering",
+            "label": "steering",
+            "type": "string"
+          },
+          {
             "id": "permissions",
             "label": "permissions",
             "type": "string"
@@ -336,7 +768,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "req = str(request or \"\").strip()\nstate = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nfailures = [str(f) for f in (state.get(\"failures\") or [])]\nws = str(workspace_root or \"\").strip()\nverdict = state.get(\"last_verdict\") or {}\nif not isinstance(verdict, dict):\n    verdict = {}\nmode = str(state.get(\"mode\") or \"\")\nif not mode:\n    mode = \"build\" if completed == 0 else \"repair\"\nsame = int(state.get(\"same_signature_count\", 0) or 0)\nsummary = str(state.get(\"last_attempt_summary\") or \"\").strip()\nrepair = completed > 0 and len(failures) > 0 and mode != \"rebuild\"\nrebuild = completed > 0 and mode == \"rebuild\"\n\nparts = []\nparts.append(\"# Coding task\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Work inside the workspace root: \" + ws)\nif repair:\n    # R1 REPAIR REFLEX: anti-repeat block first when the same failure set\n    # already persisted through a previous attempt.\n    if same >= 1:\n        parts.append(\"\")\n        parts.append(\"You (or a previous round) already attempted this exact failure set and it PERSISTED. The previous approach was: \" + (summary if summary else \"(no account of the previous attempt survived)\"))\n        parts.append(\"Do something different in the same region; do not repeat the previous approach.\")\n    arts = verdict.get(\"artifacts\") or []\n    artifact = str(arts[0]).strip() if arts else \"\"\n    probe = verdict.get(\"probe\") or {}\n    if not isinstance(probe, dict):\n        probe = {}\n    engine = str(probe.get(\"engine\") or \"\")\n    diag = probe.get(\"diag\") or {}\n    parts.append(\"\")\n    parts.append(\"# REPAIR ROUND - the artifact already exists. Fix it IN PLACE; do not start over.\")\n    if artifact:\n        line = \"Artifact under repair: \" + artifact\n        if engine:\n            line = line + \" (world-side probe engine: \" + engine + \")\"\n        parts.append(line)\n    if diag:\n        parts.append(\"Probe diagnostics from the failing run: \" + str(diag))\n    parts.append(\"\")\n    parts.append(\"# Previous attempt FAILED these checks - fix EXACTLY these, do not start over:\")\n    for i, f in enumerate(failures, 1):\n        parts.append(str(i) + \". \" + f)\n    build_error = str(verdict.get(\"build_error\") or \"\").strip()\n    run_error = str(verdict.get(\"run_error\") or \"\").strip()\n    mismatch = str(verdict.get(\"mismatch\") or \"\").strip()\n    if build_error:\n        parts.append(\"Build error (verbatim): \" + build_error)\n    if run_error and run_error != \"decided by browser probe\":\n        parts.append(\"Run error (verbatim): \" + run_error)\n    if mismatch:\n        parts.append(\"Mismatch (verbatim): \" + mismatch)\n    # General-purpose region scoping: quoted strings + identifier-like tokens\n    # from the failure text, minus a small stopword list of gate/English\n    # vocabulary. Error text always carries identifiers - page errors,\n    # tracebacks and compiler errors alike - so the tokens point at the\n    # failing region for every artifact class. Noise is harmless: it only\n    # orders a search.\n    stop = {\"the\", \"a\", \"an\", \"and\", \"or\", \"not\", \"of\", \"to\", \"in\", \"on\", \"at\", \"by\", \"for\", \"with\", \"from\", \"into\", \"is\", \"are\", \"was\", \"were\", \"be\", \"been\", \"being\", \"it\", \"its\", \"this\", \"that\", \"these\", \"those\", \"does\", \"do\", \"did\", \"done\", \"but\", \"as\", \"if\", \"then\", \"than\", \"when\", \"while\", \"no\", \"none\", \"null\", \"undefined\", \"cannot\", \"can\", \"could\", \"must\", \"never\", \"only\", \"error\", \"errors\", \"page\", \"console\", \"failed\", \"failure\", \"failures\", \"file\", \"files\", \"exist\", \"exists\", \"existing\", \"missing\", \"load\", \"loads\", \"loaded\", \"resource\", \"request\", \"requests\", \"web\", \"execute\", \"executes\", \"executed\", \"execution\", \"integration\", \"delivery\", \"orphan\", \"function\", \"functions\", \"declared\", \"referenced\", \"references\", \"reference\", \"workspace\", \"entrypoint\", \"code\", \"script\", \"markup\", \"element\", \"browser\", \"probe\", \"canvas\", \"render\", \"renders\", \"rendered\", \"round\", \"still\", \"blank\", \"under\", \"input\", \"drive\", \"samples\", \"sampled\", \"pixels\", \"area\", \"covers\", \"because\", \"which\", \"where\", \"your\", \"you\", \"set\", \"setting\", \"get\", \"getting\", \"properties\", \"property\", \"value\", \"values\", \"html\", \"htm\", \"http\", \"https\", \"line\", \"lines\", \"after\", \"before\", \"self\", \"report\", \"verification\", \"verified\", \"modified\", \"artifact\", \"artifacts\", \"delivered\", \"bytes\", \"different\", \"attests\", \"regenerate\", \"task\", \"named\", \"feature\", \"depend\", \"depends\", \"dom\", \"contract\", \"runtime\", \"resolves\", \"rename\", \"applied\", \"side\", \"add\", \"update\", \"intended\", \"gate\", \"gates\", \"check\", \"checks\", \"split\", \"brain\", \"sibling\", \"inline\", \"delete\", \"call\", \"every\"}\n    tokens = []\n    sources = failures + [build_error, run_error, mismatch]\n    for src in sources:\n        text = str(src)\n        for q in (\"'\", \"\\\"\"):\n            pos = 0\n            while True:\n                i = text.find(q, pos)\n                if i < 0:\n                    break\n                j = text.find(q, i + 1)\n                if j < 0:\n                    break\n                tok = text[i + 1:j].strip()\n                pos = j + 1\n                if tok and len(tok) <= 60 and \" \" not in tok and \"\\n\" not in tok:\n                    if tok.lower() not in stop and tok not in tokens:\n                        tokens.append(tok)\n        k = 0\n        n = len(text)\n        while k < n:\n            c = text[k]\n            if c.isalpha() or c == \"_\" or c == \"$\":\n                t = c\n                k = k + 1\n                while k < n and (text[k].isalnum() or text[k] == \"_\" or text[k] == \"$\"):\n                    t = t + text[k]\n                    k = k + 1\n                if len(t) >= 3 and t.lower() not in stop and t not in tokens:\n                    tokens.append(t)\n            else:\n                k = k + 1\n    tokens = tokens[:12]\n    parts.append(\"\")\n    parts.append(\"Repair protocol (follow IN ORDER):\")\n    parts.append(\"Step 1: read \" + (artifact if artifact else \"the failing artifact\") + \" with read_file before changing anything.\")\n    if tokens:\n        parts.append(\"Step 2: search_files for these tokens from the failure text: \" + \", \".join(tokens) + \" - the failure lives where they are used.\")\n    else:\n        parts.append(\"Step 2: search_files for the identifiers named in the failure text - the failure lives where they are used.\")\n    parts.append(\"Step 3: make the SMALLEST edit_file change that fixes the named failure. Do NOT rewrite the file with write_file - a rewrite discards working code and re-rolls its bugs.\")\n    parts.append(\"Step 4: re-run your self-probe and confirm THE NAMED FAILURE no longer reproduces, then stop.\")\nelse:\n    parts.append(\"\")\n    parts.append(\"Delivery rules (verified mechanically after every round):\")\n    parts.append(\"- Every produced file must live in the run workspace — never /tmp or another directory.\")\n    parts.append(\"- For small web builds (games, pages, demos): prefer ONE self-contained entrypoint (index.html with inline script/styles) unless the task explicitly requires multiple files.\")\n    parts.append(\"- If you do split files, the entrypoint must actually load every sibling (script src / link href) — an unreferenced file is a delivery failure, not a bonus.\")\n    parts.append(\"- The hidden .cg_rounds/ directory is loop bookkeeping (round snapshots) — never modify it, reference it, or deliver anything from it.\")\n    # C1 (plan improving-code, 2026-07-21): codex-grade engineering rules. The\n    # dead-temporal-ripple defect (0,0,0 samples across all three 0.2.2 runs)\n    # came from code that ran WITHOUT error yet computed a constant — the class\n    # these rules target. Phrased general-purpose (every coding task), not\n    # graph-specific.\n    parts.append(\"\")\n    parts.append(\"Engineering rules (a clean run is not enough — the output must be CORRECT):\")\n    parts.append(\"- Bound every traversal, recursion, and iteration with an explicit limit (max depth/hops, a per-step cap, a visited set) — an unbounded or accidentally-empty loop is a bug even when it does not crash.\")\n    parts.append(\"- Before writing logic over any data structure, VERIFY its actual shape and the DIRECTION of its references (which field points at which; source vs target; parent vs child) by inspecting a real sample — do not assume the direction from the name.\")\n    parts.append(\"- Same output for every input is BROKEN even without an error: if a feature is meant to react to its input, its result MUST change when the input changes. Never ship a function whose output is provably constant across the inputs it is supposed to respond to.\")\n    parts.append(\"- Self-probe before you finish: actually exercise the code on representative input (run it, or for a web build load it and observe) and confirm the task-named behavior is VISIBLE and VARIES — do not declare done on 'it compiles' or 'it loads'.\")\n    if rebuild:\n        # R5 escalation: exactly one rebuild, entered when repairs did not\n        # converge (same_signature_count >= 2) or the failure is design-level\n        # (matches-only gap). The failed design is named so it is not\n        # reproduced verbatim by a fresh agent with no memory.\n        parts.append(\"\")\n        parts.append(\"# REBUILD ROUND (one-time escalation) - repairs did not converge; the previous DESIGN is the problem, not a single line.\")\n        parts.append(\"The previous design failed for these reasons; do NOT reproduce the same design:\")\n        for i, f in enumerate(failures, 1):\n            parts.append(str(i) + \". \" + f)\n        if summary:\n            parts.append(\"The last attempt was: \" + summary)\n        parts.append(\"Rebuild from a DIFFERENT design that avoids these failure mechanisms.\")\n    parts.append(\"\")\n    # C2 (plan improving-code, 2026-07-21): round-0 data profiling. Findings\n    # ride as a source comment block so the verifier (and the next round) can\n    # see what the input actually looked like — the antidote to logic built\n    # on an assumed data shape/direction.\n    parts.append(\"First, PROFILE the inputs before writing logic: inspect the real data/assets/parameters the task operates on (shape, ranges, reference direction, edge cases, whether fields are populated), and record what you found as a short comment block at the top of your main source file (a `PROFILE:`/`DATA NOTES:` header). Build the logic to match what you OBSERVED, not what the names suggest.\")\n    parts.append(\"Then write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.\")\n# C8 (plan improving-code, 2026-07-21): SELFCHECK.md evidence file. Ranked\n# below the mechanical gates deliberately (a self-report is confabulation-\n# aware, not proof) — it makes the builder's own verification claims\n# auditable against the deterministic gates + probe.\n# R3 amendment (memgraph forensics): the self-report must BIND to the bytes\n# it verified via ARTIFACT-SHA256 lines — emitted in EVERY round, repair\n# included: a repair MUST touch SELFCHECK with fresh hashes or G5 fails the\n# round, resolving the old minimal-change-vs-regenerate-report tension\n# mechanically.\nparts.append(\"\")\nparts.append(\"Before finishing, write a SELFCHECK.md in the workspace: for EACH behavior the task named, one line stating how you verified it and the CONCRETE evidence you observed (the command you ran and its output, or the on-screen result and how it VARIED with input) — not 'looks correct'. If you could not verify something, say so plainly. This file is evidence for an independent verifier, so claims without observed evidence are worse than an honest 'unverified'.\")\nparts.append(\"MANDATORY HASH BINDING (a deterministic gate recomputes this): AFTER your FINAL edit, compute the sha256 of every file you claim (execute_command: shasum -a 256 <path>) and END SELFCHECK.md with one line per claimed file, exactly this format:\")\nparts.append(\"ARTIFACT-SHA256: <workspace-relative-path> <sha256>\")\nparts.append(\"Example: ARTIFACT-SHA256: index.html 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae\")\nparts.append(\"If ANY byte of a claimed file changes after its hash line was computed, the round FAILS ('artifact modified after last self-verification'). So: once your self-probe passes, STOP — any further edit requires re-probing AND regenerating SELFCHECK.md with fresh hash lines.\")\nreturn \"\\n\".join(parts)"
+        "codeBody": "req = str(request or \"\").strip()\nstate = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nfailures = [str(f) for f in (state.get(\"failures\") or [])]\nws = str(workspace_root or \"\").strip()\nverdict = state.get(\"last_verdict\") or {}\nif not isinstance(verdict, dict):\n    verdict = {}\nmode = str(state.get(\"mode\") or \"\")\nif not mode:\n    mode = \"build\" if completed == 0 else \"repair\"\nsame = int(state.get(\"same_signature_count\", 0) or 0)\nsummary = str(state.get(\"last_attempt_summary\") or \"\").strip()\nrepair = completed > 0 and len(failures) > 0 and mode != \"rebuild\"\nrebuild = completed > 0 and mode == \"rebuild\"\n\nparts = []\nparts.append(\"# Coding task\")\nparts.append(req)\n# LIVE OPERATOR STEERING (0.2.5): messages the host queued through\n# `inject_guidance` / `Runtime.steer()` while this run was already going.\n# Placed immediately under the task because that is what they amend, and\n# BEFORE the repair/rebuild blocks so a steer can redirect a repair round.\nsteer = str(steering or \"\").strip()\nif steer:\n    parts.append(\"\")\n    parts.append(\"# OPERATOR STEERING (live — arrived while this run was working; it amends the task above)\")\n    parts.append(steer)\n    parts.append(\"Apply it before continuing with the round's own instructions.\")\nif ws:\n    parts.append(\"\")\n    parts.append(\"Work inside the workspace root: \" + ws)\nif repair:\n    # R1 REPAIR REFLEX: anti-repeat block first when the same failure set\n    # already persisted through a previous attempt.\n    if same >= 1:\n        parts.append(\"\")\n        parts.append(\"You (or a previous round) already attempted this exact failure set and it PERSISTED. The previous approach was: \" + (summary if summary else \"(no account of the previous attempt survived)\"))\n        parts.append(\"Do something different in the same region; do not repeat the previous approach.\")\n    arts = verdict.get(\"artifacts\") or []\n    artifact = str(arts[0]).strip() if arts else \"\"\n    probe = verdict.get(\"probe\") or {}\n    if not isinstance(probe, dict):\n        probe = {}\n    engine = str(probe.get(\"engine\") or \"\")\n    diag = probe.get(\"diag\") or {}\n    parts.append(\"\")\n    parts.append(\"# REPAIR ROUND - the artifact already exists. Fix it IN PLACE; do not start over.\")\n    if artifact:\n        line = \"Artifact under repair: \" + artifact\n        if engine:\n            line = line + \" (world-side probe engine: \" + engine + \")\"\n        parts.append(line)\n    if diag:\n        parts.append(\"Probe diagnostics from the failing run: \" + str(diag))\n    parts.append(\"\")\n    parts.append(\"# Previous attempt FAILED these checks - fix EXACTLY these, do not start over:\")\n    for i, f in enumerate(failures, 1):\n        parts.append(str(i) + \". \" + f)\n    build_error = str(verdict.get(\"build_error\") or \"\").strip()\n    run_error = str(verdict.get(\"run_error\") or \"\").strip()\n    mismatch = str(verdict.get(\"mismatch\") or \"\").strip()\n    if build_error:\n        parts.append(\"Build error (verbatim): \" + build_error)\n    if run_error and run_error != \"decided by browser probe\":\n        parts.append(\"Run error (verbatim): \" + run_error)\n    if mismatch:\n        parts.append(\"Mismatch (verbatim): \" + mismatch)\n    # General-purpose region scoping: quoted strings + identifier-like tokens\n    # from the failure text, minus a small stopword list of gate/English\n    # vocabulary. Error text always carries identifiers - page errors,\n    # tracebacks and compiler errors alike - so the tokens point at the\n    # failing region for every artifact class. Noise is harmless: it only\n    # orders a search.\n    stop = {\"the\", \"a\", \"an\", \"and\", \"or\", \"not\", \"of\", \"to\", \"in\", \"on\", \"at\", \"by\", \"for\", \"with\", \"from\", \"into\", \"is\", \"are\", \"was\", \"were\", \"be\", \"been\", \"being\", \"it\", \"its\", \"this\", \"that\", \"these\", \"those\", \"does\", \"do\", \"did\", \"done\", \"but\", \"as\", \"if\", \"then\", \"than\", \"when\", \"while\", \"no\", \"none\", \"null\", \"undefined\", \"cannot\", \"can\", \"could\", \"must\", \"never\", \"only\", \"error\", \"errors\", \"page\", \"console\", \"failed\", \"failure\", \"failures\", \"file\", \"files\", \"exist\", \"exists\", \"existing\", \"missing\", \"load\", \"loads\", \"loaded\", \"resource\", \"request\", \"requests\", \"web\", \"execute\", \"executes\", \"executed\", \"execution\", \"integration\", \"delivery\", \"orphan\", \"function\", \"functions\", \"declared\", \"referenced\", \"references\", \"reference\", \"workspace\", \"entrypoint\", \"code\", \"script\", \"markup\", \"element\", \"browser\", \"probe\", \"canvas\", \"render\", \"renders\", \"rendered\", \"round\", \"still\", \"blank\", \"under\", \"input\", \"drive\", \"samples\", \"sampled\", \"pixels\", \"area\", \"covers\", \"because\", \"which\", \"where\", \"your\", \"you\", \"set\", \"setting\", \"get\", \"getting\", \"properties\", \"property\", \"value\", \"values\", \"html\", \"htm\", \"http\", \"https\", \"line\", \"lines\", \"after\", \"before\", \"self\", \"report\", \"verification\", \"verified\", \"modified\", \"artifact\", \"artifacts\", \"delivered\", \"bytes\", \"different\", \"attests\", \"regenerate\", \"task\", \"named\", \"feature\", \"depend\", \"depends\", \"dom\", \"contract\", \"runtime\", \"resolves\", \"rename\", \"applied\", \"side\", \"add\", \"update\", \"intended\", \"gate\", \"gates\", \"check\", \"checks\", \"split\", \"brain\", \"sibling\", \"inline\", \"delete\", \"call\", \"every\"}\n    tokens = []\n    sources = failures + [build_error, run_error, mismatch]\n    for src in sources:\n        text = str(src)\n        for q in (\"'\", \"\\\"\"):\n            pos = 0\n            while True:\n                i = text.find(q, pos)\n                if i < 0:\n                    break\n                j = text.find(q, i + 1)\n                if j < 0:\n                    break\n                tok = text[i + 1:j].strip()\n                pos = j + 1\n                if tok and len(tok) <= 60 and \" \" not in tok and \"\\n\" not in tok:\n                    if tok.lower() not in stop and tok not in tokens:\n                        tokens.append(tok)\n        k = 0\n        n = len(text)\n        while k < n:\n            c = text[k]\n            if c.isalpha() or c == \"_\" or c == \"$\":\n                t = c\n                k = k + 1\n                while k < n and (text[k].isalnum() or text[k] == \"_\" or text[k] == \"$\"):\n                    t = t + text[k]\n                    k = k + 1\n                if len(t) >= 3 and t.lower() not in stop and t not in tokens:\n                    tokens.append(t)\n            else:\n                k = k + 1\n    tokens = tokens[:12]\n    parts.append(\"\")\n    parts.append(\"Repair protocol (follow IN ORDER):\")\n    parts.append(\"Step 1: read \" + (artifact if artifact else \"the failing artifact\") + \" with read_file before changing anything.\")\n    if tokens:\n        parts.append(\"Step 2: search_files for these tokens from the failure text: \" + \", \".join(tokens) + \" - the failure lives where they are used.\")\n    else:\n        parts.append(\"Step 2: search_files for the identifiers named in the failure text - the failure lives where they are used.\")\n    parts.append(\"Step 3: make the SMALLEST edit_file change that fixes the named failure. Do NOT rewrite the file with write_file - a rewrite discards working code and re-rolls its bugs.\")\n    parts.append(\"Step 4: re-run your self-probe and confirm THE NAMED FAILURE no longer reproduces, then stop.\")\nelse:\n    parts.append(\"\")\n    parts.append(\"Delivery rules (verified mechanically after every round):\")\n    parts.append(\"- Every produced file must live in the run workspace — never /tmp or another directory.\")\n    parts.append(\"- For small web builds (games, pages, demos): prefer ONE self-contained entrypoint (index.html with inline script/styles) unless the task explicitly requires multiple files.\")\n    parts.append(\"- If you do split files, the entrypoint must actually load every sibling (script src / link href) — an unreferenced file is a delivery failure, not a bonus.\")\n    parts.append(\"- The hidden .cg_rounds/ directory is loop bookkeeping (round snapshots) — never modify it, reference it, or deliver anything from it.\")\n    # C1 (plan improving-code, 2026-07-21): codex-grade engineering rules. The\n    # dead-temporal-ripple defect (0,0,0 samples across all three 0.2.2 runs)\n    # came from code that ran WITHOUT error yet computed a constant — the class\n    # these rules target. Phrased general-purpose (every coding task), not\n    # graph-specific.\n    parts.append(\"\")\n    parts.append(\"Engineering rules (a clean run is not enough — the output must be CORRECT):\")\n    parts.append(\"- Bound every traversal, recursion, and iteration with an explicit limit (max depth/hops, a per-step cap, a visited set) — an unbounded or accidentally-empty loop is a bug even when it does not crash.\")\n    parts.append(\"- Before writing logic over any data structure, VERIFY its actual shape and the DIRECTION of its references (which field points at which; source vs target; parent vs child) by inspecting a real sample — do not assume the direction from the name.\")\n    parts.append(\"- Same output for every input is BROKEN even without an error: if a feature is meant to react to its input, its result MUST change when the input changes. Never ship a function whose output is provably constant across the inputs it is supposed to respond to.\")\n    parts.append(\"- Self-probe before you finish: actually exercise the code on representative input (run it, or for a web build load it and observe) and confirm the task-named behavior is VISIBLE and VARIES — do not declare done on 'it compiles' or 'it loads'.\")\n    if rebuild:\n        # R5 escalation: exactly one rebuild, entered when repairs did not\n        # converge (same_signature_count >= 2) or the failure is design-level\n        # (matches-only gap). The failed design is named so it is not\n        # reproduced verbatim by a fresh agent with no memory.\n        parts.append(\"\")\n        parts.append(\"# REBUILD ROUND (one-time escalation) - repairs did not converge; the previous DESIGN is the problem, not a single line.\")\n        parts.append(\"The previous design failed for these reasons; do NOT reproduce the same design:\")\n        for i, f in enumerate(failures, 1):\n            parts.append(str(i) + \". \" + f)\n        if summary:\n            parts.append(\"The last attempt was: \" + summary)\n        parts.append(\"Rebuild from a DIFFERENT design that avoids these failure mechanisms.\")\n    parts.append(\"\")\n    # C2 (plan improving-code, 2026-07-21): round-0 data profiling. Findings\n    # ride as a source comment block so the verifier (and the next round) can\n    # see what the input actually looked like — the antidote to logic built\n    # on an assumed data shape/direction.\n    parts.append(\"First, PROFILE the inputs before writing logic: inspect the real data/assets/parameters the task operates on (shape, ranges, reference direction, edge cases, whether fields are populated), and record what you found as a short comment block at the top of your main source file (a `PROFILE:`/`DATA NOTES:` header). Build the logic to match what you OBSERVED, not what the names suggest.\")\n    parts.append(\"Then write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.\")\n# C8 (plan improving-code, 2026-07-21): SELFCHECK.md evidence file. Ranked\n# below the mechanical gates deliberately (a self-report is confabulation-\n# aware, not proof) — it makes the builder's own verification claims\n# auditable against the deterministic gates + probe.\n# R3 amendment (memgraph forensics): the self-report must BIND to the bytes\n# it verified via ARTIFACT-SHA256 lines — emitted in EVERY round, repair\n# included: a repair MUST touch SELFCHECK with fresh hashes or G5 fails the\n# round, resolving the old minimal-change-vs-regenerate-report tension\n# mechanically.\nparts.append(\"\")\nparts.append(\"Before finishing, write a SELFCHECK.md in the workspace: for EACH behavior the task named, one line stating how you verified it and the CONCRETE evidence you observed (the command you ran and its output, or the on-screen result and how it VARIED with input) — not 'looks correct'. If you could not verify something, say so plainly. This file is evidence for an independent verifier, so claims without observed evidence are worse than an honest 'unverified'.\")\nparts.append(\"MANDATORY HASH BINDING (a deterministic gate recomputes this): AFTER your FINAL edit, compute the sha256 of every file you claim (execute_command: shasum -a 256 <path>) and END SELFCHECK.md with one line per claimed file, exactly this format:\")\nparts.append(\"ARTIFACT-SHA256: <workspace-relative-path> <sha256>\")\nparts.append(\"Example: ARTIFACT-SHA256: index.html 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae\")\nparts.append(\"If ANY byte of a claimed file changes after its hash line was computed, the round FAILS ('artifact modified after last self-verification'). So: once your self-probe passes, STOP — any further edit requires re-probing AND regenerating SELFCHECK.md with fresh hash lines.\")\nreturn \"\\n\".join(parts)"
       },
       "label": null,
       "icon": null,
@@ -870,7 +1302,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "verdict = verifier if isinstance(verifier, dict) else {}\nprev = prev_state if isinstance(prev_state, dict) else {}\nrnd = int(round_index or 0)\nnext_round = rnd + 1\nverdict_missing = (\"builds\" not in verdict) and (\"all_passed\" not in verdict)\nif verdict_missing:\n    meta = verify_meta if isinstance(verify_meta, dict) else {}\n    err = str(meta.get(\"error\") or \"the verification subflow returned no verdict\")\n    env_line = \"verification unavailable: the verification subflow failed before returning a verdict: \" + err[:300]\n    verdict = {\n        \"builds\": False,\n        \"executes\": False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": [],\n        \"environment_failures\": [env_line],\n        \"summary\": \"the verification subflow failed before returning a verdict; the build round finished but is unverified\",\n        \"artifacts\": [],\n        \"verifier_died\": True,\n        \"gate_source\": \"none (verification subflow failed)\",\n    }\nall_passed = bool(verdict.get(\"all_passed\"))\nfailures = verdict.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nfailures = [str(f) for f in failures]\nenv_failures = verdict.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\nenv_failures = [str(f) for f in env_failures]\n# Belt: if the verdict claims pass but a gate is false, do not trust the pass.\nbelted = False\nif all_passed and not (verdict.get(\"builds\") and verdict.get(\"executes\") and verdict.get(\"matches\")):\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed but a gate was false\"]\n    belted = True\nif all_passed and env_failures:\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed despite environment_failures\"]\n    belted = True\n# F7 (self-review 2026-07-21): write the belted decision BACK into the verdict\n# dict before it is stored as last_verdict/best_verdict. Otherwise the stored\n# verdict keeps the verifier's raw failures:[]/all_passed:True, and the\n# restore-path FINAL_REPORT (which reads best_verdict.failures) would omit the\n# belt findings for the delivered round even though the status line stayed\n# honest. Plain subscript writes only (RestrictedPython forbids augmented\n# assignment on subscripts).\nif belted:\n    verdict[\"all_passed\"] = all_passed\n    verdict[\"failures\"] = failures\n# R1: normalized failure signature (per-line, compared as a SET) — the KEY is\n# the stable failure MECHANISM, not its volatile phrasing.\n#   (F2, self-review 2026-07-21) truncate each line at the first \" - \": failure\n#   lines are \"<class>: <specific> - <reason/evidence>\" and the reason half is\n#   LLM-authored prose (verifier failures[], the R4 vacuous-feature fold's\n#   evidence) that drifts every round — keeping it meant the same unfixed\n#   defect never matched itself and the stall guard never fired, burning the\n#   whole budget. The discriminating specifics (filenames, ids, feature names)\n#   always sit in the prefix before the first \" - \".\n#   (F1, self-review 2026-07-21) strip only STANDALONE digit runs (round\n#   counters like \"round 2\", \"3 errors\"); KEEP digits fused to an identifier\n#   (level2.js vs level3.js, sprite1.png) — collapsing those made a builder\n#   fixing one distinct file per round look stalled and wrongly spent its one\n#   rebuild. A digit run is standalone iff neither boundary char is a letter,\n#   \"_\" or \".\" (so \"gate3\" keeps its 3 — a stable gate name — while the\n#   counter after \"round \" drops).\nident = \"abcdefghijklmnopqrstuvwxyz_.\"\nnorm = []\nfor f in failures:\n    t = str(f).strip().lower()\n    dash = t.find(\" - \")\n    if dash >= 0:\n        t = t[:dash]\n    s = \"\"\n    i = 0\n    n = len(t)\n    while i < n:\n        c = t[i]\n        if c in \"0123456789\":\n            j = i\n            while j < n and t[j] in \"0123456789\":\n                j = j + 1\n            before = t[i - 1] if i > 0 else \"\"\n            after = t[j] if j < n else \"\"\n            if (before in ident) or (after in ident):\n                s = s + t[i:j]\n            i = j\n        else:\n            s = s + c\n            i = i + 1\n    norm.append(s)\nsig = \"|\".join(sorted(set(norm)))\nprev_sig = str(prev.get(\"failure_signature\") or \"\")\nsame = int(prev.get(\"same_signature_count\", 0) or 0)\nif sig and prev_sig and sig == prev_sig:\n    same = same + 1\nelse:\n    same = 0\n# R1: the builder's own account of what it did (truncated ~800 chars); an\n# empty report keeps the previous summary rather than erasing the memory.\nsummary_txt = str(builder_report or \"\").strip()\nif len(summary_txt) > 800:\n    summary_txt = summary_txt[:800] + \"...\"\nif not summary_txt:\n    summary_txt = str(prev.get(\"last_attempt_summary\") or \"\")\n# R2: gate score + best-round tracking (monotone max; ties keep the earlier\n# round — first-best wins).\ndet = verdict.get(\"deterministic\") or {}\nif not isinstance(det, dict):\n    det = {}\ngate_count = 0\nif verdict.get(\"builds\"):\n    gate_count = gate_count + 1\nif verdict.get(\"executes\"):\n    gate_count = gate_count + 1\nif verdict.get(\"matches\"):\n    gate_count = gate_count + 1\ngate_score = [1 if all_passed else 0, gate_count, 1 if det.get(\"delivery_ok\") else 0]\nwarnings_state = [str(w) for w in (prev.get(\"warnings\") or [])]\nbest_score = prev.get(\"best_score\")\nbest_round = prev.get(\"best_round\")\nbest_snapshot = str(prev.get(\"best_snapshot\") or \"\")\nbest_verdict = prev.get(\"best_verdict\") or {}\nif bool(snapshot_ok):\n    better = True\n    if isinstance(best_score, list) and len(best_score) == 3:\n        cur = (gate_score[0], gate_score[1], gate_score[2])\n        old = (int(best_score[0] or 0), int(best_score[1] or 0), int(best_score[2] or 0))\n        better = cur > old\n    if better:\n        best_score = gate_score\n        best_round = rnd\n        best_snapshot = \".cg_rounds/round_\" + str(rnd)\n        best_verdict = verdict\nelse:\n    w = \"snapshot: round \" + str(rnd) + \" snapshot failed - best-artifact restore cannot cover this round (#FALLBACK: delivery falls back to the last write for it)\"\n    if w not in warnings_state:\n        warnings_state.append(w)\n# R1: attempt history (bounded by max_rounds).\nhistory = prev.get(\"attempt_history\") or []\nif not isinstance(history, list):\n    history = []\nhistory = history + [{\"round\": rnd, \"failures\": failures, \"gate_score\": gate_score}]\n# R5: mode economics.\nrebuilds_used = int(prev.get(\"rebuilds_used\", 0) or 0)\nrepair_attempts = int(prev.get(\"repair_attempts\", 0) or 0)\nif str(prev.get(\"mode\") or \"\") == \"repair\":\n    repair_attempts = repair_attempts + 1\nmatches_gap = bool(verdict.get(\"builds\")) and bool(verdict.get(\"executes\")) and not bool(verdict.get(\"matches\")) and len(env_failures) == 0\nnext_mode = \"repair\"\nif (not all_passed) and len(failures) > 0 and (same >= 2 or matches_gap) and rebuilds_used == 0:\n    next_mode = \"rebuild\"\n    rebuilds_used = 1\n    same = 0\nreturn {\n    \"rounds_completed\": next_round,\n    \"all_passed\": all_passed,\n    \"failures\": failures,\n    \"environment_failures\": env_failures,\n    \"last_verdict\": verdict,\n    \"attempt_history\": history,\n    \"failure_signature\": sig,\n    \"same_signature_count\": same,\n    \"last_attempt_summary\": summary_txt,\n    \"mode\": next_mode,\n    \"rebuilds_used\": rebuilds_used,\n    \"repair_attempts\": repair_attempts,\n    \"best_round\": best_round,\n    \"best_score\": best_score,\n    \"best_snapshot\": best_snapshot,\n    \"best_verdict\": best_verdict,\n    \"warnings\": warnings_state,\n}"
+        "codeBody": "verdict = verifier if isinstance(verifier, dict) else {}\nprev = prev_state if isinstance(prev_state, dict) else {}\nrnd = int(round_index or 0)\nnext_round = rnd + 1\nverdict_missing = (\"builds\" not in verdict) and (\"all_passed\" not in verdict)\nif verdict_missing:\n    meta = verify_meta if isinstance(verify_meta, dict) else {}\n    err = str(meta.get(\"error\") or \"the verification subflow returned no verdict\")\n    env_line = \"verification unavailable: the verification subflow failed before returning a verdict: \" + err[:300]\n    verdict = {\n        \"builds\": False,\n        \"executes\": False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": [],\n        \"environment_failures\": [env_line],\n        \"summary\": \"the verification subflow failed before returning a verdict; the build round finished but is unverified\",\n        \"artifacts\": [],\n        \"verifier_died\": True,\n        \"gate_source\": \"none (verification subflow failed)\",\n    }\nall_passed = bool(verdict.get(\"all_passed\"))\nfailures = verdict.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nfailures = [str(f) for f in failures]\nenv_failures = verdict.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\nenv_failures = [str(f) for f in env_failures]\n# Belt: if the verdict claims pass but a gate is false, do not trust the pass.\nbelted = False\nif all_passed and not (verdict.get(\"builds\") and verdict.get(\"executes\") and verdict.get(\"matches\")):\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed but a gate was false\"]\n    belted = True\nif all_passed and env_failures:\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed despite environment_failures\"]\n    belted = True\n# F7 (self-review 2026-07-21): write the belted decision BACK into the verdict\n# dict before it is stored as last_verdict/best_verdict. Otherwise the stored\n# verdict keeps the verifier's raw failures:[]/all_passed:True, and the\n# restore-path FINAL_REPORT (which reads best_verdict.failures) would omit the\n# belt findings for the delivered round even though the status line stayed\n# honest. Plain subscript writes only (RestrictedPython forbids augmented\n# assignment on subscripts).\nif belted:\n    verdict[\"all_passed\"] = all_passed\n    verdict[\"failures\"] = failures\n# R1: normalized failure signature (per-line, compared as a SET) — the KEY is\n# the stable failure MECHANISM, not its volatile phrasing.\n#   (F2, self-review 2026-07-21) truncate each line at the first \" - \": failure\n#   lines are \"<class>: <specific> - <reason/evidence>\" and the reason half is\n#   LLM-authored prose (verifier failures[], the R4 vacuous-feature fold's\n#   evidence) that drifts every round — keeping it meant the same unfixed\n#   defect never matched itself and the stall guard never fired, burning the\n#   whole budget. The discriminating specifics (filenames, ids, feature names)\n#   always sit in the prefix before the first \" - \".\n#   (F1, self-review 2026-07-21) strip only STANDALONE digit runs (round\n#   counters like \"round 2\", \"3 errors\"); KEEP digits fused to an identifier\n#   (level2.js vs level3.js, sprite1.png) — collapsing those made a builder\n#   fixing one distinct file per round look stalled and wrongly spent its one\n#   rebuild. A digit run is standalone iff neither boundary char is a letter,\n#   \"_\" or \".\" (so \"gate3\" keeps its 3 — a stable gate name — while the\n#   counter after \"round \" drops).\nident = \"abcdefghijklmnopqrstuvwxyz_.\"\nnorm = []\nfor f in failures:\n    t = str(f).strip().lower()\n    dash = t.find(\" - \")\n    if dash >= 0:\n        t = t[:dash]\n    s = \"\"\n    i = 0\n    n = len(t)\n    while i < n:\n        c = t[i]\n        if c in \"0123456789\":\n            j = i\n            while j < n and t[j] in \"0123456789\":\n                j = j + 1\n            before = t[i - 1] if i > 0 else \"\"\n            after = t[j] if j < n else \"\"\n            if (before in ident) or (after in ident):\n                s = s + t[i:j]\n            i = j\n        else:\n            s = s + c\n            i = i + 1\n    norm.append(s)\nsig = \"|\".join(sorted(set(norm)))\nprev_sig = str(prev.get(\"failure_signature\") or \"\")\nsame = int(prev.get(\"same_signature_count\", 0) or 0)\nif sig and prev_sig and sig == prev_sig:\n    same = same + 1\nelse:\n    same = 0\n# R1: the builder's own account of what it did (truncated ~800 chars); an\n# empty report keeps the previous summary rather than erasing the memory.\n# ADR-0026: the builder's own account flows whole — clipping it at 800 chars\n# erased exactly the \"what I tried\" detail the next round needed.\nsummary_txt = str(builder_report or \"\").strip()\nif not summary_txt:\n    summary_txt = str(prev.get(\"last_attempt_summary\") or \"\")\n# R2: gate score + best-round tracking (monotone max; ties keep the earlier\n# round — first-best wins).\ndet = verdict.get(\"deterministic\") or {}\nif not isinstance(det, dict):\n    det = {}\ngate_count = 0\nif verdict.get(\"builds\"):\n    gate_count = gate_count + 1\nif verdict.get(\"executes\"):\n    gate_count = gate_count + 1\nif verdict.get(\"matches\"):\n    gate_count = gate_count + 1\ngate_score = [1 if all_passed else 0, gate_count, 1 if det.get(\"delivery_ok\") else 0]\nwarnings_state = [str(w) for w in (prev.get(\"warnings\") or [])]\nbest_score = prev.get(\"best_score\")\nbest_round = prev.get(\"best_round\")\nbest_snapshot = str(prev.get(\"best_snapshot\") or \"\")\nbest_verdict = prev.get(\"best_verdict\") or {}\nif bool(snapshot_ok):\n    better = True\n    if isinstance(best_score, list) and len(best_score) == 3:\n        cur = (gate_score[0], gate_score[1], gate_score[2])\n        old = (int(best_score[0] or 0), int(best_score[1] or 0), int(best_score[2] or 0))\n        better = cur > old\n    if better:\n        best_score = gate_score\n        best_round = rnd\n        best_snapshot = \".cg_rounds/round_\" + str(rnd)\n        best_verdict = verdict\nelse:\n    w = \"snapshot: round \" + str(rnd) + \" snapshot failed - best-artifact restore cannot cover this round (#FALLBACK: delivery falls back to the last write for it)\"\n    if w not in warnings_state:\n        warnings_state.append(w)\n# R1: attempt history (bounded by max_rounds).\nhistory = prev.get(\"attempt_history\") or []\nif not isinstance(history, list):\n    history = []\nhistory = history + [{\"round\": rnd, \"failures\": failures, \"gate_score\": gate_score}]\n# R5: mode economics.\nrebuilds_used = int(prev.get(\"rebuilds_used\", 0) or 0)\nrepair_attempts = int(prev.get(\"repair_attempts\", 0) or 0)\nif str(prev.get(\"mode\") or \"\") == \"repair\":\n    repair_attempts = repair_attempts + 1\nmatches_gap = bool(verdict.get(\"builds\")) and bool(verdict.get(\"executes\")) and not bool(verdict.get(\"matches\")) and len(env_failures) == 0\nnext_mode = \"repair\"\nif (not all_passed) and len(failures) > 0 and (same >= 2 or matches_gap) and rebuilds_used == 0:\n    next_mode = \"rebuild\"\n    rebuilds_used = 1\n    same = 0\nreturn {\n    \"rounds_completed\": next_round,\n    \"all_passed\": all_passed,\n    \"failures\": failures,\n    \"environment_failures\": env_failures,\n    \"last_verdict\": verdict,\n    \"attempt_history\": history,\n    \"failure_signature\": sig,\n    \"same_signature_count\": same,\n    \"last_attempt_summary\": summary_txt,\n    \"mode\": next_mode,\n    \"rebuilds_used\": rebuilds_used,\n    \"repair_attempts\": repair_attempts,\n    \"best_round\": best_round,\n    \"best_score\": best_score,\n    \"best_snapshot\": best_snapshot,\n    \"best_verdict\": best_verdict,\n    \"warnings\": warnings_state,\n}"
       },
       "label": null,
       "icon": null,
@@ -1615,7 +2047,7 @@
       "type": "get",
       "position": {
         "x": 1160,
-        "y": 620
+        "y": 660
       },
       "data": {
         "nodeType": "get",
@@ -1730,12 +2162,132 @@
       "animated": true
     },
     {
-      "id": "e-rounds-loop-builder-exec-in",
+      "id": "e-rounds-loop-steer_fold-exec-in",
       "source": "rounds",
       "sourceHandle": "loop",
+      "target": "steer_fold",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-steer_fold-exec-out-set_steering-exec-in",
+      "source": "steer_fold",
+      "sourceHandle": "exec-out",
+      "target": "set_steering",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-set_steering-exec-out-set_steer_seen-exec-in",
+      "source": "set_steering",
+      "sourceHandle": "exec-out",
+      "target": "set_steer_seen",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-set_steer_seen-exec-out-round_line-exec-in",
+      "source": "set_steer_seen",
+      "sourceHandle": "exec-out",
+      "target": "round_line",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-round_line-exec-out-round_status-exec-in",
+      "source": "round_line",
+      "sourceHandle": "exec-out",
+      "target": "round_status",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-round_status-exec-out-builder-exec-in",
+      "source": "round_status",
+      "sourceHandle": "exec-out",
       "target": "builder",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "e-get_inbox-value-steer_fold-inbox",
+      "source": "get_inbox",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "inbox",
+      "animated": false
+    },
+    {
+      "id": "e-get_steer_seen-value-steer_fold-steer_seen",
+      "source": "get_steer_seen",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "steer_seen",
+      "animated": false
+    },
+    {
+      "id": "e-get_steering-value-steer_fold-steering",
+      "source": "get_steering",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "steering",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold-steering-set_steering-value",
+      "source": "steer_fold",
+      "sourceHandle": "steering",
+      "target": "set_steering",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold-seen-set_steer_seen-value",
+      "source": "steer_fold",
+      "sourceHandle": "seen",
+      "target": "set_steer_seen",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_body-value-round_line-loop_state",
+      "source": "get_state_body",
+      "sourceHandle": "value",
+      "target": "round_line",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_rounds-round_line-max_rounds",
+      "source": "start",
+      "sourceHandle": "max_rounds",
+      "target": "round_line",
+      "targetHandle": "max_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold-fresh-round_line-fresh_steers",
+      "source": "steer_fold",
+      "sourceHandle": "fresh",
+      "target": "round_line",
+      "targetHandle": "fresh_steers",
+      "animated": false
+    },
+    {
+      "id": "e-round_line-message-round_status-message",
+      "source": "round_line",
+      "sourceHandle": "message",
+      "target": "round_status",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "e-get_steering-value-builder_prompt-steering",
+      "source": "get_steering",
+      "sourceHandle": "value",
+      "target": "builder_prompt",
+      "targetHandle": "steering",
+      "animated": false
     },
     {
       "id": "e-builder-exec-out-verify-exec-in",
@@ -2251,6 +2803,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-21T20:06:00.180433+00:00",
-  "updated_at": "2026-07-21T20:06:00.180433+00:00"
+  "created_at": "2026-08-01T05:39:16.947440+00:00",
+  "updated_at": "2026-08-01T05:39:16.947440+00:00"
 }

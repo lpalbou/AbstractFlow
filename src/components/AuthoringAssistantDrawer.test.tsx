@@ -1035,6 +1035,36 @@ describe('AuthoringAssistantDrawer catalog fidelity (ADR-0026)', () => {
     expect(context.prompt).toContain('Common rejected-edge mistakes');
   });
 
+  // Operator ruling 2026-07-30: "the whole point of VISUAL authoring is to have
+  // no code, except for experts". The generation-time guidance must land the
+  // author on NODES first — the skill document alone is not enough, because the
+  // system prompt is what the model reads as its own instructions.
+  it('encodes the visual-first ladder and the code-node boundary', () => {
+    const prompt = assistantSystemPrompt();
+    expect(prompt).toContain('VISUAL FIRST — NODES AND WIRES ALWAYS COME FIRST');
+    // Every rung, in order.
+    expect(prompt).toContain('an existing node from NODE CATALOG');
+    expect(prompt).toContain('a subflow with one input pin per field');
+    expect(prompt).toContain('get_var/set_var/set_vars for run state');
+    expect(prompt).toContain('only for a DERIVATION');
+    expect(prompt).toContain('DETERMINISTIC GLUE only');
+    expect(prompt).toContain('PROPOSE A REUSABLE NODE');
+    // What code must never take over.
+    expect(prompt).toContain('never for PROMPT OR SYSTEM TEXT');
+    expect(prompt).toContain('A code node is NEVER for orchestration');
+    // The 0154 amendment: generation stays in node vocabulary.
+    expect(prompt).toContain('GENERATE IN NODE VOCABULARY');
+    // The gap must be surfaced, not silently patched.
+    expect(prompt).toContain('Node gap:');
+  });
+
+  it('requires per-field subflow wiring instead of a hand-built input object', () => {
+    const prompt = assistantSystemPrompt();
+    expect(prompt).toContain('SUBFLOW WIRING — ONE INPUT PIN PER FIELD');
+    expect(prompt).toContain('subflow_interface');
+    expect(prompt).toContain('no Build JSON -> subflow.input');
+  });
+
   it('teaches the artifact versus server-path source contract to the planner', () => {
     const prompt = assistantSystemPrompt();
     expect(prompt).toContain('Artifact = saved reusable file');

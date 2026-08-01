@@ -389,6 +389,25 @@ def main() -> int:
             check("silent moment names itself",
                   "without words" in str(out3.get("moment_error") or ""),
                   f"moment_error={out3.get('moment_error')!r}")
+            # HONEST FAILURE EPISODE (adversary fix 2026-08-01): the
+            # empty-completion half of P0-1 — a moment that ended without
+            # words must NOT deposit "(I stayed silent)" (fabricated chosen
+            # silence) in the append-only graph; it deposits a LABELED
+            # failed moment instead.
+            life3 = ert.home.ms.query(TripleQuery(scope="life", owner_id=ert.entity_id, limit=0))
+            silent_lie3 = any(
+                "(I stayed silent)" in str(getattr(a, "object", ""))
+                for a in life3
+            )
+            check("silent moment: NO false '(I stayed silent)' episode",
+                  not silent_lie3, "a fabricated-silence episode formed on empty completion")
+            failed_labeled = any(
+                "this moment failed" in str(getattr(a, "object", ""))
+                and "not chosen silence" in str(getattr(a, "object", ""))
+                for a in life3
+            )
+            check("silent moment: a LABELED failed-moment episode formed",
+                  failed_labeled, "no labeled failure episode found in the graph")
 
             # SCENARIO 3b — PRIVATE DIARY WORDS NEVER REST ON THE TOOL LANE
             # (flow-side of runtime's C2, claimed c5415): the mind elects a

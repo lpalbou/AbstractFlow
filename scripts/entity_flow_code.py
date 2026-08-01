@@ -869,12 +869,36 @@ reply = str(_input.get("clean_reply") or "")
 phase = str(_input.get("phase") or "visit")
 turn_id = str(_input.get("turn_id") or "")
 
+# HONEST FAILURE EPISODES (adversary fix 2026-08-01): a machinery failure
+# must never masquerade as chosen silence in the append-only graph. Two
+# degradation signals ride in from the turn — guard_died (the rounds child
+# DIED; the reply lane carries the labeled error bracket) and ended_silent
+# (the moment ended without words: an empty completion, historically the
+# relay returning content null). Either one makes this a FAILED moment:
+# digest + verbatim say so, and "(I stayed silent)" stays RESERVED for a
+# reply the entity actually chose to keep wordless (e.g. elections-only
+# replies that clean to empty). Without this, every provider-empty turn
+# deposited a false "(I stayed silent)" memory the entity would later
+# recall as its own choice.
+guard_died = 1 if _input.get("guard_died") == 1 else 0
+ended_silent = 1 if _input.get("ended_silent") == 1 else 0
+degraded = 1 if (guard_died == 1 or ended_silent == 1) else 0
+moment_error = str(_input.get("guard_error") or "")
+if degraded == 1 and not moment_error:
+    moment_error = "the moment ended without words"
+if len(moment_error) > 400:
+    moment_error = moment_error[:400] + " [#TRUNCATION]"
+
 # TITLE SOURCE BY PHASE (wave-4 adversary E, F3): the personal-day cue is
 # computed ONCE and reused for every self-tick, so stimulus-derived titles
 # made all of a day's personal episodes share one boilerplate title (the
 # engine's maintenance flagged them as a duplicate group). On self phases
 # the REPLY — the entity's own words for that distinct step — is the title.
-if phase == "personal":
+if degraded == 1:
+    # A failed moment is titled as one — never by the error bracket posing
+    # as the entity's words, never by the stimulus posing as a lived turn.
+    title = "a moment that failed (" + phase + ", " + turn_id + ")"
+elif phase == "personal":
     title = reply.strip().replace("\n", " ")
 else:
     title = stimulus.strip().replace("\n", " ")
@@ -927,16 +951,29 @@ elif phase == "visit":
 else:
     stim_label = "The moment brought: "
     stim_verb_label = "THE MOMENT BROUGHT:"
-if stim_gist and reply_gist:
+if degraded == 1:
+    # The failure is the truth of the moment: no "I said:" attribution
+    # (the entity said nothing — the bracket text is the guard's, not the
+    # entity's) and no "(I stayed silent)" (silence was not chosen).
+    failure_line = "[this moment failed: " + moment_error + " - no words were spoken; machinery, not chosen silence]"
+    if stim_gist:
+        digest = stim_label + stim_gist + " - " + failure_line
+    else:
+        digest = failure_line
+    verbatim = (stim_verb_label + "\n" + stimulus +
+                "\n\nTHE MOMENT FAILED (machinery, not chosen silence):\n" + moment_error)
+elif stim_gist and reply_gist:
     digest = stim_label + stim_gist + " - I said: " + reply_gist
+    verbatim = stim_verb_label + "\n" + stimulus + "\n\nI SAID:\n" + reply
 elif reply_gist:
     digest = "I said: " + reply_gist
+    verbatim = stim_verb_label + "\n" + stimulus + "\n\nI SAID:\n" + reply
 elif stim_gist:
     digest = stim_label + stim_gist + " - (I stayed silent)"
+    verbatim = stim_verb_label + "\n" + stimulus + "\n\nI SAID:\n" + reply
 else:
     digest = "(a silent moment)"
-
-verbatim = stim_verb_label + "\n" + stimulus + "\n\nI SAID:\n" + reply
+    verbatim = stim_verb_label + "\n" + stimulus + "\n\nI SAID:\n" + reply
 
 # Formation-time keywords (Castor's-first-dream lesson: young episodes
 # without keywords are invisible to lexical recall on vectorless homes).
@@ -946,7 +983,11 @@ stop = {"the", "and", "that", "this", "with", "your", "what", "have", "from",
         "they", "said", "will", "would", "about", "there", "their", "them",
         "just", "very", "when", "then", "than", "were", "been", "being",
         "does", "much", "some", "here", "you", "not", "but", "for"}
-for word in (stimulus + " " + reply).lower().split():
+# Degraded moments key on the STIMULUS only: guard/error prose is the
+# machinery's words, not the moment's content — it must not become the
+# lexical handle this memory answers to.
+kw_source = stimulus if degraded == 1 else (stimulus + " " + reply)
+for word in kw_source.lower().split():
     w = ""
     for ch in word:
         if ch.isalnum():
@@ -972,6 +1013,12 @@ if participants:
     attrs["participants"] = participants
 if truncated == 1:
     attrs["digest_truncated"] = True
+if degraded == 1:
+    # Machine-readable twin of the digest's failure line: consumers (world
+    # model, maintenance, observers) filter failed moments structurally
+    # instead of parsing prose.
+    attrs["degraded"] = True
+    attrs["moment_error"] = moment_error
 
 records = [{
     "kind": "episode",

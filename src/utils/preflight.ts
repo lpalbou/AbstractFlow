@@ -228,6 +228,21 @@ export function collectDeclaredVarNames(nodes: Node<FlowNodeData>[]): Set<string
       const nm = d.pinDefaults?.name;
       if (typeof nm === 'string' && nm.trim()) names.add(nm.trim());
     }
+    // `set_vars` writes N top-level vars from ONE `updates` object, so its
+    // names are only static when the node carries a seed default — which is
+    // exactly how a flow declares its run-var inventory on the canvas (the
+    // flat-vars replacement for a single `state` blob). Collect those keys so
+    // the unknown-var check and the expression editor's hint know them; a
+    // computed-only `updates` contributes nothing and the check abstains as
+    // before.
+    if (d.nodeType === 'set_vars') {
+      const seed = d.pinDefaults?.updates;
+      if (seed && typeof seed === 'object' && !Array.isArray(seed)) {
+        for (const key of Object.keys(seed as Record<string, unknown>)) {
+          if (key.trim()) names.add(key.trim());
+        }
+      }
+    }
     if (d.nodeType === 'on_flow_start') {
       for (const p of d.outputs || []) {
         if (p.type !== 'execution' && p.id) names.add(p.id);
@@ -235,6 +250,114 @@ export function collectDeclaredVarNames(nodes: Node<FlowNodeData>[]): Set<string
     }
   }
   return names;
+}
+
+/**
+ * A literal permitted as the second argument of `.get(key, default)`.
+ * Kept narrow so `x.get("k", compute())` is never mistaken for a plain read.
+ */
+const GET_DEFAULT_LITERAL = String.raw`(True|False|None|-?\d+(\.\d+)?|"[^"]*"|'[^']*'|\[\]|\{\})`;
+
+/** The whole expression is a read of a run var, optionally dotted, optionally
+ * with a default — `get_var{name:"<dotted.path>", default:<d>}` expresses it
+ * exactly (the runtime handler walks dotted paths and honours `default`). */
+const TRIVIAL_VAR_READ = new RegExp(
+  String.raw`^\s*vars(\.[A-Za-z_]\w*|\[\s*["'][^"']+["']\s*\])+` +
+    String.raw`(\s*\.\s*get\(\s*["'][^"']*["']\s*(,\s*${GET_DEFAULT_LITERAL}\s*)?\))?\s*$`
+);
+
+/** The whole expression is a field read off the pin's OWN wired value. A
+ * Get Variable node cannot express this — the honest fixes are a declared
+ * output pin upstream, or Break Object when several fields come off one wire. */
+const TRIVIAL_FIELD_EXTRACT = new RegExp(
+  String.raw`^\s*(` +
+    String.raw`\(\s*value\s+or\s+(\{\}|\[\]|"")\s*\)\s*\.\s*get\(\s*["'][^"']*["']\s*(,\s*${GET_DEFAULT_LITERAL}\s*)?\)` +
+    String.raw`|value(\[\s*["'][^"']+["']\s*\]|\s*\.\s*get\(\s*["'][^"']*["']\s*(,\s*${GET_DEFAULT_LITERAL}\s*)?\))+` +
+    String.raw`)\s*$`
+);
+
+/** Classify an expression that carries no derivation. Exported so the audit
+ * script's Python twin and this can be diffed against the same corpus. */
+export function trivialExpressionKind(expression: string): 'var-read' | 'field-extract' | null {
+  const one = expression.trim().replace(/\s+/g, ' ');
+  if (TRIVIAL_VAR_READ.test(one)) return 'var-read';
+  if (TRIVIAL_FIELD_EXTRACT.test(one)) return 'field-extract';
+  return null;
+}
+
+/**
+ * Subflow input pins that carry a whole object instead of a named field. The
+ * runtime spreads DECLARED input pins into the child's run vars and only falls
+ * back to these when nothing else is declared (`_create_subflow_handler`), so
+ * per-field pins cost nothing at run time — the blob only buys invisibility.
+ */
+const SUBFLOW_BLOB_PINS: ReadonlySet<string> = new Set(['input', 'vars']);
+const SUBFLOW_CONTROL_PINS: ReadonlySet<string> = new Set(['inherit_context', 'inheritContext']);
+/** Node types that BUILD an object — feeding one into a blob pin is the smell. */
+const OBJECT_BUILDER_TYPES: ReadonlySet<string> = new Set(['make_object', 'code', 'merge', 'parse_json']);
+
+/**
+ * P6 HIDDEN CONTRACT (advisory). The editor cannot see the child's graph, so
+ * the conservative signal is the pairing: the subflow node declares ONE object
+ * pin and something upstream hand-BUILDS the object fed into it. That pair is
+ * always a boundary the canvas is refusing to draw. A node that simply has one
+ * `input` pin with a plain wire is left alone — the child's contract may
+ * genuinely be one value.
+ */
+function hiddenSubflowContract(
+  node: Node<FlowNodeData>,
+  edges: Edge[],
+  nodesById: Map<string, Node<FlowNodeData>>
+): string | null {
+  if (node.data.nodeType !== 'subflow') return null;
+  const declared = (node.data.inputs || [])
+    .filter((p) => p.type !== 'execution' && !SUBFLOW_CONTROL_PINS.has(p.id))
+    .map((p) => p.id);
+  if (declared.length !== 1 || !SUBFLOW_BLOB_PINS.has(declared[0])) return null;
+  const feeder = edges.find((e) => e.target === node.id && e.targetHandle === declared[0]);
+  if (!feeder) return null;
+  const source = nodesById.get(feeder.source);
+  if (!source || !OBJECT_BUILDER_TYPES.has(String(source.data.nodeType))) return null;
+  return `This subflow takes one '${declared[0]}' object built by "${source.data.label || source.id}" — declare an input pin per child field instead, so the canvas shows what crosses the boundary`;
+}
+
+/**
+ * P7 CODE-FOR-ORCHESTRATION (advisory). Prompt and system text must stay
+ * editable by users and agents without opening a Python body. Dominance is
+ * measured in CHARACTERS: a prompt is one long literal on ONE line, so a line
+ * ratio scores the worst offenders lowest.
+ */
+const CODE_STRING_LITERAL = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
+const SHELL_MARKERS = ['&&', '||', '2>&1', '>/dev/null', '$(', '`'];
+const PROSE_MIN_WORDS = 8;
+const PROSE_CHAR_SHARE = 0.5;
+const PROMPT_PIN_IDS: ReadonlySet<string> = new Set([
+  'prompt', 'system', 'system_prompt', 'instructions', 'brief', 'task', 'question',
+]);
+
+/** Characters of natural language in a string literal, else 0. Shell/command
+ * text is deterministic glue — the legitimate use of a code node — never prose. */
+function proseLiteralLength(literal: string): number {
+  const body = literal.replace(/^['"]+|['"]+$/g, '');
+  if (SHELL_MARKERS.some((marker) => body.includes(marker))) return 0;
+  const words = body.split(/\s+/).filter(Boolean);
+  if (words.length < PROSE_MIN_WORDS) return 0;
+  const wordy = words.filter((w) => /^[A-Za-z][A-Za-z'\-,.;:()]*$/.test(w)).length;
+  if (wordy < words.length * 0.5) return 0;
+  return body.length;
+}
+
+/** Share of a code body that is prose text. Exported so the audit script's
+ * Python twin and this can be diffed against the same corpus. */
+export function codeProseShare(body: string): number {
+  const code = body
+    .split('\n')
+    .filter((line) => line.trim() && !line.trim().startsWith('#'))
+    .join('\n');
+  if (code.length < 80) return 0;
+  let prose = 0;
+  for (const match of code.matchAll(CODE_STRING_LITERAL)) prose += proseLiteralLength(match[0]);
+  return prose / code.length;
 }
 
 /** vars.<name> and vars["name"] references inside an expression. A regex is
@@ -373,6 +496,27 @@ export function computeRunPreflightIssues(
             `Expression on '${pinId}' calls ${callName}(…) — not a flow function or sandbox builtin (typo, or create it in the Functions panel)`
           );
         }
+
+        // Doctrine advisories (2026-07-30). An expression that only READS is
+        // not an expression — it is a node the canvas is not drawing, and the
+        // two lanes are behaviourally identical (every pure node is volatile
+        // and re-pulled per resolution, so a wired Get Variable re-reads in a
+        // loop condition exactly as the expression does). WARNING-grade on
+        // purpose: this is style, and a style rule must never block Run.
+        const trivial = trivialExpressionKind(expr);
+        if (trivial === 'var-read') {
+          push(
+            n,
+            `Expression on '${pinId}' only reads a variable — use a Get Variable node (it resolves dotted paths and takes a default) and wire it in`,
+            'warning'
+          );
+        } else if (trivial === 'field-extract') {
+          push(
+            n,
+            `Expression on '${pinId}' only reads a field off its own wire — declare that output pin upstream, or use Break Object`,
+            'warning'
+          );
+        }
       }
     }
 
@@ -427,6 +571,42 @@ export function computeRunPreflightIssues(
 
     if (t === 'transcribe_audio') {
       if (!artifactInputPresent(edges, n, 'audio_artifact')) push(n, 'Missing required input: audio_artifact');
+    }
+  }
+
+  // Visual-primacy advisories (2026-07-30, doctrine 0155): what the canvas is
+  // failing to show. Their own pass because the prime offender — a prompt
+  // composer — is a PURE node, and pure nodes never enter the exec-reachable
+  // set the readiness rules walk. "Live" here means reachable, or one data hop
+  // from something reachable (the pure-helper lane). Both are WARNING-grade for
+  // the same reason the expression advisories are: they are style, and a style
+  // rule that blocks Run gets the whole panel switched off.
+  const live = new Set(reachable);
+  for (const e of edges) {
+    if (reachable.has(e.target) && !isExecutionEdge(nodesById, e)) live.add(e.source);
+  }
+  for (const n of nodes) {
+    if (!live.has(n.id)) continue;
+
+    const hiddenContract = hiddenSubflowContract(n, edges, nodesById);
+    if (hiddenContract) push(n, hiddenContract, 'warning');
+
+    if (n.data.nodeType === 'code') {
+      const share = codeProseShare(String(n.data.codeBody || n.data.code || ''));
+      if (share > PROSE_CHAR_SHARE) {
+        const feeds = Array.from(
+          new Set(
+            edges
+              .filter((e) => e.source === n.id && PROMPT_PIN_IDS.has(String(e.targetHandle || '')))
+              .map((e) => String(e.targetHandle))
+          )
+        );
+        push(
+          n,
+          `${Math.round(share * 100)}% of this code body is prose text${feeds.length ? ` feeding ${feeds.join('/')}` : ''} — prompt and system text belongs in an editable pin default or a String Template; keep the code node for selecting between texts that live on pins`,
+          'warning'
+        );
+      }
     }
   }
 

@@ -61,6 +61,7 @@ import { actOnlyRefLabel, collectActOnlyRefs } from '../utils/actOnlyRefs';
 import { unambiguousSubRunCandidate } from '../utils/subrunAttach';
 import { displayDataPinTypeLabel } from '../utils/pinTypeOptions';
 import { savedFlowSummariesFromResponse, subflowExecutionLabel } from '../utils/subflowPins';
+import { findGatedStep, gatedStepKey } from '../utils/gatedStep';
 import {
   formatProgressSummary,
   progressDisplayPercent,
@@ -2067,6 +2068,10 @@ export function RunFlowModal({
   const lastFollowedStepIdRef = useRef<string | null>(null);
   const [progressClockMs, setProgressClockMs] = useState(() => Date.now());
   const lastAutoTerminalStepIdRef = useRef<string | null>(null);
+  // Which user-blocking wait we have already jumped to, keyed by step id +
+  // wait key so re-entering the SAME gate (a second approval round on the same
+  // node) jumps again, while re-renders of one wait do not fight the user.
+  const lastGatedJumpKeyRef = useRef<string | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
   const [failuresExpanded, setFailuresExpanded] = useState(false);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
@@ -4362,7 +4367,7 @@ export function RunFlowModal({
   // Expand every collapsed ancestor of a step so a programmatic jump (failure
   // panel, follow) actually reveals the target row, then select + scroll.
   const jumpToStep = useCallback(
-    (stepId: string) => {
+    (stepId: string, options?: { preserveFollow?: boolean }) => {
       const id = String(stepId || '').trim();
       if (!id) return;
       const path: string[] = [];
@@ -4393,7 +4398,13 @@ export function RunFlowModal({
           return changed ? next : prev;
         });
       }
-      selectStepManually(id);
+      // A gate jump reveals a blocking question; it is not the user pinning a
+      // step, so it must not disarm live following for the rest of the run.
+      if (options?.preserveFollow) {
+        setSelectedStepId(id);
+      } else {
+        selectStepManually(id);
+      }
       // Scroll after the expansion has rendered the row.
       requestAnimationFrame(() => scrollStepIntoView(id));
     },
@@ -4416,13 +4427,28 @@ export function RunFlowModal({
     setSelectedStepId(completedTerminalStep.id);
   }, [completedTerminalStep, displayStepById, followLive, isOpen, isRunning, isWaiting]);
 
+  /**
+   * The step that is BLOCKING on the user, if any.
+   *
+   * A `subworkflow` wait is the parent parked on its child — the run is making
+   * progress and that row deliberately renders as RUNNING. Every other waiting
+   * status needs a human: an approval gate, an Ask User question, a tool
+   * approval. Searched from the end so the innermost/most recent gate wins.
+   */
+  const gatedStep = useMemo(() => findGatedStep(steps), [steps]);
+
   // Follow the live execution while armed: when new steps arrive during a run
   // (or waiting), auto-select the latest step so the user sees what's
   // happening. Disarmed by any manual selection (backlog 0115).
+  //
+  // Yields to an open gate: while the run is blocked on a question, the last
+  // step is not the interesting one — the gate is, and the gate effect below
+  // owns the selection until it is answered.
   useEffect(() => {
     if (!isOpen) return;
     if (!followLive) return;
     if (!(isRunning || isWaiting)) return;
+    if (gatedStep) return;
     if (steps.length === 0) return;
     const last = steps[steps.length - 1];
     if (!last) return;
@@ -4431,7 +4457,34 @@ export function RunFlowModal({
       lastFollowedStepIdRef.current = last.id;
       scrollStepIntoView(last.id);
     }
-  }, [followLive, isOpen, isRunning, isWaiting, scrollStepIntoView, steps]);
+  }, [followLive, gatedStep, isOpen, isRunning, isWaiting, scrollStepIntoView, steps]);
+
+  /**
+   * Always reveal a gate, even when live-following was disarmed.
+   *
+   * Live-follow exists so streaming steps don't steal the details pane, and any
+   * manual click disarms it for the rest of the run. But a question that BLOCKS
+   * the run is not live noise — an operator who clicked one step early would
+   * otherwise sit watching a run that looked busy while it silently waited for
+   * an answer. Observed: a plan-approval gate went unanswered because the pane
+   * never moved to it.
+   *
+   * Jumping expands collapsed subflow ancestors too, so a gate nested inside a
+   * child run is actually revealed rather than merely selected, and it does NOT
+   * disarm following — revealing a question is not the user pinning a step.
+   */
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!gatedStep) {
+      lastGatedJumpKeyRef.current = null;
+      return;
+    }
+    if (!displayStepById.has(gatedStep.id)) return;
+    const key = gatedStepKey(gatedStep);
+    if (lastGatedJumpKeyRef.current === key) return;
+    lastGatedJumpKeyRef.current = key;
+    jumpToStep(gatedStep.id, { preserveFollow: true });
+  }, [displayStepById, gatedStep, isOpen, jumpToStep]);
 
   const selectedStep = useMemo(() => {
     if (!selectedStepId) return null;

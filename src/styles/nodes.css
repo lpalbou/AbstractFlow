@@ -39,6 +39,93 @@
   min-width: 250px;
 }
 
+/* Compact Get Variable — Blueprint's `CompactNodeTitle` posture.
+ *
+ * A configured getter's header already reads `Get <name>`, so at rest the name
+ * dropdown and an empty `default` row are pure duplication. Collapsing them
+ * takes the node from a full 320×220 layout cell down to a chip, which is what
+ * makes "read state with a node, not an expression" affordable — an expensive
+ * getter is exactly why authors reached for invisible pin expressions instead.
+ *
+ * Everything reveals on hover or selection, so inline editing is never lost and
+ * no affordance is hidden from someone looking for it. */
+.flow-node.flow-node--compact-getter {
+  min-width: 0;
+}
+
+.flow-node.flow-node--compact-getter .node-body {
+  padding: 6px 10px;
+  min-height: 0;
+}
+
+.flow-node.flow-node--compact-getter .pin-row[data-pin-id='name'],
+.flow-node.flow-node--compact-getter .pin-row[data-pin-id='default'] {
+  display: none;
+}
+
+/* Reveal the config rows when the author is actually working on the node —
+ * and ALWAYS when the row carries a folded read (0156). A computed read
+ * (getter → another getter's `name`/`default`) hides its wire behind the fold,
+ * so collapsing the row too would erase the read from the canvas entirely:
+ * P12 muted-variable violation, the one thing the fold must never do. */
+.react-flow__node:hover .flow-node.flow-node--compact-getter .pin-row[data-pin-id='name'],
+.react-flow__node:hover .flow-node.flow-node--compact-getter .pin-row[data-pin-id='default'],
+.flow-node.flow-node--compact-getter.selected .pin-row[data-pin-id='name'],
+.flow-node.flow-node--compact-getter.selected .pin-row[data-pin-id='default'],
+.flow-node.flow-node--compact-getter .pin-row.pin-folded-read[data-pin-id='name'],
+.flow-node.flow-node--compact-getter .pin-row.pin-folded-read[data-pin-id='default'] {
+  display: flex;
+}
+
+/* Folded-read pill (0156 Stage 1): a single-consumer Get Variable drawn ON the
+ * pin row it feeds. Teal = the variables family; unmistakably not a literal.
+ * The pill is a button — clicking reveals + selects the folded node card. */
+.folded-read-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 168px;
+  padding: 1px 8px 1px 6px;
+  border: 1px solid rgba(22, 160, 133, 0.65);
+  border-radius: 999px;
+  background: rgba(22, 160, 133, 0.16);
+  color: #7fe0cd;
+  font-size: 10px;
+  line-height: 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.folded-read-pill:hover {
+  background: rgba(22, 160, 133, 0.3);
+  border-color: rgba(22, 160, 133, 0.95);
+}
+
+.folded-read-pill-icon {
+  font-size: 9px;
+}
+
+.folded-read-pill-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Run-time glow parity (0156): a folded read must be as visible EXECUTING as a
+ * drawn getter — when the hidden getter node fires, its pin row flashes with
+ * the same afterglow language the node cards use. */
+.pin-row.pin-folded-read--active .folded-read-pill {
+  border-color: rgba(39, 174, 96, 0.95);
+  background: rgba(39, 174, 96, 0.28);
+  color: #a4f4c5;
+  animation: foldedReadAfterglow 3s ease-out forwards;
+}
+
+@keyframes foldedReadAfterglow {
+  0% { box-shadow: 0 0 10px rgba(39, 174, 96, 0.65); }
+  100% { box-shadow: 0 0 0 rgba(39, 174, 96, 0); }
+}
+
 /* Tooltips are rendered inside node DOM; ensure hovered nodes float above neighbors
    so tooltip bubbles don't get occluded by nearby nodes with higher z-index. */
 .react-flow__node:hover {
@@ -773,6 +860,20 @@
 .react-flow__edge.exec-base .react-flow__edge-path {
   stroke-width: 3;
   opacity: 0.85;
+}
+
+/* Variable wires (source = Get Variable) render de-emphasised at rest so the
+ * execution spine reads first — Grasshopper's faint tier, never hidden
+ * (0156 parity rule). Full weight returns on hover or selection. */
+.react-flow__edge.var-edge .react-flow__edge-path {
+  stroke-opacity: 0.45;
+  stroke-width: 1.5;
+}
+
+.react-flow__edge.var-edge:hover .react-flow__edge-path,
+.react-flow__edge.var-edge.selected .react-flow__edge-path {
+  stroke-opacity: 1;
+  stroke-width: 2.5;
 }
 
 .react-flow__edge.route-override .react-flow__edge-path {

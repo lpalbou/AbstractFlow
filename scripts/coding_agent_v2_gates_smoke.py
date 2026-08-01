@@ -345,8 +345,72 @@ def main() -> int:
     check("no-executor -> executes_web false", r["executes_web"] is False)
     r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(None, success=False, error="Tool 'browser_probe' not found"), "round_index": 0})
     check("tool missing -> environment failure", bool(r["environment_failures"]) and not r["fixable_failed"], str(r))
+    check("tool missing NAMES the branch", any("NOT MOUNTED" in str(f) for f in r["environment_failures"]), str(r["environment_failures"]))
     r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": {"mode": "approval_required"}, "round_index": 0})
     check("unapproved call -> environment failure", bool(r["environment_failures"]) and not r["fixable_failed"], str(r))
+    check("unapproved call NAMES the branch", any("REFUSED" in str(f) and "auto_approve_tools" in str(f) for f in r["environment_failures"]), str(r["environment_failures"]))
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(None, success=False, error="browser_probe is not allowed for this node"), "round_index": 0})
+    check("policy refusal NAMES the branch", any("REFUSED" in str(f) for f in r["environment_failures"]), str(r["environment_failures"]))
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(42), "round_index": 0})
+    check("unparseable result NAMES the branch", any("UNREADABLE" in str(f) for f in r["environment_failures"]), str(r["environment_failures"]))
+
+    # --- TEXT-shape probe results (operator-reported drift, 2026-07-30) ------
+    # This host's abstractcore returns browser_probe's PASS/FAIL REPORT as a
+    # plain string (its documented, test-pinned return: "A PASS/FAIL report").
+    # The gate used to require a dict at results[0].output, so a real probe
+    # that RENDERED THE PAGE read as "did not run" and the run stopped with
+    # `web execution gate unavailable: ... : executed` (the trailing token was
+    # `mode`). These strings are copied from abstractcore's own probe output.
+    pass_text = (
+        "Browser probe: PASS (navigation only — no content assertions requested)\n"
+        "Target: file:///w/index.html (local file; network blocked (no outbound attempts))\n"
+        "HTTP status: 200\nNavigation: 0.04s\nreadyState: complete | title: 'Snake Game'\n"
+        "Visible text: 97 chars — \"Snake Score: 0 Restart\"\n"
+        "Visual elements (canvas/svg/img/video/embed): 1\n"
+        "Console: clean (no errors, no uncaught exceptions)\nTiming: 0.63s total (budget 20s)"
+    )
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(pass_text), "round_index": 0})
+    check("text-shape PASS is EXERCISED (ran)", r["ran"] is True and r["executes_web"] is True and not r["environment_failures"], str(r))
+    check("text-shape PASS warns about missing canvas diag", any("canvas-liveness" in str(w) for w in r["warnings"]), str(r["warnings"]))
+    # The operator's actual run: PASS verdict, but the page threw. With
+    # require_nonblank=false the probe passes on navigation alone, so an
+    # uncaught exception must still fail the gate.
+    dirty_text = pass_text.replace(
+        "Console: clean (no errors, no uncaught exceptions)",
+        "Console: 0 error(s), 1 uncaught exception(s) — a page can render and still be broken:\n"
+        "  [uncaught] Invalid or unexpected token",
+    )
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(dirty_text), "round_index": 0})
+    check("text-shape PASS + uncaught exception FAILS the gate", r["ran"] is True and r["fixable_failed"]
+          and any("Invalid or unexpected token" in str(f) for f in r["failures"]) and r["executes_web"] is False, str(r))
+    fail_text = (
+        "Browser probe: FAIL — 1 check(s) failed\nTarget: file:///w/index.html (local file)\n"
+        "Checks:\n  ✗ nonblank — page stayed blank within budget (no visible text, no canvas/svg/img/video) (4.0s)\n"
+        "Console: 1 error(s), 0 uncaught exception(s) — a page can render and still be broken:\n"
+        "  [error] ReferenceError: draw is not defined (at file:///w/game.js:12)"
+    )
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(fail_text), "round_index": 0})
+    check("text-shape FAIL is a FIXABLE failure, not an environment one", r["ran"] is True and r["fixable_failed"]
+          and not r["environment_failures"] and any("draw is not defined" in str(f) for f in r["failures"]), str(r))
+    # The install hints are ❌-prefixed, so the tool executor moves them to
+    # results[0].error (output stays None) with the ❌ stripped.
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(
+        None, success=False,
+        error="Missing dependency: `playwright`\nbrowser_probe renders pages in a headless browser via Playwright.\nInstall (2 steps): pip install \"abstractcore[browser]\""),
+        "round_index": 0})
+    check("playwright missing -> no-executor environment failure", bool(r["environment_failures"])
+          and not r["fixable_failed"] and r["stage"] == "no-executor", str(r))
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(
+        None, success=False, error="Browser binary missing: Playwright is installed but its Chromium headless shell is not."), "round_index": 0})
+    check("chromium missing -> no-executor environment failure", bool(r["environment_failures"])
+          and not r["fixable_failed"] and r["stage"] == "no-executor", str(r))
+    # `rendered` beside structured fields (the dual-channel shape): the
+    # structured payload wins, no text parse, no #FALLBACK warning.
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(
+        {"rendered": pass_text, "ok": True, "stage": "run",
+         "diag": {"has_canvas": True, "non_blank_samples": 40, "sampled_pixels": 369}}), "round_index": 0})
+    check("structured payload still wins over `rendered`", r["executes_web"] is True and r["stage"] == "run"
+          and not any("canvas-liveness" in str(w) for w in r["warnings"]), str(r))
     blank = {"ok": True, "stage": "run", "diag": {"has_canvas": True, "non_blank_samples": 0}}
     # Red-team fold (2026-07-17): blank canvas BLOCKS the pass on every round
     # (a nothing-renders game must never report PASSED); round 0 gets the
@@ -626,7 +690,7 @@ def main() -> int:
         "last_verdict": {"artifacts": ["memory_graph.html"], "build_error": "", "run_error": "decided by browser probe",
                          "mismatch": "", "probe": {"engine": "python-playwright", "diag": {"has_canvas": True}}},
     }
-    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": repair_state})
+    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": repair_state, "steering": ""})
     check("repair prompt names the artifact", "Artifact under repair: memory_graph.html" in p, p[:600])
     check("repair prompt carries grep tokens (quoted 'oninput' + memory_graph)", "oninput" in p and "memory_graph" in p and "search_files" in p, p)
     check("repair prompt forbids write_file rewrites", "Do NOT rewrite the file with write_file" in p, p)
@@ -637,15 +701,47 @@ def main() -> int:
     check("repair prompt has no anti-repeat block on a first attempt", "already attempted" not in p, p)
     check("probe-sentinel run_error not echoed", "decided by browser probe" not in p, p)
     repair_state2 = dict(repair_state, same_signature_count=1, last_attempt_summary="Rewrote the whole init IIFE and renamed the slider ids.")
-    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": repair_state2})
+    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": repair_state2, "steering": ""})
     check("repeated failure prepends the anti-repeat block",
           "already attempted this exact failure set" in p and "Rewrote the whole init IIFE" in p and "Do something different" in p, p)
     rebuild_state = dict(repair_state, mode="rebuild", last_attempt_summary="patched the handler twice")
-    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": rebuild_state})
+    p = run_code(builder_prompt, {"request": "Build a memory graph visualizer", "workspace_root": "/ws", "loop_state": rebuild_state, "steering": ""})
     check("rebuild round keeps build rules + forbids reproducing the design",
           "REBUILD ROUND" in p and "do NOT reproduce the same design" in p and "Delivery rules" in p and "PROFILE the inputs" in p, p)
-    p = run_code(builder_prompt, {"request": "Build a game", "workspace_root": "/ws", "loop_state": {}})
+    p = run_code(builder_prompt, {"request": "Build a game", "workspace_root": "/ws", "loop_state": {}, "steering": ""})
     check("round 0 keeps profiling + gains the hash binding", "PROFILE the inputs" in p and "ARTIFACT-SHA256:" in p and ".cg_rounds" in p, p)
+
+    print("unit: 0.2.5 STEERING + PROGRESS (the interactive bar)")
+    p = run_code(builder_prompt, {"request": "Build a game", "workspace_root": "/ws",
+                                  "loop_state": {}, "steering": "- keep it to ONE file"})
+    check("steering rides directly under the task",
+          "OPERATOR STEERING" in p and "keep it to ONE file" in p
+          and p.find("OPERATOR STEERING") < p.find("Work inside the workspace root"), p[:800])
+    p = run_code(builder_prompt, {"request": "Build a game", "workspace_root": "/ws",
+                                  "loop_state": repair_state, "steering": "- stop, do X instead"})
+    check("steering also reaches a repair round",
+          "stop, do X instead" in p and p.find("OPERATOR STEERING") < p.find("REPAIR ROUND"), p[:900])
+    steer_fold = code_body("STEER_FOLD_CODE")
+    r = run_code(steer_fold, {"inbox": [{"role": "system", "content": "use tabs"}],
+                              "steer_seen": 0, "steering": ""})
+    check("steer fold applies a fresh message",
+          "use tabs" in r["steering"] and r["seen"] == 1 and r["fresh"] == 1, str(r))
+    r2 = run_code(steer_fold, {"inbox": [{"role": "system", "content": "use tabs"}],
+                               "steer_seen": r["seen"], "steering": r["steering"]})
+    check("steer fold dedups on the watermark",
+          r2["steering"] == r["steering"] and r2["fresh"] == 0, str(r2))
+    r3 = run_code(steer_fold, {"inbox": [], "steer_seen": 4, "steering": "x"})
+    check("steer fold survives a host-reset inbox", r3["seen"] == 0 and r3["fresh"] == 0, str(r3))
+    round_line = code_body("ROUND_LINE_CODE")
+    line_defaults = {"line_text": "coding round {{n}} of {{max}}: {{note}}",
+                     "steer_word": "steering applied — "}
+    r = run_code(round_line, {"loop_state": {"rounds_completed": 1, "mode": "repair"},
+                              "max_rounds": 4, "fresh_steers": 0, **line_defaults})
+    check("round line reads round N of M", r["message"] == "coding round 2 of 4: repair", str(r))
+    r = run_code(round_line, {"loop_state": {}, "max_rounds": 4, "fresh_steers": 2,
+                              **line_defaults})
+    check("round line announces steering",
+          r["message"] == "coding round 1 of 4: steering applied — build", str(r))
 
     print("unit: LOOP_CONDITION stall guard (R1)")
     r = run_code(loop, {"loop_state": {"rounds_completed": 2, "all_passed": False, "failures": ["f"], "environment_failures": [], "same_signature_count": 2}, "max_rounds": 4})
@@ -663,7 +759,13 @@ def main() -> int:
                                "prev_state": {}, "snapshot_ok": True})
     check("state: attempt_history appended", len(s1["attempt_history"]) == 1 and s1["attempt_history"][0]["round"] == 0, str(s1.get("attempt_history")))
     check("state: gate_score = [passed, gates, delivery]", s1["attempt_history"][0]["gate_score"] == [0, 2, 1], str(s1["attempt_history"]))
-    check("state: builder report captured + truncated <= ~800", 0 < len(s1["last_attempt_summary"]) <= 803, str(len(s1["last_attempt_summary"])))
+    # ADR-0026 retired the 800-char clip: the builder's own account flows WHOLE
+    # into the next round, because clipping it erased exactly the "what I tried"
+    # detail the next round needed. Assert what the builder now guarantees.
+    check("state: builder report captured whole (ADR-0026, no clip)",
+          s1["last_attempt_summary"] == s1["last_attempt_summary"].strip()
+          and len(s1["last_attempt_summary"]) > 803,
+          str(len(s1["last_attempt_summary"])))
     check("state: first failure -> signature recorded, count 0", bool(s1["failure_signature"]) and s1["same_signature_count"] == 0, str(s1["failure_signature"]))
     check("state: best snapshot recorded (R2)", s1["best_snapshot"] == ".cg_rounds/round_0" and s1["best_score"] == [0, 2, 1] and s1["best_round"] == 0, str(s1))
     check("state: mode -> repair", s1["mode"] == "repair", str(s1.get("mode")))

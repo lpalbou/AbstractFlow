@@ -71,7 +71,14 @@ pin's value. The expression environment is small:
 - `value` — what the pin would have resolved to without the expression: the
   wire value if connected, else the pin default, else `None`.
 - The Code-node sandbox builtins (`len`, `sorted`, `sum`, ...) plus
-  `parse_json` / `to_json`.
+  `parse_json` / `to_json` / `shq` / `text_of`. The last two are for the two
+  things flows kept hand-rolling: `shq(value)` escapes a value for a
+  single-quoted shell context (`"cd '" + shq(path) + "'"`) — use it for every
+  value you interpolate into a command, one unescaped quote is an injection —
+  and `text_of(envelope)` pulls the text out of a tool result whatever
+  envelope shape it arrives in. Both are available in Code node bodies too
+  (one source, both sandboxes), which is what lets a shell-command composer be
+  a Code node with a visible body rather than a flow-library function.
 
 Expressions compile under the same RestrictedPython policy as Code node
 bodies, in expression mode: statements and imports cannot appear, while
@@ -82,10 +89,99 @@ the consuming step with an error naming `<node>.<pin>` plus an expression
 preview. Evaluation happens at every resolution, so a While condition
 expression re-reads `vars.*` fresh each iteration.
 
-Use an expression for a small condition, field read, or one-line transform
-that would otherwise need a Get Variable → Code chain (`vars.fix_cycles < 3`,
-`value["field"]`, `to_json(value)`). Use a Code node when the logic needs
-multiple statements or several outputs.
+### The authoring ladder
+
+An expression is one rung of a ladder, and the ladder has one rule: **nodes and
+wires first, always.** Visual authoring exists so a process can be understood by
+looking at it. Anything expressed off the canvas — in a code body, an
+expression, a function, or one object blob crossing a boundary — is hidden, and
+the reader has to open something to learn what the flow depends on.
+
+Code and pure functions are here to harness DETERMINISTIC or tedious work —
+contact a database, run an ETL, convert format 1 to format 2 — so the node
+vocabulary does not have to explode combinatorially. They are not a replacement
+for the abstractions that already ship, which must always be favoured.
+
+Walk from the top; stop at the first rung that works.
+
+| rung | reach for | for |
+|---|---|---|
+| 1 | **an existing node** | anything the catalog ships. Check `docs/workflow-node-catalog.md` before writing a line of Python. |
+| 2 | **a subflow, one input pin per field** | a whole reusable process. `subflow_interface` names the child's pins; wire one edge each. Never a hand-built `input` object. |
+| 3 | **`get_var` / `set_var` / `set_vars`** | reading and writing run state. |
+| 4 | **a pin expression** | a derivation: `vars.fix_cycles < 3`, `not vars.accepted and vars.revisions < 3`, `to_json(value)`. Never a plain read. |
+| 5 | **a code node** | deterministic glue: external systems, ETL, format/shape transforms, checksums, validation, shell composition. Exec pins when it acts; pure otherwise. Expert territory. |
+| 6 | **a flow function** | the same derivation at 2+ call sites, ≤ 25 lines. |
+| 7 | **a runtime builtin** | something useful in every flow (envelope parsing, shell quoting). |
+| 8 | **propose a reusable node** | nothing above fits — say so, out loud, instead of working around it in a body. |
+
+Within rung 4, what an expression is NOT for:
+
+| what you are doing | use |
+|---|---|
+| reading a run variable, incl. a dotted path and a default | **Get Variable** node, wired in |
+| reading one field off this pin's own wire | declare that **output pin upstream** |
+| reading several fields off one wire | **Break Object** |
+| interpolating values into a string | **String Template** |
+| combining two reads with `and` / `or` / `not` / a comparison | those nodes, or an expression |
+| multiple statements, branching, several outputs | **Code node** |
+| the same derivation at two or more call sites | a **flow function** (≤ 25 lines) |
+
+And what a **code node is never for**: orchestration (sequence/parallel/if/
+switch/loop/for/while own that), state reads and writes, field extraction, or
+**prompt and system text**. Every sentence a model reads must be editable by a
+user or an agent without opening Python — it lives on the consumer's pin default
+or in a String Template. A body may SELECT between texts that sit on pins; it
+may not contain them.
+
+It is never for a plain read. The runtime treats both lanes identically (every
+pure node is volatile and re-pulled at each resolution, so a wired getter
+re-reads inside a `While` condition exactly as an expression does), so the
+choice is purely about what the canvas shows — and a node shows it.
+
+`get_var` resolves dotted paths and honours a `default`, so
+`get_var{name:"state.wait_gating", default:true}` is an exact replacement for
+`vars.state.get("wait_gating", True)` — including the missing-key case. One
+getter can fan out to many consumers; five agents reading `state.provider`
+want getter nodes and edges, not five expressions.
+
+How far to fan one getter out is a LAYOUT question, and the honest answer is
+"per neighbourhood", not "once per flow". Auto-layout puts a pure helper in
+the column of its EARLIEST consumer, so a getter shared by consumers ten
+columns apart drags a wire the width of the canvas. Cluster consumers that sit
+within a column or two of each other, give a distant cluster its own getter,
+and measure: on the `multiagent-coding` bundle, one pair per agent cost 10
+chips, one pair for all five produced a 7,872px wire, and three neighbourhood
+pairs (6 chips) came out shortest on every wire metric at once.
+
+The editor DRAWS a single-consumer read on the pin row it feeds instead of as
+a separate card: a `get_var` with a configured `name`, no incoming edges and
+exactly one outgoing wire renders as a teal read pill on its consumer, the card
+and wire hidden until you click the pill (which reveals and selects the node).
+This is a render fold and nothing else — the document keeps the getter node and
+its edge, so nothing to author or migrate changes, and the audit reports both
+counts as `[nodes=…, rendered_nodes=…]`. Shared, dangling and computed reads
+(2+ consumers, no consumer, or a wired `name`/`default`) stay drawn, because
+there the node is the subject rather than the argument. The toolbar toggle
+beside the execution view turns the fold off and puts every chip back on the
+canvas.
+
+`scripts/audit_flow_graph.py --policy` checks a flow against the whole ladder,
+and the editor's preflight panel raises the same findings as warnings while you
+author (never as Run blockers — style must not stop a run):
+
+| check | fires on |
+|---|---|
+| P1 TRIVIAL READ | an expression that is only a run-var read (either spelling: `vars.state.get("k")` or `(vars.get("s") or {}).get("k")`) |
+| P2 FIELD EXTRACT | an expression that is only a field read off the pin's own wire |
+| P3 THIN WRAPPER | an expression that is only a call to a function failing P4/P5 |
+| P4 SINGLE USE | a flow function with fewer than 2 call sites |
+| P5 OVERSIZED FN | a flow function longer than 25 lines |
+| P6 HIDDEN CONTRACT | a subflow node whose only data input is one `input`/`vars` object while the child declares several start pins — the finding names the smuggled fields when the child resolves beside it |
+| P7 CODE-FOR-ORCHESTRATION | a code node whose body is mostly prose — the "prompt composer in Python" smell; the text belongs on a pin default or in a String Template |
+
+`--policy` is advisory; `--policy-strict` makes it affect the exit code.
+`--selftest` runs the predicates against their own fixtures.
 
 Version skew is safe by construction: a runtime that predates pin expressions
 never reads the field, so the pin falls back to its wire or default value —

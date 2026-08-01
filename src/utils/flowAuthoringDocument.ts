@@ -289,6 +289,13 @@ export function flowToAuthoringDocument(flow: VisualFlow): AuthoringDocument {
       // serializer-only context so the model knows which edges are legal
       // into/out of this node (subflow pins are patched from the child flow
       // and are not dynamic-pin authorable).
+      //
+      // This block exists to make PER-FIELD wiring possible: it names every
+      // boundary field so the author can emit one edge per field instead of a
+      // hand-built `input` object. The runtime spreads declared input pins into
+      // the child's run vars and only falls back to a whole-object `input`/
+      // `vars` pin when nothing else is declared, so the blob buys nothing but
+      // invisibility (doctrine 0155 P6 HIDDEN CONTRACT).
       if (data.subflowId) doc.subflow_ref = data.subflowId;
       const interfaceInputs = dataPins(data.inputs).filter((pin) => pin.id !== 'inherit_context' && pin.id !== 'inheritContext');
       const interfaceOutputs = dataPins(data.outputs);

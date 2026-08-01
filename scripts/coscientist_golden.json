@@ -1,0 +1,940 @@
+{
+ "arch_input.basename": {
+  "node": "arch_input",
+  "path": "basename",
+  "value": "architecture-2026-07-31T09-00-00"
+ },
+ "arch_input.spec": {
+  "node": "arch_input",
+  "path": "spec",
+  "value": {
+   "caption": "",
+   "edges": [
+    {
+     "from": "stream",
+     "label": "writes",
+     "style": "solid",
+     "to": "egr"
+    },
+    {
+     "from": "egr",
+     "label": "consolidates",
+     "style": "dashed",
+     "to": "sic"
+    },
+    {
+     "from": "ghost",
+     "label": "drops",
+     "style": "solid",
+     "to": "acc"
+    }
+   ],
+   "kind": "layered",
+   "layers": [
+    {
+     "label": "Input",
+     "nodes": [
+      {
+       "id": "stream",
+       "label": "Task stream"
+      }
+     ]
+    },
+    {
+     "label": "Retention",
+     "nodes": [
+      {
+       "id": "egr",
+       "label": "Entropy-Gated Replay (EGR)"
+      },
+      {
+       "id": "sic",
+       "label": "Sparse Index Consolidation (SIC)"
+      }
+     ]
+    },
+    {
+     "label": "Eval",
+     "nodes": [
+      {
+       "id": "acc",
+       "label": "Average accuracy"
+      }
+     ]
+    }
+   ],
+   "title": "Figure 1 - Proposed architecture"
+  }
+ },
+ "cite_apply.sources": {
+  "node": "cite_apply",
+  "path": "sources",
+  "value": [
+   {
+    "fetched": true,
+    "takeaway": "frames the desiderata; evidence: high",
+    "title": "Concrete Problems in AI Safety",
+    "url": "https://arxiv.org/abs/1606.06565",
+    "verification": "verified"
+   },
+   {
+    "fetched": false,
+    "takeaway": "marketing claims only [citation check FAILED: claimed \"Vendor Whitepaper\" but the page serves \"EfficientNet\"]",
+    "title": "Vendor Whitepaper",
+    "url": "https://example.com/whitepaper",
+    "verification": "mismatch"
+   }
+  ]
+ },
+ "cite_apply.text": {
+  "node": "cite_apply",
+  "path": "text",
+  "value": "Grounded findings from the literature:\n1. Replay-based consolidation dominates regularization on long task streams.\n\nSources:\n- Concrete Problems in AI Safety (https://arxiv.org/abs/1606.06565): frames the desiderata; evidence: high\n\nCITATION RULE: cite ONLY sources from this fetched list.\n- Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>\n\nCITATION VERIFICATION (ledger URLs were fetched and title-checked deterministically):\n- [VERIFIED] Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>\n- [MISMATCH] Vendor Whitepaper <https://example.com/whitepaper>\n\nREVISED CITATION RULE: the sources marked MISMATCH/UNREACHABLE above FAILED verification and MUST NOT be cited anywhere in your output — not by title, id, or url. Cite only the VERIFIED/UNVERIFIED-kept sources."
+ },
+ "cite_apply.warnings": {
+  "node": "cite_apply",
+  "path": "warnings",
+  "value": [
+   "#FALLBACK: ledger citation check DROPPED \"Vendor Whitepaper\" — claimed \"Vendor Whitepaper\" but the page serves \"EfficientNet\""
+  ]
+ },
+ "cite_apply.zero_sources.text": {
+  "node": "cite_apply",
+  "path": "text",
+  "value": "(no literature grounding was gathered)"
+ },
+ "cite_args.arxiv_pdf": {
+  "node": "cite_args",
+  "path": "tool_call",
+  "value": {
+   "arguments": {
+    "include_full_content": false,
+    "keep_links": false,
+    "url": "https://arxiv.org/abs/1802.07569"
+   },
+   "name": "fetch_url"
+  }
+ },
+ "cite_fold.mismatch": {
+  "node": "cite_fold",
+  "path": "acc",
+  "value": [
+   {
+    "claimed": "Concrete Problems in AI Safety",
+    "fetched_title": "[1905.11946] EfficientNet: Rethinking Model Scaling",
+    "reason": "claimed \"Concrete Problems in AI Safety\" but the arXiv id serves \"[1905.11946] EfficientNet: Rethinking Model Scaling\"",
+    "url": "https://arxiv.org/abs/1905.11946",
+    "verdict": "mismatch"
+   }
+  ]
+ },
+ "cite_fold.unreachable": {
+  "node": "cite_fold",
+  "path": "acc",
+  "value": [
+   {
+    "claimed": "Vendor Whitepaper",
+    "fetched_title": "",
+    "reason": "URL did not resolve (status 404)",
+    "url": "https://example.com/gone",
+    "verdict": "unreachable"
+   }
+  ]
+ },
+ "cite_fold.verified": {
+  "node": "cite_fold",
+  "path": "acc",
+  "value": [
+   {
+    "claimed": "Concrete Problems in AI Safety",
+    "fetched_title": "[1606.06565] Concrete Problems in AI Safety",
+    "reason": "arXiv title matches",
+    "url": "https://arxiv.org/abs/1606.06565",
+    "verdict": "verified"
+   }
+  ]
+ },
+ "cite_items.items": {
+  "node": "cite_items",
+  "path": "items",
+  "value": [
+   {
+    "title": "Concrete Problems in AI Safety",
+    "url": "https://arxiv.org/abs/1606.06565"
+   },
+   {
+    "title": "Vendor Whitepaper",
+    "url": "https://example.com/whitepaper"
+   }
+  ]
+ },
+ "elo_input.basename": {
+  "node": "elo_input",
+  "path": "basename",
+  "value": "elo-trajectory-2026-07-31T09-00-00"
+ },
+ "elo_spec.spec": {
+  "node": "elo_spec",
+  "path": "spec",
+  "value": {
+   "caption": "Best-hypothesis Elo across supervisor cycles (final point = post-review tournament; y-axis anchored at the 1200 tournament start). Elo is this system's internal self-play debate score - a relative ranking signal, not external validation.",
+   "kind": "line",
+   "series": [
+    {
+     "label": "best hypothesis",
+     "points": [
+      [
+       1,
+       1231
+      ],
+      [
+       2,
+       1260
+      ]
+     ]
+    }
+   ],
+   "title": "Figure 2 — Tournament trajectory",
+   "x_label": "supervisor cycle",
+   "y_label": "best Elo",
+   "y_min": 1200
+  }
+ },
+ "evolve_prompt.bare": {
+  "node": "evolve_prompt",
+  "path": "",
+  "value": "You are the Evolution agent. Apply THIS cycle's strategy — refine or combine — to the TOP hypotheses below to produce 1-2 genuinely IMPROVED hypotheses (not restatements or near-duplicates). An evolved hypothesis must carry a NEW title naming ITS OWN mechanism — never the parent's title with a qualifier. Return the FULL structured form for each: title, statement, rationale, experiment (one-line), and the protocol fields design, metric, expected_effect, falsification (falsification uses the SAME metric/direction as expected_effect with no unadjudicated gap; no vague thresholds). EVIDENCE VERBS: only works in the literature base's citation list may take 'shows/demonstrates/reports'; other hypotheses in this pool take 'proposes/suggests'. Phrase quantitative targets as HYPOTHESIZED/EXPECTED, never as measured results; do not invent precise numbers, benchmark names, or citations not in the literature base.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Current top hypotheses\nPOOLTEXT"
+ },
+ "evolve_prompt.full": {
+  "node": "evolve_prompt",
+  "path": "",
+  "value": "You are the Evolution agent. Apply THIS cycle's strategy — COMBINATION: merge — to the TOP hypotheses below to produce 1-2 genuinely IMPROVED hypotheses (not restatements or near-duplicates). An evolved hypothesis must carry a NEW title naming ITS OWN mechanism — never the parent's title with a qualifier. Return the FULL structured form for each: title, statement, rationale, experiment (one-line), and the protocol fields design, metric, expected_effect, falsification (falsification uses the SAME metric/direction as expected_effect with no unadjudicated gap; no vague thresholds). EVIDENCE VERBS: only works in the literature base's citation list may take 'shows/demonstrates/reports'; other hypotheses in this pool take 'proposes/suggests'. Phrase quantitative targets as HYPOTHESIZED/EXPECTED, never as measured results; do not invent precise numbers, benchmark names, or citations not in the literature base.\n\n## Feedback from prior cycles (fix these specific flaws)\nRecurring reviewer concerns from the last cycle (fix these):\n- The mechanism assumes an oracle task boundary.\nWhat won debates last cycle (favor these qualities):\n- Sharper falsification thresholds won three of four debates.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Literature base\nGrounded findings from the literature:\n1. Replay-based consolidation dominates regularization on long task streams.\n\nSources:\n- Concrete Problems in AI Safety (https://arxiv.org/abs/1606.06565): frames the desiderata; evidence: high\n\nCITATION RULE: cite ONLY sources from this fetched list.\n- Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>\n\n## Current top hypotheses\nPOOLTEXT"
+ },
+ "expand_prompt.bare": {
+  "node": "expand_prompt",
+  "path": "",
+  "value": "You are the Generation agent in RESEARCH-EXPANSION mode. Review the hypotheses ALREADY in the pool below and propose 1-2 NOVEL hypotheses in UNEXPLORED areas that the current pool does NOT cover — open a new direction, do not refine an existing one. Ground each in the literature; cite only sources in the literature base; return the FULL structured form (title, statement, rationale, experiment, design, metric, expected_effect, falsification — falsification uses the SAME metric/direction as expected_effect with no unadjudicated gap, no vague thresholds). EVIDENCE VERBS: only cited literature-base works take 'shows/demonstrates'; pool hypotheses take 'proposes/suggests'. Do not invent named benchmarks.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Hypotheses already covered (do NOT duplicate these areas)\nPOOLTEXT"
+ },
+ "expand_prompt.full": {
+  "node": "expand_prompt",
+  "path": "",
+  "value": "You are the Generation agent in RESEARCH-EXPANSION mode. Review the hypotheses ALREADY in the pool below and propose 1-2 NOVEL hypotheses in UNEXPLORED areas that the current pool does NOT cover — open a new direction, do not refine an existing one. Ground each in the literature; cite only sources in the literature base; return the FULL structured form (title, statement, rationale, experiment, design, metric, expected_effect, falsification — falsification uses the SAME metric/direction as expected_effect with no unadjudicated gap, no vague thresholds). EVIDENCE VERBS: only cited literature-base works take 'shows/demonstrates'; pool hypotheses take 'proposes/suggests'. Do not invent named benchmarks.\n\n## Recurring issues future hypotheses must address (from prior cycles)\nRecurring reviewer concerns from the last cycle (fix these):\n- The mechanism assumes an oracle task boundary.\nWhat won debates last cycle (favor these qualities):\n- Sharper falsification thresholds won three of four debates.\n\n## Open questions from the literature (good sources of unexplored directions)\n- Does replay scale past 10^6 tasks without an index rebuild?\n- What is the memory/accuracy frontier under a fixed budget?\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Literature base\nGrounded findings from the literature:\n1. Replay-based consolidation dominates regularization on long task streams.\n\nSources:\n- Concrete Problems in AI Safety (https://arxiv.org/abs/1606.06565): frames the desiderata; evidence: high\n\nCITATION RULE: cite ONLY sources from this fetched list.\n- Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>\n\n## Hypotheses already covered (do NOT duplicate these areas)\nPOOLTEXT"
+ },
+ "export_paths": {
+  "node": "export_paths",
+  "path": "md",
+  "value": "reports/co-scientist-research-2026-07-31T09-00-00-123456_00-00.md"
+ },
+ "fig_fold.caption": {
+  "node": "fig_fold",
+  "path": "caption",
+  "value": "How the mechanisms compose (see text)"
+ },
+ "fig_fold.spec": {
+  "node": "fig_fold",
+  "path": "spec",
+  "value": {
+   "caption": "How the mechanisms compose (see text)",
+   "edges": [
+    {
+     "from": "stream",
+     "label": "writes",
+     "style": "solid",
+     "to": "egr"
+    },
+    {
+     "from": "egr",
+     "label": "consolidates",
+     "style": "dashed",
+     "to": "sic"
+    }
+   ],
+   "kind": "layered",
+   "layers": [
+    {
+     "label": "Input",
+     "nodes": [
+      {
+       "id": "stream",
+       "label": "Task stream"
+      }
+     ]
+    },
+    {
+     "label": "Retention",
+     "nodes": [
+      {
+       "id": "egr",
+       "label": "Entropy-Gated Replay (EGR)"
+      },
+      {
+       "id": "sic",
+       "label": "Sparse Index Consolidation (SIC)"
+      }
+     ]
+    },
+    {
+     "label": "Eval",
+     "nodes": [
+      {
+       "id": "acc",
+       "label": "Average accuracy"
+      }
+     ]
+    }
+   ],
+   "title": "Figure 1 - Proposed architecture"
+  }
+ },
+ "fig_spec_prompt": {
+  "node": "fig_spec_prompt",
+  "path": "",
+  "value": "You are designing ONE professional architecture figure for a research overview. From the top-ranked hypotheses below, produce a LAYERED diagram spec showing how the key proposed mechanisms compose into one system (the pipeline a reader would build). Constraints: 2-4 layers (each layer = a pipeline stage, label <= 28 chars); 1-4 nodes per layer (node label <= 38 chars, the mechanism's short name — include its acronym if it has one); ids are short snake_case; edges ONLY between defined node ids, each edge labeled with a <= 14-char verb phrase or an empty string, style solid for the main path and dashed for optional paths. The title starts with 'Figure 1 — '. The caption is 1-2 sentences a scientist reads under the figure. Use ONLY mechanisms from the hypotheses below plus generic pipeline stages (input, storage, retrieval, generation) — invent nothing else.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Top hypotheses\n- Entropy-Gated Replay (EGR): Gate replay writes on predictive entropy.\n- Sparse Index Consolidation (SIC): Consolidate the retrieval index, not the weights.\n- Low Novelty Baseline (LNB): Just do experience replay again.\n- Task-Agnostic Rehearsal (TAR): Rehearse without task boundaries at all."
+ },
+ "final.ranked": {
+  "node": "final",
+  "path": "ranked_hypotheses",
+  "value": [
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1246,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "flags": [],
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rank": 1,
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 7,
+     "safety_ok": true,
+     "testability": 8
+    },
+    "statement": "Gate replay writes on predictive entropy.",
+    "title": "Entropy-Gated Replay (EGR)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1223,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "flags": [],
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rank": 2,
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 7,
+     "safety_ok": true,
+     "testability": 8
+    },
+    "statement": "Consolidate the retrieval index, not the weights.",
+    "title": "Sparse Index Consolidation (SIC)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1205,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "flags": [
+     "low_novelty"
+    ],
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rank": 3,
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 3,
+     "safety_ok": true,
+     "testability": 8
+    },
+    "statement": "Just do experience replay again.",
+    "title": "Low Novelty Baseline (LNB)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1188,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "flags": [
+     "unreviewed"
+    ],
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rank": 4,
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": false,
+    "reviews": {},
+    "statement": "Rehearse without task boundaries at all.",
+    "title": "Task-Agnostic Rehearsal (TAR)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1260,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "flags": [
+     "unsafe"
+    ],
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rank": 5,
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 7,
+     "safety_ok": false,
+     "testability": 8
+    },
+    "statement": "Self-modify the reward channel.",
+    "title": "Unsafe Direction (UD)"
+   }
+  ]
+ },
+ "final.top": {
+  "node": "final",
+  "path": "top",
+  "value": {
+   "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+   "elo": 1246,
+   "expected_effect": "we predict up to ~8 points over ER",
+   "experiment": "Train on the stream, ablate the buffer.",
+   "falsification": "below +8 points average accuracy versus ER",
+   "flags": [],
+   "metric": "average accuracy over all seen tasks after the final task",
+   "rank": 1,
+   "rationale": "Fills the gap the survey names in section 4.",
+   "reviewed": true,
+   "reviews": {
+    "correctness": 7,
+    "critique": "Sound but the boundary oracle is load-bearing.",
+    "novelty": 7,
+    "safety_ok": true,
+    "testability": 8
+   },
+   "statement": "Gate replay writes on predictive entropy.",
+   "title": "Entropy-Gated Replay (EGR)"
+  }
+ },
+ "final.warnings": {
+  "node": "final",
+  "path": "warnings",
+  "value": [
+   "#FALLBACK: 1 finalist(s) reached the ranking without a completed review; flagged 'unreviewed' and demoted below reviewed hypotheses.",
+   "#FALLBACK: 1 hypothesis(es) were flagged unsafe by the reviewer; flagged 'unsafe' and demoted below all safe hypotheses — do not action without human safety review."
+  ]
+ },
+ "fold.elo_history": {
+  "node": "fold",
+  "path": "elo_history",
+  "value": [
+   {
+    "best": 1231,
+    "cycle": 1,
+    "pool": 5,
+    "top3_mean": 1214
+   },
+   {
+    "best": 1260,
+    "cycle": 2,
+    "pool": 5,
+    "top3_mean": 1236
+   },
+   {
+    "best": 1276,
+    "cycle": 3,
+    "pool": 7,
+    "top3_mean": 1253
+   }
+  ]
+ },
+ "fold.feedback": {
+  "node": "fold",
+  "path": "feedback",
+  "value": "Recurring reviewer concerns from the last cycle (fix these):\n- The gate is well specified; the entropy estimator is the weak link.\n- Boundary-free rehearsal is not shown to converge.\nWhat won debates last cycle (favor these qualities):\n- sharper falsification threshold\n- the baseline is named and standard\n- safety concern is disqualifying"
+ },
+ "fold.pool": {
+  "node": "fold",
+  "path": "pool",
+  "value": [
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1276.898958432388,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 0,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 8,
+     "critique": "The gate is well specified; the entropy estimator is the weak link.",
+     "novelty": 7,
+     "safety_ok": true,
+     "testability": 9
+    },
+    "statement": "Gate replay writes on predictive entropy.",
+    "title": "Entropy-Gated Replay (EGR)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1244.0433969633098,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 4,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 7,
+     "safety_ok": false,
+     "testability": 8
+    },
+    "statement": "Self-modify the reward channel.",
+    "title": "Unsafe Direction (UD)"
+   },
+   {
+    "design": "ER + gate + budget on Split-CIFAR100 against ER and DER++.",
+    "elo": 1239.4,
+    "expected_effect": "we predict up to ~HYPOTHESIZED 10 points over ER",
+    "experiment": "Ablate gate and budget independently.",
+    "falsification": "below +10 points average accuracy versus ER",
+    "id": 5,
+    "metric": "average accuracy after the final task",
+    "rationale": "Merges the two strongest directions .",
+    "reviewed": false,
+    "reviews": {},
+    "statement": "Combine the entropy gate with a fixed-size index budget.",
+    "title": "Entropy-Gated Replay with Budgeted Index (EGR-BI)"
+   },
+   {
+    "design": "Difficulty-sorted schedule vs recency on Split-CIFAR100 against ER.",
+    "elo": 1239.4,
+    "expected_effect": "we predict up to ~5 points over recency ordering",
+    "experiment": "Reorder the consolidation schedule.",
+    "falsification": "below +5 points average accuracy versus recency ordering",
+    "id": 6,
+    "metric": "average accuracy after the final task",
+    "rationale": "Opens the scheduling axis the pool ignores.",
+    "reviewed": false,
+    "reviews": {},
+    "statement": "Order consolidation by task difficulty rather than recency.",
+    "title": "Curriculum-Ordered Consolidation (COC)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1223.1349807301065,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 1,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 7,
+     "safety_ok": true,
+     "testability": 8
+    },
+    "statement": "Consolidate the retrieval index, not the weights.",
+    "title": "Sparse Index Consolidation (SIC)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1205.0,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 3,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 3,
+     "safety_ok": true,
+     "testability": 8
+    },
+    "statement": "Just do experience replay again.",
+    "title": "Low Novelty Baseline (LNB)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1172.9226638741957,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 2,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 4,
+     "critique": "Boundary-free rehearsal is not shown to converge.",
+     "novelty": 8,
+     "safety_ok": true,
+     "testability": 6
+    },
+    "statement": "Rehearse without task boundaries at all.",
+    "title": "Task-Agnostic Rehearsal (TAR)"
+   }
+  ]
+ },
+ "freeze_ts.stamp": {
+  "node": "export_paths",
+  "path": "timestamp",
+  "value": "2026-07-31T09-00-00-123456_00-00"
+ },
+ "gen_prompt.grounded": {
+  "node": "gen_prompt",
+  "path": "",
+  "value": "You are the Generation agent of an AI co-scientist. GROUND your reasoning in the literature base below, then propose 5 NOVEL, plausible, testable research hypotheses that go BEYOND what the literature already establishes. Each hypothesis must be a DISTINCT direction — do not propose several variants of the same mechanism. For EACH hypothesis return these fields, and DO NOT restate the title in any other field: title (the mechanism's name); statement (the claim); rationale (connect to the literature — what specific gap it fills); experiment (a one-line summary of the test); design (the experimental SETUP — what system you build, the named baseline(s) you compare against, the ablation(s), and a NAMED dataset or benchmark; NOT the mechanism name again); metric (the exact quantity measured and how it is computed); expected_effect (the HYPOTHESIZED direction/magnitude to be tested); falsification (the concrete result that would REFUTE the hypothesis, with a threshold). FALSIFICATION FORM: the falsification threshold must use the SAME metric and the SAME direction as the expected effect and leave no unadjudicated gap (expected '>= +10%' pairs with falsified 'below +10%', never 'below +3%'); no vague words ('negligible'), no template tokens. EVIDENCE VERBS: only works in the citation list may take 'shows/demonstrates/reports'; anything else — including other hypotheses — takes 'proposes/suggests/hypothesizes'. DATASETS: name only datasets/benchmarks/baselines that exist in the literature base or are broadly standard (MS-COCO, Natural Questions class); if none fits, describe the data to COLLECT instead of inventing a named benchmark. Favor mechanistic specificity and originality over restating known results. IMPORTANT: you have run no experiments — phrase any quantitative target as a HYPOTHESIZED/EXPECTED outcome (e.g. 'we predict up to ~X%'), never as a measured result. Cite only sources present in the literature base's citation list; never invent an arXiv id, DOI, or vendor whitepaper.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Literature base (ground your hypotheses here)\nGrounded findings from the literature:\n1. Replay-based consolidation dominates regularization on long task streams.\n\nSources:\n- Concrete Problems in AI Safety (https://arxiv.org/abs/1606.06565): frames the desiderata; evidence: high\n\nCITATION RULE: cite ONLY sources from this fetched list.\n- Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>"
+ },
+ "gen_prompt.ungrounded": {
+  "node": "gen_prompt",
+  "path": "",
+  "value": "You are the Generation agent of an AI co-scientist. GROUND your reasoning in the literature base below, then propose 3 NOVEL, plausible, testable research hypotheses that go BEYOND what the literature already establishes. Each hypothesis must be a DISTINCT direction — do not propose several variants of the same mechanism. For EACH hypothesis return these fields, and DO NOT restate the title in any other field: title (the mechanism's name); statement (the claim); rationale (connect to the literature — what specific gap it fills); experiment (a one-line summary of the test); design (the experimental SETUP — what system you build, the named baseline(s) you compare against, the ablation(s), and a NAMED dataset or benchmark; NOT the mechanism name again); metric (the exact quantity measured and how it is computed); expected_effect (the HYPOTHESIZED direction/magnitude to be tested); falsification (the concrete result that would REFUTE the hypothesis, with a threshold). FALSIFICATION FORM: the falsification threshold must use the SAME metric and the SAME direction as the expected effect and leave no unadjudicated gap (expected '>= +10%' pairs with falsified 'below +10%', never 'below +3%'); no vague words ('negligible'), no template tokens. EVIDENCE VERBS: only works in the citation list may take 'shows/demonstrates/reports'; anything else — including other hypotheses — takes 'proposes/suggests/hypothesizes'. DATASETS: name only datasets/benchmarks/baselines that exist in the literature base or are broadly standard (MS-COCO, Natural Questions class); if none fits, describe the data to COLLECT instead of inventing a named benchmark. Favor mechanistic specificity and originality over restating known results. IMPORTANT: you have run no experiments — phrase any quantitative target as a HYPOTHESIZED/EXPECTED outcome (e.g. 'we predict up to ~X%'), never as a measured result. Cite only sources present in the literature base's citation list; never invent an arXiv id, DOI, or vendor whitepaper.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?"
+ },
+ "init_state.pool": {
+  "node": "init_state",
+  "path": "pool",
+  "value": [
+   {
+    "design": "ER + gate + budget on Split-CIFAR100 against ER and DER++.",
+    "elo": 1200.0,
+    "expected_effect": "we predict up to ~HYPOTHESIZED 10 points over ER",
+    "experiment": "Ablate gate and budget independently.",
+    "falsification": "below +10 points average accuracy versus ER",
+    "id": 0,
+    "metric": "average accuracy after the final task",
+    "rationale": "Merges the two strongest directions (Elo 1246).",
+    "reviewed": false,
+    "reviews": {},
+    "statement": "Combine the entropy gate with a fixed-size index budget. [UNREVIEWED]",
+    "title": "Entropy-Gated Replay with Budgeted Index (EGR-BI)"
+   },
+   {
+    "design": "Difficulty-sorted schedule vs recency on Split-CIFAR100 against ER.",
+    "elo": 1200.0,
+    "expected_effect": "we predict up to ~5 points over recency ordering",
+    "experiment": "Reorder the consolidation schedule.",
+    "falsification": "below +5 points average accuracy versus recency ordering",
+    "id": 1,
+    "metric": "average accuracy after the final task",
+    "rationale": "Opens the scheduling axis the pool ignores.",
+    "reviewed": false,
+    "reviews": {},
+    "statement": "Order consolidation by task difficulty rather than recency.",
+    "title": "Curriculum-Ordered Consolidation (COC)"
+   }
+  ]
+ },
+ "lit_base.empty.needs_retry": {
+  "node": "lit_base",
+  "path": "needs_retry",
+  "value": true
+ },
+ "lit_base.empty.text": {
+  "node": "lit_base",
+  "path": "text",
+  "value": "Grounded findings from the literature:\n1. The agent reasoned but retrieved nothing.\n\nCITATION RULE: NO sources were fetched this run. You MUST NOT name or cite any specific paper, venue, year, arXiv id, DOI, or whitepaper anywhere in your output — every such attribution would be unverifiable parametric recall. Discuss prior work only as unattributed general knowledge (e.g. 'temporal graph attention methods', never 'TGAT (KDD 2020)')."
+ },
+ "lit_base.empty.warnings": {
+  "node": "lit_base",
+  "path": "warnings",
+  "value": [
+   "#FALLBACK: literature grounding fetched 0 real sources this run (the investigation agent did not retrieve usable literature); the hypotheses below are the model's parametric reasoning, NOT grounded in fetched sources. Re-run for grounded output."
+  ]
+ },
+ "lit_base.grounded.allowed": {
+  "node": "lit_base",
+  "path": "allowed_citations",
+  "value": [
+   "Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>",
+   "Continual Learning Survey <https://arxiv.org/pdf/1802.07569.pdf>"
+  ]
+ },
+ "lit_base.grounded.flags": {
+  "node": "lit_base",
+  "path": "grounding_ok",
+  "value": true
+ },
+ "lit_base.grounded.sources": {
+  "node": "lit_base",
+  "path": "sources",
+  "value": [
+   {
+    "fetched": true,
+    "takeaway": "frames the desiderata this goal inherits; evidence: high",
+    "title": "Concrete Problems in AI Safety",
+    "url": "https://arxiv.org/abs/1606.06565"
+   },
+   {
+    "fetched": true,
+    "takeaway": "taxonomy of replay vs regularization; evidence: medium",
+    "title": "Continual Learning Survey",
+    "url": "https://arxiv.org/pdf/1802.07569.pdf"
+   },
+   {
+    "fetched": false,
+    "takeaway": "marketing claims only; not fetched: paywalled",
+    "title": "Vendor Whitepaper",
+    "url": "https://example.com/whitepaper"
+   }
+  ]
+ },
+ "lit_base.grounded.text": {
+  "node": "lit_base",
+  "path": "text",
+  "value": "Grounded findings from the literature:\n1. Replay-based consolidation dominates regularization on long task streams.\n2. Retrieval augmentation shifts forgetting from weights to the index.\n\nOpen questions / frontiers:\n- Does replay scale past 10^6 tasks without an index rebuild?\n- What is the memory/accuracy frontier under a fixed budget?\n\nKnown limitations in the current literature:\n- No longitudinal study past 200 tasks.\n\nSources:\n- Concrete Problems in AI Safety (https://arxiv.org/abs/1606.06565): frames the desiderata this goal inherits; evidence: high\n- Continual Learning Survey (https://arxiv.org/pdf/1802.07569.pdf): taxonomy of replay vs regularization; evidence: medium\n- Vendor Whitepaper (https://example.com/whitepaper) [unfetched]: marketing claims only; not fetched: paywalled\n\nCITATION RULE: cite ONLY sources from this fetched list; do NOT invent arXiv ids, DOIs, or vendor whitepapers. If a claim needs a source not listed here, state it as a general observation without a fake citation — and WITHOUT a venue-year attribution: never write '(NeurIPS 2020)' / '(ICLR 2022)' / 'Wang et al.' style references for works that are not in this list (those are unverifiable parametric recalls, the same defect as an invented id).\n- Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>\n- Continual Learning Survey <https://arxiv.org/pdf/1802.07569.pdf>"
+ },
+ "lit_pick.retry_failed.warnings": {
+  "node": "lit_pick",
+  "path": "warnings",
+  "value": [
+   "#FALLBACK: first failed",
+   "#FALLBACK: the bounded grounding retry ALSO returned 0 fetched sources; proceeding ungrounded."
+  ]
+ },
+ "lit_pick.retry_ok.warnings": {
+  "node": "lit_pick",
+  "path": "warnings",
+  "value": [
+   "#FALLBACK: the first literature investigation returned 0 fetched sources; a bounded retry succeeded — grounding below comes from the retry pass."
+  ]
+ },
+ "meta_prompt.grounded": {
+  "node": "meta_prompt",
+  "path": "",
+  "value": "You are the Meta-review agent. Synthesize the top-ranked hypotheses below into a rigorous research overview for a scientist: the most promising directions and WHY they rank highly (reference their reviews), how they relate to the current literature, the key open questions, and concrete suggested next experiments. START YOUR RESPONSE with exactly these two elements before anything else: FIRST LINE 'TITLE: <a concise professional report title you derive from the FINDINGS themselves, 5-12 words, headline style — NEVER the verbatim research goal, never a question>'; SECOND (after a blank line) 'ABSTRACT: <one paragraph of 4-6 sentences summarizing the hypothesis landscape, the strongest directions, and the key insight — a real scientific abstract>'. Then continue with the overview. WHAT ELO MEANS (state this accurately if you mention it): the Elo score is this system's OWN self-play tournament auto-evaluation (one model debating hypotheses against each other) — it is an internal ranking signal, NOT community consensus, peer-review, citation count, or external validation; never describe it as any of those. CITATION HONESTY: cite ONLY the sources in the literature base; never invent an arXiv id/DOI/whitepaper, never attach a venue-year attribution ('(NeurIPS 2020)', 'Wang et al. 2023') to any work NOT in the literature base (unverifiable parametric recall = fabrication), and never attribute a specific NUMERIC RESULT (e.g. 'X reports 15-25% forgetting') to a cited work unless that exact figure is in the literature base — describe prior work qualitatively otherwise. FORMAT: write flowing PROSE in GitHub-flavored Markdown with section headings (##) — this is a human-readable research overview, NOT a data dump. Do NOT return JSON, do NOT wrap the answer in a code block. REQUIRED VISUAL ELEMENTS (the exported report renders GitHub pipe tables; a PROFESSIONAL architecture figure is rendered separately from structured data and EMBEDDED inline in the report — so do NOT emit ASCII-art, box-drawing, or mermaid diagrams anywhere, and do NOT refer to 'the appended figure' or an appendix): exactly one comparison TABLE of the key hypotheses as a GitHub pipe table, comparing DESIGN dimensions a scientist decides by — core mechanism, what it improves over the literature, main risk or failure mode, and the evidence an experiment must produce (do NOT tabulate Elo/review scores; those are already tabulated elsewhere in the report; additional tables for OTHER content, e.g. experiment matrices, are welcome). Keep every table cell one line. CRITICAL HONESTY RULE: these hypotheses are UNTESTED proposals. Never write that they 'report', 'demonstrate', 'achieve', or 'show' any result — no experiment was run. Present every quantitative figure as a hypothesized/expected TARGET to be tested, and do not assert benchmark results as if observed. If a hypothesis is flagged 'unreviewed' or 'low_correctness', say so rather than promoting it. NUMBER FIDELITY: any Elo or review score you quote must match the ranked data EXACTLY, and superlatives must be true of the data ('strongest novelty' only for the actual maximum novelty score). RANK vs ELO: ranks are tier-ordered (reviewed/safe/sound/novel first) THEN Elo within tier, with near-variants de-crowded ('sibling' flag) — when you discuss a hypothesis whose rank and Elo diverge (a flagged one holding high Elo, or a sibling reordered), SAY WHY at that mention, in one clause.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Literature base\nGrounded findings from the literature:\n1. Replay-based consolidation dominates regularization on long task streams.\n\nSources:\n- Concrete Problems in AI Safety (https://arxiv.org/abs/1606.06565): frames the desiderata; evidence: high\n\nCITATION RULE: cite ONLY sources from this fetched list.\n- Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>\n\n## Top ranked hypotheses (with Elo + reviews)\n### #1 Entropy-Gated Replay (EGR) (Elo 1246)\nGate replay writes on predictive entropy.\nExperiment: Train on the stream, ablate the buffer.\nDesign: Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.\nMetric: average accuracy over all seen tasks after the final task\nExpected (hypothesized): we predict up to ~8 points over ER\nFalsified if: below +8 points average accuracy versus ER\nReviewer note (corr=8, nov=7, safety_ok=True): The gate is well specified; the entropy estimator is the weak link.\n\n### #2 Sparse Index Consolidation (SIC) (Elo 1223)\nConsolidate the retrieval index, not the weights.\nExperiment: Train on the stream, ablate the buffer.\nFLAGS: sibling (do not present a flagged hypothesis as a top recommendation without saying so).\nReviewer note (corr=7, nov=7, safety_ok=True): Sound but the boundary oracle is load-bearing.\n\n### #3 Low Novelty Baseline (LNB) (Elo 1205)\nJust do experience replay again.\nFLAGS: low_novelty (do not present a flagged hypothesis as a top recommendation without saying so).\nReviewer note (corr=7, nov=3, safety_ok=True): Already the standard baseline.\n\n### #4 Task-Agnostic Rehearsal (TAR) (Elo 1188)\nRehearse without task boundaries at all.\nFLAGS: unreviewed (do not present a flagged hypothesis as a top recommendation without saying so).\n"
+ },
+ "meta_prompt.ungrounded": {
+  "node": "meta_prompt",
+  "path": "",
+  "value": "You are the Meta-review agent. Synthesize the top-ranked hypotheses below into a rigorous research overview for a scientist: the most promising directions and WHY they rank highly (reference their reviews), how they relate to the current literature, the key open questions, and concrete suggested next experiments. START YOUR RESPONSE with exactly these two elements before anything else: FIRST LINE 'TITLE: <a concise professional report title you derive from the FINDINGS themselves, 5-12 words, headline style — NEVER the verbatim research goal, never a question>'; SECOND (after a blank line) 'ABSTRACT: <one paragraph of 4-6 sentences summarizing the hypothesis landscape, the strongest directions, and the key insight — a real scientific abstract>'. Then continue with the overview. WHAT ELO MEANS (state this accurately if you mention it): the Elo score is this system's OWN self-play tournament auto-evaluation (one model debating hypotheses against each other) — it is an internal ranking signal, NOT community consensus, peer-review, citation count, or external validation; never describe it as any of those. CITATION HONESTY: cite ONLY the sources in the literature base; never invent an arXiv id/DOI/whitepaper, never attach a venue-year attribution ('(NeurIPS 2020)', 'Wang et al. 2023') to any work NOT in the literature base (unverifiable parametric recall = fabrication), and never attribute a specific NUMERIC RESULT (e.g. 'X reports 15-25% forgetting') to a cited work unless that exact figure is in the literature base — describe prior work qualitatively otherwise. FORMAT: write flowing PROSE in GitHub-flavored Markdown with section headings (##) — this is a human-readable research overview, NOT a data dump. Do NOT return JSON, do NOT wrap the answer in a code block. REQUIRED VISUAL ELEMENTS (the exported report renders GitHub pipe tables; a PROFESSIONAL architecture figure is rendered separately from structured data and EMBEDDED inline in the report — so do NOT emit ASCII-art, box-drawing, or mermaid diagrams anywhere, and do NOT refer to 'the appended figure' or an appendix): exactly one comparison TABLE of the key hypotheses as a GitHub pipe table, comparing DESIGN dimensions a scientist decides by — core mechanism, what it improves over the literature, main risk or failure mode, and the evidence an experiment must produce (do NOT tabulate Elo/review scores; those are already tabulated elsewhere in the report; additional tables for OTHER content, e.g. experiment matrices, are welcome). Keep every table cell one line. CRITICAL HONESTY RULE: these hypotheses are UNTESTED proposals. Never write that they 'report', 'demonstrate', 'achieve', or 'show' any result — no experiment was run. Present every quantitative figure as a hypothesized/expected TARGET to be tested, and do not assert benchmark results as if observed. If a hypothesis is flagged 'unreviewed' or 'low_correctness', say so rather than promoting it. NUMBER FIDELITY: any Elo or review score you quote must match the ranked data EXACTLY, and superlatives must be true of the data ('strongest novelty' only for the actual maximum novelty score). RANK vs ELO: ranks are tier-ordered (reviewed/safe/sound/novel first) THEN Elo within tier, with near-variants de-crowded ('sibling' flag) — when you discuss a hypothesis whose rank and Elo diverge (a flagged one holding high Elo, or a sibling reordered), SAY WHY at that mention, in one clause.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\nZERO SOURCES WERE FETCHED THIS RUN: do NOT name or cite any specific paper, venue, year, arXiv id, DOI, author, or whitepaper anywhere (no 'TGAT (KDD 2020)', no 'TPAMI 2025'). Refer to prior work only as unattributed general knowledge and state plainly that this run fetched no literature.\n\n## Top ranked hypotheses (with Elo + reviews)\n### #1 Entropy-Gated Replay (EGR) (Elo 1246)\nGate replay writes on predictive entropy.\nExperiment: Train on the stream, ablate the buffer.\nDesign: Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.\nMetric: average accuracy over all seen tasks after the final task\nExpected (hypothesized): we predict up to ~8 points over ER\nFalsified if: below +8 points average accuracy versus ER\nReviewer note (corr=8, nov=7, safety_ok=True): The gate is well specified; the entropy estimator is the weak link.\n\n### #2 Sparse Index Consolidation (SIC) (Elo 1223)\nConsolidate the retrieval index, not the weights.\nExperiment: Train on the stream, ablate the buffer.\nFLAGS: sibling (do not present a flagged hypothesis as a top recommendation without saying so).\nReviewer note (corr=7, nov=7, safety_ok=True): Sound but the boundary oracle is load-bearing.\n\n### #3 Low Novelty Baseline (LNB) (Elo 1205)\nJust do experience replay again.\nFLAGS: low_novelty (do not present a flagged hypothesis as a top recommendation without saying so).\nReviewer note (corr=7, nov=3, safety_ok=True): Already the standard baseline.\n\n### #4 Task-Agnostic Rehearsal (TAR) (Elo 1188)\nRehearse without task boundaries at all.\nFLAGS: unreviewed (do not present a flagged hypothesis as a top recommendation without saying so).\n"
+ },
+ "pool_text.clean": {
+  "node": "pool_text",
+  "path": "clean",
+  "value": "### Unsafe Direction (UD)\nSelf-modify the reward channel.\nRationale: Fills the gap the survey names in section 4.\n\n### Entropy-Gated Replay (EGR)\nGate replay writes on predictive entropy.\nRationale: Fills the gap the survey names in section 4.\n\n### Sparse Index Consolidation (SIC)\nConsolidate the retrieval index, not the weights.\nRationale: Fills the gap the survey names in section 4.\n\n### Low Novelty Baseline (LNB)\nJust do experience replay again.\nRationale: Fills the gap the survey names in section 4.\n\n### Task-Agnostic Rehearsal (TAR)\nRehearse without task boundaries at all.\nRationale: Fills the gap the survey names in section 4.\n"
+ },
+ "pool_text.decorated": {
+  "node": "pool_text",
+  "path": "decorated",
+  "value": "### [4] Unsafe Direction (UD) (Elo 1260)\nSelf-modify the reward channel.\nRationale: Fills the gap the survey names in section 4.\n\n### [0] Entropy-Gated Replay (EGR) (Elo 1246)\nGate replay writes on predictive entropy.\nRationale: Fills the gap the survey names in section 4.\n\n### [1] Sparse Index Consolidation (SIC) (Elo 1223)\nConsolidate the retrieval index, not the weights.\nRationale: Fills the gap the survey names in section 4.\n\n### [3] Low Novelty Baseline (LNB) (Elo 1205)\nJust do experience replay again.\nRationale: Fills the gap the survey names in section 4.\n\n### [2] Task-Agnostic Rehearsal (TAR) (Elo 1188) [UNREVIEWED]\nRehearse without task boundaries at all.\nRationale: Fills the gap the survey names in section 4.\n"
+ },
+ "rank_pairs.text": {
+  "node": "rank_pairs",
+  "path": "text",
+  "value": "- compare [4] vs [0]\n- compare [4] vs [1]\n- compare [0] vs [1]\n- compare [0] vs [3]\n- compare [1] vs [3]\n- compare [1] vs [2]\n- compare [3] vs [2]\n- compare [3] vs [4]\n- compare [2] vs [4]\n- compare [2] vs [0]"
+ },
+ "rank_prompt.bare": {
+  "node": "rank_prompt",
+  "path": "",
+  "value": "You are the Ranking agent running an Elo tournament via simulated scientific debate. Hold a brief scientific debate for EACH of the prioritized pairs listed below and output the winner id with a one-line reason naming the deciding quality. Rank on PLAUSIBILITY/correctness first, then testability, then novelty — a bold but unsound hypothesis should lose to a sound, testable one. You may add a few more comparisons among the strongest candidates if useful.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Prioritized pairs to debate\n- compare [0] vs [1]\n\n## Hypotheses (id, title, current Elo)\nPOOLTEXT"
+ },
+ "rank_prompt.full": {
+  "node": "rank_prompt",
+  "path": "",
+  "value": "You are the Ranking agent running an Elo tournament via simulated scientific debate. Hold a brief scientific debate for EACH of the prioritized pairs listed below and output the winner id with a one-line reason naming the deciding quality. Rank on PLAUSIBILITY/correctness first, then testability, then novelty — a bold but unsound hypothesis should lose to a sound, testable one. You may add a few more comparisons among the strongest candidates if useful.\n\n## Feedback from prior cycles (weigh these qualities)\nRecurring reviewer concerns from the last cycle (fix these):\n- The mechanism assumes an oracle task boundary.\nWhat won debates last cycle (favor these qualities):\n- Sharper falsification thresholds won three of four debates.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Prioritized pairs to debate\n- compare [0] vs [1]\n\n## Hypotheses (id, title, current Elo)\nPOOLTEXT"
+ },
+ "reflect_prompt.bare": {
+  "node": "reflect_prompt",
+  "path": "",
+  "value": "You are the Reflection agent (a rigorous virtual scientific peer reviewer). For EACH hypothesis below, score correctness (plausibility/soundness), novelty, and testability from 0-10, set safety_ok, and give a one-paragraph critique. Judge novelty AND correctness AGAINST the literature base — name the weak assumption, or the prior work that undercuts novelty. Correctness (is the mechanism sound and not already refuted?) matters as much as novelty; do not reward ungrounded ambition.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Current hypotheses\nPOOLTEXT"
+ },
+ "reflect_prompt.full": {
+  "node": "reflect_prompt",
+  "path": "",
+  "value": "You are the Reflection agent (a rigorous virtual scientific peer reviewer). For EACH hypothesis below, score correctness (plausibility/soundness), novelty, and testability from 0-10, set safety_ok, and give a one-paragraph critique. Judge novelty AND correctness AGAINST the literature base — name the weak assumption, or the prior work that undercuts novelty. Correctness (is the mechanism sound and not already refuted?) matters as much as novelty; do not reward ungrounded ambition.\n\n## Feedback from prior cycles (address these recurring concerns)\nRecurring reviewer concerns from the last cycle (fix these):\n- The mechanism assumes an oracle task boundary.\nWhat won debates last cycle (favor these qualities):\n- Sharper falsification thresholds won three of four debates.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Literature base\nGrounded findings from the literature:\n1. Replay-based consolidation dominates regularization on long task streams.\n\nSources:\n- Concrete Problems in AI Safety (https://arxiv.org/abs/1606.06565): frames the desiderata; evidence: high\n\nCITATION RULE: cite ONLY sources from this fetched list.\n- Concrete Problems in AI Safety <https://arxiv.org/abs/1606.06565>\n\n## Current hypotheses\nPOOLTEXT"
+ },
+ "report_md.grounded_with_figures": {
+  "node": "report_md",
+  "path": "",
+  "value": "# Entropy Gating as the Frontier of Continual Skill Retention\n\n**Research goal:** How can an agent retain skills across a long stream of tasks?\n\n**Abstract.** The tournament surfaced four directions, of which entropy-gated replay is the strongest sound and novel candidate.\n\n*Generated by the AbstractFlow co-scientist workflow: a literature-grounded multi-agent hypothesis engine (generation -> reflection -> Elo tournament -> evolution -> research expansion over 3 supervisor cycles, then a search-grounded full review). The hypotheses below are UNTESTED, ranked proposals for future work, not established results.*\n\n**Caveats:**\n\n- #FALLBACK: 1 finalist(s) reached the ranking without a completed review; flagged 'unreviewed' and demoted below reviewed hypotheses.\n\n---\n\n## Research Overview\n\n## Most promising directions\nEntropy-Gated Replay leads because its falsification threshold is the sharpest.\n\n### Figure 1 - Proposed architecture\n\n![The three mechanisms compose into one retention pipeline.](reports/figures/architecture-2026-07-31T09-00-00.png)\n\n---\n\n## Methodology\n\nThis overview was produced by the AbstractFlow co-scientist workflow, a literature-grounded multi-agent hypothesis tournament modeled on the Nature 2026 'AI co-scientist'. Pipeline: literature investigation (deep-plan + deep-investigate web search) -> Generation -> a supervisor loop of Reflection (peer review) / Elo ranking (pairwise scientific debate) / Evolution (per-cycle strategy) / research-expansion, with reviewer + debate feedback threaded into each next cycle -> a search-grounded full review of the finalists -> this Meta-review synthesis.\n\n- **Supervisor cycles:** 3 (test-time compute budget)\n- **Hypotheses ranked:** 4\n- **Elo:** an internal self-play tournament score (this system debating its own hypotheses) — a relative ranking signal, NOT peer review, citation count, or external validation.\n- **Literature grounding:** 1 fetched source(s) with resolvable URLs (listed below).\n\n### Tournament trajectory\n\n![Figure 2 — Tournament trajectory: best-hypothesis Elo across supervisor cycles; Elo is this system's internal self-play debate score, not external validation.](reports/figures/elo-trajectory-2026-07-31T09-00-00.png)\n\n---\n\n## Ranked Hypotheses\n\n### Key hypotheses at a glance\n\n*Ranking: reviewed, safe, sound AND novel hypotheses rank first; within each tier, higher Elo (internal self-play debate score) ranks higher unless diversity de-crowding reorders near-variants — so Elo can be non-monotonic across neighboring ranks. Flags mark demotions (low_novelty / low_correctness / unreviewed / unsafe); 'sibling' marks a near-variant of a higher-ranked hypothesis kept under the cluster cap; 'de-crowded' marks a row whose higher Elo was passed over to surface a distinct direction first.*\n\n| # | Hypothesis | Elo | Correctness | Novelty | Testability | Flags |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1 | Entropy-Gated Replay (EGR) | 1246 | 8 | 7 | 9 | — |\n| 2 | Sparse Index Consolidation (SIC) | 1223 | 7 | 7 | 8 | sibling |\n| 3 | Low Novelty Baseline (LNB) | 1205 | 7 | 3 | 8 | low_novelty |\n| 4 | Task-Agnostic Rehearsal (TAR) | 1188 | — | — | — | unreviewed |\n\n### #1. Entropy-Gated Replay (EGR)\n\n*Elo 1246 | correctness 8/10 | novelty 7/10 | testability 9/10*\n\n**Hypothesis.** Gate replay writes on predictive entropy.\n\n**Rationale.** Fills the gap the survey names in section 4.\n\n**Experimental protocol.**\n\n- *Design:* Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.\n- *Metric:* average accuracy over all seen tasks after the final task\n- *Expected effect (hypothesized, untested):* we predict up to ~8 points over ER\n- *Falsified if:* below +8 points average accuracy versus ER\n\n**Reviewer critique.** The gate is well specified; the entropy estimator is the weak link.\n\n### #2. Sparse Index Consolidation (SIC)\n\n*Elo 1223 | correctness 7/10 | novelty 7/10 | testability 8/10 | FLAGS: sibling*\n\n**Hypothesis.** Consolidate the retrieval index, not the weights.\n\n**Rationale.** Fills the gap the survey names in section 4.\n\n**Proposed experiment.** Train on the stream, ablate the buffer.\n\n**Reviewer critique.** Sound but the boundary oracle is load-bearing.\n\n### #3. Low Novelty Baseline (LNB)\n\n*Elo 1205 | correctness 7/10 | novelty 3/10 | testability 8/10 | FLAGS: low_novelty*\n\n**Hypothesis.** Just do experience replay again.\n\n**Reviewer critique.** Already the standard baseline.\n\n### #4. Task-Agnostic Rehearsal (TAR)\n\n*Elo 1188 | FLAGS: unreviewed*\n\n**Hypothesis.** Rehearse without task boundaries at all.\n\n---\n\n## Limitations & Threats to Validity\n\n- **Untested proposals.** Every hypothesis and quantitative target above is an UNTESTED prediction generated by the tournament, not a measured result. Treat the numbers as design targets to falsify, not findings.\n- **Self-evaluation.** The Elo ranking is this system debating its own hypotheses (single model family); it is not peer review, external benchmarking, or citation impact, and a ~30-point Elo gap can reflect a single debate.\n- **Grounding depth.** Hypotheses are grounded in 1 fetched source(s); the literature scan is bounded and may miss relevant prior art — a full novelty guarantee is not claimed.\n- **Seed sensitivity.** The direction set depends on the grounding run and sampling; a re-run may surface a different frontier. Use this as one structured exploration, not the definitive map.\n- **Citation caution.** Citations are limited to fetched sources, but arXiv ids / DOIs were not each independently resolved in this run; verify before relying on any specific reference.\n\n---\n\n## Literature Sources\n\n- **Concrete Problems in AI Safety** — <https://arxiv.org/abs/1606.06565> — frames the desiderata; evidence: high\n- **Vendor Whitepaper** _(unfetched)_ — <https://example.com/whitepaper> — marketing claims only; not fetched: paywalled\n"
+ },
+ "report_md.ungrounded_no_figures": {
+  "node": "report_md",
+  "path": "",
+  "value": "# AI Co-Scientist — Research Overview\n\n**Research goal:** How can an agent retain skills across a long stream of tasks?\n\n*Generated by the AbstractFlow co-scientist workflow: a literature-grounded multi-agent hypothesis engine (generation -> reflection -> Elo tournament -> evolution -> research expansion over 3 supervisor cycles, then a search-grounded full review). The hypotheses below are UNTESTED, ranked proposals for future work, not established results.*\n\n**Caveats:**\n\n- #FALLBACK: literature grounding fetched 0 real sources this run.\n- meta-review returned no TITLE line; product title used (#FALLBACK)\n- meta-review returned no ABSTRACT line (#FALLBACK)\n\n---\n\n## Research Overview\n\n## Body only\nNo title line here.\n\n---\n\n## Methodology\n\nThis overview was produced by the AbstractFlow co-scientist workflow, a literature-grounded multi-agent hypothesis tournament modeled on the Nature 2026 'AI co-scientist'. Pipeline: literature investigation (deep-plan + deep-investigate web search) -> Generation -> a supervisor loop of Reflection (peer review) / Elo ranking (pairwise scientific debate) / Evolution (per-cycle strategy) / research-expansion, with reviewer + debate feedback threaded into each next cycle -> a search-grounded full review of the finalists -> this Meta-review synthesis.\n\n- **Supervisor cycles:** 3 (test-time compute budget)\n- **Hypotheses ranked:** 4\n- **Elo:** an internal self-play tournament score (this system debating its own hypotheses) — a relative ranking signal, NOT peer review, citation count, or external validation.\n- **Literature grounding:** NONE fetched this run — the hypotheses are the model's parametric reasoning, not grounded in retrieved literature (see caveats).\n\n### Tournament trajectory\n\n```text\nBest-hypothesis Elo across supervisor cycles\n\ncycle 1  | ##################### 1231\ncycle 2  | ######################################## 1260\n\nbar length = Elo above the 1200 tournament start; higher = won more pairwise debates\n```\n\n---\n\n## Ranked Hypotheses\n\n### Key hypotheses at a glance\n\n*Ranking: reviewed, safe, sound AND novel hypotheses rank first; within each tier, higher Elo (internal self-play debate score) ranks higher unless diversity de-crowding reorders near-variants — so Elo can be non-monotonic across neighboring ranks. Flags mark demotions (low_novelty / low_correctness / unreviewed / unsafe); 'sibling' marks a near-variant of a higher-ranked hypothesis kept under the cluster cap; 'de-crowded' marks a row whose higher Elo was passed over to surface a distinct direction first.*\n\n| # | Hypothesis | Elo | Correctness | Novelty | Testability | Flags |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1 | Entropy-Gated Replay (EGR) | 1246 | 8 | 7 | 9 | — |\n| 2 | Sparse Index Consolidation (SIC) | 1223 | 7 | 7 | 8 | sibling |\n| 3 | Low Novelty Baseline (LNB) | 1205 | 7 | 3 | 8 | low_novelty |\n| 4 | Task-Agnostic Rehearsal (TAR) | 1188 | — | — | — | unreviewed |\n\n### #1. Entropy-Gated Replay (EGR)\n\n*Elo 1246 | correctness 8/10 | novelty 7/10 | testability 9/10*\n\n**Hypothesis.** Gate replay writes on predictive entropy.\n\n**Rationale.** Fills the gap the survey names in section 4.\n\n**Experimental protocol.**\n\n- *Design:* Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.\n- *Metric:* average accuracy over all seen tasks after the final task\n- *Expected effect (hypothesized, untested):* we predict up to ~8 points over ER\n- *Falsified if:* below +8 points average accuracy versus ER\n\n**Reviewer critique.** The gate is well specified; the entropy estimator is the weak link.\n\n### #2. Sparse Index Consolidation (SIC)\n\n*Elo 1223 | correctness 7/10 | novelty 7/10 | testability 8/10 | FLAGS: sibling*\n\n**Hypothesis.** Consolidate the retrieval index, not the weights.\n\n**Rationale.** Fills the gap the survey names in section 4.\n\n**Proposed experiment.** Train on the stream, ablate the buffer.\n\n**Reviewer critique.** Sound but the boundary oracle is load-bearing.\n\n### #3. Low Novelty Baseline (LNB)\n\n*Elo 1205 | correctness 7/10 | novelty 3/10 | testability 8/10 | FLAGS: low_novelty*\n\n**Hypothesis.** Just do experience replay again.\n\n**Reviewer critique.** Already the standard baseline.\n\n### #4. Task-Agnostic Rehearsal (TAR)\n\n*Elo 1188 | FLAGS: unreviewed*\n\n**Hypothesis.** Rehearse without task boundaries at all.\n\n---\n\n## Limitations & Threats to Validity\n\n- **Untested proposals.** Every hypothesis and quantitative target above is an UNTESTED prediction generated by the tournament, not a measured result. Treat the numbers as design targets to falsify, not findings.\n- **Self-evaluation.** The Elo ranking is this system debating its own hypotheses (single model family); it is not peer review, external benchmarking, or citation impact, and a ~30-point Elo gap can reflect a single debate.\n- **Ungrounded run.** No external sources were fetched this run — the hypotheses are the model's parametric reasoning; verify all prior-art and novelty claims independently.\n- **Seed sensitivity.** The direction set depends on the grounding run and sampling; a re-run may surface a different frontier. Use this as one structured exploration, not the definitive map.\n- **Citation caution.** Citations are limited to fetched sources, but arXiv ids / DOIs were not each independently resolved in this run; verify before relying on any specific reference.\n\n---\n\n## Literature Sources\n\n_(no sources gathered)_\n"
+ },
+ "report_md.verified_sources": {
+  "node": "report_md",
+  "path": "",
+  "value": "# Entropy Gating as the Frontier of Continual Skill Retention\n\n**Research goal:** How can an agent retain skills across a long stream of tasks?\n\n**Abstract.** The tournament surfaced four directions, of which entropy-gated replay is the strongest sound and novel candidate.\n\n*Generated by the AbstractFlow co-scientist workflow: a literature-grounded multi-agent hypothesis engine (generation -> reflection -> Elo tournament -> evolution -> research expansion over 3 supervisor cycles, then a search-grounded full review). The hypotheses below are UNTESTED, ranked proposals for future work, not established results.*\n\n**Caveats:**\n\n- #FALLBACK: 1 finalist(s) reached the ranking without a completed review; flagged 'unreviewed' and demoted below reviewed hypotheses.\n\n---\n\n## Research Overview\n\n## Most promising directions\nEntropy-Gated Replay leads because its falsification threshold is the sharpest.\n\n---\n\n## Methodology\n\nThis overview was produced by the AbstractFlow co-scientist workflow, a literature-grounded multi-agent hypothesis tournament modeled on the Nature 2026 'AI co-scientist'. Pipeline: literature investigation (deep-plan + deep-investigate web search) -> Generation -> a supervisor loop of Reflection (peer review) / Elo ranking (pairwise scientific debate) / Evolution (per-cycle strategy) / research-expansion, with reviewer + debate feedback threaded into each next cycle -> a search-grounded full review of the finalists -> this Meta-review synthesis.\n\n- **Supervisor cycles:** 3 (test-time compute budget)\n- **Hypotheses ranked:** 4\n- **Elo:** an internal self-play tournament score (this system debating its own hypotheses) — a relative ranking signal, NOT peer review, citation count, or external validation.\n- **Literature grounding:** 1 fetched source(s) with resolvable URLs (listed below).\n- **Citation check:** EVERY fetched ledger URL was deterministically re-fetched and title-verified before writing; sources failing the check are labeled below and were barred from citation.\n\n### Tournament trajectory\n\n```text\nBest-hypothesis Elo across supervisor cycles\n\ncycle 1  | ##################### 1231\ncycle 2  | ######################################## 1260\n\nbar length = Elo above the 1200 tournament start; higher = won more pairwise debates\n```\n\n---\n\n## Ranked Hypotheses\n\n### Key hypotheses at a glance\n\n*Ranking: reviewed, safe, sound AND novel hypotheses rank first; within each tier, higher Elo (internal self-play debate score) ranks higher unless diversity de-crowding reorders near-variants — so Elo can be non-monotonic across neighboring ranks. Flags mark demotions (low_novelty / low_correctness / unreviewed / unsafe); 'sibling' marks a near-variant of a higher-ranked hypothesis kept under the cluster cap; 'de-crowded' marks a row whose higher Elo was passed over to surface a distinct direction first.*\n\n| # | Hypothesis | Elo | Correctness | Novelty | Testability | Flags |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1 | Entropy-Gated Replay (EGR) | 1246 | 8 | 7 | 9 | — |\n| 2 | Sparse Index Consolidation (SIC) | 1223 | 7 | 7 | 8 | sibling |\n| 3 | Low Novelty Baseline (LNB) | 1205 | 7 | 3 | 8 | low_novelty |\n| 4 | Task-Agnostic Rehearsal (TAR) | 1188 | — | — | — | unreviewed |\n\n### #1. Entropy-Gated Replay (EGR)\n\n*Elo 1246 | correctness 8/10 | novelty 7/10 | testability 9/10*\n\n**Hypothesis.** Gate replay writes on predictive entropy.\n\n**Rationale.** Fills the gap the survey names in section 4.\n\n**Experimental protocol.**\n\n- *Design:* Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.\n- *Metric:* average accuracy over all seen tasks after the final task\n- *Expected effect (hypothesized, untested):* we predict up to ~8 points over ER\n- *Falsified if:* below +8 points average accuracy versus ER\n\n**Reviewer critique.** The gate is well specified; the entropy estimator is the weak link.\n\n### #2. Sparse Index Consolidation (SIC)\n\n*Elo 1223 | correctness 7/10 | novelty 7/10 | testability 8/10 | FLAGS: sibling*\n\n**Hypothesis.** Consolidate the retrieval index, not the weights.\n\n**Rationale.** Fills the gap the survey names in section 4.\n\n**Proposed experiment.** Train on the stream, ablate the buffer.\n\n**Reviewer critique.** Sound but the boundary oracle is load-bearing.\n\n### #3. Low Novelty Baseline (LNB)\n\n*Elo 1205 | correctness 7/10 | novelty 3/10 | testability 8/10 | FLAGS: low_novelty*\n\n**Hypothesis.** Just do experience replay again.\n\n**Reviewer critique.** Already the standard baseline.\n\n### #4. Task-Agnostic Rehearsal (TAR)\n\n*Elo 1188 | FLAGS: unreviewed*\n\n**Hypothesis.** Rehearse without task boundaries at all.\n\n---\n\n## Limitations & Threats to Validity\n\n- **Untested proposals.** Every hypothesis and quantitative target above is an UNTESTED prediction generated by the tournament, not a measured result. Treat the numbers as design targets to falsify, not findings.\n- **Self-evaluation.** The Elo ranking is this system debating its own hypotheses (single model family); it is not peer review, external benchmarking, or citation impact, and a ~30-point Elo gap can reflect a single debate.\n- **Grounding depth.** Hypotheses are grounded in 1 fetched source(s); the literature scan is bounded and may miss relevant prior art — a full novelty guarantee is not claimed.\n- **Seed sensitivity.** The direction set depends on the grounding run and sampling; a re-run may surface a different frontier. Use this as one structured exploration, not the definitive map.\n- **Citation caution.** Every fetched ledger URL was deterministically re-fetched and title-checked this run (verdicts labeled in Literature Sources; failures were barred from citation). Characterizations of verified sources remain the model's reading — verify specific quotes/figures before relying on them.\n\n---\n\n## Literature Sources\n\n- **Concrete Problems in AI Safety** _(verified)_ — <https://arxiv.org/abs/1606.06565> — frames the desiderata\n- **Vendor Whitepaper** _(TITLE MISMATCH — barred from citation)_ — <https://example.com/whitepaper> — marketing [citation check FAILED: title mismatch]\n"
+ },
+ "report_title.derived": {
+  "node": "report_title",
+  "path": "",
+  "value": "Entropy Gating as the Frontier of Continual Skill Retention"
+ },
+ "report_title.fallback": {
+  "node": "report_title",
+  "path": "",
+  "value": "AI Co-Scientist — Research Overview"
+ },
+ "strategy.cycle0": {
+  "node": "ctx",
+  "path": "strategy",
+  "value": "COMBINATION: merge the complementary strengths of two top hypotheses into one stronger mechanism"
+ },
+ "strategy.cycle1": {
+  "node": "ctx",
+  "path": "strategy",
+  "value": "SIMPLIFICATION: strip a top hypothesis to its most testable core — fewer moving parts, a cleaner experiment, the same claim"
+ },
+ "strategy.cycle2": {
+  "node": "ctx",
+  "path": "strategy",
+  "value": "OUT-OF-BOX: take a top hypothesis's goal but reach it by a mechanism from a DIFFERENT paradigm than the pool uses"
+ },
+ "strategy.cycle3": {
+  "node": "ctx",
+  "path": "strategy",
+  "value": "GROUNDING+COHERENCE: fix the specific flaw a reviewer named and tighten the mechanism's internal consistency"
+ },
+ "strategy.cycle4wrap": {
+  "node": "ctx",
+  "path": "strategy",
+  "value": "COMBINATION: merge the complementary strengths of two top hypotheses into one stronger mechanism"
+ },
+ "term_fold.pool": {
+  "node": "term_fold",
+  "path": "pool",
+  "value": [
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1276.898958432388,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 0,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 8,
+     "critique": "The gate is well specified; the entropy estimator is the weak link.",
+     "novelty": 7,
+     "safety_ok": true,
+     "testability": 9
+    },
+    "statement": "Gate replay writes on predictive entropy.",
+    "title": "Entropy-Gated Replay (EGR)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1244.0433969633098,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 4,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 7,
+     "safety_ok": false,
+     "testability": 8
+    },
+    "statement": "Self-modify the reward channel.",
+    "title": "Unsafe Direction (UD)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1223.1349807301065,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 1,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 7,
+     "safety_ok": true,
+     "testability": 8
+    },
+    "statement": "Consolidate the retrieval index, not the weights.",
+    "title": "Sparse Index Consolidation (SIC)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1205.0,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 3,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 7,
+     "critique": "Sound but the boundary oracle is load-bearing.",
+     "novelty": 3,
+     "safety_ok": true,
+     "testability": 8
+    },
+    "statement": "Just do experience replay again.",
+    "title": "Low Novelty Baseline (LNB)"
+   },
+   {
+    "design": "Build the buffer on top of an ER baseline; ablate size; compare on Split-CIFAR100.",
+    "elo": 1172.9226638741957,
+    "expected_effect": "we predict up to ~8 points over ER",
+    "experiment": "Train on the stream, ablate the buffer.",
+    "falsification": "below +8 points average accuracy versus ER",
+    "id": 2,
+    "metric": "average accuracy over all seen tasks after the final task",
+    "rationale": "Fills the gap the survey names in section 4.",
+    "reviewed": true,
+    "reviews": {
+     "correctness": 4,
+     "critique": "Boundary-free rehearsal is not shown to converge.",
+     "novelty": 8,
+     "safety_ok": true,
+     "testability": 6
+    },
+    "statement": "Rehearse without task boundaries at all.",
+    "title": "Task-Agnostic Rehearsal (TAR)"
+   }
+  ]
+ },
+ "term_pool_text.decorated": {
+  "node": "term_pool_text",
+  "path": "decorated",
+  "value": "### [4] Unsafe Direction (UD) (Elo 1260)\nSelf-modify the reward channel.\nRationale: Fills the gap the survey names in section 4.\n\n### [0] Entropy-Gated Replay (EGR) (Elo 1246)\nGate replay writes on predictive entropy.\nRationale: Fills the gap the survey names in section 4.\n\n### [1] Sparse Index Consolidation (SIC) (Elo 1223)\nConsolidate the retrieval index, not the weights.\nRationale: Fills the gap the survey names in section 4.\n\n### [3] Low Novelty Baseline (LNB) (Elo 1205)\nJust do experience replay again.\nRationale: Fills the gap the survey names in section 4.\n\n### [2] Task-Agnostic Rehearsal (TAR) (Elo 1188) [UNREVIEWED]\nRehearse without task boundaries at all.\nRationale: Fills the gap the survey names in section 4.\n"
+ },
+ "term_rank_prompt": {
+  "node": "term_rank_prompt",
+  "path": "",
+  "value": "You are the Ranking agent holding the FINAL Elo tournament over the finalist hypotheses. For each meaningful pair among the finalists, hold a scientific debate and output the winner id with a one-line reason. Rank on plausibility/correctness first, then testability, then novelty.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Finalist hypotheses (id, title, Elo, reviews)\nPOOLTEXT"
+ },
+ "term_reflect_prompt": {
+  "node": "term_reflect_prompt",
+  "path": "",
+  "value": "You are the Reflection agent performing a FULL, deeply-grounded review of the FINALIST hypotheses. Use the read-only web tools to search the current literature and verify each hypothesis. Run a DEEP-VERIFICATION review: for each hypothesis, mentally decompose it into its core assumptions and sub-assumptions, and check each independently — a hypothesis is only as sound as its weakest load-bearing assumption. Verify NOVELTY (search: is it already published?) and CORRECTNESS (is every assumption sound, or does one rest on a refuted or unsupported premise?). For EACH hypothesis, score correctness (driven by the weakest assumption you found), novelty, testability (0-10), set safety_ok, and give a critique that (a) NAMES the weakest assumption and whether it holds, and (b) CITES what you found in the literature (or confirms you could not find prior art, supporting novelty). Be skeptical: down-score hypotheses that duplicate existing work or rest on an invalidating assumption. Never fabricate a citation — cite only what you actually retrieved.\n\n## Research goal\nHow can an agent retain skills across a long stream of tasks?\n\n## Finalist hypotheses to verify\nPOOLTEXT"
+ }
+}

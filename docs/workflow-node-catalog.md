@@ -357,7 +357,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`; subflow id is UI-owned; do not create an unconfigured subflow as a finished workflow
 - Inputs: `exec-in` execution; `inherit_context` boolean: When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false.; `input` object
-- Outputs: `exec-out` execution; `output` object
+- Outputs: `exec-out` execution; `output` object; `child_output` object: RUNTIME-PROVIDED child metadata: null while the child run is healthy; {success: false, error} when the child run dies. Wire it to fold child death honestly instead of reading a silent empty output.
 - Default config: none
 
 ### core / Tool Calls
@@ -1916,11 +1916,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `get_var`
 - Document node: `{"id":"<unique_id>","type":"get_var"}`
-- Utility: Read a variable from workflow state by name.
+- Utility: Read a variable from workflow state by name. Supports dotted paths (state.provider); default is returned when the path is missing.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `name` string
+- Inputs: `name` string; `default` any: Value used when the path is missing.
 - Outputs: `value` any
 - Default config: none
 

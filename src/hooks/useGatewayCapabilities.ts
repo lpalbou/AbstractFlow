@@ -16,6 +16,14 @@ export function useGatewayCapabilities(enabled = true) {
     enabled,
     staleTime: 60_000,
     retry: 1,
+    // This one query gates Save, Run, Publish and the flow library. The app's
+    // global default is refetchOnWindowFocus:false (main.tsx), which left a
+    // single transient failure — a gateway restart, an expired session —
+    // poisoning those controls for the rest of the tab's life, healing only by
+    // luck when some other component happened to mount a new observer. Let it
+    // recover on its own instead.
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 }
 

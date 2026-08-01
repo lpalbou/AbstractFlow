@@ -40,6 +40,9 @@ import { computeRunPreflightIssues } from '../utils/preflight';
 import { waitNotificationText } from '../utils/waitClassification';
 import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateFlowFamily';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
+import { errorSnippet } from '../utils/errorSnippet';
+import { saveButtonDisabled, saveGateTooltip, type SaveGateInput } from '../utils/saveGate';
+import { savedBaselineSnapshot, shouldRebaselineOnIdentityChange } from '../utils/saveBaseline';
 import type { PublishedBundleTarget } from '../utils/workflowBundles';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import {
@@ -49,6 +52,7 @@ import {
   gatewayPath,
   descriptorEndpointAvailable,
   getGatewayFlowEditorReadiness,
+  GatewayHttpError,
   jsonRequest,
   type GatewayContracts,
 } from '../utils/gatewayClient';
@@ -85,12 +89,45 @@ async function updateFlowInterfaces(flowId: string, interfaces: string[], contra
   return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ interfaces }, { method: 'PUT' }));
 }
 
+/**
+ * In-app confirmation prompt (never `window.confirm` — browser dialogs are
+ * banned in this UI). Rendered by Toolbar as a `.modal-overlay` modal; Cancel
+ * or clicking the overlay dismisses without running `onConfirm`.
+ */
+interface ConfirmPrompt {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  /** Destructive confirms render the red danger button. */
+  danger?: boolean;
+  onConfirm: () => void;
+}
+
+/**
+ * Confirm before an action replaces the editor's graph.
+ *
+ * loadFlow() clears the undo stack (`past: []`, `future: []`), so replacing a
+ * dirty document is unrecoverable in-app. Open and Import used to do it with no
+ * prompt at all — a single Enter on a highlighted library row could delete an
+ * afternoon of authoring. The New Flow modal already warns; these must too.
+ */
+function discardUnsavedChangesPrompt(action: string): Omit<ConfirmPrompt, 'onConfirm'> {
+  return {
+    title: 'Unsaved changes',
+    message: `${action} will replace the flow in the editor, and this cannot be undone.\n\nYou have unsaved changes. Save or export them first if you want to keep them.`,
+    confirmLabel: 'Continue',
+    danger: true,
+  };
+}
+
 /** Bundled families duplicate to the gateway — confirm so operators do not spam "(copy)" rows. */
-function confirmFlowDuplicate(baseName: string, isBundledFamily: boolean): boolean {
+function duplicateFlowPrompt(baseName: string, isBundledFamily: boolean): Omit<ConfirmPrompt, 'onConfirm'> {
   const kind = isBundledFamily ? 'bundled workflow family' : 'workflow';
-  return window.confirm(
-    `Duplicate "${baseName}" as a new ${kind}?\n\nThis saves an editable copy on the gateway. Prefer opening bundled workflows directly — duplicates clutter the library.`
-  );
+  return {
+    title: 'Duplicate flow',
+    message: `Duplicate "${baseName}" as a new ${kind}?\n\nThis saves an editable copy on the gateway. Prefer opening bundled workflows directly — duplicates clutter the library.`,
+    confirmLabel: 'Duplicate',
+  };
 }
 
 async function duplicateFlow(source: VisualFlow, newName: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
@@ -189,23 +226,41 @@ async function saveFlow(
 ): Promise<VisualFlow> {
   // Use existingFlowId to determine if this is an update or create
   // flow.id may have a generated value even for new flows
-  const method = existingFlowId ? 'PUT' : 'POST';
   const crud = contracts?.flow_editor?.visualflows?.crud;
-  const url = existingFlowId
-    ? gatewayPath(crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}', { flow_id: existingFlowId })
-    : gatewayPath(crud?.collection_endpoint || '/api/gateway/visualflows');
+  const collectionUrl = gatewayPath(crud?.collection_endpoint || '/api/gateway/visualflows');
+  const body = jsonRequest({
+    name: flow.name,
+    description: flow.description,
+    interfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
+    nodes: flow.nodes,
+    edges: flow.edges,
+    entryNode: flow.entryNode,
+    // Part of the document (adversary P0-1: Save used to toast success
+    // while the gateway never received the library).
+    functions: Array.isArray(flow.functions) ? flow.functions : [],
+  });
 
-  return gatewayJson<VisualFlow>(url, jsonRequest({
-      name: flow.name,
-      description: flow.description,
-      interfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
-      nodes: flow.nodes,
-      edges: flow.edges,
-      entryNode: flow.entryNode,
-      // Part of the document (adversary P0-1: Save used to toast success
-      // while the gateway never received the library).
-      functions: Array.isArray(flow.functions) ? flow.functions : [],
-    }, { method }));
+  if (!existingFlowId) {
+    return gatewayJson<VisualFlow>(collectionUrl, { ...body, method: 'POST' });
+  }
+
+  const itemUrl = gatewayPath(crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}', {
+    flow_id: existingFlowId,
+  });
+  try {
+    return await gatewayJson<VisualFlow>(itemUrl, { ...body, method: 'PUT' });
+  } catch (error) {
+    // The record we are updating is gone: deleted from another tab or session,
+    // or the gateway was restarted against a different data dir. A PUT can only
+    // ever 404 from here on, which would leave the document PERMANENTLY
+    // unsaveable with the work stranded in the tab. Re-create it instead —
+    // saving under a new id beats not saving at all, and onSuccess rebinds the
+    // editor to the id the gateway returns.
+    if (error instanceof GatewayHttpError && error.status === 404) {
+      return gatewayJson<VisualFlow>(collectionUrl, { ...body, method: 'POST' });
+    }
+    throw error;
+  }
 }
 
 function flowSignatureFor(flow: Partial<VisualFlow> | null | undefined): string {
@@ -280,9 +335,15 @@ export function Toolbar() {
         ? 'Gateway capability discovery failed'
         : '';
   const gatewayCheckPending = gatewayCapabilitiesQuery.isLoading;
+  // A discovery error only blocks CRUD while we have NO contracts to work from.
+  // Once capabilities have resolved once, react-query keeps the last good data
+  // across a later transient failure (expired session, gateway blip) — blocking
+  // on that error turned Save into a dead control that healed on its own minutes
+  // later, with no way for the user to learn why. Keep the last known-good
+  // contracts and let the save attempt surface the real HTTP error instead.
   const gatewayBlockReason = gatewayCheckPending
     ? 'Checking Gateway capabilities'
-    : gatewayDiscoveryError
+    : gatewayDiscoveryError && !gatewayContracts
       ? `Gateway capability discovery failed: ${gatewayDiscoveryError}`
       : '';
   const visualflowCrudUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.save.ready);
@@ -314,6 +375,8 @@ export function Toolbar() {
     flowFunctions,
     execView,
     setExecView,
+    foldReads,
+    setFoldReads,
     setPreflightIssues,
     clearPreflightIssues,
     past,
@@ -331,10 +394,14 @@ export function Toolbar() {
   const [showLifecycleModal, setShowLifecycleModal] = useState(false);
   const [showModelResidency, setShowModelResidency] = useState(false);
   const [showNewFlowModal, setShowNewFlowModal] = useState(false);
+  const [confirmPrompt, setConfirmPrompt] = useState<ConfirmPrompt | null>(null);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
   const [loadedBundledRunTarget, setLoadedBundledRunTarget] = useState<PublishedBundleTarget | null>(null);
+  const resetLoadedDocument = useCallback(() => {
+    setLoadedBundledRunTarget(null);
+  }, []);
   const [threadRootRunId, setThreadRootRunId] = useState<string | null>(null);
   const [runWorkflowId, setRunWorkflowId] = useState<string | null>(null);
   const threadRootRunIdRef = useRef<string | null>(null);
@@ -361,24 +428,26 @@ export function Toolbar() {
   const hasUnsavedChanges = !isEmptyFlow && currentFlowSignature !== savedFlowSignature;
   const runnableFlowId = flowId || loadedBundledRunTarget?.flowId || '';
   const loadedBundledTargetDirty = Boolean(loadedBundledRunTarget && hasUnsavedChanges);
-  const saveDisabledReason = visualflowCrudUnavailable
-    ? saveUnavailableReason
-    : loadedBundledRunTarget
-      ? 'Bundled workflow families are read-only; run the shipped bundle or create an editable family copy separately'
-    : isEmptyFlow
-      ? 'Add at least one node before saving'
-      : !hasUnsavedChanges
-        ? 'No unsaved changes'
-        : 'Save Flow (Ctrl/⌘+S)';
 
   useEffect(() => {
     const nextFlowId = flowId || null;
     if (savedFlowIdentityRef.current === nextFlowId) return;
     savedFlowIdentityRef.current = nextFlowId;
-    if (nextFlowId || isEmptyFlow) {
+    // A just-completed save already published the authoritative baseline: the
+    // bytes that actually reached the gateway. Re-baselining to the CURRENT
+    // graph here would declare every edit made WHILE the request was in flight
+    // to be already-saved — the dot goes clean, Save disables, the beforeunload
+    // guard unregisters and the local draft is dropped, so that delta is gone
+    // with no affordance anywhere to recover it. It fires exactly once per
+    // document, on the first save: the end of a long authoring session.
+    const saveJustSucceeded = saveJustSucceededRef.current;
+    saveJustSucceededRef.current = false;
+    if (shouldRebaselineOnIdentityChange({ nextFlowId, isEmptyFlow, saveJustSucceeded })) {
       setSavedFlowSignature(currentFlowSignature);
     }
   }, [currentFlowSignature, flowId, isEmptyFlow]);
+
+  const saveJustSucceededRef = useRef(false);
 
   const formatValue = useCallback((value: unknown) => {
     if (value == null) return '';
@@ -411,8 +480,7 @@ export function Toolbar() {
   const showWorkflowFailedToast = useCallback(
     (fullError: unknown) => {
       const full = formatValue(fullError) || 'Unknown error';
-      const firstLine = full.split('\n').find((l) => l.trim()) || full;
-      const snippet = firstLine.length > 180 ? `${firstLine.slice(0, 179)}…` : firstLine;
+      const snippet = errorSnippet(fullError, full);
 
       toast.error(
         <div
@@ -609,8 +677,8 @@ export function Toolbar() {
     [flowLibraryCatalog.bundledFlowIds]
   );
 
-  // Handle loading a flow
-  const handleLoadFlow = useCallback(
+  // Load a flow into the editor (no unsaved-changes gate — see handleLoadFlow).
+  const doLoadFlow = useCallback(
     async (selectedFlowId: string) => {
       try {
         if (bundledFlowIdSet.has(selectedFlowId)) {
@@ -631,7 +699,7 @@ export function Toolbar() {
         }
         const flow = await fetchFlow(selectedFlowId, gatewayContracts);
         const loaded = loadFlow(flow);
-        setLoadedBundledRunTarget(null);
+        resetLoadedDocument();
         setSavedFlowSignature(flowSignatureFor(loaded));
         setShowFlowLibrary(false);
         toast.success(`Loaded "${flow.name}"`);
@@ -640,6 +708,21 @@ export function Toolbar() {
       }
     },
     [bundledFlowIdSet, flowLibraryCatalog.flows, gatewayContracts, loadFlow, setFlowId]
+  );
+
+  // Handle loading a flow
+  const handleLoadFlow = useCallback(
+    (selectedFlowId: string) => {
+      if (hasUnsavedChanges) {
+        setConfirmPrompt({
+          ...discardUnsavedChangesPrompt('Opening another flow'),
+          onConfirm: () => void doLoadFlow(selectedFlowId),
+        });
+        return;
+      }
+      void doLoadFlow(selectedFlowId);
+    },
+    [doLoadFlow, hasUnsavedChanges]
   );
 
   // Family-aware duplicate for read-only bundled flows: copies the root plus
@@ -689,7 +772,7 @@ export function Toolbar() {
         const root = await duplicateBundledFamily(id, name);
         if (root) {
           const loaded = loadFlow(root);
-          setLoadedBundledRunTarget(null);
+          resetLoadedDocument();
           setSavedFlowSignature(flowSignatureFor(loaded));
           setShowFlowLibrary(false);
         }
@@ -699,7 +782,7 @@ export function Toolbar() {
       if (flowId && id === flowId) {
         const loaded = loadFlow(updated);
         setFlowName(updated.name);
-        setLoadedBundledRunTarget(null);
+        resetLoadedDocument();
         setSavedFlowSignature(flowSignatureFor(loaded));
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
@@ -717,7 +800,7 @@ export function Toolbar() {
       const updated = await updateFlowDescription(id, nextDescription, gatewayContracts);
       // If we are currently editing that flow, keep the in-editor description in sync by reloading.
       if (flowId && id === flowId) {
-        setLoadedBundledRunTarget(null);
+        resetLoadedDocument();
         // We only have the flow name in store; description lives in the saved flow object.
         // Loading is the simplest way to keep all metadata consistent.
         const loaded = loadFlow(updated);
@@ -737,7 +820,7 @@ export function Toolbar() {
       }
       const updated = await updateFlowInterfaces(id, nextInterfaces, gatewayContracts);
       if (flowId && id === flowId) {
-        setLoadedBundledRunTarget(null);
+        resetLoadedDocument();
         const loaded = loadFlow(updated);
         setSavedFlowSignature(flowSignatureFor(loaded));
       }
@@ -757,7 +840,7 @@ export function Toolbar() {
       if (flowId && id === flowId) {
         // Keep the current graph but mark it as unsaved.
         setFlowId(null);
-        setLoadedBundledRunTarget(null);
+        resetLoadedDocument();
         setSavedFlowSignature('');
         toast.success('Deleted (editor is now unsaved)');
       } else {
@@ -769,7 +852,7 @@ export function Toolbar() {
   );
 
   const handleDuplicateFlow = useCallback(
-    async (id: string) => {
+    (id: string) => {
       if (visualflowCrudUnavailable) {
         toast.error(saveUnavailableReason);
         return;
@@ -778,25 +861,35 @@ export function Toolbar() {
       const src = all.find((f) => f.id === id);
       if (!src) return;
       const base = (src.name || 'Untitled').trim() || 'Untitled';
-      if (bundledFlowIdSet.has(id)) {
-        if (!confirmFlowDuplicate(base, true)) return;
-        const root = await duplicateBundledFamily(id, `${base} (copy)`);
-        if (root) {
-          const loaded = loadFlow(root);
-          setLoadedBundledRunTarget(null);
-          setSavedFlowSignature(flowSignatureFor(loaded));
-          setShowFlowLibrary(false);
-        }
-        return;
-      }
-      if (!confirmFlowDuplicate(base, false)) return;
-      const created = await duplicateFlow(src, `${base} (copy)`, gatewayContracts);
-      queryClient.invalidateQueries({ queryKey: ['flows'] });
-      const loaded = loadFlow(created);
-      setLoadedBundledRunTarget(null);
-      setSavedFlowSignature(flowSignatureFor(loaded));
-      setShowFlowLibrary(false);
-      toast.success(`Duplicated as "${created.name}"`);
+      const isBundled = bundledFlowIdSet.has(id);
+      setConfirmPrompt({
+        ...duplicateFlowPrompt(base, isBundled),
+        onConfirm: () => {
+          void (async () => {
+            try {
+              if (isBundled) {
+                const root = await duplicateBundledFamily(id, `${base} (copy)`);
+                if (root) {
+                  const loaded = loadFlow(root);
+                  resetLoadedDocument();
+                  setSavedFlowSignature(flowSignatureFor(loaded));
+                  setShowFlowLibrary(false);
+                }
+                return;
+              }
+              const created = await duplicateFlow(src, `${base} (copy)`, gatewayContracts);
+              queryClient.invalidateQueries({ queryKey: ['flows'] });
+              const loaded = loadFlow(created);
+              resetLoadedDocument();
+              setSavedFlowSignature(flowSignatureFor(loaded));
+              setShowFlowLibrary(false);
+              toast.success(`Duplicated as "${created.name}"`);
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : 'Duplicate failed');
+            }
+          })();
+        },
+      });
     },
     [
       bundledFlowIdSet,
@@ -821,22 +914,64 @@ export function Toolbar() {
       if (savedId) {
         setFlowId(savedId);
       }
-      setLoadedBundledRunTarget(null);
-      const savedSnapshot: VisualFlow = {
-        ...variables.flow,
-        id: savedId || variables.flow.id,
-        name: typeof savedFlow.name === 'string' ? savedFlow.name : variables.flow.name,
-        description: typeof savedFlow.description === 'string' ? savedFlow.description : variables.flow.description,
-        interfaces: Array.isArray(savedFlow.interfaces) ? savedFlow.interfaces : variables.flow.interfaces,
-      };
-      setSavedFlowSignature(flowSignatureFor(savedSnapshot));
+      resetLoadedDocument();
+      // The baseline must be the bytes we SENT, never the server's echo. The
+      // dirty flag is `flowSignatureFor(getFlow()) !== savedFlowSignature`, and
+      // getFlow() is the only thing that produces the left-hand side — so any
+      // field taken from the response that getFlow() cannot reproduce pins the
+      // flow to "dirty" forever. That is not hypothetical: the signature counts
+      // `description`, the gateway faithfully returns the stored description,
+      // and the store has no description field at all (FlowState in
+      // hooks/useFlow.ts), so every flow with a description used to come back
+      // from a successful save still showing the amber dot — and Run refused it
+      // with "Save the flow before running current changes", permanently.
+      setSavedFlowSignature(flowSignatureFor(savedBaselineSnapshot(variables.flow, savedId)));
+      // Any transition of flowId can trip the identity effect into overwriting
+      // the baseline we just set: a create (null -> id), and also the 404
+      // fallback in saveFlow, which re-creates a deleted record under a NEW id.
+      // A plain PUT keeps the same id, so the effect early-returns and the flag
+      // is neither set nor left stranded.
+      if (savedId && savedId !== variables.existingFlowId) saveJustSucceededRef.current = true;
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Flow saved!');
     },
     onError: (error) => {
+      // An expired browser session is the single most common save failure and
+      // the least self-explanatory: the top-bar pill still reads "connected"
+      // (it is probed once at mount), so "HTTP 401" alone tells the user
+      // nothing about what to do. Name the fix, and keep the graph in the
+      // editor — nothing was lost, it just was not written.
+      if (error instanceof GatewayHttpError && (error.status === 401 || error.status === 403)) {
+        toast.error(
+          'Save failed: your Gateway session expired. Reconnect from the top bar, then save again — your unsaved graph is still here.',
+          { duration: 8000 }
+        );
+        return;
+      }
+      // 413: the gateway caps request bodies at 256KB
+      // (abstractgateway security policy max_body_bytes). A large flow can sit
+      // permanently over that line, so "Save failed: HTTP 413" would be a dead
+      // end. Name the one action that still preserves the work.
+      if (error instanceof GatewayHttpError && error.status === 413) {
+        toast.error(
+          'Save failed: this flow is larger than the Gateway accepts in one request. Export to JSON now so the work is safe, then split the flow into subflows or raise the Gateway body limit.',
+          { duration: 12000 }
+        );
+        return;
+      }
       toast.error(`Save failed: ${error.message}`);
     },
   });
+
+  const saveGate: SaveGateInput = {
+    savePending: saveMutation.isPending,
+    isEmptyFlow,
+    hasUnsavedChanges,
+    crudUnavailable: visualflowCrudUnavailable,
+    crudUnavailableReason: saveUnavailableReason,
+    bundledReadOnly: Boolean(loadedBundledRunTarget),
+  };
+  const saveDisabledReason = saveGateTooltip(saveGate);
 
   // WebSocket for real-time execution (if flow is saved)
   const {
@@ -981,12 +1116,21 @@ export function Toolbar() {
 
   // Handle save
   const handleSave = useCallback(() => {
+    // Ctrl/⌘+S calls this directly, bypassing the button's disabled state — so
+    // the in-flight guard has to live here too. Without it, two saves fired
+    // before the first response both see existingFlowId === null and both POST,
+    // creating two library records for one flow (the gateway mints a fresh
+    // uuid per POST and does no dedup).
+    if (saveMutation.isPending) return;
     if (visualflowCrudUnavailable) {
       toast.error(saveUnavailableReason);
       return;
     }
     if (loadedBundledRunTarget) {
-      toast.error('Bundled workflow families are read-only; run the shipped bundle instead of saving the root flow alone.');
+      toast.error(
+        'Bundled workflow families are read-only. Use Duplicate to keep your edits as your own workflow, or Export to JSON.',
+        { duration: 8000 }
+      );
       return;
     }
     if (isEmptyFlow) {
@@ -994,6 +1138,10 @@ export function Toolbar() {
       return;
     }
     if (!hasUnsavedChanges) {
+      // Reachable only via Ctrl/⌘+S (the button is disabled here). A keystroke
+      // that produces no visible response is indistinguishable from the bug
+      // this whole gate exists to prevent — always answer.
+      toast('No unsaved changes');
       return;
     }
     const flow = getFlow();
@@ -1017,8 +1165,8 @@ export function Toolbar() {
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [handleSave]);
 
-  // Guard against silent data loss: closing/refreshing the tab with unsaved
-  // graph changes (or a save still in flight) asks for confirmation.
+  // Closing/refreshing the tab with unsaved graph changes (or a save still in
+  // flight) asks the browser-native confirmation.
   useEffect(() => {
     if (!hasUnsavedChanges && !saveMutation.isPending) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -1358,8 +1506,8 @@ export function Toolbar() {
     toast.success('Flow exported!');
   }, [getFlow]);
 
-  // Handle import
-  const handleImport = useCallback(() => {
+  // Open the file picker and import (no unsaved-changes gate — see handleImport).
+  const doImport = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -1377,7 +1525,7 @@ export function Toolbar() {
         // Save silently overwrite the original (adversary P1-1). Import
         // always lands as a NEW unsaved document; Save creates it.
         setFlowId(null);
-        setLoadedBundledRunTarget(null);
+        resetLoadedDocument();
         setSavedFlowSignature('');
         toast.success('Flow imported as a new draft — Save stores it');
       } catch (err) {
@@ -1388,13 +1536,38 @@ export function Toolbar() {
     input.click();
   }, [loadFlow, setFlowId]);
 
-  // Handle new flow
+  // Handle import
+  const handleImport = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setConfirmPrompt({
+        ...discardUnsavedChangesPrompt('Importing a flow'),
+        onConfirm: doImport,
+      });
+      return;
+    }
+    doImport();
+  }, [doImport, hasUnsavedChanges]);
+
+  const createNewFlow = useCallback(() => {
+    setShowNewFlowModal(false);
+    clearRunState();
+    clearFlow();
+    resetLoadedDocument();
+    setSavedFlowSignature(flowSignatureFor({ name: 'Untitled Flow', description: '', interfaces: [], nodes: [], edges: [] }));
+    toast.success('Created new flow');
+  }, [clearFlow, clearRunState, resetLoadedDocument]);
+
+  // Handle new flow — only ask for confirmation when there is something to lose.
   const handleNew = useCallback(() => {
+    if (!hasUnsavedChanges) {
+      createNewFlow();
+      return;
+    }
     setShowNewFlowModal(true);
-  }, []);
+  }, [createNewFlow, hasUnsavedChanges]);
 
   // Duplicate the current flow in-place (keeps current editor state as the source).
-  const handleDuplicateCurrent = useCallback(async () => {
+  const handleDuplicateCurrent = useCallback(() => {
     if (visualflowCrudUnavailable) {
       toast.error(saveUnavailableReason);
       return;
@@ -1404,35 +1577,76 @@ export function Toolbar() {
       // readonly subflow closure, references remapped) — the standalone-copy
       // refusal is retired (operator ruling 2026-07-20).
       const base = (getFlow().name || loadedBundledRunTarget.flowId || 'Untitled').trim() || 'Untitled';
-      try {
-        if (!confirmFlowDuplicate(base, true)) return;
-        const root = await duplicateBundledFamily(loadedBundledRunTarget.flowId, `${base} (copy)`);
-        if (root) {
-          const loaded = loadFlow(root);
-          setLoadedBundledRunTarget(null);
-          setSavedFlowSignature(flowSignatureFor(loaded));
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Duplicate failed';
-        toast.error(msg);
+      // ...but the family copy is built from the SHIPPED catalog entry, not
+      // from the editor. Running it against an edited bundle would duplicate
+      // the pristine original and then overwrite the user's graph with it —
+      // silently destroying every change they made. Opening a flagship example
+      // and adapting it is a primary authoring path, and Save refuses bundled
+      // targets, so this is the only route their work has out. When the editor
+      // is dirty, their bytes win: copy what is on screen.
+      if (loadedBundledTargetDirty) {
+        const flow = getFlow();
+        setConfirmPrompt({
+          title: 'Save edits as a new workflow',
+          message: `Save your edits to "${base}" as a new standalone workflow?\n\nThis copies the graph currently in the editor. It will not carry the bundled family's subflow closure — duplicate the unmodified bundle for that.`,
+          confirmLabel: 'Save copy',
+          onConfirm: () => {
+            void (async () => {
+              try {
+                const created = await duplicateFlow(flow, `${base} (copy)`, gatewayContracts);
+                queryClient.invalidateQueries({ queryKey: ['flows'] });
+                setFlowId(created.id);
+                resetLoadedDocument();
+                setSavedFlowSignature(flowSignatureFor(savedBaselineSnapshot(flow, created.id)));
+                toast.success(`Saved your edits as "${created.name}"`);
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : 'Duplicate failed');
+              }
+            })();
+          },
+        });
+        return;
       }
+      const bundledFlowId = loadedBundledRunTarget.flowId;
+      setConfirmPrompt({
+        ...duplicateFlowPrompt(base, true),
+        onConfirm: () => {
+          void (async () => {
+            try {
+              const root = await duplicateBundledFamily(bundledFlowId, `${base} (copy)`);
+              if (root) {
+                const loaded = loadFlow(root);
+                resetLoadedDocument();
+                setSavedFlowSignature(flowSignatureFor(loaded));
+              }
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : 'Duplicate failed');
+            }
+          })();
+        },
+      });
       return;
     }
     const flow = getFlow();
     const base = (flow.name || 'Untitled').trim() || 'Untitled';
-    try {
-      if (!confirmFlowDuplicate(base, false)) return;
-      const created = await duplicateFlow(flow, `${base} (copy)`, gatewayContracts);
-      queryClient.invalidateQueries({ queryKey: ['flows'] });
-      const loaded = loadFlow(created);
-      setLoadedBundledRunTarget(null);
-      setSavedFlowSignature(flowSignatureFor(loaded));
-      toast.success(`Duplicated as "${created.name}"`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Duplicate failed';
-      toast.error(msg);
-    }
-  }, [duplicateBundledFamily, gatewayContracts, getFlow, loadFlow, loadedBundledRunTarget, queryClient, saveUnavailableReason, visualflowCrudUnavailable]);
+    setConfirmPrompt({
+      ...duplicateFlowPrompt(base, false),
+      onConfirm: () => {
+        void (async () => {
+          try {
+            const created = await duplicateFlow(flow, `${base} (copy)`, gatewayContracts);
+            queryClient.invalidateQueries({ queryKey: ['flows'] });
+            const loaded = loadFlow(created);
+            resetLoadedDocument();
+            setSavedFlowSignature(flowSignatureFor(loaded));
+            toast.success(`Duplicated as "${created.name}"`);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Duplicate failed');
+          }
+        })();
+      },
+    });
+  }, [duplicateBundledFamily, gatewayContracts, getFlow, loadFlow, loadedBundledRunTarget, loadedBundledTargetDirty, queryClient, saveUnavailableReason, setFlowId, visualflowCrudUnavailable]);
 
   const handlePublish = useCallback(() => {
     if (!flowId) {
@@ -1535,7 +1749,9 @@ export function Toolbar() {
             tooltip={saveDisabledReason}
             label="Save Flow"
             onClick={handleSave}
-            disabled={saveMutation.isPending || visualflowCrudUnavailable || Boolean(loadedBundledRunTarget) || isEmptyFlow || !hasUnsavedChanges}
+            // A dirty flow's Save button is NEVER a dead control — see
+            // utils/saveGate.ts for the rule and its regression test.
+            disabled={saveButtonDisabled(saveGate)}
             className={hasUnsavedChanges ? 'save-button dirty' : 'save-button'}
           >
             <IconSave />
@@ -1543,15 +1759,20 @@ export function Toolbar() {
           </ToolbarAction>
           <ToolbarAction
             tooltip={
-              loadedBundledRunTarget
-                ? 'Bundled workflow families cannot be duplicated as one standalone flow'
-                : visualflowCrudUnavailable
-                  ? saveUnavailableReason
-                  : 'Duplicate this flow'
+              visualflowCrudUnavailable
+                ? saveUnavailableReason
+                : loadedBundledTargetDirty
+                  ? 'Save your edits to this bundled workflow as your own copy'
+                  : loadedBundledRunTarget
+                    ? 'Duplicate this bundled family as an editable copy'
+                    : 'Duplicate this flow'
             }
             label="Duplicate Flow"
             onClick={handleDuplicateCurrent}
-            disabled={visualflowCrudUnavailable || Boolean(loadedBundledRunTarget)}
+            // Not disabled for a loaded bundled target: with Save refusing those,
+            // Duplicate is the only way edits made to a bundled example can be
+            // kept, and a disabled button cannot say so.
+            disabled={visualflowCrudUnavailable}
           >
             <IconCopy />
           </ToolbarAction>
@@ -1652,6 +1873,18 @@ export function Toolbar() {
           >
             <IconExecFlow />
           </ToolbarAction>
+          <ToolbarAction
+            tooltip={
+              foldReads
+                ? 'Unfold reads: draw every Get Variable as a node card'
+                : 'Fold reads: single-consumer Get Variables render on their consumer pin rows'
+            }
+            label="Toggle folded reads"
+            onClick={() => setFoldReads(!foldReads)}
+            pressed={foldReads}
+          >
+            <span aria-hidden="true" style={{ fontSize: 13, lineHeight: 1 }}>&#x1F4E5;</span>
+          </ToolbarAction>
         </div>
 
         <div className="toolbar-spacer" />
@@ -1666,17 +1899,7 @@ export function Toolbar() {
               <button className="modal-button cancel" onClick={() => setShowNewFlowModal(false)}>
                 Cancel
               </button>
-              <button
-                className="modal-button danger"
-                onClick={() => {
-                  setShowNewFlowModal(false);
-                  clearRunState();
-                  clearFlow();
-                  setLoadedBundledRunTarget(null);
-                  setSavedFlowSignature(flowSignatureFor({ name: 'Untitled Flow', description: '', interfaces: [], nodes: [], edges: [] }));
-                  toast.success('Created new flow');
-                }}
-              >
+              <button className="modal-button danger" onClick={createNewFlow}>
                 Create new flow
               </button>
             </div>
@@ -1765,7 +1988,12 @@ export function Toolbar() {
         bundledRunTargetIds={flowLibraryCatalog.bundledRunTargetIds}
         isLoading={flowsQuery.isLoading && flowLibraryCatalog.flows.length === 0}
         isRefreshing={flowsQuery.isFetching && flowLibraryCatalog.flows.length > 0 && !flowsQuery.data}
-        error={flowLibraryCatalog.flows.length === 0 ? flowsQuery.error : null}
+        // `flows` ALWAYS contains the ~25 bundled examples (a static glob), so
+        // gating this on `length === 0` made the error branch unreachable: when
+        // the session expired and the user opened the library to find their
+        // work, they saw the shipped examples and no explanation — their own
+        // flows looked deleted. Surface the fetch error whenever there is one.
+        error={flowsQuery.error}
         onClose={() => setShowFlowLibrary(false)}
         onRefresh={() => flowsQuery.refetch()}
         onLoadFlow={handleLoadFlow}
@@ -1796,6 +2024,32 @@ export function Toolbar() {
         gatewayContracts={gatewayContracts}
         onClose={() => setShowModelResidency(false)}
       />
+
+      {/* In-app confirmation modal (browser dialogs are banned in this UI).
+          Rendered last so it stacks above any other open modal. */}
+      {confirmPrompt ? (
+        <div className="modal-overlay" onClick={() => setConfirmPrompt(null)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{confirmPrompt.title}</h3>
+            <p style={{ whiteSpace: 'pre-line' }}>{confirmPrompt.message}</p>
+            <div className="modal-actions">
+              <button className="modal-button cancel" onClick={() => setConfirmPrompt(null)}>
+                Cancel
+              </button>
+              <button
+                className={confirmPrompt.danger ? 'modal-button danger' : 'modal-button primary'}
+                onClick={() => {
+                  const action = confirmPrompt.onConfirm;
+                  setConfirmPrompt(null);
+                  action();
+                }}
+              >
+                {confirmPrompt.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

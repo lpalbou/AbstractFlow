@@ -24,7 +24,6 @@ per-check messages on stderr).
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import sys
 import zipfile
@@ -53,8 +52,15 @@ ARTIFACTS: tuple[tuple[str, str], ...] = (
     # Studio, so every run without explicit overrides failed). Absent pins
     # mean "resolve at runtime": run _runtime > gateway defaults >
     # AbstractCore config defaults.
-    ("basic-agent.flow", "0.0.3"),
-    ("basic-agent@0.0.3.flow", "0.0.3"),
+    # 0.0.4 = 2026-08-01: the status helper (15f19f7f) had NO On Flow End —
+    # its exec path ended at the wait_until, so the child run never reached a
+    # terminal state and every parent subflow call waited on it forever
+    # (basic-agent@0.0.3 live-reproduced never terminating; 486 ledger
+    # records). The 0.0.2 wave wired the previously-dead Delay onto the exec
+    # path but nothing after it. Fix: wait_until -> on_flow_end. Also
+    # separated the two overlapping literal nodes.
+    ("basic-agent.flow", "0.0.4"),
+    ("basic-agent@0.0.4.flow", "0.0.4"),
 )
 
 

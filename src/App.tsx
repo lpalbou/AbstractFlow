@@ -79,6 +79,28 @@ function App() {
   // plan, and activity state that lives in the drawer.
   const [assistant_mounted, set_assistant_mounted] = useState(false);
   const gateway_connected = has_browser_gateway_session(connection_status);
+  // Once the editor has rendered it owns unsaved graph state, so losing the
+  // session must never throw the user back to the full-screen sign-in gate.
+  const entered_editor_ref = useRef(false);
+  const session_lost_notified_ref = useRef(false);
+  useEffect(() => {
+    if (gateway_connected) entered_editor_ref.current = true;
+  }, [gateway_connected]);
+  // One-time cleanup: the retired localStorage draft-mirror feature left
+  // `abstractflow_draft_v1:*` keys behind, and stale ones produced recovery
+  // prompts for flows the user never touched (or had deleted). Purge them.
+  useEffect(() => {
+    try {
+      const doomed: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && key.startsWith('abstractflow_draft_v1:')) doomed.push(key);
+      }
+      doomed.forEach((key) => window.localStorage.removeItem(key));
+    } catch {
+      /* storage unavailable — nothing to clean */
+    }
+  }, []);
   const selected_node_id = selectedNode?.id || null;
   const assistant_open = right_drawer_mode === 'assistant';
   const properties_open = right_drawer_mode === 'properties';
@@ -137,6 +159,46 @@ function App() {
     };
   }, []);
 
+  // The boot probe above runs once. A session that expires while the editor is
+  // open used to leave the top-bar pill reading "connected" forever, so every
+  // gateway call 401'd with no visible cause (Save silently went dead). Re-probe
+  // whenever the tab regains focus, and tell the user their session is gone —
+  // WITHOUT unmounting the editor, so an unsaved graph is never destroyed by a
+  // dropped session.
+  useEffect(() => {
+    if (!connection_checked) return;
+    let cancelled = false;
+    const reprobe = () => {
+      fetchGatewayConnection()
+        .then((status) => {
+          if (cancelled) return;
+          const still_connected = has_browser_gateway_session(status);
+          set_connection_status(status);
+          if (!still_connected && entered_editor_ref.current && !session_lost_notified_ref.current) {
+            session_lost_notified_ref.current = true;
+            set_show_connection(true);
+            toast.error('Gateway session expired — reconnect to save or run. Your open flow is untouched.', {
+              duration: 8000,
+            });
+          }
+          if (still_connected) session_lost_notified_ref.current = false;
+        })
+        .catch(() => {
+          /* Network blip: keep the last known phase rather than flapping the UI. */
+        });
+    };
+    const on_visibility = () => {
+      if (document.visibilityState === 'visible') reprobe();
+    };
+    window.addEventListener('focus', reprobe);
+    document.addEventListener('visibilitychange', on_visibility);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', reprobe);
+      document.removeEventListener('visibilitychange', on_visibility);
+    };
+  }, [connection_checked]);
+
   const handle_connection_saved = (status: GatewayConnectionStatus) => {
     set_connection_status(status);
     const needs_connection = !has_browser_gateway_session(status);
@@ -171,7 +233,9 @@ function App() {
       ? 'connected'
       : 'disconnected';
 
-  if (!connection_checked || !gateway_connected) {
+  // Only gate the app when we have never been connected. After that the editor
+  // stays mounted and the top-bar pill carries the disconnected state.
+  if (!connection_checked || (!gateway_connected && !entered_editor_ref.current)) {
     return (
       <div className="app-container connection-only">
         {!connection_checked ? (

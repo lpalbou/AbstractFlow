@@ -77,7 +77,7 @@
       "type": "literal_string",
       "position": {
         "x": -912.0,
-        "y": 120.0
+        "y": 540.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -210,6 +210,33 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 480.0,
+        "y": -144.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Status sent",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -260,6 +287,14 @@
       "target": "node-9",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "e-node-9-exec-out-end-exec-in",
+      "source": "node-9",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
     }
   ],
   "entryNode": "node-1",

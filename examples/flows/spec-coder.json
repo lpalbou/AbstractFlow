@@ -1,0 +1,626 @@
+{
+  "id": "spec-coder",
+  "name": "Spec coder — chat entry (requirements-coverage coding)",
+  "description": "Chat-agent entrypoint for the spec-coding pipeline: extracts mechanically checkable requirements from the prompt ONCE (stated scope + reachability run-probes for every runtime surface + optional field-standard derivation via derive_standards/min_reqs), runs coding-agent's verify-gated build loop, then a coverage loop that probes the delivered bytes (grep/file counts + executed 'run' probes whose output is runtime evidence + a read-only quoted-evidence judge) and spends up to spec_rounds scope-completion rounds on uncovered requirements. The answer is the report with a requirements table (✓/✗/? per item, source column); meta carries passed + the unmet list + the field. workspace_root is required (refused at the door). gating_mode and tools are accepted for the coder-family bench parity; there is no human gate (wait and auto both run unattended) and the pipeline's tool allowlists are fixed by design. Unattended runs send gating_mode=auto and input_data._runtime.tool_policy = {\"auto_approve_tools\": [\"execute_command\", \"read_file\", \"write_file\", \"edit_file\", \"list_files\", \"search_files\", \"skim_files\", \"skim_folders\", \"analyze_code\", \"browser_probe\"]}.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Prompt",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "spec_rounds",
+            "label": "spec_rounds",
+            "type": "number"
+          },
+          {
+            "id": "min_reqs",
+            "label": "min_reqs",
+            "type": "number"
+          },
+          {
+            "id": "derive_standards",
+            "label": "derive_standards",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "",
+          "workspace_root": "",
+          "gating_mode": "wait",
+          "browser_probe_available": true,
+          "max_rounds": 2,
+          "spec_rounds": 4,
+          "min_reqs": 10,
+          "derive_standards": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "build",
+      "type": "subflow",
+      "position": {
+        "x": 480.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Run the spec-coding pipeline",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "spec_rounds",
+            "label": "spec_rounds",
+            "type": "number"
+          },
+          {
+            "id": "min_reqs",
+            "label": "min_reqs",
+            "type": "number"
+          },
+          {
+            "id": "derive_standards",
+            "label": "derive_standards",
+            "type": "boolean"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "child_output",
+            "label": "child_output",
+            "type": "object"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "boolean"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "rounds_used",
+            "label": "rounds_used",
+            "type": "number"
+          },
+          {
+            "id": "spec_rounds_used",
+            "label": "spec_rounds_used",
+            "type": "number"
+          },
+          {
+            "id": "field",
+            "label": "field",
+            "type": "string"
+          },
+          {
+            "id": "open_failures",
+            "label": "open_failures",
+            "type": "array"
+          },
+          {
+            "id": "artifacts",
+            "label": "artifacts",
+            "type": "array"
+          },
+          {
+            "id": "unmet",
+            "label": "unmet",
+            "type": "array"
+          },
+          {
+            "id": "requirements",
+            "label": "requirements",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "spec-coding"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "answer",
+      "type": "code",
+      "position": {
+        "x": 960.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose answer",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "child_success",
+            "label": "child_success",
+            "type": "boolean"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "unmet",
+            "label": "unmet",
+            "type": "array"
+          },
+          {
+            "id": "requirements",
+            "label": "requirements",
+            "type": "array"
+          },
+          {
+            "id": "field",
+            "label": "field",
+            "type": "string"
+          },
+          {
+            "id": "rounds_used",
+            "label": "rounds_used",
+            "type": "number"
+          },
+          {
+            "id": "spec_rounds_used",
+            "label": "spec_rounds_used",
+            "type": "number"
+          },
+          {
+            "id": "child_result",
+            "label": "child_result",
+            "type": "object"
+          },
+          {
+            "id": "died_text",
+            "label": "died_text",
+            "type": "string"
+          },
+          {
+            "id": "unknown_error_text",
+            "label": "unknown_error_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "died_text": "The spec coding run did not finish: {{error}}\n\nThe workspace holds whatever the completed rounds delivered; the run's own trace holds the failing step.",
+          "unknown_error_text": "the child run ended without producing a report"
+        },
+        "functionName": "transform",
+        "codeBody": "rep = report if isinstance(report, str) else \"\"\nokv = bool(child_success)\ndied = child_result if isinstance(child_result, dict) else {}\nif not rep.strip():\n    err = str(died.get(\"error\") or \"\").strip()\n    rep = str(died_text or \"\").replace(\n        \"{{error}}\", err if err else str(unknown_error_text or \"\"))\n    okv = False\nu = unmet if isinstance(unmet, list) else []\nreqs = requirements if isinstance(requirements, list) else []\nreturn {\n    \"response\": rep,\n    \"ok\": okv,\n    \"meta\": {\"passed\": bool(passed), \"unmet\": u, \"requirements\": reqs,\n             \"field\": str(field or \"\"),\n             \"rounds_used\": rounds_used if isinstance(rounds_used, (int, float)) else 0,\n             \"spec_rounds_used\": spec_rounds_used if isinstance(spec_rounds_used, (int, float)) else 0,\n             \"orchestration\": \"spec-coding\"},\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1440.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {
+          "response": "",
+          "success": false,
+          "meta": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-prompt-build-request",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "build",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-build-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "build",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-gating_mode-build-gating_mode",
+      "source": "start",
+      "sourceHandle": "gating_mode",
+      "target": "build",
+      "targetHandle": "gating_mode",
+      "animated": false
+    },
+    {
+      "id": "e-start-browser_probe_available-build-browser_probe_available",
+      "source": "start",
+      "sourceHandle": "browser_probe_available",
+      "target": "build",
+      "targetHandle": "browser_probe_available",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_rounds-build-max_rounds",
+      "source": "start",
+      "sourceHandle": "max_rounds",
+      "target": "build",
+      "targetHandle": "max_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-start-spec_rounds-build-spec_rounds",
+      "source": "start",
+      "sourceHandle": "spec_rounds",
+      "target": "build",
+      "targetHandle": "spec_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-start-min_reqs-build-min_reqs",
+      "source": "start",
+      "sourceHandle": "min_reqs",
+      "target": "build",
+      "targetHandle": "min_reqs",
+      "animated": false
+    },
+    {
+      "id": "e-start-derive_standards-build-derive_standards",
+      "source": "start",
+      "sourceHandle": "derive_standards",
+      "target": "build",
+      "targetHandle": "derive_standards",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-build-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "build",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-build-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "build",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-build-report-answer-report",
+      "source": "build",
+      "sourceHandle": "report",
+      "target": "answer",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-build-success-answer-child_success",
+      "source": "build",
+      "sourceHandle": "success",
+      "target": "answer",
+      "targetHandle": "child_success",
+      "animated": false
+    },
+    {
+      "id": "e-build-passed-answer-passed",
+      "source": "build",
+      "sourceHandle": "passed",
+      "target": "answer",
+      "targetHandle": "passed",
+      "animated": false
+    },
+    {
+      "id": "e-build-unmet-answer-unmet",
+      "source": "build",
+      "sourceHandle": "unmet",
+      "target": "answer",
+      "targetHandle": "unmet",
+      "animated": false
+    },
+    {
+      "id": "e-build-requirements-answer-requirements",
+      "source": "build",
+      "sourceHandle": "requirements",
+      "target": "answer",
+      "targetHandle": "requirements",
+      "animated": false
+    },
+    {
+      "id": "e-build-field-answer-field",
+      "source": "build",
+      "sourceHandle": "field",
+      "target": "answer",
+      "targetHandle": "field",
+      "animated": false
+    },
+    {
+      "id": "e-build-rounds_used-answer-rounds_used",
+      "source": "build",
+      "sourceHandle": "rounds_used",
+      "target": "answer",
+      "targetHandle": "rounds_used",
+      "animated": false
+    },
+    {
+      "id": "e-build-spec_rounds_used-answer-spec_rounds_used",
+      "source": "build",
+      "sourceHandle": "spec_rounds_used",
+      "target": "answer",
+      "targetHandle": "spec_rounds_used",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-answer-child_result",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "answer",
+      "targetHandle": "child_result",
+      "animated": false
+    },
+    {
+      "id": "e-start-exec-out-build-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "build",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-build-exec-out-answer-exec-in",
+      "source": "build",
+      "sourceHandle": "exec-out",
+      "target": "answer",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-answer-exec-out-end-exec-in",
+      "source": "answer",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-answer-response-end-response",
+      "source": "answer",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-answer-ok-end-success",
+      "source": "answer",
+      "sourceHandle": "ok",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-answer-meta-end-meta",
+      "source": "answer",
+      "sourceHandle": "meta",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-08-01T16:12:03.860887+00:00",
+  "updated_at": "2026-08-01T16:12:03.860887+00:00"
+}

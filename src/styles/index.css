@@ -2546,6 +2546,12 @@ button.primary:hover:not(:disabled) {
   gap: 8px;
 }
 
+/* Footer action bar hosts the delete used-by warning (flex-basis: 100%),
+   which needs to wrap onto its own row above the buttons. */
+.flow-library-actions {
+  flex-wrap: wrap;
+}
+
 .flow-library-rename {
   width: 100%;
   padding: 10px 12px;

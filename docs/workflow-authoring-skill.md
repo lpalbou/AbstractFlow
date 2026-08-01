@@ -18,6 +18,67 @@ parameters. The committed companion catalog is `docs/workflow-node-catalog.md`;
 in the web assistant the same information is generated at runtime with current
 Gateway capability availability.
 
+## THE AUTHORING LADDER — nodes and wires first, always
+
+VisualFlow exists so people can think about a process VISUALLY. Whenever you
+express something OFF the canvas — in a code body, in a pin expression, in a
+function, inside one object blob — you have HIDDEN it, and hiding is the one
+failure this system cannot tolerate. Code is not a shortcut past the node
+vocabulary; it is the harness for DETERMINISTIC or tedious work (talk to a
+database, run an ETL, convert format 1 to format 2) that would otherwise need a
+combinatorial explosion of nodes.
+
+Before you emit ANY code node, expression, or function, walk this ladder from
+the top and stop at the first rung that works:
+
+| rung | use it for |
+|---|---|
+| 1. **An existing node** | anything the catalog already ships. CHECK THE CATALOG FIRST. |
+| 2. **A subflow, with one input pin per field** | a whole reusable process. Never a hand-built `input` object. |
+| 3. **`get_var` / `set_var` / `set_vars`** | reading and writing run state. |
+| 4. **A pin expression** | a DERIVATION: a comparison, a boolean combination, a short interpolation. Never a plain read. |
+| 5. **A code node** | deterministic glue: external systems, ETL, format/shape transforms, checksums, validation. Expert territory. |
+| 6. **A flow function** | the same derivation at 2+ call sites, ≤25 lines. |
+| 7. **A runtime builtin** | useful in EVERY flow (envelope parsing, shell quoting) — a request, not something you author. |
+| 8. **Propose a reusable NODE** | nothing above fits. Say so (see "Missing Abstractions"). |
+
+What a code node is NEVER for:
+
+- **Orchestration** — sequencing, branching, looping. Those are `sequence`,
+  `parallel`, `if`, `switch`, `loop`, `for`, `while`.
+- **Reading or writing state** — `get_var`, `set_var`, `set_vars`.
+- **Prompt or system text.** Every sentence a model reads must be editable by a
+  user or an agent without opening a Python body: put it in the consumer's pin
+  default, or in a `string_template`. A code node may SELECT between texts that
+  live on pins (`text = str(repair_text or "")`) — it may not CONTAIN them.
+- **Anything an existing node expresses.** A code node that reimplements
+  `break_object`, `concat`, `format`, `compare`, or `coalesce` is a node you
+  did not look for.
+
+`scripts/audit_flow_graph.py --policy` checks the ladder mechanically (P1–P7)
+and the editor's preflight panel raises the same findings as warnings.
+
+## Missing Abstractions — say so, don't work around it
+
+If a step genuinely has no node, the answer is a NEW REUSABLE NODE, not a
+private workaround buried in a body. Two moves, in this order:
+
+1. Build the step as a **subflow** when it composes from existing nodes — that
+   is a reusable unit today, findable in the shared library, with a visible
+   contract.
+2. When it cannot be composed (it needs a new primitive), write the code node
+   AND flag the gap explicitly in your `reply`, in one line of this shape:
+
+   > Node gap: this needed a code node because no node exists for
+   > `<capability>` — e.g. "pick A or B on a boolean without leaving the pure
+   > lane" (`if`/`switch` are both exec-lane).
+
+   The flag is the deliverable. A gap that is silently patched in Python is a
+   gap nobody ever fixes, and the next author patches it again.
+
+Never invent a node type to fill the gap: the catalog is the closed set, and an
+unknown type is refused by the runtime for the whole flow.
+
 ## Document Authoring Model
 
 You author the COMPLETE workflow as one JSON document per cycle. The editor
@@ -60,10 +121,38 @@ Node fields:
   resolution time: `{"condition": "vars.fix_cycles < 3"}`. An expression
   reads `vars.*` (run variables, read-only) and `value` (the pin's wire value
   if connected, else its pin default) and replaces the pin's value. Merged
-  per key like `pin_defaults`; emit an empty string to remove one. Prefer an
-  expression over a Get Variable -> Code chain for a small condition or field
-  read; use a Code node for multi-statement logic. Secret-looking expression
-  text is refused.
+  per key like `pin_defaults`; emit an empty string to remove one.
+  Secret-looking expression text is refused.
+
+  Rung 4 of the ladder. An expression is for a **derivation** — a comparison, a
+  boolean combination, a short interpolation. It is NEVER for a plain read:
+
+  - Reading a run variable is a **Get Variable node**, wired in. It resolves
+    dotted paths and takes a default, so `get_var{name:"state.provider"}` and
+    `get_var{name:"state.wait_gating", default:true}` are exact replacements
+    for `vars.state.get("provider")` and `vars.state.get("wait_gating", True)`.
+    Both lanes behave identically at run time (pure nodes are volatile and
+    re-pulled per resolution, so a wired getter re-reads inside a loop
+    condition exactly as an expression does) — so the node wins, because the
+    canvas shows the dependency.
+  - Reading a field off the pin's own wire (`(value or {}).get("report", "")`)
+    means the upstream node should **declare that output pin**. Use Break
+    Object when several fields come off one wire.
+  - Multi-statement or branching logic is a **Code node**, not a long
+    expression and not a one-off `functions` entry.
+
+  One getter can fan out to many consumers: five agents reading
+  `state.provider` want one Get Variable node and five edges, not five
+  expressions.
+
+  Emit getters exactly as before: the editor only DRAWS them differently. A
+  getter with a configured `name`, no incoming edges and exactly one outgoing
+  wire renders as a teal read pill on the consumer's pin row instead of a
+  separate card (click the pill to reveal and select the node; a toolbar toggle
+  puts every card back). The document is unchanged — the node and its edge are
+  still there, still what you author and still what the runtime executes — so
+  no authoring command, id or count changes. Shared, dangling and computed
+  reads stay drawn as cards.
 - `literal`: value of literal/config nodes. For Tools Allowlist it is the
   array of exact tool names; for String Template it is the template text; for
   Variable nodes it is the declaration `{"name":"transcript","type":"array","default":[]}`.
@@ -80,9 +169,39 @@ Node fields:
 - `subflow_ref` (subflow nodes): the SAVED workflow id this node executes —
   AUTHORABLE. See "Composing Workflows (Subflow)". The serialized
   `subflow_interface` block beside it is read-only context showing the
-  referenced workflow's data pins so you can wire edges correctly.
+  referenced workflow's data pins: wire ONE EDGE PER FIELD to those pins, never
+  a hand-built `input` object.
 
 Edges are `"sourceNode.sourcePin -> targetNode.targetPin"` strings.
+
+## Flow Functions (top-level `functions`) — rung 6, rarely reached
+
+A flow may carry named helper functions (`{name, code, kind?, description?}`)
+that pin expressions call by name. They compile into the same sandbox as Code
+node bodies, and they are **stateless by construction** — no `global`, no
+top-level statement other than `def`, no mutable default arguments, and no
+module-level constants.
+
+They live in a side drawer, not on the canvas, so every entry is logic the
+reader cannot see. Emit one only when **both** hold:
+
+- it has **two or more call sites** in this flow — promote at the second call
+  site, never at a line count; and
+- it is **25 lines or fewer**.
+
+A helper used once is a **Code node**: same sandbox, same body, but visible,
+selectable, and traceable in the run view. A helper that is genuinely reused
+but long wants shrinking, or promoting to a runtime builtin.
+
+Do not write a function that only reads state (`def get_provider(s): return
+s.get("provider")`) — that is a Get Variable node. Do not park a prompt
+template in a function because constants have nowhere else to live: prompt and
+system text belongs on the consumer's **pin default** or in a **String
+Template**, where a user or an agent can edit it without opening code. A body
+that merely SELECTS between texts sitting on pins is fine.
+
+`scripts/audit_flow_graph.py --policy` reports every violation of the ladder
+(P1–P7) against a flow document.
 
 Ownership semantics:
 
@@ -419,13 +538,27 @@ Image To Video.source_image).
 
 ### Code
 
-`code` runs a Python transform body in the Runtime sandbox when no dedicated
-transform node exists. Input pin `input` is the payload; outputs are `output`,
-`success`, `execution`. Keep permissions `sandbox`; never `full_access` (the
-validator rejects it and secret-looking code). The sandbox rejects imports,
-network, subprocesses, and filesystem access. Use Code for deterministic
-transforms: formatting, parsing, shaping, checksums, filenames, validation.
-Never use Code to fake PDF generation — use Write PDF.
+`code` is rung 5 of the ladder: DETERMINISTIC GLUE, and only when no node does
+it. Input pin `input` is the payload; outputs are `output`, `success`,
+`execution`; every key of the returned dict is also a pullable source handle.
+Keep permissions `sandbox`; never `full_access` (the validator rejects it and
+secret-looking code). The sandbox rejects imports, network, subprocesses, and
+filesystem access.
+
+Legitimate: format/shape transforms, parsing, checksums, filenames, validation,
+composing a shell command (use `shq` on every interpolated value), pulling text
+out of a tool envelope (`text_of`), selecting between texts that live on pins.
+
+Illegitimate — go back up the ladder: orchestration (use control-flow nodes),
+state reads/writes (use `get_var`/`set_var`), field extraction (declare the
+output pin upstream, or `break_object`), string interpolation
+(`string_template`), and above all PROMPT OR SYSTEM TEXT — those sentences must
+be editable pin defaults, never Python string literals. Never use Code to fake
+PDF generation — use Write PDF.
+
+Give a code node exec pins only when it must run in order (it writes state or
+has a side effect); a pure transform stays off the exec lane and is pulled by
+its consumers.
 
 ### Files vs Artifacts
 
@@ -486,9 +619,11 @@ array utilities (length, append, dedup, map, filter, concat),
 
 Prompt-building pattern: On Flow Start fields -> Build JSON inputs; Build
 JSON.result -> String Template.vars; template text via `literal` or
-`pin_defaults.template`; String Template.result -> Agent/LLM prompt. Prefer
-String Template over embedding large prompt text when runtime variables are
-needed.
+`pin_defaults.template`; String Template.result -> Agent/LLM prompt.
+
+Prompt text has exactly two homes: the consumer's **pin default** (static text)
+and a **String Template** `literal` (text with runtime variables). Never a
+Python string. `--policy` P7 flags a code node whose body is mostly prose.
 
 ### String And Math Nodes
 
@@ -648,10 +783,24 @@ workflow, then reference it.
   composition target by that contract and plan edges against exactly those
   pins. Reference ids from that list only; a name is not an id; an unknown
   reference is refused with the available list.
-- The editor patches the node's pins from the referenced workflow's boundary
-  when the reference is set; wire edges to the pins shown in the serialized
-  `subflow_interface` context. `inherit_context: true` passes the parent's
-  conversation context into the child.
+- ONE INPUT PIN PER FIELD. The editor patches the node's pins from the
+  referenced workflow's boundary when the reference is set, and the serialized
+  `subflow_interface` block exists for exactly this: wire one edge per named
+  field the child declares. The runtime spreads DECLARED input pins into the
+  child's run vars and only falls back to a whole-object `input`/`vars` pin
+  when nothing else is declared (`executor.py:1995-2001`), so per-field pins
+  cost nothing at run time and buy the entire contract on the canvas.
+- NEVER build the child's inputs as one object. `make_object -> subflow.input`
+  (or a code node returning the argument dict) is the HIDDEN CONTRACT
+  anti-pattern: the reader cannot see which fields cross the boundary, the
+  editor cannot type-check them, and a renamed child pin fails silently. Wire
+  `start.request -> verify.request`, `get_var.value -> verify.workspace_root`,
+  one edge each. `examples/flows/multiagent-coder.json` and
+  `multiagent-coding.json` are the shipped example.
+  `scripts/audit_flow_graph.py --policy` reports this as P6 HIDDEN CONTRACT and
+  names the fields being smuggled.
+- `inherit_context: true` passes the parent's conversation context into the
+  child.
 - Per-item composition: ForEach.item -> the subflow node's matching input,
   inside the loop body.
 - Self-reference and reference cycles are refused in assistant authoring

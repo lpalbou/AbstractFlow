@@ -1,0 +1,1680 @@
+{
+  "id": "ralph-cycle",
+  "name": "Ralph cycle — one fresh session (llm_call + tool loop)",
+  "description": "One Ralph cycle: a bounded llm_call + tool_calls loop over a FIXED task prompt supplied by the parent. Accumulates only WITHIN the cycle; the child run's vars die with it, which is what makes the parent's context fresh every cycle. Returns the cycle's own summary, the steps used, and whether it finished inside its step budget.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Cycle task",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "task_prompt",
+            "label": "task_prompt",
+            "type": "string"
+          },
+          {
+            "id": "max_steps",
+            "label": "max_steps",
+            "type": "number"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "task_prompt": "",
+          "max_steps": 8
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "seed_cycle",
+      "type": "set_vars",
+      "position": {
+        "x": 960.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Seed cycle variables",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "updates": {
+            "step": 0,
+            "step_done": false,
+            "transcript": "",
+            "summary": "",
+            "max_steps": 8
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_seed",
+      "type": "code",
+      "position": {
+        "x": 480.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Cycle seed",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "max_steps",
+            "label": "max_steps",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "try:\n    steps = int(max_steps or 0)\nexcept Exception:\n    steps = 0\nif steps < 1:\n    steps = 1\nif steps > 30:\n    steps = 30\nreturn {\"updates\": {\"step\": 0, \"step_done\": False, \"transcript\": \"\", \"summary\": \"\",\n                    \"max_steps\": steps}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steps",
+      "type": "while",
+      "position": {
+        "x": 1440.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "CYCLE STEP LOOP",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": false
+        },
+        "pinExpressions": {
+          "condition": "not vars.step_done and vars.step < vars.max_steps"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "step_prompt",
+      "type": "code",
+      "position": {
+        "x": 1920.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose step prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "task_prompt",
+            "label": "task_prompt",
+            "type": "string"
+          },
+          {
+            "id": "transcript",
+            "label": "transcript",
+            "type": "string"
+          },
+          {
+            "id": "step",
+            "label": "step",
+            "type": "number"
+          },
+          {
+            "id": "trace_header",
+            "label": "trace_header",
+            "type": "string"
+          },
+          {
+            "id": "first_step_text",
+            "label": "first_step_text",
+            "type": "string"
+          },
+          {
+            "id": "closing_text",
+            "label": "closing_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "trace_header": "# THIS CYCLE'S STEPS SO FAR",
+          "first_step_text": "This is the first step of the cycle. Begin with the protocol above.",
+          "closing_text": "Take the next step now: either call tools, or — if this cycle's work is complete — answer with the summary and make no tool calls."
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(step or 0) + 1\nparts = [str(task_prompt or \"\")]\ntrace = str(transcript or \"\").strip()\nif trace:\n    parts.append(str(trace_header or \"\") + \"\\n\" + trace)\nelse:\n    parts.append(str(first_step_text or \"\"))\nparts.append(str(closing_text or \"\").replace(\"{{n}}\", str(n)))\nreturn {\"prompt\": \"\\n\\n\".join(parts)}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "step_prompt_transcript",
+      "type": "get_var",
+      "position": {
+        "x": 1765.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get transcript",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "transcript",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "step_prompt_step",
+      "type": "get_var",
+      "position": {
+        "x": 1765.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get step",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "step",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "step_llm",
+      "type": "llm_call",
+      "position": {
+        "x": 2400.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "REASON + ACT",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files",
+            "analyze_code",
+            "execute_command",
+            "browser_probe"
+          ],
+          "system": "You are a coding agent executing ONE cycle of work in a real workspace. Think briefly, then either call tools or finish the cycle.\n\n- Every change happens through a tool call; never claim an edit you did not make.\n- The step trace below is what you already did IN THIS CYCLE.\n- When the cycle's work is done (including the progress-file update), reply without tool calls with a two-line summary.",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "has_calls",
+      "type": "has_tools",
+      "position": {
+        "x": 2880.0,
+        "y": -320.0
+      },
+      "data": {
+        "nodeType": "has_tools",
+        "label": "Wants tools?",
+        "icon": "&#x1F50D;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "route",
+      "type": "if",
+      "position": {
+        "x": 2880.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Act or finish cycle",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "act",
+      "type": "tool_calls",
+      "position": {
+        "x": 3360.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "EXECUTE TOOL CALLS",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files",
+            "analyze_code",
+            "execute_command",
+            "browser_probe"
+          ]
+        },
+        "effectConfig": {
+          "allowed_tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files",
+            "analyze_code",
+            "execute_command",
+            "browser_probe"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "calls_json",
+      "type": "stringify_json",
+      "position": {
+        "x": 3840.0,
+        "y": -640.0
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Calls to text",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "mode": "minified"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "obs_text",
+      "type": "format_tool_results",
+      "position": {
+        "x": 3840.0,
+        "y": -320.0
+      },
+      "data": {
+        "nodeType": "format_tool_results",
+        "label": "Observations",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold",
+      "type": "code",
+      "position": {
+        "x": 3840.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold step into trace",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "transcript",
+            "label": "transcript",
+            "type": "string"
+          },
+          {
+            "id": "step",
+            "label": "step",
+            "type": "number"
+          },
+          {
+            "id": "thought",
+            "label": "thought",
+            "type": "string"
+          },
+          {
+            "id": "calls_text",
+            "label": "calls_text",
+            "type": "string"
+          },
+          {
+            "id": "observations",
+            "label": "observations",
+            "type": "string"
+          },
+          {
+            "id": "entry_text",
+            "label": "entry_text",
+            "type": "string"
+          },
+          {
+            "id": "trim_marker",
+            "label": "trim_marker",
+            "type": "string"
+          },
+          {
+            "id": "max_chars",
+            "label": "max_chars",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "entry_text": "--- step {{n}} ---\nTHOUGHT: {{thought}}\nACTIONS: {{calls}}\nOBSERVATIONS:\n{{obs}}",
+          "trim_marker": "[...earlier steps of this cycle trimmed...]\n",
+          "max_chars": 20000
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(step or 0) + 1\nentry = str(entry_text or \"\")\nentry = entry.replace(\"{{n}}\", str(n))\nentry = entry.replace(\"{{thought}}\", str(thought or \"\").strip())\nentry = entry.replace(\"{{calls}}\", str(calls_text or \"\"))\nentry = entry.replace(\"{{obs}}\", str(observations or \"\"))\ntrace = str(transcript or \"\")\ntrace = trace + (\"\\n\" if trace else \"\") + entry\ntry:\n    cap = int(max_chars or 0)\nexcept Exception:\n    cap = 0\nif cap > 0 and len(trace) > cap:\n    trace = str(trim_marker or \"\") + trace[len(trace) - cap:]\nreturn {\"updates\": {\"transcript\": trace, \"step\": n}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold_transcript",
+      "type": "get_var",
+      "position": {
+        "x": 3685.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get transcript",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "transcript",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold_step",
+      "type": "get_var",
+      "position": {
+        "x": 3685.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get step",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "step",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_step",
+      "type": "set_vars",
+      "position": {
+        "x": 4320.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save step",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "step_done",
+      "type": "code",
+      "position": {
+        "x": 3360.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Cycle finished",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "step",
+            "label": "step",
+            "type": "number"
+          },
+          {
+            "id": "empty_text",
+            "label": "empty_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "empty_text": "#FALLBACK the cycle ended without a summary; the progress file is the record of what actually happened."
+        },
+        "functionName": "transform",
+        "codeBody": "resp = str(response or \"\").strip()\nif not resp:\n    resp = str(empty_text or \"\")\nreturn {\"updates\": {\"summary\": resp, \"step_done\": True, \"step\": int(step or 0) + 1}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "step_done_step",
+      "type": "get_var",
+      "position": {
+        "x": 3205.0,
+        "y": 510.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get step",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "step",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_done",
+      "type": "set_vars",
+      "position": {
+        "x": 3840.0,
+        "y": 544.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save cycle summary",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_result",
+      "type": "code",
+      "position": {
+        "x": 1920.0,
+        "y": 492.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Cycle result",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "cycle_summary",
+            "label": "cycle_summary",
+            "type": "string"
+          },
+          {
+            "id": "step",
+            "label": "step",
+            "type": "number"
+          },
+          {
+            "id": "step_done",
+            "label": "step_done",
+            "type": "boolean"
+          },
+          {
+            "id": "budget_text",
+            "label": "budget_text",
+            "type": "string"
+          },
+          {
+            "id": "empty_text",
+            "label": "empty_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "summary",
+            "label": "summary",
+            "type": "string"
+          },
+          {
+            "id": "steps",
+            "label": "steps",
+            "type": "number"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "budget_text": "#FALLBACK this cycle used its whole step budget without declaring itself finished; the workspace holds whatever it changed.",
+          "empty_text": "#FALLBACK the cycle ended without a summary; the progress file is the record of what actually happened."
+        },
+        "functionName": "transform",
+        "codeBody": "summary = str(cycle_summary or \"\").strip()\nfinished = bool(step_done)\nif not summary:\n    summary = str(budget_text or \"\") if not finished else str(empty_text or \"\")\nreturn {\"summary\": summary, \"steps\": int(step or 0), \"ok\": finished}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_result_cycle_summary",
+      "type": "get_var",
+      "position": {
+        "x": 1765.0,
+        "y": 536.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get summary",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "summary",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_result_step",
+      "type": "get_var",
+      "position": {
+        "x": 1765.0,
+        "y": 562.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get step",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "step",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_result_step_done",
+      "type": "get_var",
+      "position": {
+        "x": 1765.0,
+        "y": 588.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get step_done",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "step_done",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 2400.0,
+        "y": 492.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Cycle done",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "summary",
+            "label": "summary",
+            "type": "string"
+          },
+          {
+            "id": "steps_used",
+            "label": "steps_used",
+            "type": "number"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {
+          "summary": "",
+          "steps_used": 0,
+          "success": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-max_steps-cycle_seed-max_steps",
+      "source": "start",
+      "sourceHandle": "max_steps",
+      "target": "cycle_seed",
+      "targetHandle": "max_steps",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_seed-updates-seed_cycle-updates",
+      "source": "cycle_seed",
+      "sourceHandle": "updates",
+      "target": "seed_cycle",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-start-task_prompt-step_prompt-task_prompt",
+      "source": "start",
+      "sourceHandle": "task_prompt",
+      "target": "step_prompt",
+      "targetHandle": "task_prompt",
+      "animated": false
+    },
+    {
+      "id": "e-step_prompt_transcript-value-step_prompt-transcript",
+      "source": "step_prompt_transcript",
+      "sourceHandle": "value",
+      "target": "step_prompt",
+      "targetHandle": "transcript",
+      "animated": false
+    },
+    {
+      "id": "e-step_prompt_step-value-step_prompt-step",
+      "source": "step_prompt_step",
+      "sourceHandle": "value",
+      "target": "step_prompt",
+      "targetHandle": "step",
+      "animated": false
+    },
+    {
+      "id": "e-step_prompt-prompt-step_llm-prompt",
+      "source": "step_prompt",
+      "sourceHandle": "prompt",
+      "target": "step_llm",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-step_llm-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "step_llm",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-step_llm-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "step_llm",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-step_llm-tool_calls-has_calls-array",
+      "source": "step_llm",
+      "sourceHandle": "tool_calls",
+      "target": "has_calls",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "e-has_calls-result-route-condition",
+      "source": "has_calls",
+      "sourceHandle": "result",
+      "target": "route",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-step_llm-tool_calls-act-tool_calls",
+      "source": "step_llm",
+      "sourceHandle": "tool_calls",
+      "target": "act",
+      "targetHandle": "tool_calls",
+      "animated": false
+    },
+    {
+      "id": "e-step_llm-tool_calls-calls_json-value",
+      "source": "step_llm",
+      "sourceHandle": "tool_calls",
+      "target": "calls_json",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-act-results-obs_text-results",
+      "source": "act",
+      "sourceHandle": "results",
+      "target": "obs_text",
+      "targetHandle": "results",
+      "animated": false
+    },
+    {
+      "id": "e-step_llm-response-fold-thought",
+      "source": "step_llm",
+      "sourceHandle": "response",
+      "target": "fold",
+      "targetHandle": "thought",
+      "animated": false
+    },
+    {
+      "id": "e-calls_json-result-fold-calls_text",
+      "source": "calls_json",
+      "sourceHandle": "result",
+      "target": "fold",
+      "targetHandle": "calls_text",
+      "animated": false
+    },
+    {
+      "id": "e-obs_text-result-fold-observations",
+      "source": "obs_text",
+      "sourceHandle": "result",
+      "target": "fold",
+      "targetHandle": "observations",
+      "animated": false
+    },
+    {
+      "id": "e-fold_transcript-value-fold-transcript",
+      "source": "fold_transcript",
+      "sourceHandle": "value",
+      "target": "fold",
+      "targetHandle": "transcript",
+      "animated": false
+    },
+    {
+      "id": "e-fold_step-value-fold-step",
+      "source": "fold_step",
+      "sourceHandle": "value",
+      "target": "fold",
+      "targetHandle": "step",
+      "animated": false
+    },
+    {
+      "id": "e-fold-updates-set_step-updates",
+      "source": "fold",
+      "sourceHandle": "updates",
+      "target": "set_step",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-step_llm-response-step_done-response",
+      "source": "step_llm",
+      "sourceHandle": "response",
+      "target": "step_done",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-step_done_step-value-step_done-step",
+      "source": "step_done_step",
+      "sourceHandle": "value",
+      "target": "step_done",
+      "targetHandle": "step",
+      "animated": false
+    },
+    {
+      "id": "e-step_done-updates-set_done-updates",
+      "source": "step_done",
+      "sourceHandle": "updates",
+      "target": "set_done",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_result_cycle_summary-value-cycle_result-cycle_summary",
+      "source": "cycle_result_cycle_summary",
+      "sourceHandle": "value",
+      "target": "cycle_result",
+      "targetHandle": "cycle_summary",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_result_step-value-cycle_result-step",
+      "source": "cycle_result_step",
+      "sourceHandle": "value",
+      "target": "cycle_result",
+      "targetHandle": "step",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_result_step_done-value-cycle_result-step_done",
+      "source": "cycle_result_step_done",
+      "sourceHandle": "value",
+      "target": "cycle_result",
+      "targetHandle": "step_done",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_result-summary-end-summary",
+      "source": "cycle_result",
+      "sourceHandle": "summary",
+      "target": "end",
+      "targetHandle": "summary",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_result-steps-end-steps_used",
+      "source": "cycle_result",
+      "sourceHandle": "steps",
+      "target": "end",
+      "targetHandle": "steps_used",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_result-ok-end-success",
+      "source": "cycle_result",
+      "sourceHandle": "ok",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-start-exec-out-cycle_seed-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "cycle_seed",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_seed-exec-out-seed_cycle-exec-in",
+      "source": "cycle_seed",
+      "sourceHandle": "exec-out",
+      "target": "seed_cycle",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-seed_cycle-exec-out-steps-exec-in",
+      "source": "seed_cycle",
+      "sourceHandle": "exec-out",
+      "target": "steps",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-steps-loop-step_prompt-exec-in",
+      "source": "steps",
+      "sourceHandle": "loop",
+      "target": "step_prompt",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-step_prompt-exec-out-step_llm-exec-in",
+      "source": "step_prompt",
+      "sourceHandle": "exec-out",
+      "target": "step_llm",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-step_llm-exec-out-route-exec-in",
+      "source": "step_llm",
+      "sourceHandle": "exec-out",
+      "target": "route",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-route-true-act-exec-in",
+      "source": "route",
+      "sourceHandle": "true",
+      "target": "act",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-act-exec-out-fold-exec-in",
+      "source": "act",
+      "sourceHandle": "exec-out",
+      "target": "fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-fold-exec-out-set_step-exec-in",
+      "source": "fold",
+      "sourceHandle": "exec-out",
+      "target": "set_step",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-route-false-step_done-exec-in",
+      "source": "route",
+      "sourceHandle": "false",
+      "target": "step_done",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-step_done-exec-out-set_done-exec-in",
+      "source": "step_done",
+      "sourceHandle": "exec-out",
+      "target": "set_done",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-steps-done-cycle_result-exec-in",
+      "source": "steps",
+      "sourceHandle": "done",
+      "target": "cycle_result",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_result-exec-out-end-exec-in",
+      "source": "cycle_result",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-08-01T16:06:00.954208+00:00",
+  "updated_at": "2026-08-01T16:06:00.954208+00:00"
+}

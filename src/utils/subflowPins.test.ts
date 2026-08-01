@@ -119,6 +119,40 @@ describe('subflow pin derivation', () => {
     ).not.toBeNull();
   });
 
+  it('never rewrites an IN-USE PER-FIELD node (pins-not-blobs shape)', () => {
+    // The multiagent family declares the child's start fields as its own input
+    // pins and keeps the runtime-provided output/child_output death channel.
+    // A blind sync would ADD the child fields the caller deliberately omits
+    // (an unwired declared pin pushes None across the boundary and shadows the
+    // child's own start-pin default) and DROP output/child_output, orphaning
+    // the dead-child wire. In-use means in-use, in either convention.
+    const perField = nodeData('subflow');
+    perField.inputs = [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'inherit_context', label: 'inherit_context', type: 'boolean' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
+    ];
+    perField.outputs = [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'output', label: 'output', type: 'object' },
+      { id: 'child_output', label: 'child_output', type: 'object' },
+      { id: 'output1', label: 'output1', type: 'object' },
+    ];
+    expect(
+      subflowPinPatchForSelectedFlow(perField, childFlow(), {
+        nodeId: 'build',
+        edges: [{ source: 'start', sourceHandle: 'prompt', target: 'build', targetHandle: 'prompt' }],
+      })
+    ).toBeNull();
+    // Only exec wires attached is NOT "in use": the interface sync still runs.
+    expect(
+      subflowPinPatchForSelectedFlow(perField, childFlow(), {
+        nodeId: 'build',
+        edges: [{ source: 'start', sourceHandle: 'exec-out', target: 'build', targetHandle: 'exec-in' }],
+      })
+    ).not.toBeNull();
+  });
+
   it('keeps subflow control pins while replacing child data pins from the selected flow', () => {
     const parent = nodeData('subflow');
     const patch = subflowPinPatchForSelectedFlow(parent, childFlow());

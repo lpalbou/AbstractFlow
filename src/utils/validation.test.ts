@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node } from 'reactflow';
 import type { FlowNodeData } from '../types/flow';
-import { areTypesCompatible, validateConnection } from './validation';
+import { areTypesCompatible, getConnectionError, validateConnection } from './validation';
 
 describe('pin type compatibility', () => {
   it('treats json_schema as an object-compatible nominal type', () => {
@@ -85,5 +85,84 @@ describe('expression-adapter connections', () => {
         targetHandle: 'exec-in',
       })
     ).toBe(false);
+  });
+});
+
+describe('getConnectionError names a folded read (0156)', () => {
+  const pin = (id: string, type = 'any') => ({ id, label: id, type });
+  const getter = (id: string, name: string): Node<FlowNodeData> =>
+    ({
+      id,
+      type: 'custom',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeType: 'get_var',
+        label: `Get ${name}`,
+        icon: '',
+        headerColor: '',
+        inputs: [pin('name', 'string'), pin('default')],
+        outputs: [pin('value')],
+        pinDefaults: { name },
+      },
+    }) as unknown as Node<FlowNodeData>;
+  const consumer = (id: string): Node<FlowNodeData> =>
+    ({
+      id,
+      type: 'custom',
+      position: { x: 600, y: 0 },
+      data: {
+        nodeType: 'code',
+        label: id,
+        icon: '',
+        headerColor: '',
+        inputs: [pin('exec-in', 'execution'), pin('a')],
+        outputs: [pin('exec-out', 'execution')],
+      },
+    }) as unknown as Node<FlowNodeData>;
+  const feed = (source: string): Edge =>
+    ({ id: `e-${source}`, source, sourceHandle: 'value', target: 'c1', targetHandle: 'a' }) as Edge;
+  const secondWire = { source: 'src', sourceHandle: 'out', target: 'c1', targetHandle: 'a' };
+  const producer: Node<FlowNodeData> = {
+    id: 'src',
+    type: 'custom',
+    position: { x: 0, y: 300 },
+    data: {
+      nodeType: 'code',
+      label: 'src',
+      icon: '',
+      headerColor: '',
+      inputs: [],
+      outputs: [pin('out')],
+    },
+  } as unknown as Node<FlowNodeData>;
+
+  it('points at the read pill, not at an invisible node id, when the feed is folded', () => {
+    const nodes = [getter('g1', 'fix_cycles'), consumer('c1'), producer];
+    const error = getConnectionError(nodes, [feed('g1')], secondWire);
+    // The author sees no wire on that pin — only a teal pill. Naming the
+    // variable and the pill is the only way the refusal makes sense.
+    expect(error).toContain("read pill on this pin row");
+    expect(error).toContain("'fix_cycles'");
+    // The node id stays in the message so the authoring assistant can act.
+    expect(error).toContain('g1');
+  });
+
+  it('falls back to the wire spelling when the getter is drawn (shared read)', () => {
+    const nodes = [getter('g1', 'fix_cycles'), consumer('c1'), consumer('c2'), producer];
+    const edges = [
+      feed('g1'),
+      { id: 'e-shared', source: 'g1', sourceHandle: 'value', target: 'c2', targetHandle: 'a' } as Edge,
+    ];
+    const error = getConnectionError(nodes, edges, secondWire);
+    expect(error).toContain('from g1.value');
+    expect(error).toContain("reads variable 'fix_cycles'");
+    expect(error).not.toContain('read pill');
+  });
+
+  it('keeps the plain message for a non-getter source', () => {
+    const other: Node<FlowNodeData> = { ...producer, id: 'other' } as Node<FlowNodeData>;
+    const nodes = [other, consumer('c1'), producer];
+    const error = getConnectionError(nodes, [feed('other')], secondWire);
+    expect(error).toBe("Input pin 'a' already connected (from other.value)");
   });
 });

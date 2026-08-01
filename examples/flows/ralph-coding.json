@@ -1,0 +1,6666 @@
+{
+  "id": "ralph-coding",
+  "name": "Ralph coder — same prompt, fresh context, every cycle",
+  "description": "The Ralph loop: every cycle sends the SAME fixed task prompt to a FRESH session (`ralph-cycle` subflow — a child run has its own vars, so nothing carries over). Memory lives in the workspace: the model reads PLAN.md/PROGRESS.md and updates PROGRESS.md each cycle. Completion is DETERMINISTIC, never model-claimed — the configured verify command must exit 0 AND the progress file must carry the completion marker; otherwise the loop runs another cycle up to max_cycles. Steering (`_runtime.inbox`) is folded into a steering_notes var that is templated into every cycle's prompt.",
+  "interfaces": [
+    "abstractcode.coding.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Coding request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "max_steps_per_cycle",
+            "label": "max_steps_per_cycle",
+            "type": "number"
+          },
+          {
+            "id": "warm_entries",
+            "label": "warm_entries",
+            "type": "number"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "plan_file",
+            "label": "plan_file",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "done_marker",
+            "label": "done_marker",
+            "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "request": "",
+          "workspace_root": "",
+          "gating_mode": "wait",
+          "max_cycles": 8,
+          "max_steps_per_cycle": 16,
+          "warm_entries": 3,
+          "verify_command": "",
+          "plan_file": "PLAN.md",
+          "progress_file": "PROGRESS.md",
+          "done_marker": "DONE:",
+          "browser_probe_available": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "preflight",
+      "type": "code",
+      "position": {
+        "x": 480.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Preflight",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "gating_mode",
+            "label": "gating_mode",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "max_steps_per_cycle",
+            "label": "max_steps_per_cycle",
+            "type": "number"
+          },
+          {
+            "id": "warm_entries",
+            "label": "warm_entries",
+            "type": "number"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "plan_file",
+            "label": "plan_file",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "done_marker",
+            "label": "done_marker",
+            "type": "string"
+          },
+          {
+            "id": "browser_probe_available",
+            "label": "browser_probe_available",
+            "type": "boolean"
+          },
+          {
+            "id": "empty_request_text",
+            "label": "empty_request_text",
+            "type": "string"
+          },
+          {
+            "id": "no_workspace_text",
+            "label": "no_workspace_text",
+            "type": "string"
+          },
+          {
+            "id": "refusal_header_text",
+            "label": "refusal_header_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "empty_request_text": "no coding request was provided (send `prompt` on the agent wrapper, or `request` on the root)",
+          "no_workspace_text": "no workspace_root was provided; this workflow reads and writes real files, so it refuses to run against an unknown directory",
+          "refusal_header_text": "REFUSED AT THE DOOR — the ralph coding loop did not start:"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nmode = str(gating_mode or \"wait\").strip().lower()\ntry:\n    budget = int(max_cycles or 0)\nexcept Exception:\n    budget = 0\nif budget < 1:\n    budget = 1\nif budget > 30:\n    budget = 30\ntry:\n    steps = int(max_steps_per_cycle or 0)\nexcept Exception:\n    steps = 0\nif steps < 1:\n    steps = 1\nif steps > 30:\n    steps = 30\nverify = str(verify_command or \"\").strip()\nplan = str(plan_file or \"PLAN.md\").strip() or \"PLAN.md\"\nprogress = str(progress_file or \"PROGRESS.md\").strip() or \"PROGRESS.md\"\nmarker = str(done_marker or \"DONE:\").strip() or \"DONE:\"\ntry:\n    warm = int(warm_entries or 3)\nexcept Exception:\n    warm = 3\nif warm < 1:\n    warm = 1\nif warm > 10:\n    warm = 10\nproblems = []\nif not req:\n    problems.append(str(empty_request_text or \"\"))\nif not ws:\n    problems.append(str(no_workspace_text or \"\"))\nok = len(problems) == 0\nlines = []\nif not ok:\n    lines.append(str(refusal_header_text or \"\"))\n    for p in problems:\n        lines.append(\"- \" + p)\nreturn {\n    \"updates\": {\n        \"preflight_ok\": ok,\n        \"wait_gating\": mode != \"auto\",\n        \"request\": req,\n        \"workspace_root\": ws,\n        \"verify_command\": verify,\n        \"has_verify\": len(verify) > 0,\n        \"probe_ok\": bool(browser_probe_available),\n        \"plan_file\": plan,\n        \"progress_file\": progress,\n        \"done_marker\": marker,\n        \"max_cycles\": budget,\n        \"max_steps_per_cycle\": steps,\n        \"warm_entries\": warm,\n        \"cycle\": 0,\n        \"done\": False,\n        \"complete\": False,\n        \"verify_ok\": False,\n        \"promise_done\": False,\n        \"prev_verify_ok\": False,\n        \"settled\": False,\n        \"fp_changes\": -1,\n        \"warm_progress\": \"\",\n        \"warm_listing\": \"\",\n        \"steering_notes\": \"\",\n        \"steer_seen\": 0,\n        \"steer_new\": 0,\n        \"last_summary\": \"\",\n        \"last_check\": \"\",\n        \"evidence\": \"\",\n        \"stopped_reason\": \"\",\n    },\n    \"report\": \"\\n\".join(lines),\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "seed_vars",
+      "type": "set_vars",
+      "position": {
+        "x": 960.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Seed run variables",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "updates": {
+            "preflight_ok": false,
+            "wait_gating": true,
+            "request": "",
+            "workspace_root": "",
+            "verify_command": "",
+            "has_verify": false,
+            "probe_ok": false,
+            "plan_file": "PLAN.md",
+            "progress_file": "PROGRESS.md",
+            "done_marker": "DONE:",
+            "max_cycles": 8,
+            "max_steps_per_cycle": 8,
+            "warm_entries": 3,
+            "cycle": 0,
+            "done": false,
+            "complete": false,
+            "verify_ok": false,
+            "promise_done": false,
+            "prev_verify_ok": false,
+            "settled": false,
+            "fp_changes": -1,
+            "warm_progress": "",
+            "warm_listing": "",
+            "steering_notes": "",
+            "steer_seen": 0,
+            "steer_new": 0,
+            "last_summary": "",
+            "last_check": "",
+            "evidence": "",
+            "stopped_reason": ""
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_preflight",
+      "type": "if",
+      "position": {
+        "x": 1440.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Preflight ok?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_preflight_condition",
+      "type": "get_var",
+      "position": {
+        "x": 1285.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get preflight_ok",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "preflight_ok",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end_pre",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1920.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Refused (preflight)",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "branch",
+            "label": "branch",
+            "type": "string"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "cycles_used",
+            "label": "cycles_used",
+            "type": "number"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {
+          "passed": false,
+          "success": false,
+          "branch": "",
+          "stopped_reason": "preflight-failed",
+          "cycles_used": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gating_line",
+      "type": "code",
+      "position": {
+        "x": 1920.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose gating line",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "wait_gating",
+            "label": "wait_gating",
+            "type": "boolean"
+          },
+          {
+            "id": "line_text",
+            "label": "line_text",
+            "type": "string"
+          },
+          {
+            "id": "wait_word",
+            "label": "wait_word",
+            "type": "string"
+          },
+          {
+            "id": "auto_word",
+            "label": "auto_word",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "line_text": "gating: {{mode}}",
+          "wait_word": "wait",
+          "auto_word": "auto"
+        },
+        "functionName": "transform",
+        "codeBody": "word = str(wait_word or \"\") if bool(wait_gating) else str(auto_word or \"\")\nreturn {\"message\": str(line_text or \"\").replace(\"{{mode}}\", word)}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gating_line_wait_gating",
+      "type": "get_var",
+      "position": {
+        "x": 1765.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get wait_gating",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "wait_gating",
+          "default": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gating_status",
+      "type": "answer_user",
+      "position": {
+        "x": 2400.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Gating mode",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "level": "message"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "bootstrap_cmd",
+      "type": "code",
+      "position": {
+        "x": 2880.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose memory bootstrap",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "plan_file",
+            "label": "plan_file",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "plan_header",
+            "label": "plan_header",
+            "type": "string"
+          },
+          {
+            "id": "progress_header",
+            "label": "progress_header",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "plan_header": "# PLAN\n(stub — the first cycle fills this in)\n",
+          "progress_header": "# PROGRESS LOG\n(append one entry per cycle)\n"
+        },
+        "functionName": "transform",
+        "codeBody": "ws_q = shq(str(workspace_root or \"\").strip())\nplan_q = shq(str(plan_file or \"PLAN.md\"))\nprog_q = shq(str(progress_file or \"PROGRESS.md\"))\nplan_head = shq(str(plan_header or \"\"))\nprog_head = shq(str(progress_header or \"\"))\ncmd = (\"cd '\" + ws_q + \"' && \"\n       \"[ -f '\" + plan_q + \"' ] || printf '%s' '\" + plan_head + \"' > '\" + plan_q + \"'; \"\n       \"[ -f '\" + prog_q + \"' ] || printf '%s' '\" + prog_head + \"' > '\" + prog_q + \"'; \"\n       \"echo RALPH_MEMORY_READY\")\nreturn {\"tool_call\": {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 60},\n                      \"call_id\": \"ralph-bootstrap\"}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "bootstrap_cmd_workspace_root",
+      "type": "get_var",
+      "position": {
+        "x": 2725.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get workspace_root",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "workspace_root",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "bootstrap_cmd_plan_file",
+      "type": "get_var",
+      "position": {
+        "x": 2725.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get plan_file",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "plan_file",
+          "default": "PLAN.md"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "bootstrap_cmd_progress_file",
+      "type": "get_var",
+      "position": {
+        "x": 2725.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get progress_file",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "progress_file",
+          "default": "PROGRESS.md"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "bootstrap_call",
+      "type": "call_tool",
+      "position": {
+        "x": 3360.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Create plan/progress files",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "loop",
+      "type": "while",
+      "position": {
+        "x": 3840.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "RALPH LOOP",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": false
+        },
+        "pinExpressions": {
+          "condition": "not vars.done and vars.cycle < vars.max_cycles"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold",
+      "type": "code",
+      "position": {
+        "x": 4320.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Drain steer inbox",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inbox",
+            "label": "inbox",
+            "type": "array"
+          },
+          {
+            "id": "steer_seen",
+            "label": "steer_seen",
+            "type": "number"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "steer_new",
+            "label": "steer_new",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "items = inbox if isinstance(inbox, list) else []\nseen = int(steer_seen or 0)\nif seen > len(items):\n    seen = 0\nnotes = str(steering_notes or \"\")\nadded = 0\nfor m in items[seen:]:\n    text = \"\"\n    if isinstance(m, dict):\n        c = m.get(\"content\")\n        text = str(c) if c is not None else \"\"\n    else:\n        text = str(m or \"\")\n    text = text.strip()\n    if text:\n        notes = notes + (\"\\n\" if notes else \"\") + \"- \" + text\n        added = added + 1\n# CARRY (0.1.1): a steer caught by the LATE drain at the end of the previous\n# cycle is already folded into the notes, but this cycle's progress line has\n# not announced it yet. Carrying the pending count means the line still says\n# \"steering applied\" on the cycle that actually acts on it; the count is\n# cleared once the cycle's own fold runs.\nreturn {\"updates\": {\"steering_notes\": notes, \"steer_seen\": len(items),\n                    \"steer_new\": added + int(steer_new or 0)}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold_inbox",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get _runtime.inbox",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "_runtime.inbox",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold_steer_seen",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_seen",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_seen",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_fold_steer_new",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_new",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_new",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_steer",
+      "type": "set_vars",
+      "position": {
+        "x": 4800.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Apply steering",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line",
+      "type": "code",
+      "position": {
+        "x": 5280.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose cycle line",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "steer_new",
+            "label": "steer_new",
+            "type": "number"
+          },
+          {
+            "id": "last_summary",
+            "label": "last_summary",
+            "type": "string"
+          },
+          {
+            "id": "line_text",
+            "label": "line_text",
+            "type": "string"
+          },
+          {
+            "id": "start_word",
+            "label": "start_word",
+            "type": "string"
+          },
+          {
+            "id": "steer_word",
+            "label": "steer_word",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "line_text": "ralph cycle {{n}} of {{max}}: {{note}}",
+          "start_word": "fresh context, re-reading the workspace",
+          "steer_word": "steering applied — "
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(cycle or 0) + 1\nmx = int(max_cycles or 0)\nnote = str(last_summary or \"\").strip().replace(\"\\n\", \" \")\nif len(note) > 120:\n    note = note[:120]\nif not note:\n    note = str(start_word or \"\")\nif int(steer_new or 0) > 0:\n    note = str(steer_word or \"\") + note\nmsg = str(line_text or \"\")\nmsg = msg.replace(\"{{n}}\", str(n)).replace(\"{{max}}\", str(mx)).replace(\"{{note}}\", note)\nreturn {\"message\": msg}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line_max_cycles",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get max_cycles",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "max_cycles",
+          "default": 8
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line_steer_new",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_new",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_new",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_line_last_summary",
+      "type": "get_var",
+      "position": {
+        "x": 5125.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get last_summary",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "last_summary",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_status",
+      "type": "answer_user",
+      "position": {
+        "x": 5760.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Cycle progress",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "level": "message"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "warm_cmd",
+      "type": "code",
+      "position": {
+        "x": 6240.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose warm-start gather",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws_q = shq(str(workspace_root or \"\").strip())\nprog_q = shq(str(progress_file or \"PROGRESS.md\"))\ncmd = (\"cd '\" + ws_q + \"' && echo '---RALPH-LISTING---'; \"\n       \"find . -maxdepth 2 -name .git -prune -o -print 2>/dev/null | sort | head -n 120; \"\n       \"echo '---RALPH-PROGRESS---'; cat '\" + prog_q + \"' 2>/dev/null; \"\n       \"echo; echo '---RALPH-WARM-END---'\")\nreturn {\"tool_call\": {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 60},\n                      \"call_id\": \"ralph-warm\"}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "warm_cmd_workspace_root",
+      "type": "get_var",
+      "position": {
+        "x": 6085.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get workspace_root",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "workspace_root",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "warm_cmd_progress_file",
+      "type": "get_var",
+      "position": {
+        "x": 6085.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get progress_file",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "progress_file",
+          "default": "PROGRESS.md"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "warm_call",
+      "type": "call_tool",
+      "position": {
+        "x": 6720.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Gather listing + progress tail",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "warm_fold",
+      "type": "code",
+      "position": {
+        "x": 7200.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold warm context (whole entries)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "warm_entries",
+            "label": "warm_entries",
+            "type": "number"
+          },
+          {
+            "id": "omitted_text",
+            "label": "omitted_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "omitted_text": "[older cycles omitted ({{omitted}} entr(y/ies)) — read the progress file for full history]"
+        },
+        "functionName": "transform",
+        "codeBody": "txt = text_of(result)\nlisting = \"\"\nprogress = \"\"\nif \"---RALPH-LISTING---\" in txt:\n    after = txt.split(\"---RALPH-LISTING---\", 1)[1]\n    if \"---RALPH-PROGRESS---\" in after:\n        parts2 = after.split(\"---RALPH-PROGRESS---\", 1)\n        listing = parts2[0]\n        progress = parts2[1]\n    else:\n        listing = after\nif \"---RALPH-WARM-END---\" in progress:\n    progress = progress.split(\"---RALPH-WARM-END---\", 1)[0]\nlines = []\nfor ln in listing.splitlines():\n    s = ln.strip()\n    if s and s != \".\" and \".ralph_\" not in s:\n        lines.append(s)\nextra = 0\nif len(lines) > 100:\n    extra = len(lines) - 100\n    lines = lines[:100]\nlisting_out = \"\\n\".join(lines)\nif extra > 0:\n    listing_out = listing_out + \"\\n(... \" + str(extra) + \" more paths at depth <= 2)\"\ntry:\n    n = int(warm_entries or 3)\nexcept Exception:\n    n = 3\nif n < 1:\n    n = 1\nif n > 10:\n    n = 10\nentries = []\ncur = []\nin_entry = False\nfor ln in progress.splitlines():\n    if ln.startswith(\"## \"):\n        if in_entry:\n            entries.append(\"\\n\".join(cur).strip())\n        cur = [ln]\n        in_entry = True\n    else:\n        if in_entry:\n            cur.append(ln)\nif in_entry:\n    entries.append(\"\\n\".join(cur).strip())\nomitted = 0\nwarm = \"\"\nif entries:\n    keep = entries\n    if len(keep) > n:\n        omitted = len(keep) - n\n        keep = keep[len(keep) - n:]\n    total = 0\n    for e in keep:\n        total = total + len(e)\n    while len(keep) > 1 and total > 6000:\n        total = total - len(keep[0])\n        omitted = omitted + 1\n        keep = keep[1:]\n    warm = \"\\n\\n\".join(keep)\n    if omitted > 0:\n        warm = str(omitted_text or \"\").replace(\"{{omitted}}\", str(omitted)) + \"\\n\\n\" + warm\nelse:\n    body = progress.strip()\n    if body:\n        if len(body) > 2500:\n            tail = body[len(body) - 2500:]\n            cut = tail.find(\"\\n\")\n            if cut >= 0:\n                tail = tail[cut + 1:]\n            warm = str(omitted_text or \"\").replace(\"{{omitted}}\", \"?\") + \"\\n\\n\" + tail\n        else:\n            warm = body\nreturn {\"updates\": {\"warm_listing\": listing_out, \"warm_progress\": warm}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "warm_fold_warm_entries",
+      "type": "get_var",
+      "position": {
+        "x": 7045.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get warm_entries",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "warm_entries",
+          "default": 3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_warm",
+      "type": "set_vars",
+      "position": {
+        "x": 7680.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save warm context",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt",
+      "type": "code",
+      "position": {
+        "x": 8160.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose the FIXED cycle prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "plan_file",
+            "label": "plan_file",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "done_marker",
+            "label": "done_marker",
+            "type": "string"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "last_check",
+            "label": "last_check",
+            "type": "string"
+          },
+          {
+            "id": "warm_listing",
+            "label": "warm_listing",
+            "type": "string"
+          },
+          {
+            "id": "warm_progress",
+            "label": "warm_progress",
+            "type": "string"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "probe_ok",
+            "label": "probe_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "task_text",
+            "label": "task_text",
+            "type": "string"
+          },
+          {
+            "id": "verify_hint",
+            "label": "verify_hint",
+            "type": "string"
+          },
+          {
+            "id": "no_verify_text",
+            "label": "no_verify_text",
+            "type": "string"
+          },
+          {
+            "id": "probe_hint",
+            "label": "probe_hint",
+            "type": "string"
+          },
+          {
+            "id": "steering_header",
+            "label": "steering_header",
+            "type": "string"
+          },
+          {
+            "id": "last_check_text",
+            "label": "last_check_text",
+            "type": "string"
+          },
+          {
+            "id": "warm_listing_text",
+            "label": "warm_listing_text",
+            "type": "string"
+          },
+          {
+            "id": "warm_progress_text",
+            "label": "warm_progress_text",
+            "type": "string"
+          },
+          {
+            "id": "warm_empty_text",
+            "label": "warm_empty_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "task_text": "# STANDING TASK (identical every cycle — your context is fresh, the workspace is not)\n{{request}}\n\nWORKSPACE ROOT: {{workspace}}\nPLAN FILE: {{plan_file}}   PROGRESS FILE: {{progress_file}}\nThis is cycle {{cycle}} of at most {{max}}.\n\nPROTOCOL FOR THIS CYCLE:\n1. Orient from the WORKSPACE SNAPSHOT and RECENT PROGRESS sections below — the orchestrator injects them fresh each cycle, so do NOT spend steps re-listing the workspace or re-reading {{progress_file}} for orientation. Open {{plan_file}} (or older progress history) only when those sections leave a real question. If {{plan_file}} is still a stub, write the plan into it first — the next cycle depends on it.\n2. Pick the next unfinished item and implement it.\n3. Verify what you changed.\n4. Append an entry to {{progress_file}} starting with a '## Cycle {{cycle}} — <short title>' heading line: what changed, what you verified, what is next.\n5. Only if the WHOLE task is complete and verified, add a line starting with \"{{marker}}\" followed by the evidence (what you ran and what it printed).",
+          "verify_hint": "VERIFICATION COMMAND (the orchestrator runs this itself after your cycle; it must exit 0 before the loop can end): `{{verify}}`",
+          "no_verify_text": "No verification command is configured, so completion rests on the marker plus the evidence you record. Write down exactly what you ran and what it printed.",
+          "probe_hint": "The `browser_probe` tool is mounted: load pages you produce and read back console errors instead of guessing. Give it a timeout in SECONDS and a port you own.",
+          "steering_header": "# OPERATOR STEERING (standing instructions added during this run — they amend the task and apply to every remaining cycle)",
+          "last_check_text": "# LAST AUTOMATED CHECK (the orchestrator's own run of the verification command after the previous cycle — this is machine output, not a claim)\n{{tail}}",
+          "warm_listing_text": "# WORKSPACE SNAPSHOT (mechanical listing, depth 2, taken just before this cycle)\n{{listing}}",
+          "warm_progress_text": "# RECENT PROGRESS (the newest entries of the progress file, injected verbatim by the orchestrator — orient from these instead of re-reading the file)\n{{tail}}",
+          "warm_empty_text": "# RECENT PROGRESS\n(no progress entries yet — if this is cycle 1, write the plan and record your first '## Cycle 1' entry at the end of the cycle)"
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(cycle or 0) + 1\nmx = int(max_cycles or 0)\nplan = str(plan_file or \"PLAN.md\")\nprogress = str(progress_file or \"PROGRESS.md\")\nhead = str(task_text or \"\")\nhead = head.replace(\"{{request}}\", str(request or \"\"))\nhead = head.replace(\"{{workspace}}\", str(workspace_root or \"\"))\nhead = head.replace(\"{{plan_file}}\", plan).replace(\"{{progress_file}}\", progress)\nhead = head.replace(\"{{marker}}\", str(done_marker or \"DONE:\"))\nhead = head.replace(\"{{cycle}}\", str(n)).replace(\"{{max}}\", str(mx))\nparts = [head]\n# WARM START (0.2.0): both sections are mechanical workspace memory, injected\n# every cycle so the model does not burn steps re-deriving its situation.\nwl = str(warm_listing or \"\").strip()\nif wl:\n    parts.append(str(warm_listing_text or \"\").replace(\"{{listing}}\", wl))\nwp = str(warm_progress or \"\").strip()\nif wp:\n    parts.append(str(warm_progress_text or \"\").replace(\"{{tail}}\", wp))\nelse:\n    parts.append(str(warm_empty_text or \"\"))\nverify = str(verify_command or \"\").strip()\nif verify:\n    parts.append(str(verify_hint or \"\").replace(\"{{verify}}\", verify))\nelse:\n    parts.append(str(no_verify_text or \"\"))\nif bool(probe_ok):\n    parts.append(str(probe_hint or \"\"))\nnotes = str(steering_notes or \"\").strip()\nif notes:\n    parts.append(str(steering_header or \"\") + \"\\n\" + notes)\ncheck = str(last_check or \"\").strip()\nif check:\n    parts.append(str(last_check_text or \"\").replace(\"{{tail}}\", check))\nreturn {\"prompt\": \"\\n\\n\".join(parts)}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_request",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get request",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "request",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_workspace_root",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get workspace_root",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "workspace_root",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_plan_file",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get plan_file",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "plan_file",
+          "default": "PLAN.md"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_progress_file",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get progress_file",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "progress_file",
+          "default": "PROGRESS.md"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_done_marker",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 148.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get done_marker",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "done_marker",
+          "default": "DONE:"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_verify_command",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 174.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get verify_command",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "verify_command",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 200.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_last_check",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 226.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get last_check",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "last_check",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_warm_listing",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 252.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get warm_listing",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "warm_listing",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_warm_progress",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 278.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get warm_progress",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "warm_progress",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 304.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_max_cycles",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 330.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get max_cycles",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "max_cycles",
+          "default": 8
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycle_prompt_probe_ok",
+      "type": "get_var",
+      "position": {
+        "x": 8005.0,
+        "y": 356.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get probe_ok",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "probe_ok",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "session",
+      "type": "subflow",
+      "position": {
+        "x": 8640.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Run one fresh cycle",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "task_prompt",
+            "label": "task_prompt",
+            "type": "string"
+          },
+          {
+            "id": "max_steps",
+            "label": "max_steps",
+            "type": "number"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "child_output",
+            "label": "child_output",
+            "type": "object"
+          },
+          {
+            "id": "summary",
+            "label": "summary",
+            "type": "string"
+          },
+          {
+            "id": "steps_used",
+            "label": "steps_used",
+            "type": "number"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "ralph-cycle"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "session_max_steps",
+      "type": "get_var",
+      "position": {
+        "x": 8485.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get max_steps_per_cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "max_steps_per_cycle",
+          "default": 8
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "session_provider",
+      "type": "get_var",
+      "position": {
+        "x": 8485.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get provider",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "provider",
+          "default": null
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "session_model",
+      "type": "get_var",
+      "position": {
+        "x": 8485.0,
+        "y": 148.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get model",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "model",
+          "default": null
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_cmd",
+      "type": "code",
+      "position": {
+        "x": 9120.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose completion check",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "plan_file",
+            "label": "plan_file",
+            "type": "string"
+          },
+          {
+            "id": "done_marker",
+            "label": "done_marker",
+            "type": "string"
+          },
+          {
+            "id": "verify_command",
+            "label": "verify_command",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws_q = shq(str(workspace_root or \"\").strip())\nprog_q = shq(str(progress_file or \"PROGRESS.md\"))\nplan_q = shq(str(plan_file or \"PLAN.md\"))\nmarker_q = shq(str(done_marker or \"DONE:\"))\nverify = str(verify_command or \"\").strip()\nif not verify:\n    verify = \"true\"\n# CHANGE FINGERPRINT (0.2.0): files newer than the stamp touched at the END of\n# the previous check = what this cycle actually changed. Memory files (plan,\n# progress) and the check's own artifacts are excluded — appending the progress\n# entry is the loop's bookkeeping, not work. First check prints FP_NO_BASELINE.\ncmd = (\"cd '\" + ws_q + \"' && ( \" + verify + \" ) > .ralph_verify.log 2>&1; \"\n       \"echo \\\"VERIFY_EXIT=$?\\\"; \"\n       \"if grep -qF '\" + marker_q + \"' '\" + prog_q + \"' 2>/dev/null; then echo PROMISE=1; \"\n       \"else echo PROMISE=0; fi; \"\n       \"echo '---CHANGES---'; \"\n       \"if [ -f .ralph_fp.stamp ]; then \"\n       \"find . -name .git -prune -o -type f \"\n       \"! -path './\" + prog_q + \"' ! -path './\" + plan_q + \"' \"\n       \"! -name .ralph_verify.log ! -name .ralph_fp.stamp \"\n       \"-newer .ralph_fp.stamp -print 2>/dev/null | head -n 20; \"\n       \"else echo FP_NO_BASELINE; fi; \"\n       \"touch .ralph_fp.stamp; \"\n       \"echo '---PROGRESS-TAIL---'; tail -n 30 '\" + prog_q + \"' 2>/dev/null; \"\n       \"echo '---VERIFY-TAIL---'; tail -n 30 .ralph_verify.log 2>/dev/null\")\nreturn {\"tool_call\": {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 300},\n                      \"call_id\": \"ralph-check\"}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_cmd_workspace_root",
+      "type": "get_var",
+      "position": {
+        "x": 8965.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get workspace_root",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "workspace_root",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_cmd_progress_file",
+      "type": "get_var",
+      "position": {
+        "x": 8965.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get progress_file",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "progress_file",
+          "default": "PROGRESS.md"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_cmd_plan_file",
+      "type": "get_var",
+      "position": {
+        "x": 8965.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get plan_file",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "plan_file",
+          "default": "PLAN.md"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_cmd_done_marker",
+      "type": "get_var",
+      "position": {
+        "x": 8965.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get done_marker",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "done_marker",
+          "default": "DONE:"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_cmd_verify_command",
+      "type": "get_var",
+      "position": {
+        "x": 8965.0,
+        "y": 148.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get verify_command",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "verify_command",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_call",
+      "type": "call_tool",
+      "position": {
+        "x": 9600.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Run completion check",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "execute_command"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_fold",
+      "type": "code",
+      "position": {
+        "x": 10080.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Read the check",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "cycle_summary",
+            "label": "cycle_summary",
+            "type": "string"
+          },
+          {
+            "id": "has_verify",
+            "label": "has_verify",
+            "type": "boolean"
+          },
+          {
+            "id": "prev_verify_ok",
+            "label": "prev_verify_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "txt = text_of(result)\nverify_ok = \"VERIFY_EXIT=0\" in txt\npromise = \"PROMISE=1\" in txt\nseg = \"\"\nif \"---CHANGES---\" in txt:\n    seg = txt.split(\"---CHANGES---\", 1)[1]\n    if \"---PROGRESS-TAIL---\" in seg:\n        seg = seg.split(\"---PROGRESS-TAIL---\", 1)[0]\nchanged_files = []\nbaseline = True\nfor ln in seg.splitlines():\n    s = ln.strip()\n    if not s:\n        continue\n    if s == \"FP_NO_BASELINE\":\n        baseline = False\n    else:\n        changed_files.append(s)\nquiet = baseline and len(changed_files) == 0\n# EARLY STOP (0.2.0, two-green rule): two CONSECUTIVE verify-green cycles with\n# NO file changes between them conclude the run — a loop that is done twice is\n# done. Guarded by has_verify: with no verify command the exit code is a\n# constant 0 and must never stop the loop on its own.\nsettled = bool(has_verify) and verify_ok and bool(prev_verify_ok) and quiet\nn = int(cycle or 0) + 1\nevidence = txt[-3000:] if len(txt) > 3000 else txt\nsummary = str(cycle_summary or \"\").strip()\nfp = len(changed_files) if baseline else -1\nreturn {\"updates\": {\"cycle\": n, \"verify_ok\": verify_ok, \"promise_done\": promise,\n                    \"complete\": (verify_ok and promise) or settled,\n                    \"settled\": settled, \"prev_verify_ok\": verify_ok, \"fp_changes\": fp,\n                    \"evidence\": evidence,\n                    \"last_check\": evidence, \"last_summary\": summary, \"steer_new\": 0}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_fold_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 9925.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_fold_has_verify",
+      "type": "get_var",
+      "position": {
+        "x": 9925.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get has_verify",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "has_verify",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_fold_prev_verify_ok",
+      "type": "get_var",
+      "position": {
+        "x": 9925.0,
+        "y": 148.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get prev_verify_ok",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "prev_verify_ok",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_check",
+      "type": "set_vars",
+      "position": {
+        "x": 10560.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save check result",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_line",
+      "type": "code",
+      "position": {
+        "x": 11040.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose check line",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "has_verify",
+            "label": "has_verify",
+            "type": "boolean"
+          },
+          {
+            "id": "verify_ok",
+            "label": "verify_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "promise_done",
+            "label": "promise_done",
+            "type": "boolean"
+          },
+          {
+            "id": "fp_changes",
+            "label": "fp_changes",
+            "type": "number"
+          },
+          {
+            "id": "settled",
+            "label": "settled",
+            "type": "boolean"
+          },
+          {
+            "id": "line_text",
+            "label": "line_text",
+            "type": "string"
+          },
+          {
+            "id": "ok_word",
+            "label": "ok_word",
+            "type": "string"
+          },
+          {
+            "id": "red_word",
+            "label": "red_word",
+            "type": "string"
+          },
+          {
+            "id": "skipped_word",
+            "label": "skipped_word",
+            "type": "string"
+          },
+          {
+            "id": "first_word",
+            "label": "first_word",
+            "type": "string"
+          },
+          {
+            "id": "settled_word",
+            "label": "settled_word",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "line_text": "ralph check {{n}}: verify={{verify}} promise={{promise}} changes={{changes}}",
+          "ok_word": "pass",
+          "red_word": "fail",
+          "skipped_word": "not configured",
+          "first_word": "baseline",
+          "settled_word": " — settled: second consecutive green with no changes; concluding"
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(cycle or 0)\nvword = str(skipped_word or \"\")\nif bool(has_verify):\n    vword = str(ok_word or \"\") if bool(verify_ok) else str(red_word or \"\")\npword = str(ok_word or \"\") if bool(promise_done) else str(red_word or \"\")\ntry:\n    fp = int(fp_changes)\nexcept Exception:\n    fp = -1\ncword = str(first_word or \"\") if fp < 0 else str(fp)\nmsg = str(line_text or \"\")\nmsg = msg.replace(\"{{n}}\", str(n)).replace(\"{{verify}}\", vword).replace(\"{{promise}}\", pword)\nmsg = msg.replace(\"{{changes}}\", cword)\nif bool(settled):\n    msg = msg + str(settled_word or \"\")\nreturn {\"message\": msg}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_line_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 10885.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_line_has_verify",
+      "type": "get_var",
+      "position": {
+        "x": 10885.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get has_verify",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "has_verify",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_line_verify_ok",
+      "type": "get_var",
+      "position": {
+        "x": 10885.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get verify_ok",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "verify_ok",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_line_promise_done",
+      "type": "get_var",
+      "position": {
+        "x": 10885.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get promise_done",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "promise_done",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_line_fp_changes",
+      "type": "get_var",
+      "position": {
+        "x": 10885.0,
+        "y": 148.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get fp_changes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "fp_changes",
+          "default": -1
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_line_settled",
+      "type": "get_var",
+      "position": {
+        "x": 10885.0,
+        "y": 174.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get settled",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "settled",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "check_status",
+      "type": "answer_user",
+      "position": {
+        "x": 11520.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Check result",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "level": "message"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late",
+      "type": "code",
+      "position": {
+        "x": 12000.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Drain steer inbox (late)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inbox",
+            "label": "inbox",
+            "type": "array"
+          },
+          {
+            "id": "steer_seen",
+            "label": "steer_seen",
+            "type": "number"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "complete",
+            "label": "complete",
+            "type": "boolean"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "items = inbox if isinstance(inbox, list) else []\nseen = int(steer_seen or 0)\nif seen > len(items):\n    seen = 0\nnotes = str(steering_notes or \"\")\nadded = 0\nfor m in items[seen:]:\n    text = \"\"\n    if isinstance(m, dict):\n        c = m.get(\"content\")\n        text = str(c) if c is not None else \"\"\n    else:\n        text = str(m or \"\")\n    text = text.strip()\n    if text:\n        notes = notes + (\"\\n\" if notes else \"\") + \"- \" + text\n        added = added + 1\nstill_complete = bool(complete) and added == 0\nreturn {\"updates\": {\"steering_notes\": notes, \"steer_seen\": len(items),\n                    \"steer_new\": added, \"complete\": still_complete}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late_inbox",
+      "type": "get_var",
+      "position": {
+        "x": 11845.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get _runtime.inbox",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "_runtime.inbox",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late_steer_seen",
+      "type": "get_var",
+      "position": {
+        "x": 11845.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steer_seen",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steer_seen",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 11845.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "steer_late_complete",
+      "type": "get_var",
+      "position": {
+        "x": 11845.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get complete",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "complete",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_steer_late",
+      "type": "set_vars",
+      "position": {
+        "x": 12480.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Apply late steering",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_complete",
+      "type": "if",
+      "position": {
+        "x": 12960.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Deterministically complete?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_complete_condition",
+      "type": "get_var",
+      "position": {
+        "x": 12805.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get complete",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "complete",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_gate",
+      "type": "if",
+      "position": {
+        "x": 13440.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Human review?",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_gate_condition",
+      "type": "get_var",
+      "position": {
+        "x": 13285.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get wait_gating",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "wait_gating",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_prompt",
+      "type": "code",
+      "position": {
+        "x": 13920.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose review question",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "evidence",
+            "label": "evidence",
+            "type": "string"
+          },
+          {
+            "id": "settled",
+            "label": "settled",
+            "type": "boolean"
+          },
+          {
+            "id": "promise_done",
+            "label": "promise_done",
+            "type": "boolean"
+          },
+          {
+            "id": "prompt_text",
+            "label": "prompt_text",
+            "type": "string"
+          },
+          {
+            "id": "settled_prompt_text",
+            "label": "settled_prompt_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "prompt_text": "Cycle {{cycles}} passed the deterministic check (verification command exited 0 and the progress file carries the completion marker).\n\n{{evidence}}\n\nReply 'accept' to finish, or describe what still needs to change (your words become standing operator steering for the next cycle).",
+          "settled_prompt_text": "Cycle {{cycles}} is the SECOND consecutive cycle where the verification command exited 0 with no workspace changes between the two (memory files excluded) — by the two-green rule the loop looks done, even though the completion marker was not written.\n\n{{evidence}}\n\nReply 'accept' to finish, or describe what still needs to change (your words become standing operator steering for the next cycle)."
+        },
+        "functionName": "transform",
+        "codeBody": "text = str(prompt_text or \"\")\n# Two-green completion without the marker gets its OWN words: the standard\n# text would claim a marker that was never written.\nif bool(settled) and not bool(promise_done):\n    alt = str(settled_prompt_text or \"\")\n    if alt:\n        text = alt\ntext = text.replace(\"{{cycles}}\", str(int(cycle or 0)))\ntext = text.replace(\"{{evidence}}\", str(evidence or \"\").strip())\nreturn {\"prompt\": text}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_prompt_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 13765.0,
+        "y": 44.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_prompt_evidence",
+      "type": "get_var",
+      "position": {
+        "x": 13765.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get evidence",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "evidence",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_prompt_settled",
+      "type": "get_var",
+      "position": {
+        "x": 13765.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get settled",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "settled",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_prompt_promise_done",
+      "type": "get_var",
+      "position": {
+        "x": 13765.0,
+        "y": 122.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get promise_done",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "promise_done",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate",
+      "type": "ask_user",
+      "position": {
+        "x": 14400.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "GATE: accept the verified result?",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_fold",
+      "type": "code",
+      "position": {
+        "x": 14880.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold reviewer answer",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "string"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "accept_reason",
+            "label": "accept_reason",
+            "type": "string"
+          },
+          {
+            "id": "revise_reason",
+            "label": "revise_reason",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "accept_reason": "verified-and-accepted",
+          "revise_reason": "user-revision"
+        },
+        "functionName": "transform",
+        "codeBody": "ans = str(answer or \"\").strip()\nlow = ans.lower()\naccepted = (not low) or low.startswith(\"accept\") or low.startswith(\"approve\") or low == \"ok\" or low == \"yes\"\nif accepted:\n    return {\"updates\": {\"done\": True, \"stopped_reason\": str(accept_reason or \"\")}}\nnotes = str(steering_notes or \"\")\nnotes = notes + (\"\\n\" if notes else \"\") + \"- \" + ans\nreturn {\"updates\": {\"done\": False, \"complete\": False, \"steering_notes\": notes,\n                    \"stopped_reason\": str(revise_reason or \"\"), \"steer_new\": 1}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate_fold_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 14725.0,
+        "y": 70.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_gate",
+      "type": "set_vars",
+      "position": {
+        "x": 15360.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save review outcome",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "auto_done",
+      "type": "code",
+      "position": {
+        "x": 13920.0,
+        "y": 492.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Finish (auto mode)",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "stop_reason",
+            "label": "stop_reason",
+            "type": "string"
+          },
+          {
+            "id": "has_verify",
+            "label": "has_verify",
+            "type": "boolean"
+          },
+          {
+            "id": "settled",
+            "label": "settled",
+            "type": "boolean"
+          },
+          {
+            "id": "promise_done",
+            "label": "promise_done",
+            "type": "boolean"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "stop_reason": "verified-complete"
+        },
+        "functionName": "transform",
+        "codeBody": "# Honesty split (workflow-bench forensics 2026-08-01): with verify_command\n# empty, the deterministic check degenerates to `grep DONE: PROGRESS.md` — a\n# model-written string. ralph-3 wrote DONE: at exactly cycle 8/8 while its own\n# progress entry still listed the remaining work. A marker-only completion is\n# not a verified one and must not claim to be.\nreason = str(stop_reason or \"\")\nif not bool(has_verify) and reason == \"verified-complete\":\n    reason = \"marker-only-unverified\"\nelif bool(settled) and not bool(promise_done):\n    # 0.2.0 two-green rule: the loop concluded because verify passed twice in\n    # a row with no changes between — the marker was NOT written, and the\n    # stopped_reason must say which rule ended the run.\n    reason = \"settled-two-green\"\nreturn {\"updates\": {\"done\": True, \"stopped_reason\": reason}}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "auto_done_has_verify",
+      "type": "get_var",
+      "position": {
+        "x": 13765.0,
+        "y": 562.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get has_verify",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "has_verify",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "auto_done_settled",
+      "type": "get_var",
+      "position": {
+        "x": 13765.0,
+        "y": 588.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get settled",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "settled",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "auto_done_promise_done",
+      "type": "get_var",
+      "position": {
+        "x": 13765.0,
+        "y": 614.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get promise_done",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "promise_done",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_done",
+      "type": "set_vars",
+      "position": {
+        "x": 14400.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "set_vars",
+        "label": "Save completion",
+        "icon": "&#x1F4E4;&#xFE0F;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "updates",
+            "label": "updates",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report",
+      "type": "code",
+      "position": {
+        "x": 4320.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Final report",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "cycle",
+            "label": "cycle",
+            "type": "number"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "complete_flag",
+            "label": "complete_flag",
+            "type": "boolean"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "progress_file",
+            "label": "progress_file",
+            "type": "string"
+          },
+          {
+            "id": "last_summary",
+            "label": "last_summary",
+            "type": "string"
+          },
+          {
+            "id": "evidence",
+            "label": "evidence",
+            "type": "string"
+          },
+          {
+            "id": "steering_notes",
+            "label": "steering_notes",
+            "type": "string"
+          },
+          {
+            "id": "complete_text",
+            "label": "complete_text",
+            "type": "string"
+          },
+          {
+            "id": "marker_only_text",
+            "label": "marker_only_text",
+            "type": "string"
+          },
+          {
+            "id": "settled_text",
+            "label": "settled_text",
+            "type": "string"
+          },
+          {
+            "id": "fallback_text",
+            "label": "fallback_text",
+            "type": "string"
+          },
+          {
+            "id": "summary_header",
+            "label": "summary_header",
+            "type": "string"
+          },
+          {
+            "id": "evidence_header",
+            "label": "evidence_header",
+            "type": "string"
+          },
+          {
+            "id": "steering_summary_text",
+            "label": "steering_summary_text",
+            "type": "string"
+          },
+          {
+            "id": "footer_text",
+            "label": "footer_text",
+            "type": "string"
+          },
+          {
+            "id": "complete_reason",
+            "label": "complete_reason",
+            "type": "string"
+          },
+          {
+            "id": "budget_reason",
+            "label": "budget_reason",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "stopped",
+            "label": "stopped",
+            "type": "string"
+          },
+          {
+            "id": "cycles",
+            "label": "cycles",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "complete_text": "The task passed the deterministic completion check after {{cycles}} cycle(s): the verification command exited 0 and {{progress_file}} carries the completion marker.",
+          "marker_only_text": "The loop stopped after {{cycles}} cycle(s) because {{progress_file}} carries the completion marker — but NO verification command was configured, so this completion is the model's own claim, not a verified fact. Configure verify_command to make completion deterministic.",
+          "settled_text": "The loop concluded after {{cycles}} cycle(s) by the two-green early-stop rule: the verification command exited 0 in two consecutive cycles and no files changed between them (memory files excluded from the fingerprint). A loop that is done twice is done — the remaining cycle budget was not burned. The completion marker was not written; {{progress_file}} holds the model's own account.",
+          "fallback_text": "#FALLBACK the cycle budget ({{max}}) ran out before the deterministic check passed. The workspace holds the work of every completed cycle and {{progress_file}} holds their own account; re-run to continue from there.",
+          "summary_header": "LAST CYCLE'S OWN SUMMARY:",
+          "evidence_header": "EVIDENCE (tail of the progress file and the verification output):",
+          "steering_summary_text": "OPERATOR STEERING APPLIED DURING THIS RUN:",
+          "footer_text": "— ralph loop: {{cycles}} of {{max}} cycles used, stopped_reason={{stopped}}",
+          "complete_reason": "verified-complete",
+          "budget_reason": "budget-exhausted"
+        },
+        "functionName": "transform",
+        "codeBody": "n = int(cycle or 0)\nmx = int(max_cycles or 0)\nprogress = str(progress_file or \"PROGRESS.md\")\ncomplete = bool(complete_flag)\nstopped = str(stopped_reason or \"\")\nif complete:\n    if stopped == \"marker-only-unverified\":\n        head = str(marker_only_text or \"\")\n    elif stopped == \"settled-two-green\":\n        head = str(settled_text or \"\")\n    else:\n        head = str(complete_text or \"\")\n    head = head.replace(\"{{cycles}}\", str(n)).replace(\"{{progress_file}}\", progress)\n    if not stopped:\n        stopped = str(complete_reason or \"\")\nelse:\n    head = str(fallback_text or \"\")\n    head = head.replace(\"{{max}}\", str(mx)).replace(\"{{progress_file}}\", progress)\n    stopped = str(budget_reason or \"\")\nlines = [head]\nsummary = str(last_summary or \"\").strip()\nif summary:\n    lines.append(str(summary_header or \"\") + \"\\n\" + summary)\nev = str(evidence or \"\").strip()\nif ev:\n    lines.append(str(evidence_header or \"\") + \"\\n\" + ev)\nnotes = str(steering_notes or \"\").strip()\nif notes:\n    lines.append(str(steering_summary_text or \"\") + \"\\n\" + notes)\nfoot = str(footer_text or \"\")\nfoot = foot.replace(\"{{cycles}}\", str(n)).replace(\"{{max}}\", str(mx)).replace(\"{{stopped}}\", stopped)\nlines.append(foot)\nreturn {\"report\": \"\\n\\n\".join(lines), \"passed\": complete, \"ok\": complete,\n        \"stopped\": stopped, \"cycles\": n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_cycle",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 484.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_max_cycles",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 510.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get max_cycles",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "max_cycles",
+          "default": 8
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_complete_flag",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 536.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get complete",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "complete",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_stopped_reason",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 562.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get stopped_reason",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "stopped_reason",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_progress_file",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 588.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get progress_file",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "progress_file",
+          "default": "PROGRESS.md"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_last_summary",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 614.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get last_summary",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "last_summary",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_evidence",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 640.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get evidence",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "evidence",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_steering_notes",
+      "type": "get_var",
+      "position": {
+        "x": 4165.0,
+        "y": 666.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steering_notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "steering_notes",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 4800.0,
+        "y": 440.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Report",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "branch",
+            "label": "branch",
+            "type": "string"
+          },
+          {
+            "id": "stopped_reason",
+            "label": "stopped_reason",
+            "type": "string"
+          },
+          {
+            "id": "cycles_used",
+            "label": "cycles_used",
+            "type": "number"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {
+          "report": "",
+          "passed": false,
+          "success": false,
+          "branch": "",
+          "stopped_reason": "",
+          "cycles_used": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-request-preflight-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "preflight",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-preflight-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "preflight",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-gating_mode-preflight-gating_mode",
+      "source": "start",
+      "sourceHandle": "gating_mode",
+      "target": "preflight",
+      "targetHandle": "gating_mode",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_cycles-preflight-max_cycles",
+      "source": "start",
+      "sourceHandle": "max_cycles",
+      "target": "preflight",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_steps_per_cycle-preflight-max_steps_per_cycle",
+      "source": "start",
+      "sourceHandle": "max_steps_per_cycle",
+      "target": "preflight",
+      "targetHandle": "max_steps_per_cycle",
+      "animated": false
+    },
+    {
+      "id": "e-start-warm_entries-preflight-warm_entries",
+      "source": "start",
+      "sourceHandle": "warm_entries",
+      "target": "preflight",
+      "targetHandle": "warm_entries",
+      "animated": false
+    },
+    {
+      "id": "e-start-verify_command-preflight-verify_command",
+      "source": "start",
+      "sourceHandle": "verify_command",
+      "target": "preflight",
+      "targetHandle": "verify_command",
+      "animated": false
+    },
+    {
+      "id": "e-start-plan_file-preflight-plan_file",
+      "source": "start",
+      "sourceHandle": "plan_file",
+      "target": "preflight",
+      "targetHandle": "plan_file",
+      "animated": false
+    },
+    {
+      "id": "e-start-progress_file-preflight-progress_file",
+      "source": "start",
+      "sourceHandle": "progress_file",
+      "target": "preflight",
+      "targetHandle": "progress_file",
+      "animated": false
+    },
+    {
+      "id": "e-start-done_marker-preflight-done_marker",
+      "source": "start",
+      "sourceHandle": "done_marker",
+      "target": "preflight",
+      "targetHandle": "done_marker",
+      "animated": false
+    },
+    {
+      "id": "e-start-browser_probe_available-preflight-browser_probe_available",
+      "source": "start",
+      "sourceHandle": "browser_probe_available",
+      "target": "preflight",
+      "targetHandle": "browser_probe_available",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-updates-seed_vars-updates",
+      "source": "preflight",
+      "sourceHandle": "updates",
+      "target": "seed_vars",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-if_preflight_condition-value-if_preflight-condition",
+      "source": "if_preflight_condition",
+      "sourceHandle": "value",
+      "target": "if_preflight",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-report-end_pre-report",
+      "source": "preflight",
+      "sourceHandle": "report",
+      "target": "end_pre",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-gating_line_wait_gating-value-gating_line-wait_gating",
+      "source": "gating_line_wait_gating",
+      "sourceHandle": "value",
+      "target": "gating_line",
+      "targetHandle": "wait_gating",
+      "animated": false
+    },
+    {
+      "id": "e-gating_line-message-gating_status-message",
+      "source": "gating_line",
+      "sourceHandle": "message",
+      "target": "gating_status",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "e-bootstrap_cmd_workspace_root-value-bootstrap_cmd-workspace_root",
+      "source": "bootstrap_cmd_workspace_root",
+      "sourceHandle": "value",
+      "target": "bootstrap_cmd",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-bootstrap_cmd_plan_file-value-bootstrap_cmd-plan_file",
+      "source": "bootstrap_cmd_plan_file",
+      "sourceHandle": "value",
+      "target": "bootstrap_cmd",
+      "targetHandle": "plan_file",
+      "animated": false
+    },
+    {
+      "id": "e-bootstrap_cmd_progress_file-value-bootstrap_cmd-progress_file",
+      "source": "bootstrap_cmd_progress_file",
+      "sourceHandle": "value",
+      "target": "bootstrap_cmd",
+      "targetHandle": "progress_file",
+      "animated": false
+    },
+    {
+      "id": "e-bootstrap_cmd-tool_call-bootstrap_call-tool_call",
+      "source": "bootstrap_cmd",
+      "sourceHandle": "tool_call",
+      "target": "bootstrap_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold_inbox-value-steer_fold-inbox",
+      "source": "steer_fold_inbox",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "inbox",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold_steer_seen-value-steer_fold-steer_seen",
+      "source": "steer_fold_steer_seen",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "steer_seen",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold_steering_notes-value-steer_fold-steering_notes",
+      "source": "steer_fold_steering_notes",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold_steer_new-value-steer_fold-steer_new",
+      "source": "steer_fold_steer_new",
+      "sourceHandle": "value",
+      "target": "steer_fold",
+      "targetHandle": "steer_new",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold-updates-set_steer-updates",
+      "source": "steer_fold",
+      "sourceHandle": "updates",
+      "target": "set_steer",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line_cycle-value-cycle_line-cycle",
+      "source": "cycle_line_cycle",
+      "sourceHandle": "value",
+      "target": "cycle_line",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line_max_cycles-value-cycle_line-max_cycles",
+      "source": "cycle_line_max_cycles",
+      "sourceHandle": "value",
+      "target": "cycle_line",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line_steer_new-value-cycle_line-steer_new",
+      "source": "cycle_line_steer_new",
+      "sourceHandle": "value",
+      "target": "cycle_line",
+      "targetHandle": "steer_new",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line_last_summary-value-cycle_line-last_summary",
+      "source": "cycle_line_last_summary",
+      "sourceHandle": "value",
+      "target": "cycle_line",
+      "targetHandle": "last_summary",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line-message-cycle_status-message",
+      "source": "cycle_line",
+      "sourceHandle": "message",
+      "target": "cycle_status",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "e-warm_cmd_workspace_root-value-warm_cmd-workspace_root",
+      "source": "warm_cmd_workspace_root",
+      "sourceHandle": "value",
+      "target": "warm_cmd",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-warm_cmd_progress_file-value-warm_cmd-progress_file",
+      "source": "warm_cmd_progress_file",
+      "sourceHandle": "value",
+      "target": "warm_cmd",
+      "targetHandle": "progress_file",
+      "animated": false
+    },
+    {
+      "id": "e-warm_cmd-tool_call-warm_call-tool_call",
+      "source": "warm_cmd",
+      "sourceHandle": "tool_call",
+      "target": "warm_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-warm_call-raw-warm_fold-result",
+      "source": "warm_call",
+      "sourceHandle": "raw",
+      "target": "warm_fold",
+      "targetHandle": "result",
+      "animated": false
+    },
+    {
+      "id": "e-warm_fold_warm_entries-value-warm_fold-warm_entries",
+      "source": "warm_fold_warm_entries",
+      "sourceHandle": "value",
+      "target": "warm_fold",
+      "targetHandle": "warm_entries",
+      "animated": false
+    },
+    {
+      "id": "e-warm_fold-updates-set_warm-updates",
+      "source": "warm_fold",
+      "sourceHandle": "updates",
+      "target": "set_warm",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_request-value-cycle_prompt-request",
+      "source": "cycle_prompt_request",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_workspace_root-value-cycle_prompt-workspace_root",
+      "source": "cycle_prompt_workspace_root",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_plan_file-value-cycle_prompt-plan_file",
+      "source": "cycle_prompt_plan_file",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "plan_file",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_progress_file-value-cycle_prompt-progress_file",
+      "source": "cycle_prompt_progress_file",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "progress_file",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_done_marker-value-cycle_prompt-done_marker",
+      "source": "cycle_prompt_done_marker",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "done_marker",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_verify_command-value-cycle_prompt-verify_command",
+      "source": "cycle_prompt_verify_command",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "verify_command",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_steering_notes-value-cycle_prompt-steering_notes",
+      "source": "cycle_prompt_steering_notes",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_last_check-value-cycle_prompt-last_check",
+      "source": "cycle_prompt_last_check",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "last_check",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_warm_listing-value-cycle_prompt-warm_listing",
+      "source": "cycle_prompt_warm_listing",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "warm_listing",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_warm_progress-value-cycle_prompt-warm_progress",
+      "source": "cycle_prompt_warm_progress",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "warm_progress",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_cycle-value-cycle_prompt-cycle",
+      "source": "cycle_prompt_cycle",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_max_cycles-value-cycle_prompt-max_cycles",
+      "source": "cycle_prompt_max_cycles",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt_probe_ok-value-cycle_prompt-probe_ok",
+      "source": "cycle_prompt_probe_ok",
+      "sourceHandle": "value",
+      "target": "cycle_prompt",
+      "targetHandle": "probe_ok",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt-prompt-session-task_prompt",
+      "source": "cycle_prompt",
+      "sourceHandle": "prompt",
+      "target": "session",
+      "targetHandle": "task_prompt",
+      "animated": false
+    },
+    {
+      "id": "e-session_max_steps-value-session-max_steps",
+      "source": "session_max_steps",
+      "sourceHandle": "value",
+      "target": "session",
+      "targetHandle": "max_steps",
+      "animated": false
+    },
+    {
+      "id": "e-session_provider-value-session-provider",
+      "source": "session_provider",
+      "sourceHandle": "value",
+      "target": "session",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-session_model-value-session-model",
+      "source": "session_model",
+      "sourceHandle": "value",
+      "target": "session",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-check_cmd_workspace_root-value-check_cmd-workspace_root",
+      "source": "check_cmd_workspace_root",
+      "sourceHandle": "value",
+      "target": "check_cmd",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-check_cmd_progress_file-value-check_cmd-progress_file",
+      "source": "check_cmd_progress_file",
+      "sourceHandle": "value",
+      "target": "check_cmd",
+      "targetHandle": "progress_file",
+      "animated": false
+    },
+    {
+      "id": "e-check_cmd_plan_file-value-check_cmd-plan_file",
+      "source": "check_cmd_plan_file",
+      "sourceHandle": "value",
+      "target": "check_cmd",
+      "targetHandle": "plan_file",
+      "animated": false
+    },
+    {
+      "id": "e-check_cmd_done_marker-value-check_cmd-done_marker",
+      "source": "check_cmd_done_marker",
+      "sourceHandle": "value",
+      "target": "check_cmd",
+      "targetHandle": "done_marker",
+      "animated": false
+    },
+    {
+      "id": "e-check_cmd_verify_command-value-check_cmd-verify_command",
+      "source": "check_cmd_verify_command",
+      "sourceHandle": "value",
+      "target": "check_cmd",
+      "targetHandle": "verify_command",
+      "animated": false
+    },
+    {
+      "id": "e-check_cmd-tool_call-check_call-tool_call",
+      "source": "check_cmd",
+      "sourceHandle": "tool_call",
+      "target": "check_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-check_call-raw-check_fold-result",
+      "source": "check_call",
+      "sourceHandle": "raw",
+      "target": "check_fold",
+      "targetHandle": "result",
+      "animated": false
+    },
+    {
+      "id": "e-session-summary-check_fold-cycle_summary",
+      "source": "session",
+      "sourceHandle": "summary",
+      "target": "check_fold",
+      "targetHandle": "cycle_summary",
+      "animated": false
+    },
+    {
+      "id": "e-check_fold_cycle-value-check_fold-cycle",
+      "source": "check_fold_cycle",
+      "sourceHandle": "value",
+      "target": "check_fold",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-check_fold_has_verify-value-check_fold-has_verify",
+      "source": "check_fold_has_verify",
+      "sourceHandle": "value",
+      "target": "check_fold",
+      "targetHandle": "has_verify",
+      "animated": false
+    },
+    {
+      "id": "e-check_fold_prev_verify_ok-value-check_fold-prev_verify_ok",
+      "source": "check_fold_prev_verify_ok",
+      "sourceHandle": "value",
+      "target": "check_fold",
+      "targetHandle": "prev_verify_ok",
+      "animated": false
+    },
+    {
+      "id": "e-check_fold-updates-set_check-updates",
+      "source": "check_fold",
+      "sourceHandle": "updates",
+      "target": "set_check",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-check_line_cycle-value-check_line-cycle",
+      "source": "check_line_cycle",
+      "sourceHandle": "value",
+      "target": "check_line",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-check_line_has_verify-value-check_line-has_verify",
+      "source": "check_line_has_verify",
+      "sourceHandle": "value",
+      "target": "check_line",
+      "targetHandle": "has_verify",
+      "animated": false
+    },
+    {
+      "id": "e-check_line_verify_ok-value-check_line-verify_ok",
+      "source": "check_line_verify_ok",
+      "sourceHandle": "value",
+      "target": "check_line",
+      "targetHandle": "verify_ok",
+      "animated": false
+    },
+    {
+      "id": "e-check_line_promise_done-value-check_line-promise_done",
+      "source": "check_line_promise_done",
+      "sourceHandle": "value",
+      "target": "check_line",
+      "targetHandle": "promise_done",
+      "animated": false
+    },
+    {
+      "id": "e-check_line_fp_changes-value-check_line-fp_changes",
+      "source": "check_line_fp_changes",
+      "sourceHandle": "value",
+      "target": "check_line",
+      "targetHandle": "fp_changes",
+      "animated": false
+    },
+    {
+      "id": "e-check_line_settled-value-check_line-settled",
+      "source": "check_line_settled",
+      "sourceHandle": "value",
+      "target": "check_line",
+      "targetHandle": "settled",
+      "animated": false
+    },
+    {
+      "id": "e-check_line-message-check_status-message",
+      "source": "check_line",
+      "sourceHandle": "message",
+      "target": "check_status",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late_inbox-value-steer_late-inbox",
+      "source": "steer_late_inbox",
+      "sourceHandle": "value",
+      "target": "steer_late",
+      "targetHandle": "inbox",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late_steer_seen-value-steer_late-steer_seen",
+      "source": "steer_late_steer_seen",
+      "sourceHandle": "value",
+      "target": "steer_late",
+      "targetHandle": "steer_seen",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late_steering_notes-value-steer_late-steering_notes",
+      "source": "steer_late_steering_notes",
+      "sourceHandle": "value",
+      "target": "steer_late",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late_complete-value-steer_late-complete",
+      "source": "steer_late_complete",
+      "sourceHandle": "value",
+      "target": "steer_late",
+      "targetHandle": "complete",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late-updates-set_steer_late-updates",
+      "source": "steer_late",
+      "sourceHandle": "updates",
+      "target": "set_steer_late",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-if_complete_condition-value-if_complete-condition",
+      "source": "if_complete_condition",
+      "sourceHandle": "value",
+      "target": "if_complete",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-if_gate_condition-value-if_gate-condition",
+      "source": "if_gate_condition",
+      "sourceHandle": "value",
+      "target": "if_gate",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt_cycle-value-gate_prompt-cycle",
+      "source": "gate_prompt_cycle",
+      "sourceHandle": "value",
+      "target": "gate_prompt",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt_evidence-value-gate_prompt-evidence",
+      "source": "gate_prompt_evidence",
+      "sourceHandle": "value",
+      "target": "gate_prompt",
+      "targetHandle": "evidence",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt_settled-value-gate_prompt-settled",
+      "source": "gate_prompt_settled",
+      "sourceHandle": "value",
+      "target": "gate_prompt",
+      "targetHandle": "settled",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt_promise_done-value-gate_prompt-promise_done",
+      "source": "gate_prompt_promise_done",
+      "sourceHandle": "value",
+      "target": "gate_prompt",
+      "targetHandle": "promise_done",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt-prompt-gate-prompt",
+      "source": "gate_prompt",
+      "sourceHandle": "prompt",
+      "target": "gate",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-gate-response-gate_fold-answer",
+      "source": "gate",
+      "sourceHandle": "response",
+      "target": "gate_fold",
+      "targetHandle": "answer",
+      "animated": false
+    },
+    {
+      "id": "e-gate_fold_steering_notes-value-gate_fold-steering_notes",
+      "source": "gate_fold_steering_notes",
+      "sourceHandle": "value",
+      "target": "gate_fold",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-gate_fold-updates-set_gate-updates",
+      "source": "gate_fold",
+      "sourceHandle": "updates",
+      "target": "set_gate",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done_has_verify-value-auto_done-has_verify",
+      "source": "auto_done_has_verify",
+      "sourceHandle": "value",
+      "target": "auto_done",
+      "targetHandle": "has_verify",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done_settled-value-auto_done-settled",
+      "source": "auto_done_settled",
+      "sourceHandle": "value",
+      "target": "auto_done",
+      "targetHandle": "settled",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done_promise_done-value-auto_done-promise_done",
+      "source": "auto_done_promise_done",
+      "sourceHandle": "value",
+      "target": "auto_done",
+      "targetHandle": "promise_done",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done-updates-set_done-updates",
+      "source": "auto_done",
+      "sourceHandle": "updates",
+      "target": "set_done",
+      "targetHandle": "updates",
+      "animated": false
+    },
+    {
+      "id": "e-report_cycle-value-report-cycle",
+      "source": "report_cycle",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "cycle",
+      "animated": false
+    },
+    {
+      "id": "e-report_max_cycles-value-report-max_cycles",
+      "source": "report_max_cycles",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-report_complete_flag-value-report-complete_flag",
+      "source": "report_complete_flag",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "complete_flag",
+      "animated": false
+    },
+    {
+      "id": "e-report_stopped_reason-value-report-stopped_reason",
+      "source": "report_stopped_reason",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-report_progress_file-value-report-progress_file",
+      "source": "report_progress_file",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "progress_file",
+      "animated": false
+    },
+    {
+      "id": "e-report_last_summary-value-report-last_summary",
+      "source": "report_last_summary",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "last_summary",
+      "animated": false
+    },
+    {
+      "id": "e-report_evidence-value-report-evidence",
+      "source": "report_evidence",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "evidence",
+      "animated": false
+    },
+    {
+      "id": "e-report_steering_notes-value-report-steering_notes",
+      "source": "report_steering_notes",
+      "sourceHandle": "value",
+      "target": "report",
+      "targetHandle": "steering_notes",
+      "animated": false
+    },
+    {
+      "id": "e-report-report-end-report",
+      "source": "report",
+      "sourceHandle": "report",
+      "target": "end",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-report-passed-end-passed",
+      "source": "report",
+      "sourceHandle": "passed",
+      "target": "end",
+      "targetHandle": "passed",
+      "animated": false
+    },
+    {
+      "id": "e-report-ok-end-success",
+      "source": "report",
+      "sourceHandle": "ok",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-report-stopped-end-stopped_reason",
+      "source": "report",
+      "sourceHandle": "stopped",
+      "target": "end",
+      "targetHandle": "stopped_reason",
+      "animated": false
+    },
+    {
+      "id": "e-report-cycles-end-cycles_used",
+      "source": "report",
+      "sourceHandle": "cycles",
+      "target": "end",
+      "targetHandle": "cycles_used",
+      "animated": false
+    },
+    {
+      "id": "e-start-exec-out-preflight-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "preflight",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-preflight-exec-out-seed_vars-exec-in",
+      "source": "preflight",
+      "sourceHandle": "exec-out",
+      "target": "seed_vars",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-seed_vars-exec-out-if_preflight-exec-in",
+      "source": "seed_vars",
+      "sourceHandle": "exec-out",
+      "target": "if_preflight",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_preflight-false-end_pre-exec-in",
+      "source": "if_preflight",
+      "sourceHandle": "false",
+      "target": "end_pre",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_preflight-true-gating_line-exec-in",
+      "source": "if_preflight",
+      "sourceHandle": "true",
+      "target": "gating_line",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gating_line-exec-out-gating_status-exec-in",
+      "source": "gating_line",
+      "sourceHandle": "exec-out",
+      "target": "gating_status",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gating_status-exec-out-bootstrap_cmd-exec-in",
+      "source": "gating_status",
+      "sourceHandle": "exec-out",
+      "target": "bootstrap_cmd",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-bootstrap_cmd-exec-out-bootstrap_call-exec-in",
+      "source": "bootstrap_cmd",
+      "sourceHandle": "exec-out",
+      "target": "bootstrap_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-bootstrap_call-exec-out-loop-exec-in",
+      "source": "bootstrap_call",
+      "sourceHandle": "exec-out",
+      "target": "loop",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-loop-loop-steer_fold-exec-in",
+      "source": "loop",
+      "sourceHandle": "loop",
+      "target": "steer_fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-steer_fold-exec-out-set_steer-exec-in",
+      "source": "steer_fold",
+      "sourceHandle": "exec-out",
+      "target": "set_steer",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-set_steer-exec-out-cycle_line-exec-in",
+      "source": "set_steer",
+      "sourceHandle": "exec-out",
+      "target": "cycle_line",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_line-exec-out-cycle_status-exec-in",
+      "source": "cycle_line",
+      "sourceHandle": "exec-out",
+      "target": "cycle_status",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_status-exec-out-warm_cmd-exec-in",
+      "source": "cycle_status",
+      "sourceHandle": "exec-out",
+      "target": "warm_cmd",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-warm_cmd-exec-out-warm_call-exec-in",
+      "source": "warm_cmd",
+      "sourceHandle": "exec-out",
+      "target": "warm_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-warm_call-exec-out-warm_fold-exec-in",
+      "source": "warm_call",
+      "sourceHandle": "exec-out",
+      "target": "warm_fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-warm_fold-exec-out-set_warm-exec-in",
+      "source": "warm_fold",
+      "sourceHandle": "exec-out",
+      "target": "set_warm",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-set_warm-exec-out-cycle_prompt-exec-in",
+      "source": "set_warm",
+      "sourceHandle": "exec-out",
+      "target": "cycle_prompt",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-cycle_prompt-exec-out-session-exec-in",
+      "source": "cycle_prompt",
+      "sourceHandle": "exec-out",
+      "target": "session",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-session-exec-out-check_cmd-exec-in",
+      "source": "session",
+      "sourceHandle": "exec-out",
+      "target": "check_cmd",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-check_cmd-exec-out-check_call-exec-in",
+      "source": "check_cmd",
+      "sourceHandle": "exec-out",
+      "target": "check_call",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-check_call-exec-out-check_fold-exec-in",
+      "source": "check_call",
+      "sourceHandle": "exec-out",
+      "target": "check_fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-check_fold-exec-out-set_check-exec-in",
+      "source": "check_fold",
+      "sourceHandle": "exec-out",
+      "target": "set_check",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-set_check-exec-out-check_line-exec-in",
+      "source": "set_check",
+      "sourceHandle": "exec-out",
+      "target": "check_line",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-check_line-exec-out-check_status-exec-in",
+      "source": "check_line",
+      "sourceHandle": "exec-out",
+      "target": "check_status",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-check_status-exec-out-steer_late-exec-in",
+      "source": "check_status",
+      "sourceHandle": "exec-out",
+      "target": "steer_late",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-steer_late-exec-out-set_steer_late-exec-in",
+      "source": "steer_late",
+      "sourceHandle": "exec-out",
+      "target": "set_steer_late",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-set_steer_late-exec-out-if_complete-exec-in",
+      "source": "set_steer_late",
+      "sourceHandle": "exec-out",
+      "target": "if_complete",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_complete-true-if_gate-exec-in",
+      "source": "if_complete",
+      "sourceHandle": "true",
+      "target": "if_gate",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_gate-true-gate_prompt-exec-in",
+      "source": "if_gate",
+      "sourceHandle": "true",
+      "target": "gate_prompt",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate_prompt-exec-out-gate-exec-in",
+      "source": "gate_prompt",
+      "sourceHandle": "exec-out",
+      "target": "gate",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate-exec-out-gate_fold-exec-in",
+      "source": "gate",
+      "sourceHandle": "exec-out",
+      "target": "gate_fold",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-gate_fold-exec-out-set_gate-exec-in",
+      "source": "gate_fold",
+      "sourceHandle": "exec-out",
+      "target": "set_gate",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-if_gate-false-auto_done-exec-in",
+      "source": "if_gate",
+      "sourceHandle": "false",
+      "target": "auto_done",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-auto_done-exec-out-set_done-exec-in",
+      "source": "auto_done",
+      "sourceHandle": "exec-out",
+      "target": "set_done",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-loop-done-report-exec-in",
+      "source": "loop",
+      "sourceHandle": "done",
+      "target": "report",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "e-report-exec-out-end-exec-in",
+      "source": "report",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-08-01T16:06:00.962626+00:00",
+  "updated_at": "2026-08-01T16:06:00.962626+00:00"
+}

@@ -8,6 +8,440 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- 2026-08-01 **`entity-life@0.0.18` — honest failure episodes (the
+  empty-completion half of P0-1).** A moment that ended WITHOUT WORDS (the
+  provider/relay served an empty completion — live find 2026-08-01: the
+  act node's `llm_call` returned `content: null` and the turn surfaced
+  `silent:1/degraded:1` honestly while the EPISODE still deposited
+  `"(I stayed silent)"` into the append-only graph as if the entity chose
+  it) now forms a LABELED failed-moment episode instead: title
+  `a moment that failed (<phase>, <turn_id>)`, digest carries
+  `[this moment failed: <moment_error> - no words were spoken; machinery,
+  not chosen silence]`, verbatim replaces the false `I SAID:` frame with
+  `THE MOMENT FAILED (machinery, not chosen silence):`, keywords derive
+  from the stimulus only (error prose is not the moment's content), and
+  `attributes` carry the machine-readable twin (`degraded: true`,
+  `moment_error`). The dead-rounds-child path gets the same treatment (its
+  episode no longer claims `I said: [the moment could not be lived: …]`).
+  Wiring mirrors the fold's exactly: `episode_prep` now receives
+  `guard_died`/`guard_error` from `rounds_guard` and `ended_silent` from
+  the turn output (`entity_flow_code.py` EPISODE_CODE +
+  `build_entity_life_workflow.py`). `"(I stayed silent)"` stays RESERVED
+  for replies that clean to empty by the entity's own election.
+  `entity_life_smoke.py` now pins both halves (scenario 2's existing
+  no-fabricated-silence check + two new scenario-3 checks: no
+  `(I stayed silent)` on an empty completion, and the labeled failure
+  episode present). Both entity smokes green; bundle packed to
+  `abstractgateway/flows/bundles/entity-life@0.0.18.flow` (the gateway
+  serves it after its next bundle reload/restart).
+- 2026-08-01 **Entity builder pins the guards' death channel against the
+  new `subflow_node` pin convention.** The 2026-07-30 `wf_common`
+  `subflow_node` started DECLARING `child_output` as an output pin; the
+  visual executor folds every declared non-exec output pin except
+  `output` into `effect_config.output_pins`, and the runtime compiler's
+  `start_subworkflow` spread overwrites `current["child_output"]` with
+  `result_value.get("child_output")` (None) whenever a resume payload's
+  output dict lacks a `"result"` wrapper — so a DEAD child read healthy
+  (`died=0`), degraded stayed 0, and the P0-1 fabricated-silence bug
+  returned (measured: `entity_life_smoke` scenario 2 went red on the first
+  rebuild). The entity builder now strips the declared `child_output` pin
+  (the shipped 0.0.17 byte shape: WIRED but not declared) until the
+  runtime spread skips `child_output` by name — that fix is runtime's
+  lane, and other bundle families that consume `child_output` after a
+  rebuild are exposed to the same clobber.
+- 2026-08-01 **Tool-approval drivers dedup by key again — and that is now
+  correct.** `scripts/benchmark_orchestrations.py` had been forced to approve by
+  OCCURRENCE (re-approving the same key up to 60 times) because an agent node
+  reused ONE `wait_key` (`tool_calls:<run_id>:act`) for every approval round, so
+  a key-deduplicating driver answered #1 and parked the run forever on #2
+  (live 2026-07-31, multiagent/bugfix). AbstractRuntime now mints one durable
+  key per approval instance (`tool_approval:{run}:{node}:{effect_identity}`), so
+  the benchmark driver is back to answering each key exactly once
+  (`MAX_ROUNDS_PER_KEY = 1`) — which keeps it a REGRESSION DETECTOR: if keys
+  ever collapse again the benchmark stalls loudly instead of quietly
+  re-approving its way through. `scripts/multiagent_coding_run.mjs` already
+  deduped by key and needed no change; its dedup is now documented as
+  correct-by-construction. Live proof: `basic-agent` driven by a strictly
+  key-deduplicating approver took 3 sequential approvals at the same `act` node
+  with 3 distinct wait keys and completed (run 6529fb2d, agent sub-run
+  f04548e2).
+- 2026-07-31 **`co-scientist@0.2.0` — the complete doctrine rework, with the
+  report bytes gated.** The deepest workflow in the corpus predated every
+  authoring wave: 37 exec-less code nodes, 4 namespaced state blobs
+  (`co.state`, `co.lit`, `co.citecheck`, `co.ts`) written by 9 `set_var`
+  nodes, 8 legacy `get` nodes, 5 subflow calls hiding their whole contract
+  behind one `input` object, ~12 000 characters of prompt and report prose
+  concatenated inside Python bodies, and zero pin expressions. All of it moved:
+  - **No blobs.** 23 flat top-level run vars written by 11 `set_vars` nodes and
+    read by 56 `get_var` chips (17 distinct names) that the canvas draws
+    folded. The blob had also DUPLICATED the literature base inside the
+    tournament state; flat vars removed the copy, so `lit_text` now has one
+    writer lineage instead of two.
+  - **Every code node is on the execution lane** (36 of them, 0 exec-less), so
+    each runs once in exec order instead of being re-pulled per consumer.
+  - **133 sentences became editable pin defaults with `{{slots}}`** — prompts,
+    citation rules, caveats, the methodology paragraph, every limitation
+    bullet, both grounding briefings. Bodies now only SELECT between texts and
+    fill slots. The 12 KB report body split into four section nodes
+    (head / methodology / ranked hypotheses / limitations+sources) plus a
+    prose-free join, each carrying its own section's wording.
+  - **Subflow calls declare one pin per child field**, both directions
+    (`deep-plan`, `deep-investigate` ×2, `diagram-render` ×2). That deleted the
+    three "compose the child's input object" code nodes AND the three `get`
+    nodes that dug results back out; the investigation ledger-discipline and
+    retry briefings are now editable array pin defaults on the call itself.
+  - **Two pin expressions, both real derivations**: the supervisor loop
+    (`vars.cycle < vars.max_cycles and len(vars.pool) > 0`) and the grounding
+    retry gate (`not vars.lit_grounding_ok`). Plain reads stayed chips.
+  - `audit_flow_graph.py --policy` goes from **17 policy findings to clean**
+    (5×P6, 12×P7), 130 nodes / 74 rendered, zero overlaps.
+  **No output changed, and that is gated, not asserted:**
+  `scripts/coscientist_smoke.py` replays **63 golden cases** captured from
+  0.1.16 (`scripts/coscientist_golden.json`, `coscientist_fixtures.py`) through
+  the REAL runtime code-node lane against the SHIPPED flow and fails on one
+  byte of drift — every prompt in both branches, the fold/Elo/ranking data
+  paths, and three full report renderings (grounded+figures, ungrounded, and
+  the citation-verified ledger). A second gate re-asserts each load-bearing
+  rule by name in the composed corpus of the stage that must obey it, so a
+  future pin edit cannot quietly delete one. Verified live end-to-end through
+  the gateway on the same goal and model as a 0.1.16 baseline run.
+
+### Fixed
+- 2026-07-31 **Bundled-flow drafts no longer haunt the empty canvas** (operator
+  report: an EMPTY Untitled canvas offered "Restore Multi-agent coding… from 3
+  minutes ago" after merely browsing that flow). Bundled flows load with
+  `flowId = null` by design, and `getFlow()` synthesizes a throwaway id — so
+  their local draft mirrors landed in the `__new__` slot, the exact slot a new
+  Untitled flow reads on the next visit. Bundled documents now get their own
+  draft slot (`bundled:<catalog-id>`, tracked via `loadedDocumentId` set on the
+  bundled load path and reset on every other identity change), the writer /
+  offer / discard / save-clear paths all speak the same slot, and a one-time
+  `rehomeMisfiledNewDraft` migration moves drafts the old bug misfiled into
+  `__new__` over to their bundled slot (never clobbering a newer one). A
+  bundled flow's unsaved edits are still offered back — when loading THAT
+  flow, where they belong. 5 new tests.
+- 2026-07-31 **Stale-draft recovery prompt now says which side is newer**
+  (operator hit this live). The localStorage draft safety net offered a
+  hours-old mirror of `multiagent-coding` with "Restore" as the primary
+  button — while the flow itself had been regenerated twice since. The prompt
+  knew the draft's age but never compared it to the loaded document, so
+  restoring would have silently replaced the newer version with superseded
+  work. `compareDraftRecency` (`src/utils/flowDraft.ts`) compares
+  `draft.savedAt` against the document's `updated_at`; when the draft is
+  OLDER, the prompt states the flow was updated more recently, "Restore"
+  demotes to "Restore anyway", and "Discard" becomes primary. The normal
+  recover-my-work case (draft newer) is unchanged. 4 new tests.
+
+### Added
+- 2026-07-31 **Readable reads: single-consumer Get Variables fold onto the pin
+  row they feed (backlog 0156 Stage 1, render-only).** The flat-state migration
+  had implemented "reads must be visible" as "reads must have a node", and
+  `multiagent-coding` paid for it: 161 nodes of which 91 were `get_var` chips,
+  85 of them feeding exactly one consumer, one 19-chip tower spanning 6,080px
+  to restate what the consumer's own pin rows already said in 500px. A `get_var`
+  with a configured `name`, no incoming edges and exactly one wire off `value`
+  now DRAWS as a teal read pill on its consumer's pin row; the card and wire are
+  hidden until the pill is clicked (reveal + select), and a toolbar toggle beside
+  the execution view puts every card back. The DOCUMENT is untouched — same
+  nodes, same edges, same runtime, nothing to migrate — so the fold is a pure
+  function of the graph and cannot drift; tools report `[nodes=…,
+  rendered_nodes=…]`. Shared, dangling and computed reads stay drawn (there the
+  node is the subject, not the argument). Measured on `multiagent-coding`:
+  rendered 161 → 76 cards + 85 pills, canvas 8,090px → ~2,100px, tallest column
+  7,010px → ~1,460px. Run-glow parity is kept on the pin row (`executingNodeId`
+  / recent-trajectory are node-keyed, so a folded read would otherwise lose its
+  execution trace), and variable wires render tri-state (faint at rest, full on
+  hover/selection) so a drawn read is never LESS visible than a folded one. The
+  predicate exists in TypeScript and in Python (layout + audit) and the two are
+  pinned by an executable gate, not a comment: `scripts/dump_folded.py` prints
+  the Python verdict for all 176 bundled flows and a vitest asserts the
+  TypeScript verdict is identical, id for id.
+  - Adversary pass, four breaks found and fixed: **deleting a consumer left its
+    folded reads behind** as dangling zero-edge getters that unfolded into an
+    unreadable 19-card pile at the deleted node's gutter — a delete now takes
+    the reads drawn on the card with it (only when they are folded, provably
+    dead, and one undo step); **the read pill revealed without selecting**, so
+    the revealed card had no selection ring and Delete/Backspace — which React
+    Flow routes by `node.selected` — silently did nothing (new
+    `selectNodeById`); **the canvas projection could leak into the document**,
+    because `useReactFlow().setEdges` re-emits the DISPLAYED edges as `reset`
+    changes that replace the whole list, so editing a Sequence pin would have
+    stamped `hidden: true` onto every folded read's wire and saved it (BaseNode
+    now reads and writes the store's edges, and the store strips `hidden` — a
+    render-only key no shipped flow carries — from reset/add changes);
+    and **a read folded onto another getter's `name` pin rendered nowhere at
+    all**, wire hidden by the fold and pill hidden by the compact-getter card's
+    collapsed config rows — a P12 muted-variable violation, now the one thing
+    that always keeps the row open. Marquee selection, undo/redo across
+    fold-affecting edits, clipboard, exec-view interaction and run-glow were
+    exercised and hold.
+
+### Fixed
+- 2026-07-31 **Fresh-workspace merge always failed: `main` was never born
+  (live gateway find)**: the git bootstrap ran `git init -b main` then
+  `checkout -b <slug>` — but `checkout -b` off an UNBORN head *moves* the ref,
+  so `main` never materialized as a branch and the merge step reported "no
+  main/master branch found - merge skipped" on every green build in a fresh
+  workspace (run fb548675: `approved-merge-failed` with all gates green). The
+  branch-first ordering existed to protect an EXISTING repo's current branch
+  from the baseline sweep (adversary F7) — a concern that does not apply to a
+  fresh init. The bootstrap is now two-sided: fresh init births `main` with the
+  baseline commit (`--allow-empty`) BEFORE branching; existing repos keep
+  branch-first. Proven by an isolated shell repro and by live gateway run
+  09d97d3b: `Outcome: approved-and-merged, Merged: yes`, textbook
+  `--no-ff` graph. Smoke's one-sided ordering assertion replaced by two
+  (`git-fresh-init-births-main`, `git-branch-before-baseline-sweep`).
+- 2026-07-31 **Auto mode parked forever on `list_files` (live gateway find)**:
+  the bundle's `auto_mode_requirement` metadata — and the wrapper's own
+  user-facing description — told unattended callers to auto-approve
+  `execute_command` alone, but the verify subflow also calls `list_files` /
+  `read_file` (and, on probe-capable hosts, `browser_probe`) through
+  `call_tool` nodes. An operator following the bundle's own instructions
+  deadlocked on the first uncovered tool (gateway run 02eb7ba9: 20+ minutes
+  parked at verify `list_call` with no visible cause). Both advertised lists
+  now name all four tools, and a new smoke gate
+  (`auto-mode-metadata-covers-call-tools`) fails the build if any advertised
+  auto-approve list stops covering every `call_tool` allowlist in the family —
+  the gate reads the INTERSECTION of all advertised lists, so one stale copy
+  fails it. Runtime tool-policy propagation itself was verified correct
+  (`runtime.py` `_handle_start_subworkflow` forwards
+  `_runtime.tool_policy` across every subflow hop with setdefault semantics).
+
+### Changed
+- 2026-07-30 **multiagent-coding 0.0.16: pins, not blobs.** The operator's
+  ruling — *"I do not understand how you can call a subflow without setting the
+  input. The whole point of VISUAL authoring is to have no code, except for
+  experts. Whenever you are NOT using the pins, it means you are HIDING
+  something and that's very bad"* — applied to every subflow call in the family.
+  A subflow node now DECLARES the child's `on_flow_start` fields as its own
+  input pins (`wf_common.subflow_node(child_inputs=...)`), mirroring the
+  `child_outputs` mechanism already shipped, so a call's contract is WIRED on
+  the canvas instead of assembled off it.
+  - **wrapper `multiagent-coder`**: the `input:object` pin and the `map_input`
+    ("Map prompt -> request") code node that built it are gone; six declared
+    pins (`request`, `workspace_root`, `gating_mode`, `provider`, `model`,
+    `browser_probe_available`) are wired straight from `start`, and
+    `prompt -> request` is a rename you can now SEE. `map_input` was deleted
+    after auditing it line-by-line against the child's real door: strip-request,
+    strip-workspace, gating normalize + allowlist are all done by
+    `multiagent-coding`'s `preflight`, on the run that actually uses them. The
+    wrapper is pure wiring: `start -> build -> compose answer -> end`
+    (5 nodes -> 4, and its only code node is the dead-child answer floor).
+  - **root `multiagent-coding`**: the `verify` call's `input:object` and the
+    `make_object "Build JSON"` feeding it are gone; the seven Get Variable
+    chips that already existed wire straight into seven declared pins
+    (162 nodes -> 161). No `make_object` survives anywhere in the family.
+  - **absent means absent** (measured against the real scheduler, not assumed):
+    a declared-but-unwired, undefaulted pin never reaches `input_data`, so it is
+    not written into the child's vars and the CHILD's own start-pin default
+    applies. A pin that IS wired and carries `None` DOES shadow that default —
+    which is why the wrapper declares only the six of the child's twelve fields
+    it actually owns, and leaves `skills`/the three budgets/the two commands to
+    the child. Proven live: the effect payload carries exactly six keys.
+  - **the gate**: `multiagent_coding_smoke.py` and `bundledFlows.test.ts` both
+    fail, naming the offender, if any subflow node in the family takes a
+    one-object `input` pin, declares a pin that is not a real field of its
+    child, or declares a pin nothing wires.
+  - **editor**: `subflowPinPatchForSelectedFlow` no longer rewrites ANY in-use
+    subflow node (it previously guarded only the one-object convention). A
+    per-field node needs it more: a blind interface sync would add the child
+    fields the caller deliberately omits and drop the `output`/`child_output`
+    death channel, orphaning wires on load.
+- 2026-07-30 **multiagent-coding 0.0.15: the state blob is gone.** The operator's
+  standing ruling — *"the state blob, I don't think it should ever have been
+  created, it's opaque and then we never see on the visual authoring which
+  variable is actually used, we have to open the function and try to make sense
+  of it. this is bad. ... I would completely break / remove the state blob"* —
+  is fulfilled. Run state is FLAT, top-level, typed run vars:
+  - **writes**: nine `set_vars` nodes replace nine `set_var{name:"state"}`.
+    Each fold returns `{"updates": {…}}` naming exactly the variables it moves,
+    and `set_vars` writes only the keys it is given — so the conditional writes
+    (`environment_blocked`, `repair_history`, `approved`, the doc-drift red
+    write) stay conditional without copying a container forward. No new node
+    type: `set_vars` already shipped in the catalog and the runtime.
+  - **reads**: 16 `get_var{name:"state"}` blob pulls became 91 chips naming 38
+    distinct variables, each wired to a pin named after it. No node takes a
+    `loop_state` container pin. `scout_merge`, `branch_fold` and `doc_drift`
+    now read ZERO run vars; `gate1_parse` reads one.
+  - **expressions**: 22 → 14, and `vars.state` occurs 0 times. Loop and branch
+    laws must stay expressions (one pure pin, re-read per iteration) but now
+    spell every variable they weigh — `build_again` takes eight named arguments
+    where it took the blob. `audit --policy`: 0 P1 trivial reads, 0 P2 field
+    extracts.
+  - **the one surviving object** is `verify.input`, where seven values cross a
+    run boundary as a unit: BUILT there by a `make_object` node fed by seven
+    chips, never stored, never a seven-way `.get()` expression.
+  - **the gate**: `verify_multiagent_bundle.py` now fails, naming the offender,
+    on any `set_var`/`get_var` named `state`, any expression touching
+    `vars.state`, any function body reading it, any `loop_state` pin, and any
+    `set_var` on the coding root. Mirrored at build time and in the smoke +
+    vitest. Proven by negative control.
+  - `collectDeclaredVarNames` learned `set_vars`: the seed node carries the
+    whole 31-key run-var inventory as its `updates` pin default, so the
+    vocabulary is visible/editable on one node, the variable picker and the
+    unknown-var preflight check know the names, and a missing wire is
+    fail-closed (`preflight_ok: false` refuses at the door).
+- 2026-07-30 **multiagent-coding: three canvas smells the operator named, and
+  what each one actually deserved.**
+  - *"Why not create get model and get provider once for an area of the graph
+    and reuse them on the nearby agent calls?"* — right, and now measured
+    rather than guessed. Clusters are derived from the laid-out exec columns
+    (`apply_flow_layout` pitch = 480px/column; a pure helper takes the column
+    of its EARLIEST consumer): **scouts** (adjacent columns), **authors**
+    (planner + builder, two columns), **doc** (ten columns out, alone). Ten
+    chips became six, and every canvas metric improved together — fewest node
+    boxes crossed by a getter wire (11 → 9), shortest flow-wide mean data wire
+    (550 → 519px) and shortest flow-wide max (3067 → 2767px), because chips a
+    column no longer stacks also stop pushing that column's exec lane down.
+    One pair for the whole flow was measured and REJECTED: a 7,872px wire to
+    the documenter, 26 crossings.
+  - *"Why don't you use a variable enum and do a switch on gating_mode?"* —
+    the switch is refused and the reason is on the node: `switch` is exec-lane,
+    so it costs a switch + one Answer User per case + a re-join to emit ONE
+    line, each case carries its own copy of the `"gating: "` prefix, and it
+    fails OPEN on an unenumerated value (the run-start line silently vanishes
+    exactly when something unexpected happened). What the ask is right about —
+    two cases a human can read and change — ships as the flow's own
+    prose-composer shape: `gating_line` and `cycle_line` are code nodes whose
+    sentence and case words are editable pin defaults with `{{slots}}`, fed by
+    named Get Variable chips. Both status lines were pin EXPRESSIONS carrying
+    user-visible prose, which is worse than prose buried in Python: you cannot
+    find it from the canvas. Gate 2's `choices` moved the same way — from a
+    conditional-literal expression to a second output pin on `gate2_prompt`,
+    which already branches on `all_passed` to word the prompt, so the words a
+    reviewer is offered and the words asking for them cannot drift.
+  - *"Why did you create that complicated tool call + pure function instead of
+    just a code node?"* — the Call Tool node stays (a sandboxed code node
+    cannot spawn a process, so `execute_command` is load-bearing), but the
+    COMPOSITION was an invisible pin expression reaching into the Functions
+    drawer: four hops to answer "what command does this run?". All seven shell
+    composers are now code nodes feeding their Call Tool node's `tool_call` pin
+    on a wire — the same compose→consume shape `gate2_prompt`, `builder_prompt`
+    and `pr_body` already used. Unblocked by promoting `shq` to a runtime
+    sandbox helper (see the AbstractRuntime changelog): the ONE reason they
+    lived in the library was that a code node could not call the shell escape,
+    and seven inlined copies of a quoting routine is a command injection
+    waiting for one of them to drift. The flow function library is down to
+    three entries (`branch_slug`, `build_again`, `tail_escalate`) from twelve.
+    Command TEXT deliberately did NOT become editable pin defaults: these are
+    hardened executable strings where every interpolation point is a quoting
+    decision, and a `{{slot}}` template invites an edit that adds an unescaped
+    one.
+
+### Fixed
+- 2026-07-30 **A gated run looked busy instead of asking its question**
+  (operator report). The run view auto-selects the latest step only while live
+  following is ARMED, and any manual click disarms it for the rest of the run —
+  so an operator who inspected one step early sat watching a run that appeared
+  to be working while it was actually blocked on a plan-approval gate. The
+  details pane never moved to the waiting node. Now a step blocking on a HUMAN
+  (`status: waiting` with any reason other than `subworkflow`, which is the
+  parent parked on its child and deliberately renders as RUNNING) always pulls
+  focus: collapsed subflow ancestors expand, the row scrolls into view, and the
+  question is shown — regardless of the follow state. Revealing a gate does NOT
+  disarm following (`jumpToStep({preserveFollow: true})`), live-follow yields
+  while a gate is open, and the jump is keyed by step id + wait key so a second
+  approval round on the same node jumps again while re-renders of one wait do
+  not fight the user. Extracted to `src/utils/gatedStep.ts`; 11 tests.
+- 2026-07-30 **A provider outage was laundered into wrong advice.** An empty
+  `planner_data` has two causes that look identical to `auto_accept_plan`: a
+  live planner emitting malformed JSON, and a planner whose `llm_call` DIED
+  (agent death does not fail the parent, so a provider 400/429 also arrives as
+  `{}`). The feedback asserted the first — "planner returned no structured plan
+  - emit valid JSON with title, goal and steps" — and the loop burned all three
+  plan revisions retrying. Observed live against a hard
+  `credit balance is too low` 400. The message no longer asserts a cause it
+  cannot know and points at the agent trace; two smoke gates pin it, including
+  one that fails if the text ever blames JSON again. The structural fix
+  (short-circuit revisions on a provider-level failure) needs the agent's error
+  to reach the shaper and is NOT done — `set_state_plan_auto.value` already
+  carries a wire plus an expression, and a second data wire into one pin is a
+  hard `ValueError`.
+- 2026-07-30 **`errorSnippet` reads a completed-but-unsuccessful run.** Such a
+  payload carries `error: null` with the human sentence in
+  `result.response`/`meta.stopped_reason`, so the first version fell through to
+  the compact-JSON branch and showed machinery instead of the outcome. Added
+  `stopped_reason`/`response`/`report` to the message keys and a `result`/
+  `output` carrier descent, ordered so a real `error` still wins.
+- 2026-07-30 **Run-failure toast showed a lone `{` instead of the error**
+  (operator report). `showWorkflowFailedToast` formatted the payload with
+  `JSON.stringify(err, null, 2)` and then displayed its FIRST non-empty line —
+  which for every object-shaped error, i.e. everything the gateway returns, is
+  the opening brace. The toast read "Workflow failed / {" and the entire
+  diagnostic was unreachable without clicking to copy, so a failing run gave
+  the operator nothing to act on. New `src/utils/errorSnippet.ts` walks the
+  payload for `detail`/`message`/`error`/`reason` (recursing into nested
+  gateway shapes and arrays of validation errors), appends the failing
+  `node`/`pin` when the message does not already name it, and falls back to
+  COMPACT json rather than a structural brace. 11 tests.
+
+### Changed
+- 2026-07-30 **Expression/function doctrine — bound the tiers, restore the
+  primitives** (operator ruling; two adversarial reviews + a corpus census —
+  see `docs/backlog/proposed/0155_expression_and_function_doctrine.md`).
+  `multiagent-coding` carried 56 pin expressions, 28 flow functions (579 lines
+  off-canvas, **25 of them called once**), and **zero** `get_var`,
+  `break_object`, `string_template` or `format` nodes — all four of which ship.
+  Corpus-wide, 70% of the 111 pin expressions are not derivations at all: 20
+  are plain run-var reads, 32 are field extracts off a wire, 26 are one-call
+  wrappers over single-use functions. The two lanes are behaviourally
+  IDENTICAL — every pure node is volatile (`executor.py:4663`) and re-pulled per
+  resolution, loops evict upstream pure outputs per iteration
+  (`compiler.py:4310`), and the same loop written both ways completes the same
+  (probe: expression `final_i=3`, `get_var` chain `final_i=3`) — so the choice
+  is only about what the canvas draws. Ruling: **an expression is for a
+  derivation, never for a read.** Enabling changes:
+  - **`get_var` declares a `default` pin.** The runtime always honoured
+    `pinDefaults.default`, but the template declared no pin, so a palette getter
+    could not express `.get(key, fallback)` and resolved to `None` on a missing
+    path — falsy, which on `if_g1`/`if_g2` silently skips a human approval gate.
+    This is why every `.get(k, d)` read had to stay an expression. Existing
+    saved getters are untouched (template pin backfill runs only for `code`
+    nodes and a media allowlist).
+  - **Compact getter render.** A configured Get Variable collapses to a chip
+    (256×108, was 256×190); name/default rows reveal on hover or selection so
+    inline editing is never lost. A getter used to occupy the same 320×220
+    layout cell as an Agent node — that cost is why authors reached for
+    invisible expressions. Blueprint's `CompactNodeTitle` posture.
+  - **Doctrine advisories in preflight** (`trivialExpressionKind`), WARNING-grade
+    only: a style rule must never block Run.
+  - **`audit_flow_graph.py --policy`** reports P1 trivial read / P2 field
+    extract / P3 thin wrapper / P4 single-use function / P5 oversized function
+    (`--policy-strict` to enforce). Also adds always-on **pin-level endpoint
+    checks** — undeclared source/target pins, with the documented carve-out for
+    `code` and `subflow` source handles — clean across the whole bundled
+    catalog, and 18 real defects found in 7 legacy flows every existing gate
+    calls clean.
+  - **Authoring guidance rewritten** (`workflow-authoring-skill.md`,
+    `visualflow.md`). The old text told authoring agents to "prefer an
+    expression over a Get Variable -> Code chain for a small condition or field
+    read", which is the instruction that produced the corpus; and the
+    `functions` field was accepted by the authoring document with no rule
+    documented anywhere. Both fixed.
+  **Migration wave 1 — `multiagent-coding` 0.0.13**: every trivial read is now a
+  node. 47→67 nodes, 68→88 edges, **56→36 pin expressions, 0→20 Get Variable
+  chips**, `--policy` P1 findings **20→0**. The 10 provider/model reads became
+  LOCAL chips (two per agent) rather than shared getters: `apply_flow_layout`
+  puts a pure helper in its consumer's column, so a chip per consumer keeps
+  wires short instead of dragging one getter across 5,700px — Blueprint's own
+  idiom, where getters are duplicated freely and placed next to what reads them.
+  The 5 boolean gate conditions carry their `default` on the chip, so a missing
+  key keeps the gates SHOWN. The 5 folds take loop state on a visible wire. Node
+  count rose because visibility was the point — those 20 edges were always real
+  dependencies, merely undrawn. Also fixes a latent layout bug
+  (`wf_common.apply_flow_layout`): lane-1 pure helpers stacked upward from lane
+  1's base into lane 0's exec column, which never showed before branch lanes
+  carried pure helpers. Smoke updated — the four condition assertions now pin
+  the getter WIRING (name + default) instead of expression text, plus a
+  `no-trivial-read-expressions` doctrine gate; 198 checks pass.
+  Verified: `npm run verify:multiagent` clean, `multiagent_coding_smoke.py` all
+  198 checks pass (incl. every e2e through the real Runtime), full-tree probe
+  byte-identical, 470 editor tests, 163 runtime visualflow tests. Not a finding:
+  `multiagent-coder` **executes** end to end through the real Runtime — the
+  `map_input.built` edge is the documented code-node returned-dict idiom; any
+  failure to run it is host-side (async+wait child pumping, and no live-run
+  script targets the wrapper).
+
 - 2026-07-28 **multiagent-coding 0.0.12 (wave-B library + layout)** — one
   operator-facing library row (`multiagent-coder`); pipeline
   (`multiagent-coding`) and verify subflow fold under

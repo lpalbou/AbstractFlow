@@ -230,37 +230,42 @@ export function subflowPinPatchForSelectedFlow(
     }>;
   }
 ): Pick<FlowNodeData, 'inputs' | 'outputs'> | null {
-  // Generator-built flows use the ONE-OBJECT convention: a single `input`
-  // object pin (the runtime maps its keys by name onto the child's start
-  // fields) and one `output` pin collecting the end fields. When that shape
-  // is IN USE (an expression composes `input`, or edges ride input/output),
-  // it is valid as-is — rewriting it to per-field interface pins orphans
-  // every wire on the node (persistence adversary P1-2: a family copy
-  // rendered 60 of its 69 persisted edges after the sync fired). A
-  // template-fresh node (same shape, nothing attached) still syncs — that
-  // is the palette flow the interface sync exists for.
-  const dataInputIds = (data.inputs || []).filter((p) => p.type !== 'execution').map((p) => p.id);
-  const dataOutputIds = (data.outputs || []).filter((p) => p.type !== 'execution').map((p) => p.id);
-  const usesObjectConvention =
-    dataInputIds.includes('input') &&
-    dataOutputIds.includes('output') &&
-    dataInputIds.every((id) => id === 'input' || id === 'inherit_context' || id === 'inheritContext');
-  if (usesObjectConvention) {
-    const exprs = data.pinExpressions;
-    const inputExpression =
-      exprs && typeof exprs === 'object' ? (exprs as Record<string, unknown>).input : undefined;
-    const hasInputExpression = typeof inputExpression === 'string' && inputExpression.trim().length > 0;
-    const nid = opts?.nodeId;
-    const carriesEdge = Boolean(
-      nid &&
-        (opts?.edges || []).some(
-          (e) =>
-            (e.target === nid && e.targetHandle === 'input') ||
-            (e.source === nid && e.sourceHandle === 'output')
-        )
-    );
-    if (hasInputExpression || carriesEdge) return null;
-  }
+  // AN IN-USE SUBFLOW NODE IS NEVER REWRITTEN, in either convention.
+  //
+  // Rewriting an attached node to the child's interface pins orphans every
+  // wire that does not survive the rename (persistence adversary P1-2: a
+  // family copy rendered 60 of its 69 persisted edges after the sync fired).
+  // That was first fixed for the ONE-OBJECT convention (a single `input`
+  // object pin plus an `output` pin collecting the end fields), but the
+  // hazard was never about the convention — it was about the WIRES.
+  //
+  // PER-FIELD nodes need the same protection, and more of it: an authored
+  // node declares the child fields it actually sets (the caller may own six
+  // of the child's twelve — see `wf_common.subflow_node`, where declaring a
+  // field it does not own would push a None across the boundary and shadow
+  // the child's own start-pin default), and it keeps the runtime-provided
+  // `output` / `child_output` handles that carry the dead-child channel.
+  // A blind sync would add the six it deliberately omits and DROP the death
+  // channel, silently breaking a wired graph on load.
+  //
+  // A template-fresh node (nothing attached) still syncs — that is the
+  // palette flow the interface sync exists for.
+  const exprs = data.pinExpressions;
+  const inputExpression =
+    exprs && typeof exprs === 'object' ? (exprs as Record<string, unknown>).input : undefined;
+  const hasInputExpression = typeof inputExpression === 'string' && inputExpression.trim().length > 0;
+  const nid = opts?.nodeId;
+  const isDataHandle = (handle?: string | null) =>
+    Boolean(handle) && handle !== 'exec-in' && handle !== 'exec-out';
+  const carriesEdge = Boolean(
+    nid &&
+      (opts?.edges || []).some(
+        (e) =>
+          (e.target === nid && isDataHandle(e.targetHandle)) ||
+          (e.source === nid && isDataHandle(e.sourceHandle))
+      )
+  );
+  if (hasInputExpression || carriesEdge) return null;
 
   const start = findFlowStartNode(flow);
   const end = findFlowEndNode(flow);

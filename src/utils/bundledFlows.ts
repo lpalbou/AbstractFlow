@@ -51,6 +51,12 @@ const bundledFlowModules = import.meta.glob<VisualFlow>(
     // are the named brain processes (composed, listed as children). Same
     // wildcard rationale as multiagent-*.
     '../../examples/flows/entity-*.json',
+    // The two HAND-WIRED LOOP coders (operator directive 2026-07-31): a ReAct
+    // loop and a Ralph loop built from llm_call + tool_calls with NO agent
+    // node, so the loop itself is on the canvas and benchmarks against the
+    // multiagent pipeline. Same wildcard rationale as multiagent-*.
+    '../../examples/flows/react-*.json',
+    '../../examples/flows/ralph-*.json',
   ],
   {
     eager: true,
@@ -75,8 +81,11 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // 0.0.2 stayed registered on the gateway, so this pin silently kept
     // one-click library runs on the known-bad version until the surfacing
     // check compared pins against the registry (2026-07-25).
-    bundleVersion: '0.0.3',
-    bundleRef: 'basic-agent@0.0.3',
+    // 0.0.4 = 2026-08-01: the status helper subflow gained its missing
+    // On Flow End — 0.0.3 runs never terminated (the child run could not
+    // reach a terminal state, so the parent waited on it forever).
+    bundleVersion: '0.0.4',
+    bundleRef: 'basic-agent@0.0.4',
   },
   'coding-agent': {
     flowId: 'coding-agent',
@@ -84,24 +93,37 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // 0.2.0 = deterministic-gates redesign (R-Type post-mortem): delivery +
     // integration gates before the LLM, browser_probe execution gate for web
     // entrypoints (fail-closed), environment-vs-fixable failure split.
-    bundleVersion: '0.2.4',
-    bundleRef: 'coding-agent@0.2.4',
+    // 0.2.5 = the interactive bar (2026-07-31): every round drains
+    // `_runtime.inbox` (inject_guidance / Runtime.steer) into the builder
+    // prompt behind a run-owned watermark, and emits a "coding round N of M"
+    // progress line — the same steering + progress contract the new
+    // react-coder / ralph-coder loops ship with.
+    bundleVersion: '0.2.5',
+    bundleRef: 'coding-agent@0.2.5',
   },
   coder: {
     flowId: 'coder',
     bundleId: 'coding-agent',
-    bundleVersion: '0.2.4',
-    bundleRef: 'coding-agent@0.2.4',
+    bundleVersion: '0.2.5',
+    bundleRef: 'coding-agent@0.2.5',
   },
   'co-scientist': {
     flowId: 'co-scientist',
     bundleId: 'co-scientist',
+    // 0.2.0 = the doctrine rework: four state blobs dissolved into flat run
+    // vars (set_vars writes, get_var chips read), every code node on the exec
+    // lane, 133 prompt/report sentences moved into editable pin defaults with
+    // {{slots}}, five subflow calls converted to per-field pins, eight legacy
+    // `get` nodes removed, two pin expressions for the real derivations.
+    // NO OUTPUT CHANGED: scripts/coscientist_smoke.py replays 63 golden cases
+    // captured from 0.1.16 and fails on one byte of drift.
+    // 0.1.16 = TOTAL citation-verification coverage (every fetched ledger URL
+    // re-fetched and title-checked; failures barred from citation).
     // 0.1.8 = quality wave vs the Nature paper: hardened grounding + citation
     // allowlist, decoration-free generative views, novelty floor + diversity,
     // structured per-hypothesis protocols, Elo-evolution figure + methodology.
-    // 0.1.7 = deep-* subflow rename (grounding via deep-plan/deep-investigate).
-    bundleVersion: '0.1.16',
-    bundleRef: 'co-scientist@0.1.16',
+    bundleVersion: '0.2.0',
+    bundleRef: 'co-scientist@0.2.0',
   },
   'diagram-render': {
     flowId: 'diagram-render',
@@ -160,9 +182,41 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   'multiagent-coder': {
     flowId: 'multiagent-coder',
     bundleId: 'multiagent-coding',
-    // 0.0.12 = canvas-aligned layout + verify_input inline; sole library run target.
-    bundleVersion: '0.0.12',
-    bundleRef: 'multiagent-coding@0.0.12',
+    // 0.0.16 = PINS, NOT BLOBS: every subflow node in the family DECLARES the
+    // child's on_flow_start fields as its own input pins, so a call's contract
+    // is wired on the canvas instead of assembled off it. The wrapper's
+    // `map_input` code node and the root's `make_object "Build JSON"` are both
+    // deleted (their coercions were already the child door's job), leaving the
+    // wrapper as pure wiring: start -> build -> compose answer -> end. Builds
+    // on 0.0.15 (state blob removal: flat, top-level, typed run vars; writes
+    // are `set_vars`, reads are one `get_var` chip per variable) and 0.0.14
+    // (no ACCESS expression anywhere in the family; every prompt/report/
+    // advisory in an editable pin default). Sole library run target.
+    bundleVersion: '0.0.16',
+    bundleRef: 'multiagent-coding@0.0.16',
+  },
+  // The two hand-wired loop coders (2026-07-31). Only the agent.v1 WRAPPERS
+  // are run targets: the coding.v1 roots and ralph's per-cycle session are
+  // composed members (see BUNDLED_COMPOSED_ONLY_IDS), same shape as
+  // multiagent-coder / multiagent-coding.
+  'react-coder': {
+    flowId: 'react-coder',
+    bundleId: 'react-coding',
+    // 0.1.1 = the LATE STEER DRAIN (found on live gateway run 97d61a88's
+    // class): the inbox is drained again after the model claims it is done,
+    // and a steer that landed while it was answering re-opens the loop for
+    // one more cycle instead of being dropped silently.
+    bundleVersion: '0.1.1',
+    bundleRef: 'react-coding@0.1.1',
+  },
+  'ralph-coder': {
+    flowId: 'ralph-coder',
+    bundleId: 'ralph-coding',
+    // 0.1.1 = the LATE STEER DRAIN (found on live gateway run 07989c5d: the
+    // deterministic check passed on cycle 1 and the in-flight steer was never
+    // applied). Fresh steering now RE-OPENS a completion.
+    bundleVersion: '0.1.1',
+    bundleRef: 'ralph-coding@0.1.1',
   },
 };
 
@@ -174,6 +228,9 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
 export const BUNDLED_COMPOSED_ONLY_IDS: ReadonlySet<string> = new Set([
   'multiagent-coding',
   'multiagent-verify-gates',
+  'react-coding',
+  'ralph-coding',
+  'ralph-cycle',
 ]);
 
 /** Names produced by Toolbar/Rename family duplicate — used by cleanup script classification only. */
