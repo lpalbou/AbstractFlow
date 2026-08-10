@@ -1368,8 +1368,11 @@ for it in items_l:
                      "kind": kind, "source": src, "practice_note": pnote,
                      "status": status, "evidence": ev, "proxy_note": note})
 arts = [str(a).strip() for a in (verdict.get("artifacts") or []) if str(a).strip()]
+# ADR-0026: name EVERY produced file — a [:5] slice made the report
+# unable to point at artifacts 6+ (the operator then needed a second
+# agent just to FIND them).
 if not arts and files:
-    arts = files[:5]
+    arts = files
 if arts:
     lines.append("")
     lines.append("Artifacts (paths relative to the run workspace root):")

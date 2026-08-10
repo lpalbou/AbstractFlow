@@ -21,8 +21,9 @@ steering fold visible as a node. So the ReAct loop is drawn:
 MEMORY MODEL: ACCUMULATING. The transcript run var grows every cycle and is
 templated into the next prompt — that is ReAct's identity, and the axis this
 family is meant to measure against ralph-coder (fresh context + workspace
-memory). The transcript is tail-bounded so a long run degrades honestly
-instead of exploding the context.
+memory). The transcript is UNBOUNDED by default (ADR-0026): an operator who
+wants a tail bound sets the `max_chars` pin explicitly, and the trim then
+carries the loud `trim_marker` in-band.
 
 STEERING (the mission's second half): `Runtime.steer()` / the gateway's
 `inject_guidance` command queue into the steer sidecar; the run's own tick
@@ -425,15 +426,18 @@ VERIFY_CMD_CODE = r"""
 ws_q = shq(str(workspace_root or "").strip())
 cmd = ("cd '" + ws_q + "' && ( " + str(verify_command or "true") + " ) "
        "> .react_verify.log 2>&1; echo \"VERIFY_EXIT=$?\"; "
-       "tail -n 40 .react_verify.log 2>/dev/null")
+       # ADR-0026: whole log — `tail -n 40` hid the first error from the coder.
+       "cat .react_verify.log 2>/dev/null")
 return {"tool_call": {"name": "execute_command", "arguments": {"command": cmd, "timeout": 300},
                       "call_id": "react-verify"}}
 """.strip()
 
 VERIFY_FOLD_CODE = r"""
 txt = text_of(result)
-tail = txt[-2000:] if len(txt) > 2000 else txt
-return {"updates": {"verified": "VERIFY_EXIT=0" in txt, "verify_text": tail}}
+# ADR-0026: `verify_text` is read by the next cycle's coder prompt. A silent
+# 2000-char tail clip sat here and dropped the FIRST error of every long
+# verify log — the one the coder needed most — with no marker.
+return {"updates": {"verified": "VERIFY_EXIT=0" in txt, "verify_text": txt}}
 """.strip()
 
 REPORT_CODE = r"""
@@ -700,7 +704,13 @@ def build_root() -> dict:
                      outputs=[pin("updates", "updates", "object")], exec_pins=True)
     fold["data"]["pinDefaults"].update({"entry_text": TRACE_ENTRY_TEXT,
                                         "trim_marker": TRACE_TRIM_TEXT,
-                                        "max_chars": 24000})
+                                        # ADR-0026: NO default transcript bound.
+                                        # 24000 shipped as a silent default and
+                                        # ate the head of any run past ~15
+                                        # cycles. 0 = unbounded; an operator who
+                                        # WANTS a bound sets this pin explicitly
+                                        # and gets the loud trim marker with it.
+                                        "max_chars": 0})
     N.append(fold)
     E.append(edge("react_llm", "response", "fold", "thought"))
     E.append(edge("calls_json", "result", "fold", "calls_text"))

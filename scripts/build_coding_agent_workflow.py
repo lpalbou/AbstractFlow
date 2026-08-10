@@ -712,7 +712,8 @@ if have:
             continue
         if p not in paths:
             paths.append(p)
-paths = paths[:16]
+# ADR-0026: hash EVERY declared artifact; a [:16] slice left artifacts
+# 17+ unbound to their SELFCHECK.md hashes, i.e. silently unverified.
 if not paths:
     return {
         "name": "execute_command",
@@ -1198,15 +1199,17 @@ if web:
         # still navigates and still reports "Browser probe: PASS". Harvesting
         # these only under `not ok` let exactly that class through as
         # "executes".
-        for e in (r.get("page_errors") or [])[:8]:
+        # ADR-0026: EVERY page error is a defect the repair round must see —
+        # 8/4/6 slices sat on these three and hid the tail of a broken page.
+        for e in (r.get("page_errors") or []):
             failures.append("execute(web): uncaught exception in " + entry + ": " + str(e))
-        for e in (r.get("console_errors") or [])[:4]:
+        for e in (r.get("console_errors") or []):
             failures.append("execute(web): console error in " + entry + ": " + str(e))
         # World-side dangling-asset catch (closes what G1's parser deliberately
         # skips: css url(), srcset, dynamic imports): a failed LOCAL load is a
         # real defect even when the page survives it. Cross-origin blocks are
         # reported separately by the probe (blocked_requests) and stay quiet.
-        for e in (r.get("failed_requests") or [])[:6]:
+        for e in (r.get("failed_requests") or []):
             failures.append("execute(web): failed resource load: " + str(e) + " — a referenced asset is missing or misnamed")
         if not bool(r.get("ok")) and not failures:
             failures.append("execute(web): browser probe failed at stage " + (stage or "?") + ": " + str(r.get("error") or "unknown"))
@@ -1322,7 +1325,7 @@ failures = (
 warnings = [str(w) for w in (g5.get("warnings") or [])]
 failed = len(failures) > 0
 entry = str(g0.get("entrypoint") or "")
-arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])][:5]
+arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])]  # ADR-0026: no [:5]
 summary = "deterministic gates failed before verification: " + "; ".join(failures) if failed else "deterministic gates passed"
 return {
     "failed": failed,
@@ -1396,7 +1399,7 @@ if verdict_missing:
         + " — deterministic gates (" + passed_gates + ") passed; the artifact is delivered but could not be independently verified here"
     )
     entry = str(g0.get("entrypoint") or "")
-    arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])][:5]
+    arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])]  # ADR-0026: no [:5]
     return {
         "builds": False,
         "executes": bool(g3.get("executes_web")) if web else False,
@@ -1486,7 +1489,7 @@ all_passed = builds and executes and matches and len(env_failures) == 0
 arts = [str(a).strip() for a in (v.get("artifacts") or []) if str(a).strip()]
 if not arts:
     entry = str(g0.get("entrypoint") or "")
-    arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])][:5]
+    arts = [entry] if entry else [str(f) for f in (g0.get("files") or [])]  # ADR-0026: no [:5]
 return {
     "builds": builds,
     "executes": executes,
@@ -1722,7 +1725,8 @@ if repair:
                     tokens.append(t)
             else:
                 k = k + 1
-    tokens = tokens[:12]
+    # ADR-0026: every token from the failure text; a [:12] slice dropped the
+    # ones naming the actual defect site.
     parts.append("")
     parts.append("Repair protocol (follow IN ORDER):")
     parts.append("Step 1: read " + (artifact if artifact else "the failing artifact") + " with read_file before changing anything.")
@@ -1811,7 +1815,8 @@ if ws:
     parts.append("Workspace root: " + ws)
 parts.append("")
 parts.append("## Ground truth already verified mechanically (do not re-derive)")
-parts.append("Delivered files (" + str(len(files)) + "): " + ", ".join(files[:40]))
+# ADR-0026: name every delivered file (a [:40] slice sat here).
+parts.append("Delivered files (" + str(len(files)) + "): " + ", ".join(files))
 if web:
     parts.append("Artifact class: web. Entrypoint: " + entry + ". Reference integrity already checked.")
     if bool(g3.get("ran")):
@@ -2273,8 +2278,11 @@ if verifier_died:
 # need a second agent to FIND the artifact (code seat ask, 2026-07-16). When
 # the verifier died the terminal listing supplies the paths instead.
 arts = [str(a).strip() for a in (verdict.get("artifacts") or []) if str(a).strip()]
+# ADR-0026: name EVERY produced file — a [:5] slice made the report
+# unable to point at artifacts 6+ (the operator then needed a second
+# agent just to FIND them).
 if not arts and files:
-    arts = files[:5]
+    arts = files
 if arts:
     lines.append("")
     lines.append("Artifacts (paths relative to the run workspace root):")
@@ -2307,7 +2315,7 @@ if restored:
     lines.append("")
     lines.append("Final round verdict (discarded after restore):")
     lines.append("- builds/executes/matches: " + str(bool(final_round_verdict.get("builds"))) + "/" + str(bool(final_round_verdict.get("executes"))) + "/" + str(bool(final_round_verdict.get("matches"))))
-    for f in [str(x) for x in (final_round_verdict.get("failures") or [])][:6]:
+    for f in [str(x) for x in (final_round_verdict.get("failures") or [])]:
         lines.append("- " + f)
 if verdict.get("summary"):
     lines.append("")

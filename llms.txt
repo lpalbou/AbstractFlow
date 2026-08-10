@@ -19,6 +19,7 @@ Useful files:
 - [Web editor](docs/web-editor.md)
 - [Workflow authoring skill](docs/workflow-authoring-skill.md)
 - [Workflow node catalog](docs/workflow-node-catalog.md)
+- [Shipped workflow sources](docs/shipped-workflow-sources.md): editable flows + generators behind Gateway's out-of-the-box coder, deep-research, and co-scientist bundles
 - [Architecture](docs/architecture.md)
 - [API and contracts](docs/api.md)
 - [VisualFlow JSON](docs/visualflow.md)

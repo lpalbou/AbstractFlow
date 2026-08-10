@@ -6,7 +6,7 @@ the `deep-` vocabulary (`deep-research`, `deep-plan`, `deep-investigate`,
 `deep-review`, `deep-render`) — the historical `dp-` prefix was fully retired
 on 2026-07-16 (operator ruling); older `dp-research@0.1.x` bundles remain on
 disk only for completed-run history. It is authored as editable VisualFlow
-JSON in `examples/flows/deep-*.json` and packed as `deep-research@0.1.6.flow`
+JSON in `examples/flows/deep-*.json` and packed as `deep-research@0.1.7.flow`
 (version lineage continues from the dp era; bundle versions are immutable by
 sha).
 
@@ -94,12 +94,12 @@ does not run a bitmap image generation node in `0.1.0`.
 Regenerate the editable flows and bundle:
 
 ```bash
-python abstractflow/scripts/build_dp_research_workflows.py
+python abstractflow/scripts/build_deep_research_workflows.py
 ```
 
 Validate the shipped bundle contract from the workspace root:
 
 ```bash
 PYTHONPATH=abstractgateway/src:abstractruntime/src:abstractcore \
-  pytest -q abstractgateway/tests/test_dp_research_bundle_contract.py
+  pytest -q abstractgateway/tests/test_deep_research_bundle_contract.py
 ```

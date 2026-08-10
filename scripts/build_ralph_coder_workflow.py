@@ -342,7 +342,9 @@ WARM_CMD_CODE = r"""
 ws_q = shq(str(workspace_root or "").strip())
 prog_q = shq(str(progress_file or "PROGRESS.md"))
 cmd = ("cd '" + ws_q + "' && echo '---RALPH-LISTING---'; "
-       "find . -maxdepth 2 -name .git -prune -o -print 2>/dev/null | sort | head -n 120; "
+       # ADR-0026: no `head -n 120` — the coder reads this listing and a hidden
+       # tail is a file it re-creates.
+       "find . -maxdepth 2 -name .git -prune -o -print 2>/dev/null | sort; "
        "echo '---RALPH-PROGRESS---'; cat '" + prog_q + "' 2>/dev/null; "
        "echo; echo '---RALPH-WARM-END---'")
 return {"tool_call": {"name": "execute_command", "arguments": {"command": cmd, "timeout": 60},
@@ -375,13 +377,9 @@ for ln in listing.splitlines():
     s = ln.strip()
     if s and s != "." and ".ralph_" not in s:
         lines.append(s)
-extra = 0
-if len(lines) > 100:
-    extra = len(lines) - 100
-    lines = lines[:100]
+# ADR-0026: the workspace listing the coder reads is WHOLE. A 100-path slice
+# sat here and hid files the model then "created" a second time.
 listing_out = "\n".join(lines)
-if extra > 0:
-    listing_out = listing_out + "\n(... " + str(extra) + " more paths at depth <= 2)"
 try:
     n = int(warm_entries or 3)
 except Exception:
@@ -597,11 +595,13 @@ cmd = ("cd '" + ws_q + "' && ( " + verify + " ) > .ralph_verify.log 2>&1; "
        "find . -name .git -prune -o -type f "
        "! -path './" + prog_q + "' ! -path './" + plan_q + "' "
        "! -name .ralph_verify.log ! -name .ralph_fp.stamp "
-       "-newer .ralph_fp.stamp -print 2>/dev/null | head -n 20; "
+       "-newer .ralph_fp.stamp -print 2>/dev/null; "  # ADR-0026: no head -n 20
        "else echo FP_NO_BASELINE; fi; "
        "touch .ralph_fp.stamp; "
-       "echo '---PROGRESS-TAIL---'; tail -n 30 '" + prog_q + "' 2>/dev/null; "
-       "echo '---VERIFY-TAIL---'; tail -n 30 .ralph_verify.log 2>/dev/null")
+       # ADR-0026: whole files. `tail -n 30` clipped the head of every verify log
+       # (the first compiler error) before the next cycle's prompt could read it.
+       "echo '---PROGRESS-TAIL---'; cat '" + prog_q + "' 2>/dev/null; "
+       "echo '---VERIFY-TAIL---'; cat .ralph_verify.log 2>/dev/null")
 return {"tool_call": {"name": "execute_command", "arguments": {"command": cmd, "timeout": 300},
                       "call_id": "ralph-check"}}
 """.strip()
@@ -632,7 +632,10 @@ quiet = baseline and len(changed_files) == 0
 # constant 0 and must never stop the loop on its own.
 settled = bool(has_verify) and verify_ok and bool(prev_verify_ok) and quiet
 n = int(cycle or 0) + 1
-evidence = txt[-3000:] if len(txt) > 3000 else txt
+# ADR-0026: `evidence`/`last_check` are read by the NEXT cycle's coder prompt —
+# a silent 3000-char tail clip sat here, dropping the head of every verify log
+# (the compiler's first error) with no marker at all.
+evidence = txt
 summary = str(cycle_summary or "").strip()
 fp = len(changed_files) if baseline else -1
 return {"updates": {"cycle": n, "verify_ok": verify_ok, "promise_done": promise,

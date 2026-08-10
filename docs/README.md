@@ -43,6 +43,7 @@ The canvas reflects that split:
 - [Workflow authoring skill](workflow-authoring-skill.md)
 - [Workflow node catalog](workflow-node-catalog.md)
 - [Production research workflow](deep-research.md)
+- [Shipped workflow sources](shipped-workflow-sources.md)
 - [The entity brain (entity-life family)](entity-brain.md)
 - [Entity brain report (2026-07-24)](reports/entity-brain-report.md)
 - [Architecture](architecture.md)

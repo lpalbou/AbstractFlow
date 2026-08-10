@@ -187,6 +187,7 @@ The canvas reflects that split:
 - [Workflow authoring skill](workflow-authoring-skill.md)
 - [Workflow node catalog](workflow-node-catalog.md)
 - [Production research workflow](deep-research.md)
+- [Shipped workflow sources](shipped-workflow-sources.md)
 - [The entity brain (entity-life family)](entity-brain.md)
 - [Entity brain report (2026-07-24)](reports/entity-brain-report.md)
 - [Architecture](architecture.md)
@@ -4142,6 +4143,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- 2026-08-01 **`entity-life@0.0.18` — honest failure episodes (the
+  empty-completion half of P0-1).** A moment that ended WITHOUT WORDS (the
+  provider/relay served an empty completion — live find 2026-08-01: the
+  act node's `llm_call` returned `content: null` and the turn surfaced
+  `silent:1/degraded:1` honestly while the EPISODE still deposited
+  `"(I stayed silent)"` into the append-only graph as if the entity chose
+  it) now forms a LABELED failed-moment episode instead: title
+  `a moment that failed (<phase>, <turn_id>)`, digest carries
+  `[this moment failed: <moment_error> - no words were spoken; machinery,
+  not chosen silence]`, verbatim replaces the false `I SAID:` frame with
+  `THE MOMENT FAILED (machinery, not chosen silence):`, keywords derive
+  from the stimulus only (error prose is not the moment's content), and
+  `attributes` carry the machine-readable twin (`degraded: true`,
+  `moment_error`). The dead-rounds-child path gets the same treatment (its
+  episode no longer claims `I said: [the moment could not be lived: …]`).
+  Wiring mirrors the fold's exactly: `episode_prep` now receives
+  `guard_died`/`guard_error` from `rounds_guard` and `ended_silent` from
+  the turn output (`entity_flow_code.py` EPISODE_CODE +
+  `build_entity_life_workflow.py`). `"(I stayed silent)"` stays RESERVED
+  for replies that clean to empty by the entity's own election.
+  `entity_life_smoke.py` now pins both halves (scenario 2's existing
+  no-fabricated-silence check + two new scenario-3 checks: no
+  `(I stayed silent)` on an empty completion, and the labeled failure
+  episode present). Both entity smokes green; bundle packed to
+  `abstractgateway/flows/bundles/entity-life@0.0.18.flow` (the gateway
+  serves it after its next bundle reload/restart).
+- 2026-08-01 **Entity builder pins the guards' death channel against the
+  new `subflow_node` pin convention.** The 2026-07-30 `wf_common`
+  `subflow_node` started DECLARING `child_output` as an output pin; the
+  visual executor folds every declared non-exec output pin except
+  `output` into `effect_config.output_pins`, and the runtime compiler's
+  `start_subworkflow` spread overwrites `current["child_output"]` with
+  `result_value.get("child_output")` (None) whenever a resume payload's
+  output dict lacks a `"result"` wrapper — so a DEAD child read healthy
+  (`died=0`), degraded stayed 0, and the P0-1 fabricated-silence bug
+  returned (measured: `entity_life_smoke` scenario 2 went red on the first
+  rebuild). The entity builder now strips the declared `child_output` pin
+  (the shipped 0.0.17 byte shape: WIRED but not declared) until the
+  runtime spread skips `child_output` by name — that fix is runtime's
+  lane, and other bundle families that consume `child_output` after a
+  rebuild are exposed to the same clobber.
+- 2026-08-01 **Tool-approval drivers dedup by key again — and that is now
+  correct.** `scripts/benchmark_orchestrations.py` had been forced to approve by
+  OCCURRENCE (re-approving the same key up to 60 times) because an agent node
+  reused ONE `wait_key` (`tool_calls:<run_id>:act`) for every approval round, so
+  a key-deduplicating driver answered #1 and parked the run forever on #2
+  (live 2026-07-31, multiagent/bugfix). AbstractRuntime now mints one durable
+  key per approval instance (`tool_approval:{run}:{node}:{effect_identity}`), so
+  the benchmark driver is back to answering each key exactly once
+  (`MAX_ROUNDS_PER_KEY = 1`) — which keeps it a REGRESSION DETECTOR: if keys
+  ever collapse again the benchmark stalls loudly instead of quietly
+  re-approving its way through. `scripts/multiagent_coding_run.mjs` already
+  deduped by key and needed no change; its dedup is now documented as
+  correct-by-construction. Live proof: `basic-agent` driven by a strictly
+  key-deduplicating approver took 3 sequential approvals at the same `act` node
+  with 3 distinct wait keys and completed (run 6529fb2d, agent sub-run
+  f04548e2).
 - 2026-07-31 **`co-scientist@0.2.0` — the complete doctrine rework, with the
   report bytes gated.** The deepest workflow in the corpus predated every
   authoring wave: 37 exec-less code nodes, 4 namespaced state blobs

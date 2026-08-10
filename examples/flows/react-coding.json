@@ -2168,7 +2168,7 @@
           "permissions": "sandbox",
           "entry_text": "--- cycle {{n}} ---\nTHOUGHT: {{thought}}\nACTIONS: {{calls}}\nOBSERVATIONS:\n{{obs}}",
           "trim_marker": "[...earlier cycles trimmed to keep the context bounded...]\n",
-          "max_chars": 24000
+          "max_chars": 0
         },
         "functionName": "transform",
         "codeBody": "n = int(cycle or 0) + 1\nentry = str(entry_text or \"\")\nentry = entry.replace(\"{{n}}\", str(n))\nentry = entry.replace(\"{{thought}}\", str(thought or \"\").strip())\nentry = entry.replace(\"{{calls}}\", str(calls_text or \"\"))\nentry = entry.replace(\"{{obs}}\", str(observations or \"\"))\ntrace = str(transcript or \"\")\ntrace = trace + (\"\\n\" if trace else \"\") + entry\ntry:\n    cap = int(max_chars or 0)\nexcept Exception:\n    cap = 0\nif cap > 0 and len(trace) > cap:\n    trace = str(trim_marker or \"\") + trace[len(trace) - cap:]\nsummary = str(calls_text or \"\").strip()\nif len(summary) > 160:\n    summary = summary[:160]\nreturn {\"updates\": {\"transcript\": trace, \"cycle\": n, \"last_action\": summary, \"steer_new\": 0}}"
@@ -3448,7 +3448,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "ws_q = shq(str(workspace_root or \"\").strip())\ncmd = (\"cd '\" + ws_q + \"' && ( \" + str(verify_command or \"true\") + \" ) \"\n       \"> .react_verify.log 2>&1; echo \\\"VERIFY_EXIT=$?\\\"; \"\n       \"tail -n 40 .react_verify.log 2>/dev/null\")\nreturn {\"tool_call\": {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 300},\n                      \"call_id\": \"react-verify\"}}"
+        "codeBody": "ws_q = shq(str(workspace_root or \"\").strip())\ncmd = (\"cd '\" + ws_q + \"' && ( \" + str(verify_command or \"true\") + \" ) \"\n       \"> .react_verify.log 2>&1; echo \\\"VERIFY_EXIT=$?\\\"; \"\n       # ADR-0026: whole log — `tail -n 40` hid the first error from the coder.\n       \"cat .react_verify.log 2>/dev/null\")\nreturn {\"tool_call\": {\"name\": \"execute_command\", \"arguments\": {\"command\": cmd, \"timeout\": 300},\n                      \"call_id\": \"react-verify\"}}"
       },
       "label": null,
       "icon": null,
@@ -3648,7 +3648,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "txt = text_of(result)\ntail = txt[-2000:] if len(txt) > 2000 else txt\nreturn {\"updates\": {\"verified\": \"VERIFY_EXIT=0\" in txt, \"verify_text\": tail}}"
+        "codeBody": "txt = text_of(result)\n# ADR-0026: `verify_text` is read by the next cycle's coder prompt. A silent\n# 2000-char tail clip sat here and dropped the FIRST error of every long\n# verify log — the one the coder needed most — with no marker.\nreturn {\"updates\": {\"verified\": \"VERIFY_EXIT=0\" in txt, \"verify_text\": txt}}"
       },
       "label": null,
       "icon": null,
@@ -5223,6 +5223,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-31T12:58:22.667629+00:00",
-  "updated_at": "2026-07-31T12:58:22.667629+00:00"
+  "created_at": "2026-08-02T13:03:06.552030+00:00",
+  "updated_at": "2026-08-02T13:03:06.552030+00:00"
 }

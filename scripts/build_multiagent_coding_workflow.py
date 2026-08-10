@@ -1038,8 +1038,10 @@ return {"tool_call": {"name": "execute_command", "arguments": {"command": cmd},
 LINT_CMD_CODE = r"""
 ws_q = shq(str(workspace_root or "").strip())
 cmd = ("cd '" + ws_q + "' && "
-       "(command -v ruff >/dev/null 2>&1 && ruff check --fix . 2>&1 | tail -5 || true); "
-       "(command -v prettier >/dev/null 2>&1 && prettier --write . 2>&1 | tail -5 || true); "
+       # ADR-0026: whole linter output — `tail -5` dropped residual diagnostics
+       # before the builder's failure list could carry them.
+       "(command -v ruff >/dev/null 2>&1 && ruff check --fix . 2>&1 || true); "
+       "(command -v prettier >/dev/null 2>&1 && prettier --write . 2>&1 || true); "
        "echo LINT_DONE")
 return {"tool_call": {"name": "execute_command", "arguments": {"command": cmd},
                       "call_id": "lint-format"}}
@@ -1099,8 +1101,9 @@ branch_q = shq(str(branch or "work"))
 cmd = ("cd '" + ws_q + "' && export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true; "
        "if git remote get-url origin >/dev/null 2>&1; then "
        "if command -v gh >/dev/null 2>&1; then "
-       "git push -u origin '" + branch_q + "' 2>&1 | tail -2; "
-       "GH_PROMPT_DISABLED=1 gh pr create --fill --head '" + branch_q + "' 2>&1 | tail -2 || echo PR_EXISTS_OR_FAILED; "
+       # ADR-0026: whole git/gh output — `tail -2` swallowed the real push error.
+       "git push -u origin '" + branch_q + "' 2>&1; "
+       "GH_PROMPT_DISABLED=1 gh pr create --fill --head '" + branch_q + "' 2>&1 || echo PR_EXISTS_OR_FAILED; "
        "else echo GH_UNAVAILABLE_LOCAL_PR_MD_ONLY; fi; "
        "else echo NO_REMOTE_LOCAL_PR_MD_ONLY; fi")
 return {"tool_call": {"name": "execute_command",
@@ -1169,8 +1172,11 @@ residuals = []
 for ln in str(lint_text or "").split("\n"):
     t = ln.strip()
     if t and is_diag(t):
-        residuals.append(t[:200])
-return {"residuals": residuals[:20]}
+        # ADR-0026: whole diagnostic lines, all of them. A 200-char clip plus a
+        # 20-entry slice sat here — a lint diagnostic cut before its message is
+        # a failure the builder cannot act on.
+        residuals.append(t)
+return {"residuals": residuals}
 """.strip()
 
 DOC_PROMPT_CODE = r"""
@@ -1357,8 +1363,10 @@ updates = {
     "fix_cycles": this_cycle,
     "build_feedback": "\n".join(fails),
     "all_passed": all_passed,
-    "last_verdict": {"all_passed": all_passed, "failures": fails[:30],
-                     "environment_failures": env_fails[:15]},
+    # ADR-0026: the verdict carries EVERY failure. A 30/15 slice sat here and
+    # dropped exactly the failures a stuck repair cycle had not yet seen.
+    "last_verdict": {"all_passed": all_passed, "failures": fails,
+                     "environment_failures": env_fails},
 }
 # environment-blocked: nothing fixable remains and the environment cannot
 # verify - stop the loop honestly instead of burning the remaining budget
@@ -1368,14 +1376,15 @@ br = str(builder_response or "").strip()
 # repair history: append one entry per FAILED cycle (cycle number, a short
 # summary of what the builder said it did, and the failure that remained), so
 # the next repair prompt shows the whole trail and the builder does not repeat
-# an approach that already failed. Append-only, capped at 24 entries.
+# an approach that already failed. Append-only, UNBOUNDED (ADR-0026): a 400-char
+# clip on the builder's account, a 3-failure slice, a 300-char clip on the
+# failure line and a 24-entry ring all sat here — together they erased the
+# "what I already tried" detail the next repair round exists to read.
 if not all_passed:
     hist = list(repair_history) if isinstance(repair_history, list) else []
-    changed = br[:400] if br else "(builder gave no summary)"
-    failed_short = sig if sig else "; ".join(fails[:3])
-    hist.append({"cycle": this_cycle, "changed": changed, "failed": failed_short[:300]})
-    if len(hist) > 24:
-        hist = hist[-24:]
+    changed = br if br else "(builder gave no summary)"
+    failed_short = sig if sig else "; ".join(fails)
+    hist.append({"cycle": this_cycle, "changed": changed, "failed": failed_short})
     updates["repair_history"] = hist
 # auto mode: green means approved (no human gate by explicit operator choice).
 # `wait_gating` is the normalized gating fact the seed wrote once.
@@ -1401,8 +1410,10 @@ ok = ("DOC_GUARD_OK" in txt) or ("NO_SELFCHECK_TO_GUARD" in txt and not drifted)
 if drifted:
     return {"ok": False, "updates": {
         "all_passed": False,
+        # ADR-0026: name EVERY drifted file — a [:10] slice left the builder
+        # restoring a subset and failing the same gate again.
         "build_feedback": ("doc: the documentation pass modified verified source files: " +
-                           ", ".join(drifted[:10]) +
+                           ", ".join(drifted) +
                            " - restore or re-verify them and refresh SELFCHECK.md hashes"),
     }}
 return {"ok": ok, "updates": {}}
@@ -1459,23 +1470,26 @@ if not accepted:
     lines.append("Last plan title: " + (str(title or "").strip() or "(none)"))
     if pf:
         lines.append("Last reviewer comments on the plan:")
-        for ln in pf.split("\n")[:8]:
+        # ADR-0026: the report is READ ONWARD (operator + orchestrating agents).
+        # 8/10/15/10-line slices sat on these four blocks and quietly turned a
+        # long failure list into a short one.
+        for ln in pf.split("\n"):
             lines.append("  " + ln)
 if reason.startswith("review-rounds-exhausted") and bf:
     lines.append("")
     lines.append("Unaddressed reviewer change requests:")
-    for ln in bf.split("\n")[:10]:
+    for ln in bf.split("\n"):
         lines.append("  " + ln)
 if fails:
     lines.append("")
     lines.append("Open failures:")
-    for f in fails[:15]:
+    for f in fails:
         lines.append("- " + str(f))
 envf = env_failures if isinstance(env_failures, list) else []
 if envf:
     lines.append("")
     lines.append("Environment (not fixable by the builder; artifacts delivered unverified):")
-    for f in envf[:10]:
+    for f in envf:
         lines.append("- " + str(f))
 if warns:
     lines.append("")
@@ -1573,17 +1587,14 @@ for st in steps:
 bf = str(build_feedback or "").strip()
 fix = int(fix_cycles or 0)
 # Repair history: every past failed cycle, in order, so the builder can see
-# what it already tried. Last 8 to keep the prompt bounded; say how many
-# earlier ones are omitted.
+# what it already tried.
 hist = repair_history if isinstance(repair_history, list) else []
 trail = ""
 if hist:
-    shown = hist[-8:]
-    omitted = len(hist) - len(shown)
+    # ADR-0026: the WHOLE trail. A `hist[-8:]` window sat here and hid the
+    # early cycles — the ones a long repair loop most needs not to repeat.
     trail = "\n\nRepair history so far (do not repeat an approach that already failed):\n"
-    if omitted > 0:
-        trail = trail + "(" + str(omitted) + " earlier cycle(s) omitted)\n"
-    for h in shown:
+    for h in hist:
         hc = h if isinstance(h, dict) else {}
         trail = (trail + "- cycle " + str(hc.get("cycle")) + ": tried: "
                  + str(hc.get("changed") or "(no summary)")
@@ -1672,7 +1683,9 @@ else:
         head = head.replace("{{max_fix_cycles}}", str(int(max_fix_cycles or 6)))
     lines.append(head.replace("{{branch}}", branch))
     lines.append("Open failures:")
-    for f in fails[:12]:
+    # ADR-0026: the human/agent reviewer at this gate sees EVERY open failure.
+    # A [:12] slice sat here and hid the tail of a long red list.
+    for f in fails:
         lines.append("- " + str(f))
     lines.append(str(red_footer_text or ""))
 for w in warns:
