@@ -22,6 +22,7 @@ import {
   type GatewayConnectionPhase,
 } from '@abstractframework/ui-kit';
 import { registerMonitorGpuWidget } from '@abstractframework/monitor-gpu';
+import { registerMonitorMemoryWidget } from '@abstractframework/monitor-memory';
 
 function flag_enabled(value: unknown): boolean {
   const s = String(value ?? '').trim().toLowerCase();
@@ -35,6 +36,18 @@ function monitor_gpu_enabled(): boolean {
   try {
     const q = new URLSearchParams(window.location.search);
     return flag_enabled(q.get('monitor-gpu'));
+  } catch {
+    return false;
+  }
+}
+
+function monitor_memory_enabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.__ABSTRACT_UI_CONFIG__?.monitor_memory === true) return true;
+  if (flag_enabled(import.meta.env?.VITE_MONITOR_MEMORY)) return true;
+  try {
+    const q = new URLSearchParams(window.location.search);
+    return flag_enabled(q.get('monitor-memory'));
   } catch {
     return false;
   }
@@ -58,7 +71,9 @@ function App() {
   const { selectedNode } = useFlowStore();
   const queryClient = useQueryClient();
   const gpu_enabled = monitor_gpu_enabled();
+  const memory_enabled = monitor_memory_enabled();
   const monitor_gpu_ref = useRef<HTMLElement | null>(null);
+  const monitor_memory_ref = useRef<HTMLElement | null>(null);
   // Kit-owned appearance persistence (af_appearance_abstractflow_v1) with a
   // one-time migration from flow's legacy abstractflow_ui_settings_v1 key.
   // The hook applies theme + typography itself (synchronously on first load,
@@ -135,6 +150,11 @@ function App() {
     if (!gpu_enabled) return;
     registerMonitorGpuWidget();
   }, [gpu_enabled]);
+
+  useEffect(() => {
+    if (!memory_enabled) return;
+    registerMonitorMemoryWidget();
+  }, [memory_enabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,27 +300,54 @@ function App() {
           }}
           appearance={{ onOpen: () => set_show_appearance(true) }}
           extraActions={
-            gpu_enabled ? (
-              <monitor-gpu
-                ref={monitor_gpu_ref as any}
-                mode="icon"
-                history-size="5"
-                tick-ms="1500"
-                title="GPU usage (host)"
-                style={
-                  {
-                    ['--monitor-gpu-width' as any]: '34px',
-                    ['--monitor-gpu-bars-height' as any]: '22px',
-                    ['--monitor-gpu-padding' as any]: '2px 4px',
-                    ['--monitor-gpu-radius' as any]: '999px',
-                    ['--monitor-gpu-bg' as any]: 'rgba(0,0,0,0.18)',
-                    ['--monitor-gpu-border' as any]: 'rgba(255,255,255,0.16)',
-                    position: 'relative',
-                    zIndex: 1100,
-                    flexShrink: 0,
-                  } as CSSProperties
-                }
-              />
+            gpu_enabled || memory_enabled ? (
+              // AfTopBarActions renders extraActions as a single child slot, so
+              // both monitors ship inside one fragment.
+              <>
+                {gpu_enabled ? (
+                  <monitor-gpu
+                    ref={monitor_gpu_ref as any}
+                    mode="icon"
+                    history-size="5"
+                    tick-ms="1500"
+                    title="GPU usage (host)"
+                    style={
+                      {
+                        ['--monitor-gpu-width' as any]: '34px',
+                        ['--monitor-gpu-bars-height' as any]: '22px',
+                        ['--monitor-gpu-padding' as any]: '2px 4px',
+                        ['--monitor-gpu-radius' as any]: '999px',
+                        ['--monitor-gpu-bg' as any]: 'rgba(0,0,0,0.18)',
+                        ['--monitor-gpu-border' as any]: 'rgba(255,255,255,0.16)',
+                        position: 'relative',
+                        zIndex: 1100,
+                        flexShrink: 0,
+                      } as CSSProperties
+                    }
+                  />
+                ) : null}
+                {memory_enabled ? (
+                  <monitor-memory
+                    ref={monitor_memory_ref as any}
+                    mode="icon"
+                    tick-ms="5000"
+                    title="Host memory (RAM + device)"
+                    style={
+                      {
+                        ['--monitor-memory-width' as any]: '34px',
+                        ['--monitor-memory-bar-height' as any]: '5px',
+                        ['--monitor-memory-padding' as any]: '5px 4px',
+                        ['--monitor-memory-radius' as any]: '999px',
+                        ['--monitor-memory-bg' as any]: 'rgba(0,0,0,0.18)',
+                        ['--monitor-memory-border' as any]: 'rgba(255,255,255,0.16)',
+                        position: 'relative',
+                        zIndex: 1100,
+                        flexShrink: 0,
+                      } as CSSProperties
+                    }
+                  />
+                ) : null}
+              </>
             ) : undefined
           }
           connection={{

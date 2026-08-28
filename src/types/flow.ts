@@ -83,6 +83,31 @@ export const PIN_COLORS: Record<PinType, string> = {
   any: '#888888',
 };
 
+// Fallback modality colors for the Resources panel chips, aligned with
+// the provider/artifact pin palette above. The Gateway's
+// contracts.common.model_residency.modality_ui color map is CANONICAL and
+// wins whenever it is present; these only keep the panel legible without it.
+export type ResidencyModality =
+  | 'text'
+  | 'image'
+  | 'video'
+  | 'voice'
+  | 'music'
+  | '3d'
+  | 'embedding'
+  | 'unknown';
+
+export const MODALITY_COLORS: Record<ResidencyModality, string> = {
+  text: '#00D2FF',
+  image: '#19D3B8',
+  video: '#A855F7',
+  voice: '#22D3EE',
+  music: '#F59E0B',
+  '3d': '#9D4EDD',
+  embedding: '#94A3B8',
+  unknown: '#6B7280',
+};
+
 // A connection point on a node
 export interface Pin {
   id: string;

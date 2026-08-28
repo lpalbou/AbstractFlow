@@ -10,6 +10,7 @@ declare module "*.txt?raw" {
 declare global {
   interface ImportMetaEnv {
     readonly VITE_MONITOR_GPU?: string;
+    readonly VITE_MONITOR_MEMORY?: string;
   }
 
   interface ImportMeta {
@@ -19,6 +20,7 @@ declare global {
   interface Window {
     __ABSTRACT_UI_CONFIG__?: {
       monitor_gpu?: boolean;
+      monitor_memory?: boolean;
     };
   }
 
@@ -29,6 +31,12 @@ declare global {
         "base-url"?: string;
         "tick-ms"?: string;
         "history-size"?: string;
+        endpoint?: string;
+      };
+      "monitor-memory": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        mode?: string;
+        "base-url"?: string;
+        "tick-ms"?: string;
         endpoint?: string;
       };
     }

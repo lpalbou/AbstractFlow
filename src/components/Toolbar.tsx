@@ -1847,15 +1847,15 @@ export function Toolbar() {
           <ToolbarAction
             tooltip={
               gatewayReadiness.optional.modelResidency
-                ? 'Models currently loaded on the gateway'
-                : 'Loaded models unavailable from Gateway'
+                ? 'Host resources: loaded models, memory, session caches'
+                : 'Model residency unavailable from Gateway'
             }
-            label="Open loaded models"
+            label="Open resources"
             onClick={() => setShowModelResidency(true)}
             iconOnly={false}
           >
             <IconChip />
-            <span>Models</span>
+            <span>Resources</span>
           </ToolbarAction>
         </div>
 

@@ -62,6 +62,24 @@ export interface GatewayDurableBlocPromptCacheContract {
   [key: string]: unknown;
 }
 
+export interface GatewayModalityUiColor {
+  color?: string;
+  label?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Canonical modality/task color map advertised at
+ * contracts.common.model_residency.modality_ui. `colors` is keyed by task id
+ * (e.g. "text_generation"); consumers fall back to the local MODALITY_COLORS
+ * constant when an entry (or the whole map) is absent.
+ */
+export interface GatewayModalityUiContract {
+  version?: number;
+  colors?: Record<string, GatewayModalityUiColor | undefined>;
+  [key: string]: unknown;
+}
+
 export interface GatewayCommonContract {
   runs?: {
     start?: GatewayEndpointDescriptor;
@@ -147,6 +165,9 @@ export interface GatewayCommonContract {
       loaded?: GatewayEndpointDescriptor | string;
       load?: GatewayEndpointDescriptor | string;
       unload?: GatewayEndpointDescriptor | string;
+      lock?: GatewayEndpointDescriptor | string;
+      unlock?: GatewayEndpointDescriptor | string;
+      context_estimate?: GatewayEndpointDescriptor | string;
     };
     loaded?: GatewayEndpointDescriptor | string;
     load?: GatewayEndpointDescriptor | string;
@@ -157,6 +178,25 @@ export interface GatewayCommonContract {
     source?: string;
     config_hint?: string;
     ledger?: string;
+    row_schema?: string;
+    modality_ui?: GatewayModalityUiContract;
+  };
+  host_state?: GatewayEndpointDescriptor & {
+    route_available?: boolean;
+    endpoints?: {
+      state?: GatewayEndpointDescriptor | string;
+      memory?: GatewayEndpointDescriptor | string;
+      gpu?: GatewayEndpointDescriptor | string;
+    };
+    config_hint?: string;
+  };
+  session_caches?: GatewayEndpointDescriptor & {
+    route_available?: boolean;
+    endpoints?: {
+      list?: GatewayEndpointDescriptor | string;
+      clear_all?: GatewayEndpointDescriptor | string;
+    };
+    config_hint?: string;
   };
   memory?: GatewayEndpointDescriptor & {
     route_available?: boolean;
@@ -369,6 +409,8 @@ export interface GatewayOptionalFeatureStatus {
   generatedMusic: boolean;
   attachmentsUpload: boolean;
   modelResidency: boolean;
+  hostState: boolean;
+  sessionCaches: boolean;
 }
 
 export interface GatewayFlowEditorReadiness {
@@ -948,6 +990,22 @@ export function getGatewayFlowEditorReadiness(
       descriptorEndpointAvailable(modelResidency?.load) ||
       descriptorEndpointAvailable(modelResidency?.unload)
     );
+  const hostStateContract = common?.host_state;
+  const hostStateAvailable = Boolean(
+    hostStateContract &&
+      hostStateContract.available !== false &&
+      hostStateContract.route_available !== false &&
+      (descriptorEndpointAvailable(hostStateContract.endpoints?.state) ||
+        descriptorEndpointAvailable(hostStateContract))
+  );
+  const sessionCachesContract = common?.session_caches;
+  const sessionCachesAvailable = Boolean(
+    sessionCachesContract &&
+      sessionCachesContract.available !== false &&
+      sessionCachesContract.route_available !== false &&
+      (descriptorEndpointAvailable(sessionCachesContract.endpoints?.list) ||
+        descriptorEndpointAvailable(sessionCachesContract))
+  );
 
   return {
     ready: save.ready && publishStatus.ready && run.ready && history.ready && artifactStatus.ready,
@@ -986,6 +1044,8 @@ export function getGatewayFlowEditorReadiness(
       generatedMusic,
       attachmentsUpload: descriptorEndpointAvailable(common?.attachments?.upload),
       modelResidency: Boolean(modelResidencyRouteAvailable && gatewayModelResidencySurfaceAllows(surfaceReadiness)),
+      hostState: hostStateAvailable,
+      sessionCaches: sessionCachesAvailable,
     },
   };
 }

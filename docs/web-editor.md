@@ -49,7 +49,28 @@ the portable default for LLM Call, Agent, and generated media nodes. If you pin
 a provider and later want to return to runtime defaults, choose **Auto (Gateway
 default)** again from the provider dropdown.
 
-The Model Residency modal shows only provider-reported resident/loaded models.
+## Resources
+
+The toolbar's **Resources** button opens the Resources panel, which reads
+Gateway's model-residency, host-state, and session-cache endpoints across
+three tabs:
+
+- **Models** lists the models Gateway reports for the current runtime: a
+  modality chip (colored from Gateway's `modality_ui` contract), provider,
+  model, a tri-state Resident pill (Yes / No / Unknown), size, and context
+  length (✓ marks a calibrated value). Locked models carry a lock marker;
+  Lock/Unlock and a per-model context Estimate appear when Gateway advertises
+  those endpoints. Unloading a locked model asks for an explicit Force Unload
+  confirmation. A "Show cached/non-resident" toggle reveals cached and
+  configuration-only rows, and the load bar can lock a model as part of
+  loading it.
+- **Memory** shows host RAM, device, and per-GPU meters, process RSS, and
+  degraded-state reasons from Gateway host state, refreshed every 5 seconds
+  while the tab is open.
+- **Session caches** lists per-session prompt caches and clears a session's
+  caches after confirmation.
+
+The panel manages loaded models; it does not edit capability defaults.
 Configure capability defaults in Gateway Console or with the Gateway/Core
 config CLIs; changing a default does not load or unload a model.
 

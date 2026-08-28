@@ -7,7 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 2026-08-27 **Resources panel.** The toolbar's **Resources** button opens a
+  tabbed panel (**Models / Memory / Session caches**) built on Gateway's typed
+  `model_residency_row_v1` rows:
+  - **Models** lists each model with a modality chip (colored from Gateway's
+    `modality_ui` contract, with a built-in fallback palette), provider, model
+    with state and pinned/default markers, a tri-state Resident pill
+    (Yes / No / Unknown), size (VRAM in the tooltip), context length with a
+    calibrated ✓ marker, and a lock indicator. Row actions: **Unload** (when a
+    locked model answers 409 `model_locked`, the confirm dialog upgrades to
+    Force Unload and retries with `force`), **Lock/Unlock** (shown for lockable
+    rows when Gateway advertises the endpoints), and **Estimate** (inline
+    usable-context estimate from `/models/context_estimate`). A
+    "Show cached/non-resident" toggle reveals cached and configuration-only
+    rows, and the load bar adds an optional "Lock after load" checkbox plus a
+    live context-estimate hint for the selected provider/model. Gateways that
+    do not report the row schema keep the previous residency listing.
+  - **Memory** renders host RAM, device (backend), and per-GPU meters with
+    warning/error thresholds, process RSS, totals, and degraded-state pills
+    with reasons, from `GET /host/state` — polled every 5 seconds only while
+    the tab is open.
+  - **Session caches** lists per-session prompt caches
+    (`GET /sessions/prompt_cache`) with a confirmed per-session Clear.
+- 2026-08-27 New residency/host hooks and contract typing:
+  `useLockModel`, `useUnlockModel`, `useContextEstimate`, `useHostState`,
+  `useSessionCaches`, and `useClearSessionCache` in
+  `src/hooks/useModelResidency.ts` (all in the existing
+  `['gateway','model-residency']` invalidation family), and
+  `src/utils/gatewayClient.ts` typing for `model_residency.row_schema`,
+  `model_residency.modality_ui`, `model_residency.endpoints.{lock,unlock,context_estimate}`,
+  `common.host_state`, and `common.session_caches`, surfaced through
+  `getGatewayFlowEditorReadiness` as `hostState` / `sessionCaches` flags.
+- 2026-08-27 Optional `<monitor-memory>` top-bar widget: a compact host
+  RAM + device memory meter rendered beside the `<monitor-gpu>` widget, backed
+  by the `@abstractframework/monitor-memory` package. Enable it with the
+  `monitor_memory` UI config flag, `VITE_MONITOR_MEMORY`, or a
+  `?monitor-memory=1` query parameter (mirroring the GPU widget flags).
+
 ### Changed
+- 2026-08-27 File sizes render with GB/TB units where they previously stopped
+  at MB (shared `src/utils/formatBytes.ts`, used by workspace file listings and
+  the Resources panel).
 - 2026-08-01 **`entity-life@0.0.18` — honest failure episodes (the
   empty-completion half of P0-1).** A moment that ended WITHOUT WORDS (the
   provider/relay served an empty completion — live find 2026-08-01: the

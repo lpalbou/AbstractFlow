@@ -1,16 +1,58 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useModels, useProviders } from '../hooks/useProviders';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 import {
+  hostStateAvailable,
   modelResidencyAvailable,
+  modelResidencyEndpointAvailable,
+  residencyResponseHasRowV1,
+  sessionCacheClearAvailable,
+  sessionCachesAvailable,
+  useClearSessionCache,
+  useContextEstimate,
+  useHostState,
   useLoadedModels,
   useLoadModelResidency,
+  useLockModel,
+  useSessionCaches,
   useUnloadModelResidency,
+  useUnlockModel,
   type ModelResidencyRecord,
+  type ModelResidencyRowV1,
 } from '../hooks/useModelResidency';
-import { descriptorEndpointAvailable, gatewayJson, gatewayPath, type GatewayContracts } from '../utils/gatewayClient';
+import { gatewayJson, gatewayPath, type GatewayContracts } from '../utils/gatewayClient';
+import {
+  buildHostMemoryView,
+  buildSessionCacheViews,
+  canUnloadRow,
+  componentLabelFor,
+  contextEstimateHint,
+  displayDate,
+  displayModelFor,
+  filterResidencyRows,
+  firstString,
+  modelKey,
+  providerLoadedText,
+  residencyResultMessage,
+  residentStateLabel,
+  resolveModalityChip,
+  rowConfigOnlyV1,
+  rowContextView,
+  rowKeyV1,
+  rowResidentState,
+  rowSizeText,
+  rowStateKindV1,
+  rowVramText,
+  runtimeIdFor,
+  statusKind,
+  statusText,
+  taskLabel,
+  unloadButtonTitle,
+  unloadConflictOffersForce,
+  type SessionCacheView,
+} from '../utils/modelResidencyView';
 import {
   modelOptionsFromGatewayCatalog,
   providerOptionsFromGatewayCatalog,
@@ -29,16 +71,10 @@ interface ProviderModelOption {
   label: string;
 }
 
+type PanelTab = 'models' | 'memory' | 'caches';
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-function firstString(...values: unknown[]): string {
-  for (const value of values) {
-    const raw = typeof value === 'string' ? value.trim() : '';
-    if (raw) return raw;
-  }
-  return '';
 }
 
 function addProviderModel(out: ProviderModelOption[], seen: Set<string>, provider: string, model: string, label?: string) {
@@ -139,19 +175,6 @@ function providerValuesFrom(payload: unknown, arrayKeys: string[], mapKeys: stri
   return uniqueStrings(out);
 }
 
-function taskLabel(task: string): string {
-  if (task === 'text_generation') return 'Text';
-  if (task === 'image_generation') return 'Image';
-  if (task === 'image_to_image') return 'Image edit';
-  if (task === 'image_upscale') return 'Image upscale';
-  if (task === 'text_to_video') return 'Text to video';
-  if (task === 'image_to_video') return 'Image to video';
-  if (task === 'tts') return 'Speech';
-  if (task === 'stt') return 'Transcription';
-  if (task === 'music_generation') return 'Music';
-  return task.replace(/_/g, ' ');
-}
-
 function isVisionCatalogTask(task: string): boolean {
   return task === 'image_generation' || task === 'image_to_image' || task === 'image_upscale' || task === 'text_to_video' || task === 'image_to_video';
 }
@@ -182,156 +205,46 @@ function taskOptions(contracts: GatewayContracts | null): AfSelectOption[] {
   return out.length > 0 ? out : [{ value: 'text_generation', label: 'Text' }];
 }
 
-function residencyEndpointAvailable(
-  contracts: GatewayContracts | null,
-  key: 'loaded' | 'load' | 'unload'
-): boolean {
-  const residency = contracts?.common?.model_residency;
-  return descriptorEndpointAvailable(residency?.[key] || residency?.endpoints?.[key]);
+interface PendingUnload {
+  row: ModelResidencyRecord;
+  force: boolean;
 }
 
-function displayDate(raw: unknown): string {
-  if (typeof raw !== 'string' || !raw.trim()) return '';
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return raw;
-  return d.toLocaleString();
-}
-
-function modelKey(row: ModelResidencyRecord, index: number): string {
-  return (
-    firstString(row.runtime_id, row.load_id, row.id) ||
-    `${firstString(row.task)}:${firstString(row.provider)}:${firstString(row.model)}:${index}`
-  );
-}
-
-function runtimeIdFor(row: ModelResidencyRecord): string {
-  return firstString(row.runtime_id, row.load_id, row.id);
-}
-
-function rowDetails(row: ModelResidencyRecord): Record<string, unknown> | null {
-  return asRecord(row.details);
-}
-
-function rowRuntimeInfo(row: ModelResidencyRecord): Record<string, unknown> | null {
-  return asRecord(rowDetails(row)?.runtime_info);
-}
-
-function displayModelFor(row: ModelResidencyRecord): string {
-  const details = rowDetails(row);
-  const runtimeInfo = rowRuntimeInfo(row);
-  const direct = firstString(row.model);
-  if (direct) return direct;
-  const resolved = firstString(
-    row.display_model,
-    row.resolved_model,
-    row.effective_model,
-    row.model_id,
-    details?.display_model,
-    details?.resolved_model,
-    details?.model_id,
-    details?.model,
-    runtimeInfo?.model_id,
-    runtimeInfo?.model,
-  );
-  if (resolved) return resolved;
-  const runtimeId = runtimeIdFor(row);
-  if (runtimeId.toLowerCase().endsWith(':default')) return 'default';
-  return runtimeId || '-';
-}
-
-function componentLabelFor(row: ModelResidencyRecord): string {
-  const raw = firstString(row.component, rowDetails(row)?.component).toLowerCase();
-  if (raw === 'tts_engine') return 'TTS engine';
-  if (raw === 'cloning_engine') return 'Clone engine';
-  if (raw === 'stt_engine') return 'STT engine';
-  if (raw === 'image_engine') return 'Image engine';
-  if (raw === 'music_engine') return 'Music engine';
-  return raw ? raw.replace(/_/g, ' ') : '-';
-}
-
-function isProviderResidentRow(row: ModelResidencyRecord): boolean {
-  if (row.provider_resident === true || row.provider_loaded === true) return true;
-  if (row.provider_resident === false || row.provider_loaded === false) return false;
-  const state = firstString(row.state, row.provider_state).toLowerCase();
-  if (state === 'provider_loaded' || state === 'loaded' || state === 'resident') return true;
-  return row.loaded === true || row.resident === true;
-}
-
-function isDefaultRuntimeConfigRow(row: ModelResidencyRecord): boolean {
-  return row.default === true && !isProviderResidentRow(row);
-}
-
-function statusText(row: ModelResidencyRecord): string {
-  const raw = firstString(row.state, row.health);
-  if (raw === 'provider_loaded') return 'provider loaded';
-  if (raw === 'provider_not_loaded') return 'provider not loaded';
-  if (raw === 'client_cached') return 'runtime client cached';
-  if (raw === 'client_cached_unverified') return 'runtime cache unverified';
-  if (raw === 'not_found') return 'not resident';
-  if (raw === 'not_loaded') return 'not loaded';
-  if (isDefaultRuntimeConfigRow(row)) return 'default config';
-  return raw || (row.resident === false || row.loaded === false ? 'not resident' : 'resident');
-}
-
-function statusKind(row: ModelResidencyRecord): 'ok' | 'muted' | 'error' {
-  if (isDefaultRuntimeConfigRow(row)) return 'muted';
-  const text = statusText(row).toLowerCase();
-  if (firstString(row.error) || text.includes('error') || text.includes('fail') || text.includes('unhealthy')) return 'error';
-  if (row.resident === false || row.loaded === false || text.includes('not') || text.includes('unloaded')) return 'muted';
-  return 'ok';
-}
-
-function residencyResultMessage(result: Record<string, unknown>, fallback: string): string {
-  const warning = Array.isArray(result.warnings)
-    ? result.warnings.find((item) => typeof item === 'string' && item.trim())
-    : '';
-  return firstString(result.error, warning, result.message, result.code) || fallback;
-}
-
-function unloadButtonTitle(row: ModelResidencyRecord, unloadAvailable: boolean): string | undefined {
-  if (!unloadAvailable) return 'Unload endpoint not advertised by this Gateway runtime.';
-  if (isDefaultRuntimeConfigRow(row)) {
-    return 'This is Gateway/Runtime default configuration, not proof of a loaded provider model. Change Gateway config or restart the Runtime process to remove it.';
-  }
-  if (row.default === true && row.provider_resident !== true) {
-    return 'This default Runtime client is cached, but the provider does not report the model as loaded. Restart Gateway to remove the default client cache.';
-  }
-  if (row.default === true) {
-    return 'This is the default Runtime client; provider unload is best-effort and the Runtime client remains cached.';
-  }
-  if (row.provider_resident === false) {
-    return 'Provider does not report this model as loaded; unload clears the Runtime client cache.';
-  }
-  return undefined;
-}
-
-function canUnloadRow(row: ModelResidencyRecord, unloadAvailable: boolean): boolean {
-  return unloadAvailable && !isDefaultRuntimeConfigRow(row);
-}
-
-function providerLoadedText(row: ModelResidencyRecord): string {
-  if (row.provider_resident === true || row.provider_loaded === true) return 'yes';
-  if (row.provider_resident === false || row.provider_loaded === false) return 'no';
-  if (row.loaded === true || row.resident === true) return 'runtime cached';
-  return '-';
+interface EstimateTarget {
+  key: string;
+  provider: string;
+  model: string;
+  contextLength: number | null;
 }
 
 export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: ModelResidencyPanelProps) {
   const residency = gatewayContracts?.common?.model_residency;
   const routeAvailable = modelResidencyAvailable(gatewayContracts);
-  const loadedAvailable = residencyEndpointAvailable(gatewayContracts, 'loaded');
-  const loadAvailable = residencyEndpointAvailable(gatewayContracts, 'load');
-  const unloadAvailable = residencyEndpointAvailable(gatewayContracts, 'unload');
+  const loadedAvailable = modelResidencyEndpointAvailable(gatewayContracts, 'loaded');
+  const loadAvailable = modelResidencyEndpointAvailable(gatewayContracts, 'load');
+  const unloadAvailable = modelResidencyEndpointAvailable(gatewayContracts, 'unload');
+  const lockAvailable = modelResidencyEndpointAvailable(gatewayContracts, 'lock');
+  const unlockAvailable = modelResidencyEndpointAvailable(gatewayContracts, 'unlock');
+  const estimateAvailable = modelResidencyEndpointAvailable(gatewayContracts, 'context_estimate');
+  const hostStateOk = hostStateAvailable(gatewayContracts);
+  const cachesOk = sessionCachesAvailable(gatewayContracts);
+  const cacheClearOk = sessionCacheClearAvailable(gatewayContracts);
+  const modalityUi = residency?.modality_ui || null;
   const residencyControlsAvailable = routeAvailable && residency?.available !== false;
   const configHint =
     typeof residency?.config_hint === 'string' && !/abstractcore/i.test(residency.config_hint)
       ? residency.config_hint
       : '';
   const tasks = useMemo(() => taskOptions(gatewayContracts), [gatewayContracts]);
+  const [tab, setTab] = useState<PanelTab>('models');
   const [task, setTask] = useState(() => tasks[0]?.value || 'text_generation');
   const [provider, setProvider] = useState('');
   const [model, setModel] = useState('');
-  const [pendingUnload, setPendingUnload] = useState<ModelResidencyRecord | null>(null);
+  const [lockOnLoad, setLockOnLoad] = useState(false);
+  const [showNonResident, setShowNonResident] = useState(false);
+  const [pendingUnload, setPendingUnload] = useState<PendingUnload | null>(null);
+  const [pendingClearCache, setPendingClearCache] = useState<SessionCacheView | null>(null);
+  const [estimateTarget, setEstimateTarget] = useState<EstimateTarget | null>(null);
 
   useEffect(() => {
     if (tasks.some((option) => option.value === task)) return;
@@ -340,9 +253,39 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
     setModel('');
   }, [task, tasks]);
 
+  // Transient dialog/detail state must not survive a close: a stale (possibly
+  // force-upgraded) unload confirm or clear-cache confirm reappearing on the
+  // next open could fire against rows that no longer exist.
+  useEffect(() => {
+    if (isOpen) return;
+    setPendingUnload(null);
+    setPendingClearCache(null);
+    setEstimateTarget(null);
+  }, [isOpen]);
+
   const loadedQuery = useLoadedModels(gatewayContracts, isOpen && residencyControlsAvailable && loadedAvailable);
   const loadMutation = useLoadModelResidency(gatewayContracts);
   const unloadMutation = useUnloadModelResidency(gatewayContracts);
+  const lockMutation = useLockModel(gatewayContracts);
+  const unlockMutation = useUnlockModel(gatewayContracts);
+  const clearCacheMutation = useClearSessionCache(gatewayContracts);
+  // /host/state is slow: only poll while the panel is open on the Memory tab.
+  const hostStateQuery = useHostState(gatewayContracts, isOpen && tab === 'memory' && hostStateOk);
+  const sessionCachesQuery = useSessionCaches(gatewayContracts, isOpen && tab === 'caches' && cachesOk);
+  const loadEstimateQuery = useContextEstimate(
+    gatewayContracts,
+    { provider: provider.trim(), model: model.trim() },
+    isOpen && tab === 'models' && estimateAvailable && residencyControlsAvailable
+  );
+  const rowEstimateQuery = useContextEstimate(
+    gatewayContracts,
+    {
+      provider: estimateTarget?.provider || '',
+      model: estimateTarget?.model || '',
+      context_length: estimateTarget?.contextLength ?? undefined,
+    },
+    isOpen && tab === 'models' && estimateAvailable && Boolean(estimateTarget)
+  );
 
   const providersQuery = useProviders(isOpen && residencyControlsAvailable && task === 'text_generation');
   const modelsQuery = useModels(provider, isOpen && residencyControlsAvailable && task === 'text_generation' && Boolean(provider), TEXT_OUTPUT_CAPABILITY_ROUTE);
@@ -448,11 +391,25 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
     return out;
   }, [imagePairs, model, modelsQuery.data, musicModelsQuery.data, provider, sttCatalogQuery.data, task, ttsModelsQuery.data]);
 
-  const rows = loadedQuery.data?.models || [];
-  const providerResidentRows = useMemo(() => rows.filter(isProviderResidentRow), [rows]);
-  const hiddenConfigurationRows = Math.max(0, rows.length - providerResidentRows.length);
-  const busy = loadMutation.isPending || unloadMutation.isPending;
+  const rows = useMemo(() => loadedQuery.data?.models || [], [loadedQuery.data]);
+  const rowV1 = residencyResponseHasRowV1(loadedQuery.data);
+  const { visible: visibleRows, hiddenCount } = useMemo(
+    () => filterResidencyRows(rows, rowV1, showNonResident),
+    [rows, rowV1, showNonResident]
+  );
+  const busy =
+    loadMutation.isPending ||
+    unloadMutation.isPending ||
+    lockMutation.isPending ||
+    unlockMutation.isPending ||
+    clearCacheMutation.isPending;
   const loadDisabled = !residencyControlsAvailable || !loadAvailable || busy || !task || !provider.trim() || !model.trim();
+  const loadEstimateHint =
+    provider.trim() && model.trim() && estimateAvailable
+      ? loadEstimateQuery.isLoading
+        ? 'Estimating usable context…'
+        : contextEstimateHint(loadEstimateQuery.data)
+      : '';
   const partialControlHint =
     !loadedAvailable
       ? 'This Gateway runtime does not advertise loaded-model listing.'
@@ -519,6 +476,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
         task,
         provider: provider.trim() || undefined,
         model: model.trim() || undefined,
+        lock: lockOnLoad || undefined,
       });
       if (result.ok === false) {
         toast.error(residencyResultMessage(result, 'Model load request failed'));
@@ -535,16 +493,19 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
     }
   };
 
-  const unloadRow = async (row: ModelResidencyRecord) => {
+  const unloadRow = async (pending: PendingUnload) => {
+    const { row, force } = pending;
     const rid = runtimeIdFor(row);
     const p = firstString(row.provider);
     const m = firstString(row.model);
+    const preferProviderModel = rowV1 && p && m;
     try {
       const result = await unloadMutation.mutateAsync({
         task: firstString(row.task) || undefined,
-        runtime_id: rid || undefined,
-        provider: rid ? undefined : p || undefined,
-        model: rid ? undefined : m || undefined,
+        runtime_id: preferProviderModel ? undefined : rid || undefined,
+        provider: preferProviderModel || !rid ? p || undefined : undefined,
+        model: preferProviderModel || !rid ? m || undefined : undefined,
+        force: force || undefined,
       });
       setPendingUnload(null);
       if (result.ok === false) {
@@ -555,27 +516,487 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
         else toast.success(msg);
       }
     } catch (error) {
+      if (!force && unloadConflictOffersForce(error)) {
+        // 409 model_locked: keep the dialog open, upgraded to a force confirm.
+        setPendingUnload({ row, force: true });
+        return;
+      }
       toast.error(error instanceof Error ? error.message : 'Model unload request failed');
     }
   };
 
-  const pendingUnloadRuntimeId = pendingUnload ? runtimeIdFor(pendingUnload) : '';
-  const pendingUnloadProvider = pendingUnload ? firstString(pendingUnload.provider) : '';
-  const pendingUnloadModel = pendingUnload ? displayModelFor(pendingUnload) : '';
+  const toggleLockRow = async (row: ModelResidencyRowV1, lock: boolean) => {
+    const rid = firstString(row.runtime_id);
+    const payload = rid
+      ? { runtime_id: rid }
+      : { provider: firstString(row.provider) || undefined, model: firstString(row.model) || undefined };
+    try {
+      const mutation = lock ? lockMutation : unlockMutation;
+      const result = await mutation.mutateAsync(payload);
+      if (result.ok === false) {
+        toast.error(residencyResultMessage(result, lock ? 'Model lock request failed' : 'Model unlock request failed'));
+      } else {
+        toast.success(lock ? 'Model locked' : 'Model unlocked');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : lock ? 'Model lock request failed' : 'Model unlock request failed');
+    }
+  };
+
+  const clearSessionCache = async (cache: SessionCacheView) => {
+    try {
+      await clearCacheMutation.mutateAsync(cache.sessionId);
+      setPendingClearCache(null);
+      toast.success('Session prompt cache cleared');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Session cache clear failed');
+    }
+  };
+
+  const toggleEstimateRow = (key: string, row: ModelResidencyRowV1) => {
+    if (estimateTarget?.key === key) {
+      setEstimateTarget(null);
+      return;
+    }
+    const contextLength = typeof row.context_length === 'number' && Number.isFinite(row.context_length) ? row.context_length : null;
+    setEstimateTarget({
+      key,
+      provider: firstString(row.provider),
+      model: firstString(row.model),
+      contextLength,
+    });
+  };
+
+  const pendingRow = pendingUnload?.row || null;
+  const pendingUnloadRuntimeId = pendingRow ? runtimeIdFor(pendingRow) : '';
+  const pendingUnloadProvider = pendingRow ? firstString(pendingRow.provider) : '';
+  const pendingUnloadModel = pendingRow ? displayModelFor(pendingRow) : '';
   const pendingUnloadLabel =
     [pendingUnloadProvider, pendingUnloadModel].filter(Boolean).join(' / ') ||
     pendingUnloadRuntimeId ||
     'selected model';
 
+  const memoryView = useMemo(() => buildHostMemoryView(hostStateQuery.data), [hostStateQuery.data]);
+  const sessionCacheViews = useMemo(() => buildSessionCacheViews(sessionCachesQuery.data), [sessionCachesQuery.data]);
+
   if (!isOpen) return null;
+
+  const estimateDetail = (key: string) => {
+    if (estimateTarget?.key !== key) return null;
+    const text = rowEstimateQuery.isLoading
+      ? 'Estimating usable context…'
+      : rowEstimateQuery.isError
+        ? `Context estimate failed: ${rowEstimateQuery.error instanceof Error ? rowEstimateQuery.error.message : 'unknown error'}`
+        : contextEstimateHint(rowEstimateQuery.data) || 'No context estimate available for this model.';
+    return (
+      <tr className="model-residency-estimate-detail">
+        <td colSpan={8}>{text}</td>
+      </tr>
+    );
+  };
+
+  const modelsTable = rowV1 ? (
+    <div className="model-residency-table-wrap">
+      <table className="model-residency-table">
+        <thead>
+          <tr>
+            <th>Modality</th>
+            <th>Provider</th>
+            <th>Model</th>
+            <th>Resident</th>
+            <th>Size</th>
+            <th>Ctx</th>
+            <th aria-label="Locked">🔒</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRows.map((record, index) => {
+            const row = record as ModelResidencyRowV1;
+            const key = rowKeyV1(row, index);
+            const chip = resolveModalityChip(modalityUi, typeof row.task === 'string' ? row.task : null);
+            const resident = rowResidentState(row);
+            const ctx = rowContextView(row);
+            const sizeText = rowSizeText(row);
+            const vramText = rowVramText(row);
+            const locked = row.locked === true;
+            const lockable = row.lockable === true;
+            const configOnly = rowConfigOnlyV1(row);
+            const hasTarget = Boolean(firstString(row.runtime_id) || (firstString(row.provider) && firstString(row.model)));
+            return (
+              <Fragment key={key}>
+                <tr>
+                  <td>
+                    <span
+                      className="model-residency-chip"
+                      style={{ borderColor: chip.color, color: chip.color }}
+                      title={firstString(row.task) || 'Task unknown'}
+                    >
+                      <span className="model-residency-chip-dot" style={{ background: chip.color }} />
+                      {chip.label}
+                    </span>
+                  </td>
+                  <td>{firstString(row.provider) || '-'}</td>
+                  <td className="model-residency-model">
+                    {firstString(row.model) || firstString(row.runtime_id) || '-'}
+                    {firstString(row.state) ? (
+                      <span className={`model-residency-substate model-residency-substate--${rowStateKindV1(row)}`}>
+                        {firstString(row.state)}
+                        {row.pinned === true ? ' · pinned' : ''}
+                        {row.default === true ? ' · default' : ''}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td>
+                    <span className={`model-residency-status model-residency-status--resident-${resident}`}>
+                      {residentStateLabel(resident)}
+                    </span>
+                  </td>
+                  <td title={vramText ? `VRAM ${vramText}` : undefined}>{sizeText || '-'}</td>
+                  <td title={ctx.calibrated ? 'Calibrated context length' : undefined}>
+                    {ctx.text ? (
+                      <>
+                        {ctx.text}
+                        {ctx.calibrated ? <span className="model-residency-ctx-calibrated"> ✓</span> : null}
+                      </>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                  <td title={locked ? 'Locked: protected from unload/eviction.' : lockable ? 'Unlocked' : undefined}>
+                    {locked ? '🔒' : ''}
+                  </td>
+                  <td>
+                    <div className="model-residency-row-actions">
+                      <button
+                        type="button"
+                        className="modal-button danger"
+                        disabled={busy || !unloadAvailable || configOnly || !hasTarget}
+                        onClick={() => setPendingUnload({ row, force: false })}
+                        title={
+                          !unloadAvailable
+                            ? 'Unload endpoint not advertised by this Gateway runtime.'
+                            : configOnly
+                              ? 'This is a default configuration row, not a resident model.'
+                              : undefined
+                        }
+                      >
+                        Unload
+                      </button>
+                      {lockable ? (
+                        <button
+                          type="button"
+                          className="modal-button"
+                          disabled={busy || (locked ? !unlockAvailable : !lockAvailable)}
+                          onClick={() => toggleLockRow(row, !locked)}
+                          title={
+                            locked
+                              ? unlockAvailable
+                                ? 'Allow this model to be unloaded/evicted again.'
+                                : 'Unlock endpoint not advertised by this Gateway runtime.'
+                              : lockAvailable
+                                ? 'Protect this model from unload/eviction.'
+                                : 'Lock endpoint not advertised by this Gateway runtime.'
+                          }
+                        >
+                          {locked ? 'Unlock' : 'Lock'}
+                        </button>
+                      ) : null}
+                      {estimateAvailable && firstString(row.provider) && firstString(row.model) ? (
+                        <button
+                          type="button"
+                          className="modal-button"
+                          onClick={() => toggleEstimateRow(key, row)}
+                          title="Estimate the usable context window for this model on this host."
+                        >
+                          Estimate
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+                {estimateDetail(key)}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  ) : (
+    <div className="model-residency-table-wrap">
+      <table className="model-residency-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Provider</th>
+            <th>Model</th>
+            <th>Component</th>
+            <th>Runtime</th>
+            <th>Status</th>
+            <th>Provider Loaded</th>
+            <th>Last Used</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {visibleRows.map((row, index) => (
+            <tr key={modelKey(row, index)}>
+              <td>{taskLabel(firstString(row.task) || 'model')}</td>
+              <td>{firstString(row.provider) || '-'}</td>
+              <td className="model-residency-model">{displayModelFor(row)}</td>
+              <td>{componentLabelFor(row)}</td>
+              <td className="model-residency-runtime">
+                {runtimeIdFor(row) || '-'}
+                {firstString(row.source) ? <span>{firstString(row.source)}</span> : null}
+              </td>
+              <td>
+                <span className={`model-residency-status model-residency-status--${statusKind(row)}`}>
+                  {statusText(row)}
+                </span>
+              </td>
+              <td>{providerLoadedText(row)}</td>
+              <td>{displayDate(row.last_used_at) || '-'}</td>
+              <td>
+                <button type="button" className="modal-button danger" disabled={busy || !canUnloadRow(row, unloadAvailable)} onClick={() => setPendingUnload({ row, force: false })} title={unloadButtonTitle(row, unloadAvailable)}>
+                  Unload
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const modelsTab = (
+    <>
+      <div className="model-residency-loadbar">
+        <AfSelect
+          value={task}
+          options={tasks}
+          placeholder="Task"
+          searchable={false}
+          minPopoverWidth={180}
+          onChange={(value) => {
+            setTask(value || tasks[0]?.value || 'text_generation');
+            setProvider('');
+            setModel('');
+          }}
+        />
+        <AfSelect
+          value={provider}
+          options={providerOptions}
+          placeholder={providerPlaceholder}
+          loading={providerLoading}
+          allowCustom
+          clearable
+          minPopoverWidth={280}
+          onChange={(value) => {
+            setProvider(value);
+            setModel('');
+          }}
+        />
+        <AfSelect
+          value={model}
+          options={modelOptions}
+          placeholder={modelPlaceholder}
+          disabled={!provider}
+          loading={modelLoading}
+          allowCustom
+          clearable
+          minPopoverWidth={420}
+          onChange={setModel}
+        />
+        <button
+          type="button"
+          className="modal-button primary"
+          disabled={loadDisabled}
+          onClick={loadSelected}
+          title={!loadAvailable ? 'Load endpoint not advertised by this Gateway runtime.' : !provider.trim() || !model.trim() ? 'Choose an explicit provider and model to load.' : undefined}
+        >
+          Load
+        </button>
+        <button type="button" className="modal-button" onClick={() => loadedQuery.refetch()} disabled={!loadedAvailable || loadedQuery.isFetching}>
+          Refresh
+        </button>
+      </div>
+
+      <div className="model-residency-loadbar-meta">
+        {lockAvailable ? (
+          <label className="run-form-checkbox model-residency-lock-checkbox" title="Ask the Gateway to protect the loaded model from unload/eviction.">
+            <input type="checkbox" checked={lockOnLoad} onChange={(e) => setLockOnLoad(e.target.checked)} />
+            <span>Lock after load</span>
+          </label>
+        ) : null}
+        {loadEstimateHint ? <span className="model-residency-estimate-hint">{loadEstimateHint}</span> : null}
+      </div>
+
+      <div className="model-residency-note">
+        <label className="run-form-checkbox model-residency-filter-toggle">
+          <input type="checkbox" checked={showNonResident} onChange={(e) => setShowNonResident(e.target.checked)} />
+          <span>Show cached/non-resident</span>
+        </label>
+        {!showNonResident && hiddenCount > 0
+          ? ` ${hiddenCount} configuration/cache row${hiddenCount === 1 ? '' : 's'} hidden from this list.`
+          : ''}
+        {' '}Configure Gateway/Core routing defaults from the Gateway Console multimodal capabilities tab.
+      </div>
+
+      {partialControlHint ? (
+        <div className="model-residency-empty">
+          {partialControlHint}
+        </div>
+      ) : null}
+
+      {!loadedAvailable ? (
+        <div className="model-residency-empty">
+          Loaded-model listing is not available on this Gateway runtime.
+        </div>
+      ) : loadedQuery.isError ? (
+        <div className="model-residency-empty">
+          Failed to read loaded models: {loadedQuery.error instanceof Error ? loadedQuery.error.message : 'unknown error'}
+        </div>
+      ) : visibleRows.length === 0 ? (
+        <div className="model-residency-empty">
+          {loadedQuery.isLoading
+            ? 'Loading resident models…'
+            : hiddenCount > 0
+              ? 'No provider-resident models reported. Enable "Show cached/non-resident" to inspect cached and configuration rows.'
+              : 'No provider-resident models reported.'}
+        </div>
+      ) : (
+        modelsTable
+      )}
+    </>
+  );
+
+  const memoryTab = !hostStateOk ? (
+    <div className="model-residency-empty">
+      This Gateway runtime does not advertise host state (memory) reporting.
+    </div>
+  ) : hostStateQuery.isError ? (
+    <div className="model-residency-empty">
+      Failed to read host state: {hostStateQuery.error instanceof Error ? hostStateQuery.error.message : 'unknown error'}
+    </div>
+  ) : !hostStateQuery.data ? (
+    <div className="model-residency-empty">Loading host memory state…</div>
+  ) : (
+    <div className="model-residency-memory">
+      {memoryView.meters.length === 0 ? (
+        <div className="model-residency-empty">Host state reported no memory meters.</div>
+      ) : (
+        memoryView.meters.map((meter) => (
+          <div className="model-residency-meter" key={meter.id}>
+            <div className="model-residency-meter-head">
+              <span>{meter.label}</span>
+              <span>
+                {meter.usedText && meter.totalText ? `${meter.usedText} / ${meter.totalText}` : ''}
+                {meter.percentText ? ` (${meter.percentText})` : ''}
+              </span>
+            </div>
+            <div className="model-residency-meter-track">
+              <div
+                className={`model-residency-meter-fill model-residency-meter-fill--${meter.level}`}
+                style={{ width: `${Math.round((meter.fraction ?? 0) * 100)}%` }}
+              />
+            </div>
+          </div>
+        ))
+      )}
+      {memoryView.rssText ? (
+        <div className="model-residency-memory-row">
+          <span>Gateway process RSS</span>
+          <span>{memoryView.rssText}</span>
+        </div>
+      ) : null}
+      {memoryView.totals.length > 0 ? (
+        <div className="model-residency-memory-totals">
+          {memoryView.totals.map((total) => (
+            <span className="model-residency-total-pill" key={total.label}>
+              {total.label}: {total.value}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {memoryView.degraded.length > 0 ? (
+        <div className="model-residency-memory-degraded">
+          {memoryView.degraded.map((item) => (
+            <span
+              className="model-residency-status model-residency-status--warn"
+              key={item.name}
+              title={item.reason || undefined}
+            >
+              {item.name}
+              {item.reason ? ` — ${item.reason}` : ''}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const cachesTab = !cachesOk ? (
+    <div className="model-residency-empty">
+      This Gateway runtime does not advertise session prompt-cache listing.
+    </div>
+  ) : sessionCachesQuery.isError ? (
+    <div className="model-residency-empty">
+      Failed to read session caches: {sessionCachesQuery.error instanceof Error ? sessionCachesQuery.error.message : 'unknown error'}
+    </div>
+  ) : sessionCacheViews.length === 0 ? (
+    <div className="model-residency-empty">
+      {sessionCachesQuery.isLoading ? 'Loading session caches…' : 'No session prompt caches reported.'}
+    </div>
+  ) : (
+    <div className="model-residency-table-wrap">
+      <table className="model-residency-table">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Provider</th>
+            <th>Model</th>
+            <th>Session</th>
+            <th>Size</th>
+            <th>Tokens</th>
+            <th>Created</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {sessionCacheViews.map((cache) => (
+            <tr key={cache.key}>
+              <td className="model-residency-model">{cache.key}</td>
+              <td>{cache.provider || '-'}</td>
+              <td className="model-residency-model">{cache.model || '-'}</td>
+              <td className="model-residency-runtime">{cache.sessionId || '-'}</td>
+              <td>{cache.sizeText || '-'}</td>
+              <td>{cache.tokenText || '-'}</td>
+              <td>{cache.createdText || '-'}</td>
+              <td>
+                <button
+                  type="button"
+                  className="modal-button danger"
+                  disabled={busy || !cacheClearOk || !cache.sessionId}
+                  onClick={() => setPendingClearCache(cache)}
+                  title={!cacheClearOk ? 'Cache clear endpoint not advertised by this Gateway runtime.' : !cache.sessionId ? 'This cache row did not report a session id.' : undefined}
+                >
+                  Clear
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
       <div className="modal model-residency-modal" onClick={(e) => e.stopPropagation()}>
         <div className="model-residency-header">
           <div>
-            <h3>Model Residency</h3>
-            <p>Provider-loaded models reported by the Gateway execution host.</p>
+            <h3>Resources</h3>
+            <p>Models, memory, and session caches reported by the Gateway execution host.</p>
           </div>
           <button type="button" className="modal-button cancel" onClick={onClose}>Close</button>
         </div>
@@ -587,125 +1008,38 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
           </div>
         ) : (
           <>
-            <div className="model-residency-loadbar">
-              <AfSelect
-                value={task}
-                options={tasks}
-                placeholder="Task"
-                searchable={false}
-                minPopoverWidth={180}
-                onChange={(value) => {
-                  setTask(value || tasks[0]?.value || 'text_generation');
-                  setProvider('');
-                  setModel('');
-                }}
-              />
-              <AfSelect
-                value={provider}
-                options={providerOptions}
-                placeholder={providerPlaceholder}
-                loading={providerLoading}
-                allowCustom
-                clearable
-                minPopoverWidth={280}
-                onChange={(value) => {
-                  setProvider(value);
-                  setModel('');
-                }}
-              />
-              <AfSelect
-                value={model}
-                options={modelOptions}
-                placeholder={modelPlaceholder}
-                disabled={!provider}
-                loading={modelLoading}
-                allowCustom
-                clearable
-                minPopoverWidth={420}
-                onChange={setModel}
-              />
+            <div className="model-residency-tabs" role="tablist" aria-label="Resources sections">
               <button
                 type="button"
-                className="modal-button primary"
-                disabled={loadDisabled}
-                onClick={loadSelected}
-                title={!loadAvailable ? 'Load endpoint not advertised by this Gateway runtime.' : !provider.trim() || !model.trim() ? 'Choose an explicit provider and model to load.' : undefined}
+                role="tab"
+                aria-selected={tab === 'models'}
+                className={`model-residency-tab${tab === 'models' ? ' active' : ''}`}
+                onClick={() => setTab('models')}
               >
-                Load
+                Models
               </button>
-              <button type="button" className="modal-button" onClick={() => loadedQuery.refetch()} disabled={!loadedAvailable || loadedQuery.isFetching}>
-                Refresh
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'memory'}
+                className={`model-residency-tab${tab === 'memory' ? ' active' : ''}`}
+                onClick={() => setTab('memory')}
+              >
+                Memory
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === 'caches'}
+                className={`model-residency-tab${tab === 'caches' ? ' active' : ''}`}
+                onClick={() => setTab('caches')}
+              >
+                Session caches
               </button>
             </div>
 
-            <div className="model-residency-note">
-              Only provider-reported resident models appear here. Configure Gateway/Core routing defaults from the Gateway Console multimodal capabilities tab.
-              {hiddenConfigurationRows > 0 ? ` ${hiddenConfigurationRows} configuration/cache row${hiddenConfigurationRows === 1 ? '' : 's'} hidden from this list.` : ''}
-            </div>
+            {tab === 'models' ? modelsTab : tab === 'memory' ? memoryTab : cachesTab}
 
-            {partialControlHint ? (
-              <div className="model-residency-empty">
-                {partialControlHint}
-              </div>
-            ) : null}
-
-            {!loadedAvailable ? (
-              <div className="model-residency-empty">
-                Loaded-model listing is not available on this Gateway runtime.
-              </div>
-            ) : loadedQuery.isError ? (
-              <div className="model-residency-empty">
-                Failed to read loaded models: {loadedQuery.error instanceof Error ? loadedQuery.error.message : 'unknown error'}
-              </div>
-            ) : providerResidentRows.length === 0 ? (
-              <div className="model-residency-empty">
-                {loadedQuery.isLoading ? 'Loading resident models…' : 'No provider-resident models reported.'}
-              </div>
-            ) : (
-              <div className="model-residency-table-wrap">
-                <table className="model-residency-table">
-                  <thead>
-                    <tr>
-                      <th>Task</th>
-                      <th>Provider</th>
-                      <th>Model</th>
-                      <th>Component</th>
-                      <th>Runtime</th>
-                      <th>Status</th>
-                      <th>Provider Loaded</th>
-                      <th>Last Used</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {providerResidentRows.map((row, index) => (
-                      <tr key={modelKey(row, index)}>
-                        <td>{taskLabel(firstString(row.task) || 'model')}</td>
-                        <td>{firstString(row.provider) || '-'}</td>
-                        <td className="model-residency-model">{displayModelFor(row)}</td>
-                        <td>{componentLabelFor(row)}</td>
-                        <td className="model-residency-runtime">
-                          {runtimeIdFor(row) || '-'}
-                          {firstString(row.source) ? <span>{firstString(row.source)}</span> : null}
-                        </td>
-                        <td>
-                          <span className={`model-residency-status model-residency-status--${statusKind(row)}`}>
-                            {statusText(row)}
-                          </span>
-                        </td>
-                        <td>{providerLoadedText(row)}</td>
-                        <td>{displayDate(row.last_used_at) || '-'}</td>
-                        <td>
-                          <button type="button" className="modal-button danger" disabled={busy || !canUnloadRow(row, unloadAvailable)} onClick={() => setPendingUnload(row)} title={unloadButtonTitle(row, unloadAvailable)}>
-                            Unload
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
             {pendingUnload ? (
               <div className="model-residency-confirm-backdrop" role="presentation" onClick={() => setPendingUnload(null)}>
                 <div
@@ -715,16 +1049,50 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
                   aria-labelledby="model-residency-confirm-title"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <h4 id="model-residency-confirm-title">Unload Model</h4>
+                  <h4 id="model-residency-confirm-title">{pendingUnload.force ? 'Force Unload Locked Model' : 'Unload Model'}</h4>
                   <p>
-                    Unload <strong>{pendingUnloadLabel}</strong> from the provider?
+                    {pendingUnload.force ? (
+                      <>
+                        <strong>{pendingUnloadLabel}</strong> is locked against unload. Force unload anyway?
+                      </>
+                    ) : (
+                      <>
+                        Unload <strong>{pendingUnloadLabel}</strong> from the provider?
+                      </>
+                    )}
                   </p>
                   <div className="modal-actions">
                     <button type="button" className="modal-button cancel" onClick={() => setPendingUnload(null)} disabled={busy}>
                       Cancel
                     </button>
                     <button type="button" className="modal-button danger" onClick={() => unloadRow(pendingUnload)} disabled={busy}>
-                      Unload
+                      {pendingUnload.force ? 'Force Unload' : 'Unload'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {pendingClearCache ? (
+              <div className="model-residency-confirm-backdrop" role="presentation" onClick={() => setPendingClearCache(null)}>
+                <div
+                  className="model-residency-confirm"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="model-residency-clear-cache-title"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h4 id="model-residency-clear-cache-title">Clear Session Cache</h4>
+                  <p>
+                    Clear all prompt caches for session <strong>{pendingClearCache.sessionId}</strong>
+                    {pendingClearCache.model ? <> ({pendingClearCache.provider ? `${pendingClearCache.provider} / ` : ''}{pendingClearCache.model})</> : null}?
+                  </p>
+                  <div className="modal-actions">
+                    <button type="button" className="modal-button cancel" onClick={() => setPendingClearCache(null)} disabled={busy}>
+                      Cancel
+                    </button>
+                    <button type="button" className="modal-button danger" onClick={() => clearSessionCache(pendingClearCache)} disabled={busy}>
+                      Clear
                     </button>
                   </div>
                 </div>

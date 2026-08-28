@@ -122,7 +122,9 @@ capability route at run time. This keeps portable workflows independent of a
 specific deployment's OpenAI, Anthropic, LM Studio, Ollama, or endpoint-profile
 setup.
 
-The Model Residency modal is intentionally loaded-state only. It lists
-provider-reported resident models and does not edit capability defaults.
-Gateway Console and the Core/Gateway config CLIs own default route
-configuration.
+The Resources panel reads Gateway's model-residency rows
+(`model_residency_row_v1`), host memory/GPU state, and session prompt-cache
+listings, and issues load/unload/lock/unlock/context-estimate calls only
+through endpoints Gateway advertises in its contracts. It does not edit
+capability defaults. Gateway Console and the Core/Gateway config CLIs own
+default route configuration.

@@ -6,6 +6,7 @@ import {
   gatewayJson,
   type GatewayContracts,
 } from '../utils/gatewayClient';
+import { formatBytes } from '../utils/formatBytes';
 
 type WorkspacePathKind = 'file' | 'folder';
 
@@ -35,13 +36,6 @@ function parentFolder(path: string): string {
   const idx = text.lastIndexOf('/');
   if (idx <= 0) return '';
   return text.slice(0, idx);
-}
-
-function formatBytes(value: number | undefined): string {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '';
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function WorkspacePathInputField({
