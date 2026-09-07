@@ -4638,18 +4638,77 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   background: var(--error);
 }
 
-.model-residency-memory-row {
-  display: flex;
+/* The accelerator-heap caveat, under its bar: mmapped GGUF weights never
+   become driver-allocated accelerator memory and are not counted there. */
+.model-residency-meter-note {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* Memory tab: the breakdown under the meters — ITEMS (facts, each labelled
+   with what it measures), a rule, then REFERENCES (separate counters that
+   must not be added to the items), then the GGUF note. Same token
+   vocabulary as the meters above it. */
+.model-residency-breakdown {
+  display: grid;
+  gap: 4px;
+}
+
+.model-residency-breakdown-head {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.model-residency-breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: baseline;
-  justify-content: space-between;
   gap: 12px;
   font-size: var(--font-size-sm);
   color: var(--text-primary);
 }
 
-.model-residency-memory-row span:last-child {
+.model-residency-breakdown-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-residency-breakdown-note {
+  color: var(--text-secondary);
+}
+
+.model-residency-breakdown-bytes {
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
+}
+
+/* The rule that keeps references visually apart from the items, so nobody
+   adds an accelerator counter to a list of model weights. */
+.model-residency-breakdown-separator {
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  margin: 6px 0 2px;
+}
+
+.model-residency-breakdown-subhead {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.model-residency-breakdown-row--reference .model-residency-breakdown-name,
+.model-residency-breakdown-row--reference .model-residency-breakdown-bytes {
+  color: var(--text-secondary);
+}
+
+.model-residency-breakdown-gguf-note {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-top: 4px;
 }
 
 .model-residency-memory-totals,

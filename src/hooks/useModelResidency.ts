@@ -48,6 +48,10 @@ export interface ModelResidencyRowV1 {
   modalities?: string[] | null;
   size_bytes?: number | null;
   size_vram_bytes?: number | null;
+  /** Estimated weight footprint when the runtime reports no measured size. */
+  est_weights_bytes?: number | null;
+  /** Prompt/KV cache this model currently holds, when the host reports it. */
+  cache_bytes?: number | null;
   expires_at?: string | null;
   context_length?: number | null;
   calibrated_context_length?: number | null;
@@ -341,9 +345,22 @@ export interface HostMemoryRam {
 
 export interface HostMemoryDevice {
   backend?: string | null;
+  /**
+   * PROCESS-LOCAL allocation. On Apple silicon this reads 0 while tens of GB
+   * are resident in another process, so it must never be the headline figure
+   * when `host_in_use_bytes` is available.
+   */
   allocated_bytes?: number | null;
   total_bytes?: number | null;
   free_bytes?: number | null;
+  /**
+   * Accelerator heap in use across ALL PROCESSES. Not the machine's memory
+   * use and not a denominator: it is blind to memory-mapped GGUF weights,
+   * which llama.cpp maps from disk rather than allocating on the driver.
+   */
+  host_in_use_bytes?: number | null;
+  /** The real accelerator ceiling (Metal wired limit), below total_bytes. */
+  wired_limit_bytes?: number | null;
   [key: string]: unknown;
 }
 
@@ -376,8 +393,9 @@ export interface HostStateResponse {
   ts?: number | string;
   memory?: HostMemoryInfo | null;
   gpu?: unknown;
-  models?: ModelResidencyRowV1[];
-  session_caches?: SessionCacheRecord[];
+  /** null = the host could not enumerate this section (degraded), not "none". */
+  models?: ModelResidencyRowV1[] | null;
+  session_caches?: SessionCacheRecord[] | null;
   totals?: Record<string, unknown> | null;
   degraded?: string[];
   reasons?: Record<string, string>;

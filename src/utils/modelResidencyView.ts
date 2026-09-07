@@ -265,6 +265,113 @@ export function rowVramText(row: ModelResidencyRowV1): string {
   return formatBytes(finiteNumber(row.size_vram_bytes));
 }
 
+// ---------------------------------------------------------------------------
+// Display size: ONE coalesce rule, shared with the gateway console
+// ---------------------------------------------------------------------------
+
+export type DisplaySizeSource = 'size_bytes' | 'size_vram_bytes' | 'est_weights_bytes' | '';
+
+export interface DisplaySizeView {
+  bytes: number | null;
+  source: DisplaySizeSource;
+  /** Human phrasing of WHERE the number came from — never hidden from the UI. */
+  label: string;
+}
+
+/**
+ * The display size for a residency row: the first KNOWN of `size_bytes` ->
+ * `size_vram_bytes` -> `est_weights_bytes`. The source rides along so an
+ * ESTIMATE is never presented as a measurement — an MLX/HF row that only
+ * reports `est_weights_bytes` used to render a blank size cell.
+ */
+export function rowDisplaySize(row: ModelResidencyRowV1): DisplaySizeView {
+  const pick = (value: unknown, source: DisplaySizeSource, label: string): DisplaySizeView | null => {
+    const n = finiteNumber(value);
+    return n !== null && n >= 0 ? { bytes: n, source, label } : null;
+  };
+  return (
+    pick(row.size_bytes, 'size_bytes', 'reported size') ||
+    pick(row.size_vram_bytes, 'size_vram_bytes', 'reported VRAM size') ||
+    pick(row.est_weights_bytes, 'est_weights_bytes', 'ESTIMATED weights (not measured)') || {
+      bytes: null,
+      source: '',
+      label: 'size unknown',
+    }
+  );
+}
+
+/** Prompt/KV cache bytes this model holds, or null when unreported. */
+export function rowCacheBytes(row: ModelResidencyRowV1): number | null {
+  const n = finiteNumber(row.cache_bytes);
+  return n !== null && n >= 0 ? n : null;
+}
+
+export interface RowSizeCell {
+  text: string;
+  title: string;
+}
+
+/**
+ * The Size cell: the coalesced display size with the row's cache as a
+ * secondary figure, and a title that NAMES the source so an estimate can
+ * never be read as measured truth.
+ *
+ * An ESTIMATED size (`est_weights_bytes`) is prefixed with `~` in the
+ * RENDERED text, matching the TUIs — a tooltip-only marker is invisible.
+ */
+export function rowSizeCell(row: ModelResidencyRowV1): RowSizeCell {
+  const size = rowDisplaySize(row);
+  const cache = rowCacheBytes(row);
+  const sizeText =
+    size.bytes === null ? '' : `${size.source === 'est_weights_bytes' ? '~' : ''}${formatBytes(size.bytes)}`;
+  const cacheText = cache === null ? '' : formatBytes(cache);
+  const text = sizeText
+    ? cacheText
+      ? `${sizeText} + ${cacheText} cache`
+      : sizeText
+    : cacheText
+      ? `${cacheText} cache`
+      : '';
+  const bits: string[] = [
+    size.bytes === null ? 'Size unknown — this host reported no size for the model' : `${size.label} (${size.source})`,
+  ];
+  const vram = finiteNumber(row.size_vram_bytes);
+  if (vram !== null && size.source !== 'size_vram_bytes') bits.push(`VRAM ${formatBytes(vram)}`);
+  if (cache !== null) bits.push(`prompt/KV cache ${cacheText}`);
+  return { text, title: bits.join(' · ') };
+}
+
+// ---------------------------------------------------------------------------
+// Lock control: a lock on EVERY resident line
+// ---------------------------------------------------------------------------
+
+export type RowLockAction = 'lock' | 'unlock' | null;
+
+/**
+ * Which lock control a row offers. Locking now ADOPTS externally loaded
+ * (LM Studio / ollama) resident models, so a sweep-resident row whose
+ * `lockable` the host never reported (null) is lockable too — only an
+ * EXPLICIT `lockable: false` withholds the control. A locked row always
+ * offers Unlock, resident or not: a locked-but-evicted lock still blocks
+ * unloads and must never be stranded.
+ */
+export function rowLockAction(row: ModelResidencyRowV1): RowLockAction {
+  if (row.locked === true) return 'unlock';
+  if (row.lockable !== false && row.resident === true) return 'lock';
+  return null;
+}
+
+/**
+ * Whether locking this row ADOPTS a model this host loaded outside the
+ * Gateway. The residency sweep stamps every row `lockable: true`, so keying
+ * the adopt wording off `lockable` never fired; `source === 'provider_server'`
+ * is the field that actually says "the provider had this loaded already".
+ * This decides WORDING ONLY — the lock gate stays `rowLockAction`.
+ */
+export function rowLockAdopts(row: ModelResidencyRowV1): boolean {
+  return firstString(row.source) === 'provider_server';
+}
+
 export interface RowContextView {
   text: string;
   calibrated: boolean;
@@ -401,6 +508,10 @@ export interface MeterView {
   usedText: string;
   totalText: string;
   level: MeterLevel;
+  /** Tooltip explaining exactly which figure the bar shows. */
+  title?: string;
+  /** Caveat rendered as a sub-line under the bar (accelerator heap: GGUF). */
+  note?: string;
 }
 
 export function meterFraction(used: unknown, total: unknown): number | null {
@@ -457,11 +568,328 @@ function gpuMeters(gpu: unknown): MeterView[] {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Accelerator heap: an accelerator-heap figure that always names its scope
+// ---------------------------------------------------------------------------
+
+/**
+ * EXACT caveat carried on every rendering of the accelerator figure.
+ * `host_in_use_bytes` counts driver-allocated accelerator buffers; llama.cpp
+ * mmaps a GGUF and wraps the pages with `newBufferWithBytesNoCopy`, so those
+ * weights never become driver-allocated and never appear here.
+ */
+export const ACCELERATOR_NOTE = 'memory-mapped GGUF weights are not counted here';
+
+/** The only two scope words this figure may use. */
+export type AcceleratorScope = 'all processes' | 'this process only';
+
+export interface DeviceMemoryView {
+  scope: AcceleratorScope;
+  backend: string;
+  usedBytes: number | null;
+  ceilingBytes: number | null;
+  hostInUseBytes: number | null;
+  processBytes: number | null;
+  wiredLimitBytes: number | null;
+  totalBytes: number | null;
+  /** EXACT: `Accelerator heap · <backend> (<scope>)`. */
+  label: string;
+  /** EXACT: the GGUF caveat, for a tooltip or sub-line. */
+  note: string;
+  /** The note, which figure this is, and what the ceiling means. */
+  detail: string;
+}
+
+/**
+ * The accelerator-heap figure. `device.allocated_bytes` is PROCESS-LOCAL: on
+ * Apple silicon it reads 0 while a 90 GB GGUF is resident in another process.
+ * `device.host_in_use_bytes` is the accelerator heap across ALL PROCESSES and
+ * `device.wired_limit_bytes` the real ceiling (`total_bytes` is the whole
+ * unified pool, not what the accelerator may take). Both win whenever known.
+ *
+ * The label names the scope in the only two permitted phrasings — `all
+ * processes` / `this process only` — so this figure can never be read as the
+ * machine's memory use. It is NOT a system meter and NOT a denominator: it is
+ * blind to memory-mapped GGUF weights, which is why the note rides along.
+ */
+export function deviceMemoryView(device: unknown): DeviceMemoryView | null {
+  const rec = asRecord(device);
+  if (!rec) return null;
+  const nonNegative = (value: unknown): number | null => {
+    const n = finiteNumber(value);
+    return n !== null && n >= 0 ? n : null;
+  };
+  const backend = firstString(rec.backend);
+  const hostInUseBytes = nonNegative(rec.host_in_use_bytes);
+  const wiredLimitBytes = nonNegative(rec.wired_limit_bytes);
+  const totalBytes = nonNegative(rec.total_bytes);
+  const freeBytes = nonNegative(rec.free_bytes);
+  let processBytes = nonNegative(rec.allocated_bytes);
+  if (processBytes === null && totalBytes !== null && freeBytes !== null) {
+    processBytes = Math.max(0, totalBytes - freeBytes);
+  }
+  const scope: AcceleratorScope = hostInUseBytes === null ? 'this process only' : 'all processes';
+  const usedBytes = hostInUseBytes === null ? processBytes : hostInUseBytes;
+  const ceilingBytes = wiredLimitBytes === null ? totalBytes : wiredLimitBytes;
+  const label = `Accelerator heap · ${backend || 'device'} (${scope})`;
+  const bits: string[] = [
+    ACCELERATOR_NOTE,
+    scope === 'all processes'
+      ? 'accelerator heap in use across every process on this machine (device.host_in_use_bytes)'
+      : 'this process only (device.allocated_bytes) — no all-processes figure was reported, so a model resident in another process is not counted here',
+  ];
+  if (ceilingBytes !== null) {
+    bits.push(
+      wiredLimitBytes !== null
+        ? `ceiling: wired limit ${formatBytes(wiredLimitBytes)}`
+        : `ceiling: device total ${formatBytes(totalBytes)}`
+    );
+  }
+  if (scope === 'all processes' && processBytes !== null) bits.push(`this process: ${formatBytes(processBytes)}`);
+  if (wiredLimitBytes !== null && totalBytes !== null) bits.push(`device total ${formatBytes(totalBytes)}`);
+  return {
+    scope,
+    backend,
+    usedBytes,
+    ceilingBytes,
+    hostInUseBytes,
+    processBytes,
+    wiredLimitBytes,
+    totalBytes,
+    label,
+    note: ACCELERATOR_NOTE,
+    detail: bits.join(' · '),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Itemized memory breakdown: what is actually consuming the memory
+// ---------------------------------------------------------------------------
+
+/**
+ * EXACT: the GGUF explanation, emitted when the itemized model weights exceed
+ * the accelerator heap. That is the NORMAL case for mmapped weights, not an
+ * inconsistency, and it is why no remainder is computed against this figure.
+ */
+export const GGUF_BREAKDOWN_NOTE =
+  'Σ model weights exceeds the accelerator heap. That is the normal case for memory-mapped GGUF weights: llama.cpp maps them from disk, so they are resident as process RSS and are not counted in the accelerator heap.';
+
+/** EXACT phrasing per field that supplied a model item's byte figure. */
+const DISPLAY_SIZE_SOURCE_PHRASE: Record<Exclude<DisplaySizeSource, ''>, string> = {
+  size_bytes: 'reported by the model server (size_bytes)',
+  size_vram_bytes: 'reported by the model server (size_vram_bytes)',
+  est_weights_bytes: 'estimated on-disk weight size (est_weights_bytes)',
+};
+
+/** A fact the framework knows, labelled with what it measures. */
+export interface MemoryBreakdownItem {
+  key: string;
+  kind: 'item';
+  name: string;
+  detail: string;
+  bytes: number;
+  bytesText: string;
+  /** True when the figure is an estimate — rendered with a `~` prefix. */
+  estimated: boolean;
+}
+
+/** A separate counter. NEVER summable with the items. */
+export interface MemoryBreakdownReference {
+  key: string;
+  kind: 'reference';
+  name: string;
+  detail: string;
+  bytes: number | null;
+  /** `<used> / <total>`, or `<used>` alone when no ceiling is known. */
+  valueText: string;
+}
+
+export interface MemoryBreakdownView {
+  items: MemoryBreakdownItem[];
+  references: MemoryBreakdownReference[];
+  /** GGUF_BREAKDOWN_NOTE when Σ weights exceeds the accelerator heap, else ''. */
+  note: string;
+}
+
+/**
+ * The itemized view under the meters, in three kinds of line:
+ *
+ *  - ITEMS: facts the framework knows, each labelled with what it measures —
+ *    one per resident model with a known size (weights only), the model KV
+ *    caches, the session caches, and the gateway process RSS.
+ *  - REFERENCES: separate counters (Σ weights, RAM, the accelerator heap)
+ *    that the reader must NOT add to the items.
+ *  - NOTE: the GGUF explanation, when Σ weights exceeds the accelerator heap.
+ *
+ * A line is emitted when its value is KNOWN and omitted when unknown; a known
+ * `0` IS emitted, and no line is conditional on being non-zero.
+ *
+ * There is deliberately NO remainder. The old `host_in_use_bytes − (models +
+ * caches + rss)` subtracted RAM-dimensioned quantities from an accelerator
+ * counter that is blind to mmapped GGUF weights; live it computed −79 GB and
+ * clamped to `0 B`, blaming "overlap" for a category error. Attribution
+ * against RAM would need per-process accounting the framework does not have,
+ * so no replacement remainder is introduced.
+ */
+export function buildMemoryBreakdown(state: HostStateResponse | null | undefined): MemoryBreakdownView {
+  const snapshot = asRecord(state);
+  const memory = asRecord(snapshot?.memory);
+  const ram = asRecord(memory?.ram);
+  const process = asRecord(memory?.process);
+  const totals = asRecord(snapshot?.totals);
+  const nonNegative = (value: unknown): number | null => {
+    const n = finiteNumber(value);
+    return n !== null && n >= 0 ? n : null;
+  };
+
+  const items: MemoryBreakdownItem[] = [];
+  const references: MemoryBreakdownReference[] = [];
+
+  const modelRows = Array.isArray(snapshot?.models) ? (snapshot?.models as ModelResidencyRowV1[]) : [];
+  const residentRows = modelRows.filter((row) => row && row.resident === true);
+
+  // One item per resident row with a KNOWN display size. A resident row whose
+  // size the host never reported is SKIPPED — never an invented zero.
+  //
+  // The key rule is NORMATIVE across all four surfaces: `model:<runtime_id>`
+  // when the row carries one, else `model:<provider>:<model>`. No index and
+  // no task segment — real sweep rows have `runtime_id: null`, and an
+  // index-bearing key would differ per surface for the same model. Two rows
+  // colliding on the key are BOTH kept: a genuine duplicate provider+model
+  // row is itself worth seeing.
+  const modelItems: MemoryBreakdownItem[] = [];
+  residentRows.forEach((row) => {
+    const size = rowDisplaySize(row);
+    if (size.bytes === null || size.source === '') return;
+    const estimated = size.source === 'est_weights_bytes';
+    const identity =
+      firstString(row.runtime_id) || `${firstString(row.provider)}:${firstString(row.model)}`;
+    modelItems.push({
+      key: `model:${identity}`,
+      kind: 'item',
+      name: firstString(row.model) || firstString(row.runtime_id) || 'model',
+      detail: `resident model weights · ${DISPLAY_SIZE_SOURCE_PHRASE[size.source]}`,
+      bytes: size.bytes,
+      bytesText: `${estimated ? '~' : ''}${formatBytes(size.bytes)}`,
+      estimated,
+    });
+  });
+  items.push(...modelItems);
+  const sumModelWeights = modelItems.length === 0 ? null : modelItems.reduce((acc, item) => acc + item.bytes, 0);
+
+  let modelCacheBytes = nonNegative(totals?.cache_bytes_models);
+  if (modelCacheBytes === null) {
+    modelCacheBytes = residentRows.reduce<number | null>((acc, row) => {
+      const value = rowCacheBytes(row);
+      return value === null ? acc : (acc === null ? 0 : acc) + value;
+    }, null);
+  }
+  if (modelCacheBytes !== null) {
+    items.push({
+      key: 'model_caches',
+      kind: 'item',
+      name: 'model KV caches',
+      detail: 'prompt-cache bytes held for resident models',
+      bytes: modelCacheBytes,
+      bytesText: formatBytes(modelCacheBytes),
+      estimated: false,
+    });
+  }
+
+  let sessionCacheBytes = nonNegative(totals?.session_cache_bytes);
+  if (sessionCacheBytes === null) {
+    const cacheRows = Array.isArray(snapshot?.session_caches) ? (snapshot?.session_caches as unknown[]) : null;
+    if (cacheRows !== null) {
+      sessionCacheBytes = cacheRows.reduce<number | null>((acc, entry) => {
+        const value = nonNegative(asRecord(entry)?.bytes);
+        return value === null ? acc : (acc === null ? 0 : acc) + value;
+      }, null);
+    }
+  }
+  if (sessionCacheBytes !== null) {
+    items.push({
+      key: 'session_caches',
+      kind: 'item',
+      name: 'session caches',
+      detail: 'prompt-cache bytes held by gateway sessions',
+      bytes: sessionCacheBytes,
+      bytesText: formatBytes(sessionCacheBytes),
+      estimated: false,
+    });
+  }
+
+  const rss = nonNegative(process?.rss_bytes);
+  if (rss !== null) {
+    items.push({
+      key: 'process_rss',
+      kind: 'item',
+      name: 'gateway process RSS',
+      detail: 'resident set size of the gateway process — includes memory-mapped GGUF weights',
+      bytes: rss,
+      bytesText: formatBytes(rss),
+      estimated: false,
+    });
+  }
+
+  if (sumModelWeights !== null) {
+    references.push({
+      key: 'sum_model_weights',
+      kind: 'reference',
+      name: 'Σ model weights',
+      detail: 'sum of the resident model weights above',
+      bytes: sumModelWeights,
+      valueText: formatBytes(sumModelWeights),
+    });
+  }
+
+  const ramUsed = nonNegative(ram?.used_bytes);
+  if (ramUsed !== null) {
+    const ramTotal = nonNegative(ram?.total_bytes);
+    references.push({
+      key: 'ram',
+      kind: 'reference',
+      name: 'RAM used',
+      detail: 'system memory in use / installed',
+      bytes: ramUsed,
+      valueText: ramTotal === null ? formatBytes(ramUsed) : `${formatBytes(ramUsed)} / ${formatBytes(ramTotal)}`,
+    });
+  }
+
+  const accelerator = deviceMemoryView(memory?.device);
+  const acceleratorUsed = accelerator?.usedBytes ?? null;
+  if (accelerator !== null && acceleratorUsed !== null) {
+    references.push({
+      key: 'accelerator',
+      kind: 'reference',
+      name: accelerator.label,
+      detail: accelerator.note,
+      bytes: acceleratorUsed,
+      valueText:
+        accelerator.ceilingBytes === null
+          ? formatBytes(acceleratorUsed)
+          : `${formatBytes(acceleratorUsed)} / ${formatBytes(accelerator.ceilingBytes)}`,
+    });
+  }
+
+  const note =
+    sumModelWeights !== null && acceleratorUsed !== null && sumModelWeights > acceleratorUsed
+      ? GGUF_BREAKDOWN_NOTE
+      : '';
+
+  return { items, references, note };
+}
+
+/**
+ * NOTE: there is deliberately no `rssText` here. The gateway process RSS is
+ * reported ONCE, as the `process_rss` breakdown item that names what it
+ * measures; a second standalone row is the double-counting this panel exists
+ * to remove.
+ */
 export interface HostMemoryView {
   meters: MeterView[];
-  rssText: string;
   totals: Array<{ label: string; value: string }>;
   degraded: Array<{ name: string; reason: string }>;
+  breakdown: MemoryBreakdownView;
 }
 
 export function buildHostMemoryView(state: HostStateResponse | null | undefined): HostMemoryView {
@@ -480,21 +908,18 @@ export function buildHostMemoryView(state: HostStateResponse | null | undefined)
     if (meter) meters.push(meter);
   }
 
-  const device = asRecord(memory?.device);
+  // Accelerator-heap meter, AFTER the RAM meter: RAM stays the meter a reader
+  // takes as "how full is this machine". This one is the accelerator heap —
+  // the all-processes figure over the process-local one, the wired limit over
+  // the device total — and its label names its scope, with the GGUF caveat
+  // carried as a note so nobody reads it as whole-system usage.
+  const device = deviceMemoryView(memory?.device);
   if (device) {
-    const backend = firstString(device.backend);
-    const total = finiteNumber(device.total_bytes);
-    const free = finiteNumber(device.free_bytes);
-    let used = finiteNumber(device.allocated_bytes);
-    if (used === null && total !== null && free !== null) used = Math.max(0, total - free);
-    const meter = makeMeter('device', backend ? `Device (${backend})` : 'Device memory', used, total);
-    if (meter) meters.push(meter);
+    const meter = makeMeter('device', device.label, device.usedBytes, device.ceilingBytes);
+    if (meter) meters.push({ ...meter, title: device.detail, note: device.note });
   }
 
   meters.push(...gpuMeters(state?.gpu));
-
-  const rss = finiteNumber(asRecord(memory?.process)?.rss_bytes);
-  const rssText = rss === null ? '' : formatBytes(rss);
 
   const totals: Array<{ label: string; value: string }> = [];
   const totalsRec = asRecord(state?.totals);
@@ -521,7 +946,7 @@ export function buildHostMemoryView(state: HostStateResponse | null | undefined)
     }
   }
 
-  return { meters, rssText, totals, degraded };
+  return { meters, totals, degraded, breakdown: buildMemoryBreakdown(state) };
 }
 
 // ---------------------------------------------------------------------------

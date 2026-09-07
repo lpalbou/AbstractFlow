@@ -41,10 +41,11 @@ import {
   rowConfigOnlyV1,
   rowContextView,
   rowKeyV1,
+  rowLockAction,
+  rowLockAdopts,
   rowResidentState,
-  rowSizeText,
+  rowSizeCell,
   rowStateKindV1,
-  rowVramText,
   runtimeIdFor,
   statusKind,
   statusText,
@@ -617,10 +618,15 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
             const chip = resolveModalityChip(modalityUi, typeof row.task === 'string' ? row.task : null);
             const resident = rowResidentState(row);
             const ctx = rowContextView(row);
-            const sizeText = rowSizeText(row);
-            const vramText = rowVramText(row);
+            // Size = the coalesced display size (reported -> VRAM ->
+            // ESTIMATED weights) plus this row's own prompt cache, with a
+            // title that names the source so an estimate never reads as
+            // measured truth.
+            const size = rowSizeCell(row);
             const locked = row.locked === true;
-            const lockable = row.lockable === true;
+            // A lock on EVERY resident line: sweep-resident rows (lockable
+            // unreported) are lockable too, because locking adopts them.
+            const lockAction = rowLockAction(row);
             const configOnly = rowConfigOnlyV1(row);
             const hasTarget = Boolean(firstString(row.runtime_id) || (firstString(row.provider) && firstString(row.model)));
             return (
@@ -652,7 +658,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
                       {residentStateLabel(resident)}
                     </span>
                   </td>
-                  <td title={vramText ? `VRAM ${vramText}` : undefined}>{sizeText || '-'}</td>
+                  <td title={size.title}>{size.text || '-'}</td>
                   <td title={ctx.calibrated ? 'Calibrated context length' : undefined}>
                     {ctx.text ? (
                       <>
@@ -663,7 +669,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
                       '-'
                     )}
                   </td>
-                  <td title={locked ? 'Locked: protected from unload/eviction.' : lockable ? 'Unlocked' : undefined}>
+                  <td title={locked ? 'Locked: protected from unload/eviction.' : lockAction === 'lock' ? 'Unlocked' : undefined}>
                     {locked ? '🔒' : ''}
                   </td>
                   <td>
@@ -683,23 +689,27 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
                       >
                         Unload
                       </button>
-                      {lockable ? (
+                      {lockAction ? (
                         <button
                           type="button"
                           className="modal-button"
-                          disabled={busy || (locked ? !unlockAvailable : !lockAvailable)}
-                          onClick={() => toggleLockRow(row, !locked)}
+                          disabled={busy || (lockAction === 'unlock' ? !unlockAvailable : !lockAvailable)}
+                          onClick={() => toggleLockRow(row, lockAction === 'lock')}
                           title={
-                            locked
+                            lockAction === 'unlock'
                               ? unlockAvailable
-                                ? 'Allow this model to be unloaded/evicted again.'
+                                ? resident === 'yes'
+                                  ? 'Allow this model to be unloaded/evicted again.'
+                                  : 'Release a lock whose model is no longer in memory (the lock still blocks unloads).'
                                 : 'Unlock endpoint not advertised by this Gateway runtime.'
                               : lockAvailable
-                                ? 'Protect this model from unload/eviction.'
+                                ? rowLockAdopts(row)
+                                  ? 'Protect this model from unload/eviction — it was loaded outside this Gateway, so locking adopts it first.'
+                                  : 'Protect this model from unload/eviction.'
                                 : 'Lock endpoint not advertised by this Gateway runtime.'
                           }
                         >
-                          {locked ? 'Unlock' : 'Lock'}
+                          {lockAction === 'unlock' ? 'Unlock' : 'Lock'}
                         </button>
                       ) : null}
                       {estimateAvailable && firstString(row.provider) && firstString(row.model) ? (
@@ -886,11 +896,13 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
         <div className="model-residency-empty">Host state reported no memory meters.</div>
       ) : (
         memoryView.meters.map((meter) => (
-          <div className="model-residency-meter" key={meter.id}>
+          <div className="model-residency-meter" key={meter.id} title={meter.title}>
             <div className="model-residency-meter-head">
               <span>{meter.label}</span>
               <span>
-                {meter.usedText && meter.totalText ? `${meter.usedText} / ${meter.totalText}` : ''}
+                {meter.usedText && meter.totalText
+                  ? `${meter.usedText} / ${meter.totalText}`
+                  : meter.usedText || (meter.fraction === null ? 'unknown' : '')}
                 {meter.percentText ? ` (${meter.percentText})` : ''}
               </span>
             </div>
@@ -900,15 +912,65 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
                 style={{ width: `${Math.round((meter.fraction ?? 0) * 100)}%` }}
               />
             </div>
+            {meter.note ? <div className="model-residency-meter-note">{meter.note}</div> : null}
           </div>
         ))
       )}
-      {memoryView.rssText ? (
-        <div className="model-residency-memory-row">
-          <span>Gateway process RSS</span>
-          <span>{memoryView.rssText}</span>
+      {/* What is using memory, in three kinds of line: ITEMS (facts the
+          framework knows, each labelled with what it measures), then a rule
+          and the REFERENCES (separate counters that must NOT be added to the
+          items), then the GGUF note when Σ weights exceeds the accelerator
+          heap. No remainder: subtracting these from an accelerator counter
+          that cannot see mmapped GGUF weights is a category error. */}
+      {memoryView.breakdown.items.length > 0 || memoryView.breakdown.references.length > 0 ? (
+        <div className="model-residency-breakdown">
+          <div
+            className="model-residency-breakdown-head"
+            title="Every line below is a figure the host reported, labelled with what it measures."
+          >
+            What is using memory
+          </div>
+          {memoryView.breakdown.items.map((item) => (
+            <div className="model-residency-breakdown-row" key={item.key} title={item.detail || undefined}>
+              <span className="model-residency-breakdown-name">
+                {item.name}
+                {item.detail ? <span className="model-residency-breakdown-note"> — {item.detail}</span> : null}
+              </span>
+              <span className="model-residency-breakdown-bytes">{item.bytesText || 'unknown'}</span>
+            </div>
+          ))}
+          {memoryView.breakdown.references.length > 0 ? (
+            <>
+              <div className="model-residency-breakdown-separator" role="separator" />
+              <div className="model-residency-breakdown-subhead">
+                Separate counters — not summable with the lines above
+              </div>
+              {memoryView.breakdown.references.map((reference) => (
+                <div
+                  className="model-residency-breakdown-row model-residency-breakdown-row--reference"
+                  key={reference.key}
+                  title={reference.detail || undefined}
+                >
+                  <span className="model-residency-breakdown-name">
+                    {reference.name}
+                    {reference.detail ? (
+                      <span className="model-residency-breakdown-note"> — {reference.detail}</span>
+                    ) : null}
+                  </span>
+                  <span className="model-residency-breakdown-bytes">{reference.valueText || 'unknown'}</span>
+                </div>
+              ))}
+            </>
+          ) : null}
+          {memoryView.breakdown.note ? (
+            <div className="model-residency-breakdown-gguf-note">{memoryView.breakdown.note}</div>
+          ) : null}
         </div>
       ) : null}
+      {/* No standalone RSS row: the gateway process RSS is the `process_rss`
+          breakdown item above, stated once and labelled with what it
+          measures. Showing it twice is the double-counting this panel
+          exists to remove. */}
       {memoryView.totals.length > 0 ? (
         <div className="model-residency-memory-totals">
           {memoryView.totals.map((total) => (
