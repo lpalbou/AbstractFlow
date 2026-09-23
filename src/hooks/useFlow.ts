@@ -1316,6 +1316,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             'temperature',
             'seed',
             'thinking',
+            'speculation',
             'resp_schema',
           ];
           const ordered: Pin[] = [];
@@ -1446,6 +1447,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'temperature', label: 'temperature', type: 'number' }),
                 want({ id: 'seed', label: 'seed', type: 'number' }),
                 want({ id: 'thinking', label: 'thinking', type: 'string' }),
+                want({ id: 'speculation', label: 'MTP', type: 'any' }),
                 want({ id: 'resp_schema', label: 'resp_schema', type: 'json_schema' }),
               ]
             : [
@@ -1463,6 +1465,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'temperature', label: 'temperature', type: 'number' }),
                 want({ id: 'seed', label: 'seed', type: 'number' }),
                 want({ id: 'thinking', label: 'thinking', type: 'string' }),
+                want({ id: 'speculation', label: 'MTP', type: 'any' }),
                 want({ id: 'resp_schema', label: 'resp_schema', type: 'json_schema' }),
               ];
 

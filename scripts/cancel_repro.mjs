@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 let puppeteer;
 try { puppeteer = require('puppeteer-core'); }
-catch { puppeteer = createRequire('/Users/albou/tmp/abstractflow/web/frontend/package.json')('puppeteer-core'); }
+catch { puppeteer = createRequire(`${process.env.HOME}/tmp/abstractflow/web/frontend/package.json`)('puppeteer-core'); }
 
 const CHROME = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(existsSync);
 const BASE = 'http://127.0.0.1:3000';

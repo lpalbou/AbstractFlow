@@ -9,13 +9,15 @@ import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent, type
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
+import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
-import { SteerComposer } from '@abstractframework/ui-kit';
+import { SteerComposer, SpeculationSelect, type SpeculationValue } from '@abstractframework/ui-kit';
+import { parseSpeculationInput, withRunSpeculation } from '../utils/speculationControls';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
@@ -2049,6 +2051,8 @@ export function RunFlowModal({
 
   // Form state for each input pin
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [runSpeculation, setRunSpeculation] = useState<SpeculationValue>();
+  useEffect(() => setRunSpeculation(undefined), [flowId]);
   const [toolsValues, setToolsValues] = useState<Record<string, string[]>>({});
   const [workspaceRandom, setWorkspaceRandom] = useState(true);
   const [workspaceRoot, setWorkspaceRoot] = useState('');
@@ -2310,10 +2314,10 @@ export function RunFlowModal({
   const discovery = gatewayContracts?.common?.discovery || {};
   const modelCapabilitiesEndpoint = discovery.model_capabilities || '';
   const thinkingCapabilitiesQuery = useQuery({
-    queryKey: ['model-capabilities', modelCapabilitiesEndpoint, selectedModel],
+    queryKey: ['model-capabilities', modelCapabilitiesEndpoint, selectedProvider, selectedModel],
     queryFn: () =>
       gatewayJson<Record<string, unknown>>(
-        gatewayPath(modelCapabilitiesEndpoint, {}, { model_name: selectedModel })
+        gatewayPath(modelCapabilitiesEndpoint, {}, { model_name: selectedModel, provider: selectedProvider })
       ),
     enabled: isOpen && Boolean(selectedModel) && Boolean(modelCapabilitiesEndpoint),
     staleTime: 30_000,
@@ -2323,6 +2327,7 @@ export function RunFlowModal({
     [selectedModel, thinkingCapabilitiesQuery.data]
   );
   const thinkingSupported = thinkingOptions.length > 0;
+  const speculationCapabilitiesQuery = useExecutionCapabilities(promptCacheProvider, promptCacheModel, isOpen && !promptCacheGraphAmbiguous);
   const visibleFormInputPins = useMemo(
     () => formInputPins.filter((pin) => pin.id !== 'thinking' || thinkingSupported),
     [formInputPins, thinkingSupported]
@@ -2858,6 +2863,10 @@ export function RunFlowModal({
         return;
       }
 
+      if (pin.id === 'speculation') {
+        inputData[pin.id] = parseSpeculationInput(value);
+        return;
+      }
       // Parse based on type
       switch (pin.type) {
         case 'number':
@@ -2938,11 +2947,12 @@ export function RunFlowModal({
       inputData.context = existingContext;
     }
 
-    onRun(inputData);
+    onRun(withRunSpeculation(inputData, runSpeculation));
     if (followUpContext) setFollowUpContext(null);
   }, [
     formInputPins,
     formValues,
+    runSpeculation,
     onRun,
     toolsValues,
     visibleFormInputPins,
@@ -7904,7 +7914,7 @@ export function RunFlowModal({
                                 className="run-form-input run-form-textarea"
                                 value={workspaceIgnoredPathsText}
                                 onChange={(e) => setWorkspaceIgnoredPathsText(e.target.value)}
-                                placeholder={'.git\nnode_modules\n.venv\n~/Library\n/Users/albou/.ssh'}
+                                placeholder={'.git\nnode_modules\n.venv\n~/Library\n~/.ssh'}
                                 rows={4}
                                 disabled={isRunning}
                               />
@@ -7932,6 +7942,10 @@ export function RunFlowModal({
                         </span>
                       </div>
                       <div className="run-form-section-body">
+                        {nodes.some(node => node.data.nodeType === 'agent' || node.data.nodeType === 'llm_call') ? <SpeculationSelect value={runSpeculation} onChange={setRunSpeculation}
+                          capabilities={speculationCapabilitiesQuery.data} loading={speculationCapabilitiesQuery.isFetching}
+                          disabled={isRunning} inheritLabel="Core / Gateway default"
+                          error={speculationCapabilitiesQuery.isError ? 'MTP capability discovery failed.' : promptCacheGraphAmbiguous ? 'Multiple model routes: configure MTP on individual nodes.' : undefined} /> : null}
                         {visibleFormInputPins.length === 0 ? (
                           <div className="run-form-empty">
                             <span className="run-form-empty-icon"><PlaySolidGlyph /></span>
@@ -7943,6 +7957,13 @@ export function RunFlowModal({
                         {visibleFormInputPins.map(pin => {
                           const inputType = getInputTypeForPin(pin.type);
                           const value = formValues[pin.id] || '';
+
+                          if (pin.id === 'speculation') return <div key={pin.id} className="run-form-field">
+                            <SpeculationSelect value={parseSpeculationInput(value)}
+                              onChange={next => handleFieldChange(pin.id, next === undefined ? '' : JSON.stringify(next))}
+                              capabilities={speculationCapabilitiesQuery.data} disabled={isRunning}
+                              inheritLabel="Run / Gateway default" />
+                          </div>;
 
                           if (isArtifactPinType(pin.type)) {
                             const artifactValue = parseArtifactRefText(value);

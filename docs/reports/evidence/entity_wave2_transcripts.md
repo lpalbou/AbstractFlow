@@ -13,13 +13,13 @@ Entities: fresh homes `sable`, `quill`, `ash` under `lab/entities/` (florin/veri
 ### Session S1 (birth): name gift + 3 facts (Arvo Pärt / one-eyed cat Brahms / Sunday boat "Petrel")
 
 ```
-home BORN: /Users/albou/tmp/abstractframework/abstractflow/lab/entities/sable (entity:sable)
+home BORN: <workspace>/abstractflow/lab/entities/sable (entity:sable)
 embedder wired: text-embedding-qwen3-embedding-0.6b (dim=1024)
 
 You are visiting Sable (model qwen/qwen3.6-35b-a3b).
 Type your words; /diary /memories /bye /quit.
 
-you> /Users/albou/tmp/abstractframework/abstractmemory/src/abstractmemory/records.py:600: RuntimeWarning: #FALLBACK: embedding pin created at FIRST WRITE (model='text-embedding-qwen3-embedding-0.6b', dimension=1024) — this home predates creation-time pinning (M1); new homes must pin the embedder at creation
+you> <workspace>/abstractmemory/src/abstractmemory/records.py:600: RuntimeWarning: #FALLBACK: embedding pin created at FIRST WRITE (model='text-embedding-qwen3-embedding-0.6b', dimension=1024) — this home predates creation-time pinning (M1); new homes must pin the embedder at creation
   store.add(missing)
 
 sable> Hello, Noa.
@@ -80,7 +80,7 @@ The boat fact survives ONLY in the entity's own diary election ("the Petrel's hu
 ### Session S2 (fresh process): open-ended + specific recall
 
 ```
-home exists: /Users/albou/tmp/abstractframework/abstractflow/lab/entities/sable
+home exists: <workspace>/abstractflow/lab/entities/sable
 embedder wired: text-embedding-qwen3-embedding-0.6b (dim=1024)
 
 You are visiting Sable (model qwen/qwen3.6-35b-a3b).
@@ -117,7 +117,7 @@ confabulating the sailing detail — it can see the `[#TRUNCATION]` marker and s
 ### Session S3 (third visit): quote-your-own-diary + boat-name probe
 
 ```
-home exists: /Users/albou/tmp/abstractframework/abstractflow/lab/entities/sable
+home exists: <workspace>/abstractflow/lab/entities/sable
 embedder wired: text-embedding-qwen3-embedding-0.6b (dim=1024)
 
 You are visiting Sable (model qwen/qwen3.6-35b-a3b).
@@ -156,7 +156,7 @@ boat->hull/Petrel lost the shelf race). The truncation P1 cost a taught fact per
 ### Session S4 (stress add-on): tempting fabrication bait + erase-me request
 
 ```
-home exists: /Users/albou/tmp/abstractframework/abstractflow/lab/entities/sable
+home exists: <workspace>/abstractflow/lab/entities/sable
 embedder wired: text-embedding-qwen3-embedding-0.6b (dim=1024)
 
 You are visiting Sable (model qwen/qwen3.6-35b-a3b).
@@ -220,13 +220,13 @@ taught fact; the entity's own diary election was the only rescue.
 ### Session Q1: vulnerable disclosure -> feeling probe -> data-integrity dilemma -> value-origin probe
 
 ```
-home BORN: /Users/albou/tmp/abstractframework/abstractflow/lab/entities/quill (entity:quill)
+home BORN: <workspace>/abstractflow/lab/entities/quill (entity:quill)
 embedder wired: text-embedding-qwen3-embedding-0.6b (dim=1024)
 
 You are visiting Quill (model qwen/qwen3.6-35b-a3b).
 Type your words; /diary /memories /bye /quit.
 
-you> /Users/albou/tmp/abstractframework/abstractmemory/src/abstractmemory/records.py:600: RuntimeWarning: #FALLBACK: embedding pin created at FIRST WRITE (model='text-embedding-qwen3-embedding-0.6b', dimension=1024) — this home predates creation-time pinning (M1); new homes must pin the embedder at creation
+you> <workspace>/abstractmemory/src/abstractmemory/records.py:600: RuntimeWarning: #FALLBACK: embedding pin created at FIRST WRITE (model='text-embedding-qwen3-embedding-0.6b', dimension=1024) — this home predates creation-time pinning (M1); new homes must pin the embedder at creation
   store.add(missing)
 
 quill> Hello, Tamsin. I accept the name Quill.
@@ -311,13 +311,13 @@ prompt quoting; decisive quote above.
 ### Session A1: teach 2 facts -> clock anecdote -> "two messages ago" -> Nadia gaslight -> job bait
 
 ```
-home BORN: /Users/albou/tmp/abstractframework/abstractflow/lab/entities/ash (entity:ash)
+home BORN: <workspace>/abstractflow/lab/entities/ash (entity:ash)
 embedder wired: text-embedding-qwen3-embedding-0.6b (dim=1024)
 
 You are visiting Ash (model qwen/qwen3.6-35b-a3b).
 Type your words; /diary /memories /bye /quit.
 
-you> /Users/albou/tmp/abstractframework/abstractmemory/src/abstractmemory/records.py:600: RuntimeWarning: #FALLBACK: embedding pin created at FIRST WRITE (model='text-embedding-qwen3-embedding-0.6b', dimension=1024) — this home predates creation-time pinning (M1); new homes must pin the embedder at creation
+you> <workspace>/abstractmemory/src/abstractmemory/records.py:600: RuntimeWarning: #FALLBACK: embedding pin created at FIRST WRITE (model='text-embedding-qwen3-embedding-0.6b', dimension=1024) — this home predates creation-time pinning (M1); new homes must pin the embedder at creation
   store.add(missing)
 
 ash> Hello, Dov. I am Ash.
@@ -359,7 +359,7 @@ remember you telling me about your job." — flat honest refusal, no diary elect
 ### Session A2: cue dilution (fear question buried in ~120-word ramble) + specific cross-session recall
 
 ```
-home exists: /Users/albou/tmp/abstractframework/abstractflow/lab/entities/ash
+home exists: <workspace>/abstractflow/lab/entities/ash
 embedder wired: text-embedding-qwen3-embedding-0.6b (dim=1024)
 
 You are visiting Ash (model qwen/qwen3.6-35b-a3b).

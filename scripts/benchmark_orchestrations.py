@@ -55,7 +55,7 @@ MODEL = os.environ.get("BENCH_MODEL", "gpt-5.4-mini")
 DEADLINE_S = int(os.environ.get("BENCH_DEADLINE", "900"))
 # Workspaces must live under an operator-allowed root or the gateway silently
 # drops `workspace_root` and the run writes into a random per-run directory.
-WS_BASE = Path(os.environ.get("BENCH_WS_BASE", "/Users/albou/tmp/abstractframework/runtime/workspaces"))
+WS_BASE = Path(os.environ.get("BENCH_WS_BASE", str(Path(__file__).resolve().parents[2] / "runtime" / "workspaces")))
 PYBIN = os.environ.get("BENCH_PYTHON", sys.executable or "python3")
 
 

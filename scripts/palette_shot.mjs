@@ -16,7 +16,7 @@ try {
 } catch {
   // The workspace was renamed donotuse-abstractflow; its node_modules still
   // carries puppeteer-core (this repo deliberately does not depend on it).
-  const sibling = createRequire('/Users/albou/tmp/donotuse-abstractflow/web/frontend/package.json');
+  const sibling = createRequire(`${process.env.HOME}/tmp/donotuse-abstractflow/web/frontend/package.json`);
   puppeteer = sibling('puppeteer-core');
 }
 

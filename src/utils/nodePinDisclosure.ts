@@ -298,6 +298,7 @@ const LLM_AGENT_ADVANCED_INPUTS = [
   'temperature',
   'seed',
   'thinking',
+  'speculation',
   'resp_schema',
 ];
 

@@ -155,7 +155,7 @@ class Door:
         return not seat.get("held")
 
 
-def host_markers(entity: str, data_dir: str = "/Users/albou/tmp/abstractframework/runtime") -> list[dict]:
+def host_markers(entity: str, data_dir: str = str(pathlib.Path(__file__).resolve().parents[2] / "runtime")) -> list[dict]:
     """The entity's host-marker stream (summon/refusal/preempt census).
     Read from disk — the census surface the 04:39 incident mandated.
 

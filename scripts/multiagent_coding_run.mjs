@@ -10,7 +10,7 @@
  *   DRIVE_TOKEN=... node scripts/multiagent_coding_run.mjs
  * Env:
  *   MW_REQUEST   task text (default: small factorial task)
- *   MW_WS        workspace (default /Users/albou/tmp/multiagent-run; wiped)
+ *   MW_WS        workspace (default ~/tmp/multiagent-run; wiped)
  *   MW_GATING    auto|wait (default auto). In wait mode gates are answered
  *                with MW_GATE1 (default 'approve') / MW_GATE2 ('approve').
  *   MW_VERSION   bundle version (default 0.0.0)
@@ -20,7 +20,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 
 const GATEWAY = process.env.DRIVE_GATEWAY || 'http://127.0.0.1:8080';
 const TOKEN = process.env.DRIVE_TOKEN || '';
-const WS = process.env.MW_WS || '/Users/albou/tmp/multiagent-run';
+const WS = process.env.MW_WS || `${process.env.HOME}/tmp/multiagent-run`;
 const GATING = (process.env.MW_GATING || 'auto').toLowerCase();
 const REQUEST = process.env.MW_REQUEST ||
   'Write a Python file solution.py with a function factorial(n) returning n! (iterative, n>=0) and a __main__ block printing factorial(5). It must run with: python3 solution.py';

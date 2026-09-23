@@ -59,8 +59,19 @@ ARTIFACTS: tuple[tuple[str, str], ...] = (
     # records). The 0.0.2 wave wired the previously-dead Delay onto the exec
     # path but nothing after it. Fix: wait_until -> on_flow_end. Also
     # separated the two overlapping literal nodes.
-    ("basic-agent.flow", "0.0.4"),
-    ("basic-agent@0.0.4.flow", "0.0.4"),
+    # 0.0.5 = 2026-09-22 (chat-turn overhead): node-5 ("AGENTIC LOOP DONE")
+    # carried pinDefaults.post_delay = 3 — a pure wait_until sleep the helper
+    # performs AFTER the "Done" status event is already emitted, so the run
+    # stayed alive 3s past its answer and every no-tool chat turn paid it.
+    # The 3 was an undocumented editor pinDefault from 2026-01-10 (commit
+    # "ongoing"), inert until the 0.0.2 wave exec-wired the Delay; no doc,
+    # backlog item or client depends on it (web app.tsx and tui transcript.rs
+    # both CLEAR on a "Done" status, and both drain the ledger by REST before
+    # concluding, so nothing needs a grace window). Set to 0: the wait_until
+    # stays on the exec spine (past/zero deadline completes inline, the same
+    # path the "Thinking..." call already took).
+    ("basic-agent.flow", "0.0.5"),
+    ("basic-agent@0.0.5.flow", "0.0.5"),
 )
 
 

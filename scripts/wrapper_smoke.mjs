@@ -7,7 +7,7 @@
  */
 const GATEWAY = 'http://127.0.0.1:8080';
 const TOKEN = process.env.DRIVE_TOKEN || '';
-const WS = process.env.WRAP_WS || '/Users/albou/tmp/mac-wrapper-smoke';
+const WS = process.env.WRAP_WS || `${process.env.HOME}/tmp/mac-wrapper-smoke`;
 const H = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
 const note = (s) => console.log(`[wrap] ${s}`);
 async function j(u, i) { const r = await fetch(u, i); const t = await r.text(); let b; try { b = JSON.parse(t); } catch { b = t; } if (!r.ok) throw new Error(`${i?.method||'GET'} ${u} -> ${r.status}: ${t.slice(0,200)}`); return b; }

@@ -18,7 +18,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-FLOWS = Path("/Users/albou/tmp/abstractframework/abstractflow/examples/flows")
+FLOWS = Path(__file__).resolve().parents[3] / "examples" / "flows"
 VERDICTS: list[str] = []
 
 

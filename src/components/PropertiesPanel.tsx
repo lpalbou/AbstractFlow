@@ -6,10 +6,12 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
+import { SpeculationSelect, normalizeSpeculationValue, type SpeculationValue } from '@abstractframework/ui-kit';
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { getBundledFlow } from '../utils/bundledFlows';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import { useFlowStore } from '../hooks/useFlow';
+import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import { useVisionAdapterCatalog } from '../hooks/useVisionAdapterCatalog';
 import { useSemanticsRegistry } from '../hooks/useSemantics';
@@ -788,11 +790,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const raw = n.pinDefaults?.model;
     return typeof raw === 'string' && raw.trim() ? raw.trim() : '';
   })();
+  const selectedTextProviderForExecution = String(node?.data.agentConfig?.provider || node?.data.effectConfig?.provider || node?.data.pinDefaults?.provider || '');
   const thinkingCapabilitiesQuery = useQuery({
-    queryKey: ['model-capabilities', modelCapabilitiesEndpoint, selectedTextModelForThinking],
+    queryKey: ['model-capabilities', modelCapabilitiesEndpoint, selectedTextProviderForExecution, selectedTextModelForThinking],
     queryFn: () =>
       gatewayJson<Record<string, unknown>>(
-        gatewayPath(modelCapabilitiesEndpoint, {}, { model_name: selectedTextModelForThinking })
+        gatewayPath(modelCapabilitiesEndpoint, {}, { model_name: selectedTextModelForThinking, provider: selectedTextProviderForExecution })
       ),
     enabled:
       Boolean(selectedTextModelForThinking) &&
@@ -806,6 +809,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     selectedTextModelForThinking
   );
   const thinkingSupported = thinkingOptions.length > 0;
+  const speculationCapabilitiesQuery = useExecutionCapabilities(
+    String(node?.data.pinDefaults?.provider ?? node?.data.agentConfig?.provider ?? node?.data.effectConfig?.provider ?? ''),
+    String(node?.data.pinDefaults?.model ?? node?.data.agentConfig?.model ?? node?.data.effectConfig?.model ?? ''),
+    node?.data.nodeType === 'agent' || node?.data.nodeType === 'llm_call',
+  );
 
   useEffect(() => {
     setShowCodeEditor(false);
@@ -1578,6 +1586,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const temperaturePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'temperature');
   const seedPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'seed');
   const thinkingPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'thinking');
+  const speculationPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'speculation');
   const maxIterationsPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'max_iterations');
   const maxIterationsDefault = (() => {
     const pinVal = data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as any).max_iterations : undefined;
@@ -1915,6 +1924,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         ...(data.effectConfig || {}),
         ...patch,
       },
+    });
+  };
+
+  const setNodeSpeculation = (speculation?: SpeculationValue) => {
+    const pinDefaults = { ...data.pinDefaults };
+    delete pinDefaults.speculation;
+    updateNodeData(node.id, {
+      pinDefaults,
+      ...(data.nodeType === 'agent'
+        ? { agentConfig: { ...data.agentConfig, speculation } }
+        : { effectConfig: { ...data.effectConfig, speculation } }),
     });
   };
 
@@ -2306,7 +2326,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {/* Pin default values (unconnected primitive pins).
           This keeps the right panel consistent with inline pin editors on nodes. */}
       {(() => {
-        const skipIds = new Set(['provider', 'model', 'tools', 'thinking']); // shown in dedicated sections (agent/llm_call) for better UX
+        const skipIds = new Set(['provider', 'model', 'tools', 'thinking', 'speculation']); // shown in dedicated sections (agent/llm_call) for better UX
         const inputPins = data.inputs.filter((p) => p.type !== 'execution' && !skipIds.has(p.id));
         const mediaNode = MEDIA_NODE_TYPES.has(data.nodeType);
 
@@ -4172,6 +4192,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             </div>
           ) : null}
 
+          <div className="property-group">
+            {speculationPinConnected ? <span className="property-hint">MTP: provided by connected pin.</span> :
+              <SpeculationSelect value={normalizeSpeculationValue(data.pinDefaults?.speculation ?? data.agentConfig?.speculation)}
+                capabilities={speculationCapabilitiesQuery.data} loading={speculationCapabilitiesQuery.isFetching}
+                error={speculationCapabilitiesQuery.isError ? 'MTP capability discovery failed.' : undefined}
+                onChange={setNodeSpeculation} />}
+          </div>
           <div className="property-group">
             <label className="property-sublabel">Max iterations</label>
             {maxIterationsPinConnected ? (
@@ -6408,6 +6435,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             </div>
           ) : null}
 
+          <div className="property-group">
+            {speculationPinConnected ? <span className="property-hint">MTP: provided by connected pin.</span> :
+              <SpeculationSelect value={normalizeSpeculationValue(data.pinDefaults?.speculation ?? data.effectConfig?.speculation)}
+                capabilities={speculationCapabilitiesQuery.data} loading={speculationCapabilitiesQuery.isFetching}
+                error={speculationCapabilitiesQuery.isError ? 'MTP capability discovery failed.' : undefined}
+                onChange={setNodeSpeculation} />}
+          </div>
           <div className="property-group">
             <label className="property-sublabel">Tools (optional)</label>
             {toolsPinConnected ? (

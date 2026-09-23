@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 
-sys.path.insert(0, "/Users/albou/tmp/abstractframework/abstractflow/scripts")
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[3] / "scripts"))
 from build_entity_life_workflow import ELECTIONS_CODE, EPISODE_CODE  # noqa: E402
 
 from abstractruntime.visualflow_compiler.visual.code_executor import (  # noqa: E402

@@ -10,9 +10,13 @@ It is a web package (`@abstractframework/flow`). It runs a browser editor and a 
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-For a local checkout:
+For a local checkout, clone [AbstractUIC](https://github.com/lpalbou/AbstractUIC)
+next to this repository (`../abstractuic`): the editor builds the shared UI
+packages (`@abstractframework/ui-kit` and the monitor widgets) from that sibling
+checkout.
 
 ```bash
+git clone https://github.com/lpalbou/AbstractUIC.git ../abstractuic
 npm install
 npm run dev -- --host 0.0.0.0 --port 3003
 ```
@@ -31,6 +35,14 @@ LLM Call and Agent nodes include a Reasoning control backed by Core's
 `thinking` option. Leave it on Auto to inherit the Gateway/runtime default, or
 set/pin values such as `off`, `low`, `medium`, `high`, or `xhigh` for reasoning
 models that support explicit effort controls.
+
+LLM Call and Agent nodes also expose an **MTP depth** setting (inherit, Off, or
+a depth the selected provider/model advertises), with a run-scoped override in
+the Run dialog. See [Getting started](docs/getting-started.md) for precedence.
+
+Data input pins can carry small sandboxed Python expressions over run variables,
+and flows can define a library of named helper functions used by those
+expressions (the **Functions** drawer). See [VisualFlow JSON](docs/visualflow.md).
 
 LLM Call and Agent response schemas can be defined directly on the unconnected
 `resp_schema` pin. The Builder tab creates ordinary JSON Schema, including
@@ -107,6 +119,7 @@ AbstractFlow does not ship a Python package or local execution host. VisualFlow 
 npm run dev
 npm run build
 npm run lint
+npm test
 npm run docs:llms
 ```
 

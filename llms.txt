@@ -20,6 +20,8 @@ Useful files:
 - [Workflow authoring skill](docs/workflow-authoring-skill.md)
 - [Workflow node catalog](docs/workflow-node-catalog.md)
 - [Shipped workflow sources](docs/shipped-workflow-sources.md): editable flows + generators behind Gateway's out-of-the-box coder, deep-research, and co-scientist bundles
+- [Production research workflow](docs/deep-research.md)
+- [The entity brain](docs/entity-brain.md): the `entity-life` workflow family
 - [Architecture](docs/architecture.md)
 - [API and contracts](docs/api.md)
 - [VisualFlow JSON](docs/visualflow.md)
@@ -56,6 +58,9 @@ Current media/editor behavior:
   outputs can be synced into explicit Switch cases.
 - Connection previews must use canonical pin types; execution handles only
   preview/connect to execution handles.
+- Agent and LLM Call nodes expose an MTP depth setting (inherit, Off, or an
+  advertised depth) plus a `speculation` pin; the Run dialog offers a run-scoped
+  override. Precedence: connected pin, node setting, run override, host default.
 
 Validation:
 

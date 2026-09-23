@@ -266,6 +266,7 @@ const CORE_NODES: NodeTemplate[] = [
 		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
 		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
 		      { id: 'thinking', label: 'thinking', type: 'string', description: 'Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.' },
+		      { id: 'speculation', label: 'MTP', type: 'any', description: 'Native MTP request: false disables; {mode: "native_mtp", num_draft_tokens: 2, require_acceleration: true} requests depth. Unset inherits.' },
 		      { id: 'resp_schema', label: 'resp_schema', type: 'json_schema', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
 		    ],
 	    outputs: [
@@ -395,6 +396,7 @@ const CORE_NODES: NodeTemplate[] = [
 		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
 		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
 		      { id: 'thinking', label: 'thinking', type: 'string', description: 'Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.' },
+		      { id: 'speculation', label: 'MTP', type: 'any', description: 'Native MTP request: false disables; {mode: "native_mtp", num_draft_tokens: 2, require_acceleration: true} requests depth. Unset inherits.' },
 		      { id: 'resp_schema', label: 'resp_schema', type: 'json_schema', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
 		    ],
 	    outputs: [

@@ -215,7 +215,7 @@
         "literalValue": {
           "name": "send_email",
           "arguments": {
-            "to": "lpalbou@gmail.com",
+            "to": "you@example.com",
             "subject": "[MNEMOSYNE] : <short_subject>",
             "body_text": "<message>"
           }

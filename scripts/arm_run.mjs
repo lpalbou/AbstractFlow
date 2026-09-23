@@ -22,7 +22,7 @@ const PROVIDER = process.env.ARM_PROVIDER || 'endpoint:ovh-provider';
 const MODEL = process.env.ARM_MODEL || 'gpt-oss-120b';
 const MINUTES = Number(process.env.ARM_MINUTES || 40);
 const TAG = process.env.ARM_TAG || ARM;
-const WS = `/Users/albou/tmp/rtype-cmp/${TAG}`;
+const WS = `${process.env.HOME}/tmp/rtype-cmp/${TAG}`;
 const H = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
 const note = (s) => console.log(`[${ARM}] ${s}`);
 
@@ -152,7 +152,7 @@ for (const [rid] of tree) {
     const u = rec.result?.usage || rec.usage || {};
     inTok += Number(u.input_tokens || u.prompt_tokens || 0);
     outTok += Number(u.output_tokens || u.completion_tokens || 0);
-    if (!effWs) { const m = JSON.stringify(rec).match(/workspaces\/([a-f0-9]{32})/); if (m) effWs = `/Users/albou/tmp/abstractframework/runtime/workspaces/${m[1]}`; }
+    if (!effWs) { const m = JSON.stringify(rec).match(/workspaces\/([a-f0-9]{32})/); if (m) effWs = `${process.env.HOME}/tmp/abstractframework/runtime/workspaces/${m[1]}`; }
   }
 }
 note(`evidence: subruns=${subruns} tool_batches=${tools} in_tok=${inTok} out_tok=${outTok}`);

@@ -746,7 +746,6 @@ function CanvasBody() {
   useEffect(() => {
     if (focusNodeRequest?.nodeId) focusNode(focusNodeRequest.nodeId);
     // Keyed on nonce so repeated clicks on the same row re-center.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNodeRequest?.nonce]);
 
   // Fit the camera to every freshly loaded flow (UX adversary P1-5: a stale
@@ -765,7 +764,6 @@ function CanvasBody() {
       }
     }, 50);
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitViewRequest?.nonce]);
 
   const minimapNodeColor = useCallback((node: Node<FlowNodeData>): string => {

@@ -19,8 +19,8 @@ import json
 import sys
 from pathlib import Path
 
-FLOWS = Path("/Users/albou/tmp/abstractframework/abstractflow/examples/flows")
-sys.path.insert(0, "/Users/albou/tmp/abstractframework/abstractflow/scripts")
+FLOWS = Path(__file__).resolve().parents[3] / "examples" / "flows"
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
 
 from entity_life_loop_smoke import make_home, scripted_reply  # noqa: E402
 

@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 
 const GATEWAY = 'http://127.0.0.1:8080';
 const TOKEN = process.env.DRIVE_TOKEN || '';
-const WS = process.env.CODING_WS || '/Users/albou/tmp/coding-agent-run';
+const WS = process.env.CODING_WS || `${process.env.HOME}/tmp/coding-agent-run`;
 const MAX_ROUNDS = Number(process.env.CODING_ROUNDS || 2);
 const REQUEST = process.env.CODING_REQUEST ||
   'Write a Python file solution.py with a function factorial(n) returning n! (iterative, n>=0) and a __main__ block that prints factorial(5). It must run with: python3 solution.py';

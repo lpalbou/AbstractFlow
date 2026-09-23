@@ -2,6 +2,7 @@
  * Type definitions for the AbstractFlow visual editor.
  */
 
+import type { SpeculationValue } from '@abstractframework/ui-kit';
 // Pin types with their colors (Blueprint-inspired)
 export type PinType =
   | 'execution' // White #FFFFFF - Flow control
@@ -320,6 +321,7 @@ export interface FlowNodeData {
     temperature?: number;  // Sampling temperature (0 = deterministic)
     seed?: number;         // Seed for deterministic outputs (-1 = random/unset)
     thinking?: string;     // Reasoning/thinking control for models that support it
+    speculation?: SpeculationValue; // Absent inherits; false explicitly disables MTP.
     max_iterations?: number; // Safety cap for agent loop iterations
     tools?: string[];      // Allowlisted tool names (0..N)
     include_context?: boolean; // When true, include run context/messages as history (Recall into context)
@@ -378,6 +380,7 @@ export interface FlowNodeData {
     temperature?: number;  // For llm_call
     seed?: number;         // For llm_call (-1 = random/unset)
     thinking?: string;     // For llm_call reasoning/thinking control
+    speculation?: SpeculationValue;
     tools?: string[];      // For llm_call (tool allowlist; resolved to ToolSpecs at execution)
     include_context?: boolean; // For llm_call: include run context/messages as history (Recall into context)
     image_provider?: string; // For generated image backend/catalog selection

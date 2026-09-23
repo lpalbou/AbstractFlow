@@ -97,7 +97,7 @@ ran to `completed` on the live gateway:
   approve-all posture).
 - Camera Open → real MacBook camera on, `device_uid` returned; Capture Photo →
   a REAL 52 KB 1920×1080 JPEG written to
-  `/Users/albou/Pictures/macbook_pro_camera/capture_20260723_131801...jpg`
+  `~/Pictures/macbook_pro_camera/capture_20260723_131801...jpg`
   (verified on disk); Camera Close → released cleanly (`connected:false`).
   No agent decided anything — the nodes did.
 - Analyze Media failed HONESTLY on a host-config gap, not a node defect: it

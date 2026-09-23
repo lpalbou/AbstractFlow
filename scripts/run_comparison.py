@@ -18,7 +18,7 @@ import pathlib
 import subprocess
 import time
 
-ROOT = pathlib.Path("/Users/albou/tmp/abstractframework/abstractflow")
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 PROMPT = pathlib.Path("/tmp/rtype_prompt.txt").read_text()
 ARMS = ["multiagent", "coder", "basic"]  # order: most→least scaffolded
 PER_ARM_MIN = os.environ.get("CMP_PER_ARM_MIN", "35")

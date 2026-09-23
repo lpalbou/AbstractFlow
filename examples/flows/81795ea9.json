@@ -406,7 +406,7 @@
         "subflowId": "15f19f7f",
         "pinDefaults": {
           "state": "Done",
-          "post_delay": 3
+          "post_delay": 0
         }
       },
       "label": null,
@@ -588,5 +588,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-10T03:16:28.522693",
-  "updated_at": "2026-07-20T12:00:00.000000"
+  "updated_at": "2026-09-22T12:00:00.000000"
 }

@@ -125,7 +125,7 @@ describe('bundled multiagent coding flows', () => {
       );
     expect(blobExpressions).toEqual([]);
     expect(main?.nodes.filter((n) => n.type === 'set_var')).toEqual([]);
-    expect(main?.nodes.filter((n) => n.type === 'set_vars').length).toBe(9);
+    expect(main?.nodes.filter((n) => n.type === 'set_vars').length).toBe(10);
     // No node takes a `loop_state` container pin any more.
     expect(
       main?.nodes.filter((n) =>

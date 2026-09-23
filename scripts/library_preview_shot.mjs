@@ -18,7 +18,7 @@ let puppeteer;
 try {
   puppeteer = require('puppeteer-core');
 } catch {
-  const sibling = createRequire('/Users/albou/tmp/abstractflow/web/frontend/package.json');
+  const sibling = createRequire(`${process.env.HOME}/tmp/abstractflow/web/frontend/package.json`);
   puppeteer = sibling('puppeteer-core');
 }
 
