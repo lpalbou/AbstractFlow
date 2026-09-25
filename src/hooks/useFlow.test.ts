@@ -352,10 +352,10 @@ describe('setFlowInterfaces: declaring an interface adds its pins', () => {
     // a clean editor re-baselines to what the gateway now holds (the document
     // with the new interfaces), then the store adds the pins.
     const applyAsToolbar = (interfaces: string[], baseline: string) => {
-      const current = toolbarSignature(useFlowStore.getState().getFlow());
-      const next = current === baseline
-        ? toolbarSignature({ ...useFlowStore.getState().getFlow(), interfaces })
-        : baseline;
+      const before = useFlowStore.getState().getFlow();
+      const cleanBefore = toolbarSignature(before) === baseline ? before : null;
+      // (the PUT happens here)
+      const next = cleanBefore ? toolbarSignature({ ...cleanBefore, interfaces }) : baseline;
       useFlowStore.getState().setFlowInterfaces(interfaces);
       return next;
     };

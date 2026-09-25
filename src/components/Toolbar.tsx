@@ -780,13 +780,17 @@ export function Toolbar() {
         }
         return;
       }
+      const isOpenFlow = Boolean(flowId && id === flowId);
+      // Snapshot BEFORE the request: edits made while it is in flight must
+      // stay unsaved (see utils/saveBaseline.ts).
+      const cleanBefore = isOpenFlow && !hasUnsavedChanges ? getFlow() : null;
       const updated = await renameFlow(id, name, gatewayContracts);
-      if (flowId && id === flowId) {
+      if (isOpenFlow) {
         // Update the open document in place (never reload it: that would
         // discard unsaved edits and the undo history). A clean editor stays
         // clean — the gateway now holds this name.
         const savedName = updated.name || name;
-        if (!hasUnsavedChanges) setSavedFlowSignature(flowSignatureFor({ ...getFlow(), name: savedName }));
+        if (cleanBefore) setSavedFlowSignature(flowSignatureFor({ ...cleanBefore, name: savedName }));
         setFlowName(savedName);
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
@@ -827,15 +831,19 @@ export function Toolbar() {
         toast.error('Bundled flows are read-only. Load or duplicate first.');
         return;
       }
+      const isOpenFlow = Boolean(flowId && id === flowId);
+      // Snapshot BEFORE the request: edits made while it is in flight must
+      // stay unsaved (see utils/saveBaseline.ts).
+      const cleanBefore = isOpenFlow && !hasUnsavedChanges ? getFlow() : null;
       const updated = await updateFlowInterfaces(id, nextInterfaces, gatewayContracts);
-      if (flowId && id === flowId) {
+      if (isOpenFlow) {
         // Update the open document in place: unsaved edits and undo history
         // are kept, and the On Flow Start / On Flow End nodes receive the pins
         // the interfaces require (one undo step). The gateway holds the new
         // interfaces but not those pins yet, so the flow shows unsaved changes
-        // until Save stores both.
+        // until Save stores both; a clean editor with nothing to add stays clean.
         const interfaces = normalizeInterfaces(Array.isArray(updated?.interfaces) ? updated.interfaces : nextInterfaces);
-        if (!hasUnsavedChanges) setSavedFlowSignature(flowSignatureFor({ ...getFlow(), interfaces }));
+        if (cleanBefore) setSavedFlowSignature(flowSignatureFor({ ...cleanBefore, interfaces }));
         setFlowInterfaces(interfaces);
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
