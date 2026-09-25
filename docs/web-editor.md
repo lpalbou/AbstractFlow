@@ -32,6 +32,10 @@ Server/operator bearer tokens such as `ABSTRACTGATEWAY_AUTH_TOKEN` are not brows
 
 Remote browser-supplied Gateway URL changes are blocked by default. A hosted Flow instance should proxy only to its configured Gateway unless the operator explicitly enables `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` behind their own access control.
 
+## About
+
+The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About dialog: the AbstractFlow version, the author and license, and links to the website, source, documentation, issue tracker and feedback form. When the dialog opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`) and lists the gateway, AbstractFramework and package versions it reports. If that request fails, the dialog shows `Gateway: unavailable (...)` with the HTTP status or error.
+
 ## Provider And Model Discovery
 
 Flow does not store API keys or endpoint secrets. It asks Gateway for provider catalogs, endpoint profiles, model lists, capability defaults, and media route descriptors.

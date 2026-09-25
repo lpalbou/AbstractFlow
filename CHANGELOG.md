@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (unwired).
 
 ### Added
+- **About dialog.** The top-bar cluster has an About button (shared
+  AbstractFramework dialog from `@abstractframework/ui-kit`) showing the
+  AbstractFlow version, author, license and project links, plus the versions
+  the connected gateway reports through `GET /api/gateway/about`; a failed
+  request is shown as `Gateway: unavailable (...)`. The app version comes from
+  `package.json` at build time. See [Web Editor > About](docs/web-editor.md#about).
 - Interfaces `abstractassistant.agent.v1` (AbstractAssistant orchestrator:
   `provider`, `model`, `prompt` in; `response`, `success`, `meta` out) and
   `abstractcode.goal.v1` (AbstractCode `/goal`: `goal`, `max_cycles`,
