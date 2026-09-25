@@ -15,6 +15,7 @@ import { NodePalette } from './components/NodePalette';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { Toolbar } from './components/Toolbar';
 import { useFlowStore } from './hooks/useFlow';
+import { useAboutAction } from './hooks/useAboutAction';
 import {
   AfAppearanceDialog,
   AfTopBarActions,
@@ -82,6 +83,8 @@ function App() {
     legacyKey: 'abstractflow_ui_settings_v1',
   });
   const [show_appearance, set_show_appearance] = useState(false);
+  // About dialog (identity + gateway versions fetched when it opens).
+  const about_action = useAboutAction();
   const [show_connection, set_show_connection] = useState(false);
   const [signing_out, set_signing_out] = useState(false);
   const [connection_checked, set_connection_checked] = useState(false);
@@ -291,7 +294,7 @@ function App() {
         </div>
         <Toolbar />
         {/* The unified upper-right cluster (same order in every
-          * AbstractFramework app): assistant → appearance → [gpu] → Disconnect. */}
+          * AbstractFramework app): assistant → appearance → about → [gpu] → Disconnect. */}
         <AfTopBarActions
           assistant={{
             open: assistant_open,
@@ -299,6 +302,7 @@ function App() {
             label: 'Authoring assistant',
           }}
           appearance={{ onOpen: () => set_show_appearance(true) }}
+          about={about_action}
           extraActions={
             gpu_enabled || memory_enabled ? (
               // AfTopBarActions renders extraActions as a single child slot, so

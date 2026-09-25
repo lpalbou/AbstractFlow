@@ -8,6 +8,9 @@ declare module "*.txt?raw" {
 }
 
 declare global {
+  /** package.json version, injected by the `define` in vite.config.ts (build, dev and vitest). */
+  const __APP_VERSION__: string;
+
   interface ImportMetaEnv {
     readonly VITE_MONITOR_GPU?: string;
     readonly VITE_MONITOR_MEMORY?: string;

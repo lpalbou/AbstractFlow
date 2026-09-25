@@ -1,6 +1,18 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import { readFileSync } from 'fs';
+
+// The app version shown in the About dialog. Read from package.json at build
+// time and injected as the __APP_VERSION__ global (also under vitest, which
+// loads this config). A package.json without a version fails the build.
+const APP_VERSION: string = (() => {
+  const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')) as { version?: unknown };
+  if (typeof pkg.version !== 'string' || !pkg.version.trim()) {
+    throw new Error('vite.config.ts: package.json has no "version"; the About dialog needs it');
+  }
+  return pkg.version;
+})();
 
 const GATEWAY_URL =
   process.env.ABSTRACTGATEWAY_URL ||
@@ -418,6 +430,9 @@ function devConnectionPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [devConnectionPlugin(), react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   resolve: {
     alias: [
       { find: '@', replacement: resolve(__dirname, './src') },
