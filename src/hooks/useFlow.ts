@@ -830,7 +830,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   addNode: (template, position) => {
     get()._captureHistory();
     const id = `node-${++nodeIdCounter}`;
-    const data = createNodeData(template);
+    // A new On Flow Start / On Flow End arrives with the pins the flow's
+    // declared interfaces require (same undo step as the add).
+    const data = withInterfacePins(createNodeData(template), interfaceBoundaryPins(get().flowInterfaces));
 
     const newNode: Node<FlowNodeData> = {
       id,

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { VisualFlow } from '../types/flow';
 import type { Node } from 'reactflow';
@@ -347,5 +349,60 @@ describe('interface boundary pins', () => {
     const end = boundaryNode('end', 'on_flow_end', [{ id: 'response', label: 'response', type: 'string' }]);
     expect(missingInterfacePins(end.data, pins).map((p) => p.id)).toEqual(['success', 'meta']);
     expect(missingInterfacePins(boundaryNode('code', 'code').data, pins)).toEqual([]);
+  });
+});
+
+describe('host interfaces added to the contract', () => {
+  it('abstractassistant.agent.v1 carries the pins AbstractAssistant sends and reads', () => {
+    const pins = interfaceBoundaryPins(['abstractassistant.agent.v1']);
+    expect(pins.start.map((p) => [p.id, p.type])).toEqual([
+      ['provider', 'provider_text'],
+      ['model', 'model'],
+      ['prompt', 'string'],
+    ]);
+    expect(pins.end.map((p) => [p.id, p.type])).toEqual([
+      ['response', 'string'],
+      ['success', 'boolean'],
+      ['meta', 'object'],
+    ]);
+    expect(isExecutableFlow({ interfaces: ['abstractassistant.agent.v1'] })).toBe(true);
+  });
+
+  it('abstractcode.goal.v1 carries the pins of AbstractCode /goal; goal-agent.json implements it on every end', () => {
+    const pins = interfaceBoundaryPins(['abstractcode.goal.v1']);
+    expect(pins.start.map((p) => [p.id, p.type])).toEqual([
+      ['goal', 'string'],
+      ['max_cycles', 'number'],
+      ['provider', 'provider_text'],
+      ['model', 'model'],
+      ['tools', 'array'],
+    ]);
+    expect(pins.end.map((p) => [p.id, p.type])).toEqual([
+      ['result', 'string'],
+      ['success', 'boolean'],
+      ['cycles_used', 'number'],
+      ['stopped_reason', 'string'],
+    ]);
+    expect(isExecutableFlow({ interfaces: ['abstractcode.goal.v1'] })).toBe(true);
+
+    const goalAgent = JSON.parse(
+      readFileSync(resolve(__dirname, '../../examples/flows/goal-agent.json'), 'utf8')
+    ) as { interfaces: string[]; nodes: Array<{ data: FlowNodeData }> };
+    expect(goalAgent.interfaces).toContain('abstractcode.goal.v1');
+    const boundary = goalAgent.nodes.filter((n) => ['on_flow_start', 'on_flow_end'].includes(n.data.nodeType));
+    expect(boundary.length).toBe(3);
+    for (const node of boundary) {
+      const missing = missingInterfacePins(node.data, pins);
+      expect(missing).toEqual([]);
+      // Same types as the implementation, not just the same ids.
+      const side = node.data.nodeType === 'on_flow_start' ? node.data.outputs : node.data.inputs;
+      const required = node.data.nodeType === 'on_flow_start' ? pins.start : pins.end;
+      for (const spec of required) expect(side.find((p) => p.id === spec.id)?.type).toBe(spec.type);
+    }
+  });
+
+  it('both are offered by the interface editor (entrypoint class, not a hidden domain marker)', () => {
+    const offered = KNOWN_INTERFACES.filter((iface) => iface.class !== 'domain').map((iface) => iface.id);
+    expect(offered).toEqual(expect.arrayContaining(['abstractassistant.agent.v1', 'abstractcode.goal.v1']));
   });
 });

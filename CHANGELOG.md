@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `abstractcode.agent.v1`: `provider`, `model`, `prompt` in; `response`,
   `success`, `meta` out). Existing pins are kept as authored. Saved workflows
   that declare an interface receive any missing pin when opened. The interface
-  editor lists the typed pins of each selected interface. See
+  editor lists the typed pins of each selected interface. An `On Flow Start`
+  or `On Flow End` node added to a workflow that declares interfaces arrives
+  with their pins. See
   [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
 - Changing the name, description or interfaces of the workflow open in the
   editor from the Flow Library keeps your unsaved edits and undo history.
@@ -24,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (unwired).
 
 ### Added
+- Interfaces `abstractassistant.agent.v1` (AbstractAssistant orchestrator:
+  `provider`, `model`, `prompt` in; `response`, `success`, `meta` out) and
+  `abstractcode.goal.v1` (AbstractCode `/goal`: `goal`, `max_cycles`,
+  `provider`, `model`, `tools` in; `result`, `success`, `cycles_used`,
+  `stopped_reason` out) can be declared from the Flow Library.
 - Run preflight warns when an `On Flow Start` or `On Flow End` node lacks a
   pin required by a declared interface.
 

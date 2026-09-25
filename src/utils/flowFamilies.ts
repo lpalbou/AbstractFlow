@@ -70,6 +70,49 @@ export const KNOWN_INTERFACES: KnownInterface[] = [
     ],
   },
   {
+    id: 'abstractassistant.agent.v1',
+    label: 'Assistant orchestrator (v1)',
+    description:
+      'Executable as the AbstractAssistant orchestrator: the assistant sends provider/model/prompt to On Flow Start and reads response/success/meta from On Flow End (every end branch, chat and media alike).',
+    class: 'entrypoint',
+    // Types: AbstractAssistant's run input (gateway/run_input.py: prompt, and
+    // provider/model when overridden) and its managed orchestrator flow
+    // (assistant_workflow.py), whose every On Flow End carries this trio.
+    requiredStartPins: [
+      { id: 'provider', label: 'provider', type: 'provider_text', description: 'LLM provider chosen by the assistant (empty = gateway default).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Model chosen by the assistant (empty = gateway default).' },
+      { id: 'prompt', label: 'prompt', type: 'string', description: 'The user message the assistant sends to this workflow.' },
+    ],
+    requiredEndPins: [
+      { id: 'response', label: 'response', type: 'string', description: 'The reply shown to the user.' },
+      { id: 'success', label: 'success', type: 'boolean', description: 'True when the workflow completed its task.' },
+      { id: 'meta', label: 'meta', type: 'object', description: 'Run metadata (provider, model, ...).' },
+    ],
+  },
+  {
+    id: 'abstractcode.goal.v1',
+    label: 'Goal loop (v1)',
+    description:
+      'Runnable goal loop for AbstractCode /goal: works toward a goal cycle by cycle until it is verified done or max_cycles is reached. AbstractCode sends goal, max_cycles, provider/model and an explicit tools list.',
+    class: 'entrypoint',
+    // Types: AbstractCode TUI run input (tui/src/run_input.rs: goal,
+    // max_cycles, provider, model, tools) and goal-agent.json, the flow that
+    // implements the contract (both of its On Flow End nodes).
+    requiredStartPins: [
+      { id: 'goal', label: 'goal', type: 'string', description: 'The goal to reach.' },
+      { id: 'max_cycles', label: 'max_cycles', type: 'number', description: 'Upper bound on work cycles.' },
+      { id: 'provider', label: 'provider', type: 'provider_text', description: 'LLM provider chosen by the host (empty = gateway default).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Model chosen by the host (empty = gateway default).' },
+      { id: 'tools', label: 'tools', type: 'array', description: 'Tool names the loop may use.' },
+    ],
+    requiredEndPins: [
+      { id: 'result', label: 'result', type: 'string', description: 'What was achieved.' },
+      { id: 'success', label: 'success', type: 'boolean', description: 'True when the goal was verified done.' },
+      { id: 'cycles_used', label: 'cycles_used', type: 'number', description: 'Work cycles consumed.' },
+      { id: 'stopped_reason', label: 'stopped_reason', type: 'string', description: 'Why the loop stopped.' },
+    ],
+  },
+  {
     id: 'abstractresearch.deep.v1',
     label: 'Deep research',
     description: 'Domain marker for the deep-research family. No framework consumer yet.',

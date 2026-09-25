@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { useFlowStore } from './useFlow';
+import { getNodeTemplate } from '../types/nodes';
 import { listBundledFlows } from '../utils/bundledFlows';
 import type { VisualFlow } from '../types/flow';
 
@@ -404,5 +405,70 @@ describe('loadFlow: a saved flow that declares an interface opens with its pins'
     store.loadFlow(interfaceFixture());
     expect(pinIds('start', 'outputs')).toEqual(['exec-out', 'prompt']);
     expect(pinIds('end', 'inputs')).toEqual(['exec-in']);
+  });
+});
+
+describe('adding On Flow Start / On Flow End to a flow that declares interfaces', () => {
+  it('the new node arrives with the interface pins, in the same undo step as the add', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    useFlowStore.getState().setFlowInterfaces(['abstractcode.goal.v1']);
+    const pastBefore = useFlowStore.getState().past.length;
+
+    const startTemplate = getNodeTemplate('on_flow_start');
+    const endTemplate = getNodeTemplate('on_flow_end');
+    if (!startTemplate || !endTemplate) throw new Error('boundary templates missing');
+    useFlowStore.getState().addNode(startTemplate, { x: 0, y: 0 });
+    useFlowStore.getState().addNode(endTemplate, { x: 300, y: 0 });
+
+    const [start, end] = useFlowStore.getState().nodes;
+    expect(start.data.outputs.map((p) => [p.id, p.type])).toEqual([
+      ['exec-out', 'execution'],
+      ['goal', 'string'],
+      ['max_cycles', 'number'],
+      ['provider', 'provider_text'],
+      ['model', 'model'],
+      ['tools', 'array'],
+    ]);
+    expect(end.data.inputs.map((p) => p.id)).toEqual(['exec-in', 'result', 'success', 'cycles_used', 'stopped_reason']);
+    expect(useFlowStore.getState().past.length).toBe(pastBefore + 2);
+
+    // One undo removes the end node together with its pins; nothing else changes.
+    useFlowStore.getState().undo();
+    expect(useFlowStore.getState().nodes.map((n) => n.id)).toEqual([start.id]);
+    expect(useFlowStore.getState().nodes[0].data.outputs).toHaveLength(6);
+  });
+
+  it('other node types and flows without interfaces are unaffected', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    const endTemplate = getNodeTemplate('on_flow_end');
+    if (!endTemplate) throw new Error('on_flow_end template missing');
+    useFlowStore.getState().addNode(endTemplate, { x: 0, y: 0 });
+    expect(useFlowStore.getState().nodes[0].data.inputs.map((p) => p.id)).toEqual(['exec-in']);
+  });
+});
+
+describe('assistant set_flow_interfaces keeps the selection', () => {
+  it('an interfaces-only batch adds pins without selecting a boundary node', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    store.loadFlow(interfaceFixture());
+    useFlowStore.getState().setSelectedNode(null);
+    const result = useFlowStore.getState().applyAuthoringCommands([
+      { action: 'set_flow_interfaces', interfaces: ['abstractcode.agent.v1'] },
+    ]);
+    expect(result.errors).toEqual([]);
+    expect(pinIds('end', 'inputs')).toEqual(['exec-in', 'response', 'success', 'meta']);
+    expect(useFlowStore.getState().selectedNode).toBeNull();
+
+    // With a node selected, the same kind of batch keeps THAT selection (refreshed).
+    useFlowStore.getState().selectNodeById('start');
+    useFlowStore.getState().applyAuthoringCommands([
+      { action: 'set_flow_interfaces', interfaces: ['abstractcode.agent.v1', 'abstractcode.goal.v1'] },
+    ]);
+    const selected = useFlowStore.getState().selectedNode;
+    expect(selected?.id).toBe('start');
+    expect(selected?.data.outputs.map((p) => p.id)).toContain('goal');
   });
 });

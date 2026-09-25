@@ -1216,7 +1216,8 @@ describe('set_flow_interfaces adds the pins the interfaces require', () => {
       ['source_text', 'string'],
       ['fields_spec', 'json_schema'],
     ]);
-    expect(declared.touchedNodeIds).toEqual(expect.arrayContaining(['start', 'end']));
+    // Pins that follow from a declaration are not a user touch.
+    expect(declared.touchedNodeIds).toEqual([]);
 
     // An unrelated later batch on the declared flow leaves the pins as the author set them.
     const unrelated = applyFlowAuthoringCommands({
@@ -1227,5 +1228,50 @@ describe('set_flow_interfaces adds the pins the interfaces require', () => {
       commands: [{ action: 'set_flow_name', name: 'Renamed' }],
     });
     expect(unrelated.nodes.find((node) => node.id === 'start')?.data.outputs.map((pin) => pin.id)).toEqual(['exec-out']);
+  });
+});
+
+describe('interface pins on nodes created while interfaces are declared', () => {
+  it('a start/end added to a flow that already declares an interface gets its pins; an explicit pin keeps its label', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      flowInterfaces: ['abstractcode.coding.v1'],
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_output_pin', nodeId: 'start', id: 'request', label: 'What to build', pinType: 'string' },
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'add_node', id: 'code', nodeType: 'code' },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+    const start = result.nodes.find((node) => node.id === 'start');
+    expect(start?.data.outputs.map((pin) => pin.id)).toEqual(['exec-out', 'request']);
+    expect(start?.data.outputs[1].label).toBe('What to build');
+    expect(result.nodes.find((node) => node.id === 'end')?.data.inputs.map((pin) => [pin.id, pin.type])).toEqual([
+      ['exec-in', 'execution'],
+      ['report', 'string'],
+      ['passed', 'boolean'],
+    ]);
+  });
+
+  it('pins are only added to nodes the batch created when it does not declare interfaces', () => {
+    const base = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [{ action: 'add_node', id: 'old_end', nodeType: 'on_flow_end' }],
+    });
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      flowInterfaces: ['abstractcode.agent.v1'],
+      nodes: base.nodes,
+      edges: base.edges,
+      commands: [{ action: 'add_node', id: 'new_end', nodeType: 'on_flow_end' }],
+    });
+    expect(result.nodes.find((node) => node.id === 'old_end')?.data.inputs.map((pin) => pin.id)).toEqual(['exec-in']);
+    expect(result.nodes.find((node) => node.id === 'new_end')?.data.inputs.map((pin) => pin.id)).toEqual([
+      'exec-in',
+      'response',
+      'success',
+      'meta',
+    ]);
   });
 });

@@ -1,7 +1,7 @@
 import type { Edge, Node } from 'reactflow';
 import type { FlowFunction, FlowNodeData, JsonValue, NodeType, Pin, PinType, VisualFlow } from '../types/flow';
 import { createNodeData, getAllNodeTemplates, getNodeTemplate, type NodeTemplate } from '../types/nodes';
-import { applyInterfacePins } from './flowFamilies';
+import { interfaceBoundaryPins, withInterfacePins } from './flowFamilies';
 import { subflowPinPatchForSelectedFlow } from './subflowPins';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from './validation';
 
@@ -560,6 +560,9 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
   const touched = new Set<string>();
   const idMap = new Map<string, string>();
   let interfacesDeclared = false;
+  // On Flow Start / On Flow End nodes created by this batch: they receive the
+  // declared interfaces' pins even when the batch does not declare interfaces.
+  const addedBoundaryIds = new Set<string>();
   const skippedPureExecutionLinks: Array<{ source: string; target: string }> = [];
 
   const usedNodeIds = () => new Set(nodes.map((node) => node.id));
@@ -806,6 +809,7 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       const aliases = [command.id, command.tempId, command.temp_id, requestedId].map((item) => cleanText(item, 120)).filter(Boolean);
       for (const alias of aliases) idMap.set(alias, id);
       touched.add(id);
+      if (data.nodeType === 'on_flow_start' || data.nodeType === 'on_flow_end') addedBoundaryIds.add(id);
       applied.push(`Added ${data.label || nodeType}`);
       continue;
     }
@@ -2011,16 +2015,22 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
     }
   }
 
-  // Declaring interfaces adds the pins they require to On Flow Start / On
-  // Flow End. Applied once after the whole batch so a start/end node created
-  // (or a pin added explicitly) anywhere in the same batch is covered and
-  // never duplicated.
-  if (interfacesDeclared) {
-    const withPins = applyInterfacePins(nodes, flowInterfaces);
-    if (withPins !== nodes) {
-      withPins.forEach((node, index) => {
-        if (node !== nodes[index]) touched.add(node.id);
-      });
+  // Interface pins on On Flow Start / On Flow End: every such node when the
+  // batch declares interfaces, otherwise only the ones the batch created.
+  // Applied once after the whole batch so a pin the batch adds explicitly
+  // (with its own label) wins and is never duplicated. Not a "touch": the
+  // pins follow from the declaration, so they never move the selection.
+  if (interfacesDeclared || addedBoundaryIds.size > 0) {
+    const pins = interfaceBoundaryPins(flowInterfaces);
+    let changed = false;
+    const withPins = nodes.map((node) => {
+      if (!interfacesDeclared && !addedBoundaryIds.has(node.id)) return node;
+      const data = withInterfacePins(node.data, pins);
+      if (data === node.data) return node;
+      changed = true;
+      return { ...node, data };
+    });
+    if (changed) {
       nodes = withPins;
       applied.push('Added the pins required by the declared interfaces');
     }
