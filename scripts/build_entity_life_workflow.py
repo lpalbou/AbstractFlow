@@ -127,6 +127,22 @@ from entity_flow_code import (  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[1] / "examples" / "flows"
 
+
+def _described(pin_dict: dict, description: str) -> dict:
+    return {**pin_dict, "description": description}
+
+
+# abstractcode.agent.v1 boundary pins (the AbstractFlow editor adds them to any
+# flow declaring the interface; keep them here so a regenerated flow matches).
+AGENT_V1_PROVIDER_PIN = _described(pin("provider", "provider", "provider_text"),
+                                   "LLM provider chosen by the host (empty = gateway default).")
+AGENT_V1_MODEL_PIN = _described(pin("model", "model", "model"),
+                                "Model chosen by the host (empty = gateway default).")
+AGENT_V1_SUCCESS_PIN = _described(pin("success", "success", "boolean"),
+                                  "True when the workflow completed its task.")
+AGENT_V1_META_PIN = _described(pin("meta", "meta", "object"),
+                               "Run metadata (provider, model, tool counts, ...).")
+
 MASTER_ID = "entity-life"
 VISIT_ID = "entity-visit"
 WORK_ID = "entity-work"
@@ -747,6 +763,8 @@ def build_goodbye() -> dict:
         pin("prompt", "prompt", "string"),
         pin("reason", "reason", "string"),
         pin("state", "state", "object"),
+        AGENT_V1_PROVIDER_PIN,
+        AGENT_V1_MODEL_PIN,
     ], 80, 260, pin_defaults={"reason": "the visitor left", "prompt": ""}))
 
     # context rides a pin expression (was the single-consumer get_var
@@ -775,6 +793,8 @@ def build_goodbye() -> dict:
             pin("response", "response", "string"),
             pin("turns", "turns", "number"),
             pin("diary_entry_id", "diary_entry_id", "string"),
+            AGENT_V1_SUCCESS_PIN,
+            AGENT_V1_META_PIN,
         ], 940, 320),
         {"diary_entry_id": field_expr("diary_entry_id", '""')}))
 
@@ -1588,6 +1608,8 @@ def build_chat() -> dict:
             pin("moment_error", "moment_error", "string"),
             pin("tools_ran", "tools_ran", "array"),
             pin("tool_rounds", "tool_rounds", "number"),
+            AGENT_V1_SUCCESS_PIN,
+            AGENT_V1_META_PIN,
         ], 920, 380),
         {"tools_ran": field_expr("tools_ran", "[]"),
          "tool_rounds": field_expr("tool_rounds", "0")}))

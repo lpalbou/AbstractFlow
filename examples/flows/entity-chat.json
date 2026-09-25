@@ -424,6 +424,18 @@
             "id": "tool_rounds",
             "label": "tool_rounds",
             "type": "number"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True when the workflow completed its task."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Run metadata (provider, model, tool counts, ...)."
           }
         ],
         "outputs": [],

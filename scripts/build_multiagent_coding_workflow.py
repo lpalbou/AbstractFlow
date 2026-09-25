@@ -65,6 +65,12 @@ from wf_common import (
     validate_edges, write_json, FLOWS_DIR,
 )
 
+# abstractcode.coding.v1 requires a `passed` On Flow End input (the AbstractFlow
+# editor adds it to any flow declaring the interface; keep it here so a
+# regenerated flow matches). Not wired: this pipeline reports `success`.
+CODING_V1_PASSED_PIN = {**pin("passed", "passed", "boolean"),
+                        "description": "True when the verification gates passed."}
+
 BUNDLE_ID = "multiagent-coding"
 # 0.0.10 (2026-07-27): wave-B adversary P2 folds — the browser_probe grant
 # and the probe-protocol prompt now FOLLOW browser_probe_available (a
@@ -1800,7 +1806,8 @@ def build_root() -> dict:
     N.append(node("end_pre", "on_flow_end", "Refused (preflight)", -1720, 260,
                   inputs=[EXEC_IN, pin("report", "report", "string"),
                           pin("success", "success", "boolean"),
-                          pin("stopped_reason", "stopped_reason", "string")],
+                          pin("stopped_reason", "stopped_reason", "string"),
+                          CODING_V1_PASSED_PIN],
                   pin_defaults={"success": False,
                                 "stopped_reason": "preflight-failed"}))
 
@@ -2526,7 +2533,8 @@ def build_root() -> dict:
                   inputs=[EXEC_IN, pin("report", "report", "string"),
                           pin("success", "success", "boolean"),
                           pin("branch", "branch", "string"),
-                          pin("stopped_reason", "stopped_reason", "string")]))
+                          pin("stopped_reason", "stopped_reason", "string"),
+                          CODING_V1_PASSED_PIN]))
 
     # ---------------- edges ----------------
     def ex(a, b, *, src="exec-out", dst="exec-in"):

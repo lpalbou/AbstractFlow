@@ -39,6 +39,13 @@ START_PINS = [
 ]
 
 
+# abstractcode.agent.v1 boundary pins the root flow declares (the AbstractFlow
+# editor adds them to any flow declaring the interface; keep them here so a
+# regenerated flow matches). Not wired: the research request is `request`.
+AGENT_V1_PROMPT_PIN = _pin("prompt", "prompt", "string", "The user message the host sends to this workflow.")
+AGENT_V1_SUCCESS_PIN = _pin("success", "success", "boolean", "True when the workflow completed its task.")
+
+
 START_DEFAULTS = {
     "effort": "standard",
     "provider": "",
@@ -1467,7 +1474,7 @@ def build_root_flow() -> dict[str, Any]:
         ]
     )
     flow["nodes"] = [
-        _start_node(),
+        _start_node([*START_PINS, AGENT_V1_PROMPT_PIN]),
         _settings_node("derive_settings"),
         _get_node("get_max_review_rounds", "max_review_rounds", 2),
         _get_node("get_output_prefix", "output_prefix", "reports/deep-standard-research"),
@@ -1622,6 +1629,7 @@ def build_root_flow() -> dict[str, Any]:
                 _pin("md_artifact_id", "md_artifact_id", "string"),
                 _pin("pdf_artifact_id", "pdf_artifact_id", "string"),
                 _pin("docx_artifact_id", "docx_artifact_id", "string"),
+                AGENT_V1_SUCCESS_PIN,
             ]
         ),
     ]

@@ -39,6 +39,18 @@
             "id": "state",
             "label": "state",
             "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text",
+            "description": "LLM provider chosen by the host (empty = gateway default)."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "Model chosen by the host (empty = gateway default)."
           }
         ],
         "pinDefaults": {
@@ -348,6 +360,18 @@
             "id": "diary_entry_id",
             "label": "diary_entry_id",
             "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True when the workflow completed its task."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Run metadata (provider, model, tool counts, ...)."
           }
         ],
         "outputs": [],

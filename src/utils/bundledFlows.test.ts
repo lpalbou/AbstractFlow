@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFlowFamilyIndex } from './flowFamilies';
+import { applyInterfacePins, buildFlowFamilyIndex, interfaceBoundaryPins, missingInterfacePins } from './flowFamilies';
 import {
   BUNDLED_COMPOSED_ONLY_IDS,
   getBundledRunTarget,
@@ -253,5 +253,30 @@ describe('bundled multiagent coding flows', () => {
     const catalog = mergeFlowCatalogs([], listBundledFlows());
     expect(catalog.bundledRunTargetIds).toContain('multiagent-coder');
     expect(catalog.bundledRunTargetIds).not.toContain('multiagent-coding');
+  });
+});
+
+describe('bundled flows honour the interfaces they declare', () => {
+  it('every On Flow Start / On Flow End of a flow declaring an interface carries its required pins', () => {
+    const flows = listBundledFlows();
+    const declaring = flows.filter((flow) => {
+      const pins = interfaceBoundaryPins(flow.interfaces);
+      return pins.start.length + pins.end.length > 0;
+    });
+    // Guard against a vacuous pass: the shipped catalog declares contracts.
+    expect(declaring.length).toBeGreaterThan(10);
+    const gaps = declaring.flatMap((flow) => {
+      const pins = interfaceBoundaryPins(flow.interfaces);
+      const boundary = flow.nodes.filter((n) => n.data?.nodeType === 'on_flow_start' || n.data?.nodeType === 'on_flow_end');
+      if (!boundary.some((n) => n.data?.nodeType === 'on_flow_start')) return [`${flow.id}: no On Flow Start`];
+      return boundary.flatMap((n) =>
+        missingInterfacePins(n.data, pins).map((pin) => `${flow.id}:${n.id} missing ${pin.id} (${pin.interfaceId})`)
+      );
+    });
+    expect(gaps).toEqual([]);
+    // Consequently opening a bundled flow never changes its pins.
+    for (const flow of declaring) {
+      expect(applyInterfacePins(flow.nodes, flow.interfaces)).toBe(flow.nodes);
+    }
   });
 });

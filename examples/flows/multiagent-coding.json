@@ -473,6 +473,12 @@
             "id": "stopped_reason",
             "label": "stopped_reason",
             "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean",
+            "description": "True when the verification gates passed."
           }
         ],
         "outputs": [],
@@ -8998,6 +9004,12 @@
             "id": "stopped_reason",
             "label": "stopped_reason",
             "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean",
+            "description": "True when the verification gates passed."
           }
         ],
         "outputs": []
