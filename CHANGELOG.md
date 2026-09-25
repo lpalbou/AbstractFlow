@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Declaring an interface adds its pins.** Declaring an interface on a
+  workflow (Flow Library > Interfaces, or the authoring assistant's
+  `set_flow_interfaces` command) adds every missing pin the interface requires
+  to the `On Flow Start` and `On Flow End` nodes, typed per the contract (for
+  `abstractcode.agent.v1`: `provider`, `model`, `prompt` in; `response`,
+  `success`, `meta` out). Existing pins are kept as authored. Saved workflows
+  that declare an interface receive any missing pin when opened. The interface
+  editor lists the typed pins of each selected interface. See
+  [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
+- Changing the name, description or interfaces of the workflow open in the
+  editor from the Flow Library keeps your unsaved edits and undo history.
+- The bundled `deep-research`, `entity-chat`, `entity-goodbye` and
+  `multiagent-coding` workflows declare the pins their interfaces require
+  (unwired).
+
+### Added
+- Run preflight warns when an `On Flow Start` or `On Flow End` node lacks a
+  pin required by a declared interface.
+
 ## [0.3.20] - 2026-09-23
 
 This release brings pin expressions and a per-flow function library, canvas

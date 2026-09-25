@@ -34,6 +34,25 @@ Execution semantics are owned by AbstractRuntime. Flow's job is to author and se
 }
 ```
 
+## Interfaces
+
+A workflow can declare the contracts it implements in its top-level `interfaces` list, for example `"interfaces": ["abstractcode.agent.v1"]`. Hosts use this list to find workflows they can start (AbstractCode lists `abstractcode.agent.v1` workflows as agents) and then send inputs to the `On Flow Start` outputs and read results from the `On Flow End` inputs by pin id.
+
+Each interface requires these boundary pins:
+
+| Interface | On Flow Start outputs | On Flow End inputs |
+|---|---|---|
+| `abstractcode.agent.v1` | `provider` (provider_text), `model` (model), `prompt` (string) | `response` (string), `success` (boolean), `meta` (object) |
+| `abstractcode.coding.v1` | `request` (string) | `report` (string), `passed` (boolean) |
+| `abstractresearch.coscientist.v1` | `research_goal` (string) | `research_overview` (string), `ranked_hypotheses` (array) |
+| `abstractreview.adversarial.v1` | `artifact` (string) | `findings` (array), `verdict` (string) |
+| `abstractextract.structured.v1` | `source_text` (string), `fields_spec` (json_schema) | `data` (object), `valid` (boolean) |
+| `abstractbatch.mapreduce.v1` | `items` (array) | `results` (array), `synthesis` (string) |
+
+`abstractresearch.deep.v1` and `abstractmeta.intelligence.v1` are family markers and require no pins.
+
+When you declare an interface in the editor (Flow Library > Interfaces), AbstractFlow adds every missing required pin to the flow's `On Flow Start` and `On Flow End` nodes, with the type shown above. Pins you already have keep their id, label, type and order; nothing is removed. The change is one undo step, and **Save** stores the interfaces together with the new pins. Opening a saved workflow that declares an interface also adds any pin it is missing. The added pins are declarations: wire each one on the canvas so the host receives real values. Removing an interface keeps its pins, so you can delete the ones you no longer need. The Run preflight lists any required interface pin missing from an `On Flow Start` or `On Flow End` node as a warning.
+
 ## Authoring Rules
 
 - Nodes contain editor data and runtime-facing pin defaults.

@@ -74,6 +74,10 @@ The panel manages loaded models; it does not edit capability defaults.
 Configure capability defaults in Gateway Console or with the Gateway/Core
 config CLIs; changing a default does not load or unload a model.
 
+## Flow Interfaces
+
+Open the **Flow Library**, select a workflow and use the edit button next to **Interfaces** to declare the contracts it implements (for example **Runnable agent (v1)** for AbstractCode). The editor lists the typed pins each selected interface requires. Saving adds the missing ones to the `On Flow Start` and `On Flow End` nodes: right away when the workflow is open in the editor (your unsaved edits and undo history are kept, and the flow shows unsaved changes until you **Save**), otherwise the next time you open it. Wire the added pins on the canvas so hosts get real values. See [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for the pins of every interface.
+
 ## Workflow Authoring Assistant
 
 The star button on the right side of the toolbar opens a conversational

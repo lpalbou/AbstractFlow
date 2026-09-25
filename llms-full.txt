@@ -369,6 +369,10 @@ The panel manages loaded models; it does not edit capability defaults.
 Configure capability defaults in Gateway Console or with the Gateway/Core
 config CLIs; changing a default does not load or unload a model.
 
+## Flow Interfaces
+
+Open the **Flow Library**, select a workflow and use the edit button next to **Interfaces** to declare the contracts it implements (for example **Runnable agent (v1)** for AbstractCode). The editor lists the typed pins each selected interface requires. Saving adds the missing ones to the `On Flow Start` and `On Flow End` nodes: right away when the workflow is open in the editor (your unsaved edits and undo history are kept, and the flow shows unsaved changes until you **Save**), otherwise the next time you open it. Wire the added pins on the canvas so hosts get real values. See [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for the pins of every interface.
+
 ## Workflow Authoring Assistant
 
 The star button on the right side of the toolbar opens a conversational
@@ -3845,6 +3849,25 @@ Execution semantics are owned by AbstractRuntime. Flow's job is to author and se
 }
 ```
 
+## Interfaces
+
+A workflow can declare the contracts it implements in its top-level `interfaces` list, for example `"interfaces": ["abstractcode.agent.v1"]`. Hosts use this list to find workflows they can start (AbstractCode lists `abstractcode.agent.v1` workflows as agents) and then send inputs to the `On Flow Start` outputs and read results from the `On Flow End` inputs by pin id.
+
+Each interface requires these boundary pins:
+
+| Interface | On Flow Start outputs | On Flow End inputs |
+|---|---|---|
+| `abstractcode.agent.v1` | `provider` (provider_text), `model` (model), `prompt` (string) | `response` (string), `success` (boolean), `meta` (object) |
+| `abstractcode.coding.v1` | `request` (string) | `report` (string), `passed` (boolean) |
+| `abstractresearch.coscientist.v1` | `research_goal` (string) | `research_overview` (string), `ranked_hypotheses` (array) |
+| `abstractreview.adversarial.v1` | `artifact` (string) | `findings` (array), `verdict` (string) |
+| `abstractextract.structured.v1` | `source_text` (string), `fields_spec` (json_schema) | `data` (object), `valid` (boolean) |
+| `abstractbatch.mapreduce.v1` | `items` (array) | `results` (array), `synthesis` (string) |
+
+`abstractresearch.deep.v1` and `abstractmeta.intelligence.v1` are family markers and require no pins.
+
+When you declare an interface in the editor (Flow Library > Interfaces), AbstractFlow adds every missing required pin to the flow's `On Flow Start` and `On Flow End` nodes, with the type shown above. Pins you already have keep their id, label, type and order; nothing is removed. The change is one undo step, and **Save** stores the interfaces together with the new pins. Opening a saved workflow that declares an interface also adds any pin it is missing. The added pins are declarations: wire each one on the canvas so the host receives real values. Removing an interface keeps its pins, so you can delete the ones you no longer need. The Run preflight lists any required interface pin missing from an `On Flow Start` or `On Flow End` node as a warning.
+
 ## Authoring Rules
 
 - Nodes contain editor data and runtime-facing pin defaults.
@@ -4189,6 +4212,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+- **Declaring an interface adds its pins.** Declaring an interface on a
+  workflow (Flow Library > Interfaces, or the authoring assistant's
+  `set_flow_interfaces` command) adds every missing pin the interface requires
+  to the `On Flow Start` and `On Flow End` nodes, typed per the contract (for
+  `abstractcode.agent.v1`: `provider`, `model`, `prompt` in; `response`,
+  `success`, `meta` out). Existing pins are kept as authored. Saved workflows
+  that declare an interface receive any missing pin when opened. The interface
+  editor lists the typed pins of each selected interface. See
+  [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
+- Changing the name, description or interfaces of the workflow open in the
+  editor from the Flow Library keeps your unsaved edits and undo history.
+- The bundled `deep-research`, `entity-chat`, `entity-goodbye` and
+  `multiagent-coding` workflows declare the pins their interfaces require
+  (unwired).
+
+### Added
+- Run preflight warns when an `On Flow Start` or `On Flow End` node lacks a
+  pin required by a declared interface.
 
 ## [0.3.20] - 2026-09-23
 
