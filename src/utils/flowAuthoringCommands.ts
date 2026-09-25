@@ -1,6 +1,7 @@
 import type { Edge, Node } from 'reactflow';
 import type { FlowFunction, FlowNodeData, JsonValue, NodeType, Pin, PinType, VisualFlow } from '../types/flow';
 import { createNodeData, getAllNodeTemplates, getNodeTemplate, type NodeTemplate } from '../types/nodes';
+import { applyInterfacePins } from './flowFamilies';
 import { subflowPinPatchForSelectedFlow } from './subflowPins';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from './validation';
 
@@ -558,6 +559,7 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
   const errors: string[] = [];
   const touched = new Set<string>();
   const idMap = new Map<string, string>();
+  let interfacesDeclared = false;
   const skippedPureExecutionLinks: Array<{ source: string; target: string }> = [];
 
   const usedNodeIds = () => new Set(nodes.map((node) => node.id));
@@ -613,6 +615,7 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
         ? command.interfaces.map((item) => cleanText(item, 120)).filter(Boolean)
         : [];
       flowInterfaces = Array.from(new Set(values));
+      interfacesDeclared = true;
       applied.push('Updated flow interfaces');
       continue;
     }
@@ -2005,6 +2008,21 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       warnings.push(
         `Removed loop-back edge ${edge.source}.${edge.sourceHandle} -> ${edge.target}.${edge.targetHandle}; loop bodies return to the loop automatically when their execution chain ends`
       );
+    }
+  }
+
+  // Declaring interfaces adds the pins they require to On Flow Start / On
+  // Flow End. Applied once after the whole batch so a start/end node created
+  // (or a pin added explicitly) anywhere in the same batch is covered and
+  // never duplicated.
+  if (interfacesDeclared) {
+    const withPins = applyInterfacePins(nodes, flowInterfaces);
+    if (withPins !== nodes) {
+      withPins.forEach((node, index) => {
+        if (node !== nodes[index]) touched.add(node.id);
+      });
+      nodes = withPins;
+      applied.push('Added the pins required by the declared interfaces');
     }
   }
 

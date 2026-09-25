@@ -7,6 +7,8 @@ import {
   buildFlowFamilyIndex,
   knownInterface,
   normalizeInterfaces,
+  type InterfacePinSpec,
+  type KnownInterface,
 } from '../utils/flowFamilies';
 import {
   buildLibraryRows,
@@ -40,6 +42,15 @@ export interface FlowLibraryModalProps {
 function renderInterfaces(interfaces: string[]): string {
   if (!interfaces.length) return '—';
   return interfaces.map((iid) => knownInterface(iid)?.label || iid).join(', ');
+}
+
+function renderPinSpecs(pins: InterfacePinSpec[]) {
+  return pins.map((pin, index) => (
+    <span key={pin.id}>
+      {index > 0 ? ', ' : null}
+      <code>{pin.id}</code> ({pin.type})
+    </span>
+  ));
 }
 
 function formatDateTime(value: unknown): string {
@@ -760,24 +771,33 @@ export function FlowLibraryModal({
                         }
                       )}
 
-                      <div className="flow-library-interfaces-hint">
-                        <div className="flow-library-interfaces-hint-title">Runnable agent (v1) contract</div>
-                        <div className="flow-library-interfaces-hint-body">
-                          <div>
-                            On Flow Start outputs: <code>provider</code> (provider), <code>model</code> (model),{' '}
-                            <code>prompt</code> (string)
+                      {interfacesDraft.map((id) => knownInterface(id))
+                        .filter((iface): iface is KnownInterface =>
+                          Boolean(iface && ((iface.requiredStartPins?.length || 0) + (iface.requiredEndPins?.length || 0)) > 0)
+                        )
+                        .map((iface) => (
+                          <div key={iface.id} className="flow-library-interfaces-hint">
+                            <div className="flow-library-interfaces-hint-title">{iface.label} pins</div>
+                            <div className="flow-library-interfaces-hint-body">
+                              {iface.requiredStartPins?.length ? (
+                                <div>
+                                  On Flow Start outputs: {renderPinSpecs(iface.requiredStartPins)}
+                                </div>
+                              ) : null}
+                              {iface.requiredEndPins?.length ? (
+                                <div>
+                                  On Flow End inputs: {renderPinSpecs(iface.requiredEndPins)}
+                                </div>
+                              ) : null}
+                              <div style={{ marginTop: 6 }}>
+                                Saving adds any missing pin to the flow's On Flow Start and On Flow End nodes (right
+                                away when the flow is open in the editor, otherwise when it is next opened); existing
+                                pins are kept. Wire them on the canvas so hosts that start this workflow get real
+                                values.
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            On Flow End inputs: <code>response</code> (string), <code>success</code> (boolean),{' '}
-                            <code>meta</code> (object)
-                          </div>
-                          <div style={{ marginTop: 6 }}>
-                            <em>Note:</em> declaring the interface does NOT add these pins — wire them on the canvas
-                            yourself, or hosts that start this workflow will bind inputs to nothing and read empty
-                            outputs.
-                          </div>
-                        </div>
-                      </div>
+                        ))}
                     </div>
                   ) : null}
                 </div>

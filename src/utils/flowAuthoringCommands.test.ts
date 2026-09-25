@@ -1169,3 +1169,63 @@ describe('flow authoring transcript regressions (691c58f8)', () => {
     expect(templateEdges[0].sourceHandle).toBe('b');
   });
 });
+
+describe('set_flow_interfaces adds the pins the interfaces require', () => {
+  it('fills On Flow Start / On Flow End created in the same batch, without duplicating explicit pins', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'set_flow_interfaces', interfaces: ['abstractcode.agent.v1'] },
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_output_pin', nodeId: 'start', id: 'prompt', label: 'Question', pinType: 'string' },
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.flowInterfaces).toEqual(['abstractcode.agent.v1']);
+    const start = result.nodes.find((node) => node.id === 'start');
+    const end = result.nodes.find((node) => node.id === 'end');
+    expect(start?.data.outputs.map((pin) => pin.id)).toEqual(['exec-out', 'prompt', 'provider', 'model']);
+    expect(start?.data.outputs.find((pin) => pin.id === 'prompt')?.label).toBe('Question');
+    expect(end?.data.inputs.map((pin) => [pin.id, pin.type])).toEqual([
+      ['exec-in', 'execution'],
+      ['response', 'string'],
+      ['success', 'boolean'],
+      ['meta', 'object'],
+    ]);
+    expect(result.applied).toContain('Added the pins required by the declared interfaces');
+  });
+
+  it('fills an existing graph; batches that do not declare interfaces never re-add pins', () => {
+    const first = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+      ],
+    });
+    const declared = applyFlowAuthoringCommands({
+      ...emptyState(),
+      nodes: first.nodes,
+      edges: first.edges,
+      commands: [{ action: 'set_flow_interfaces', interfaces: ['abstractextract.structured.v1'] }],
+    });
+    expect(declared.nodes.find((node) => node.id === 'start')?.data.outputs.map((pin) => [pin.id, pin.type])).toEqual([
+      ['exec-out', 'execution'],
+      ['source_text', 'string'],
+      ['fields_spec', 'json_schema'],
+    ]);
+    expect(declared.touchedNodeIds).toEqual(expect.arrayContaining(['start', 'end']));
+
+    // An unrelated later batch on the declared flow leaves the pins as the author set them.
+    const unrelated = applyFlowAuthoringCommands({
+      ...emptyState(),
+      flowInterfaces: declared.flowInterfaces,
+      nodes: first.nodes,
+      edges: first.edges,
+      commands: [{ action: 'set_flow_name', name: 'Renamed' }],
+    });
+    expect(unrelated.nodes.find((node) => node.id === 'start')?.data.outputs.map((pin) => pin.id)).toEqual(['exec-out']);
+  });
+});

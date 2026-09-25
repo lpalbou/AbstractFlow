@@ -419,3 +419,44 @@ describe('preflight — P6 hidden subflow contract', () => {
     expect(issues.some((i) => i.message.includes('declare an input pin per child field'))).toBe(false);
   });
 });
+
+describe('declared interface boundary pins', () => {
+  it('warns (advisory) for each required pin missing from On Flow Start / On Flow End', () => {
+    const end = endNode({
+      inputs: [
+        { id: 'exec-in', label: '', type: 'execution' },
+        { id: 'response', label: 'response', type: 'string' },
+      ],
+    });
+    const issues = computeRunPreflightIssues([startNode(), end], [], { flowInterfaces: ['abstractcode.agent.v1'] });
+    const pinIssues = issues.filter((i) => i.message.includes('required by interface abstractcode.agent.v1'));
+    expect(pinIssues.map((i) => `${i.nodeId}:${i.message.split("'")[1]}`).sort()).toEqual([
+      'end:meta',
+      'end:success',
+      'start:model',
+      'start:prompt',
+      'start:provider',
+    ]);
+    expect(pinIssues.every((i) => i.severity === 'warning')).toBe(true);
+    expect(pinIssues.find((i) => i.nodeId === 'end' && i.message.includes("'success'"))?.message).toContain(
+      "Missing input pin 'success' (boolean)"
+    );
+  });
+
+  it('is silent without declared interfaces or when every pin is present', () => {
+    expect(
+      computeRunPreflightIssues([startNode(), endNode({})], []).some((i) => i.message.includes('required by interface'))
+    ).toBe(false);
+    const start = startNode();
+    start.data.outputs.push({ id: 'items', label: 'items', type: 'array' });
+    const end = endNode({
+      inputs: [
+        { id: 'exec-in', label: '', type: 'execution' },
+        { id: 'results', label: 'results', type: 'array' },
+        { id: 'synthesis', label: 'synthesis', type: 'string' },
+      ],
+    });
+    const issues = computeRunPreflightIssues([start, end], [], { flowInterfaces: ['abstractbatch.mapreduce.v1'] });
+    expect(issues.some((i) => i.message.includes('required by interface'))).toBe(false);
+  });
+});

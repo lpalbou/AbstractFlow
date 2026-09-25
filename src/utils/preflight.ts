@@ -3,6 +3,7 @@ import type { FlowFunction, FlowNodeData, Pin } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import type { GatewayFlowEditorReadiness } from './gatewayClient';
 import { gatewayAuthoringCapabilityStatus } from './gatewayClient';
+import { interfaceBoundaryPins, missingInterfacePins } from './flowFamilies';
 import { getArtifactConnectionError, getConfiguredArtifactInputError } from './mediaArtifacts';
 import { gatewayCapabilityForNodeType } from './nodeCapabilities';
 
@@ -22,6 +23,8 @@ export type RunPreflightOptions = {
   gatewayCapabilitiesKnown?: boolean;
   /** The flow's named function library (tier 2): enables unknown-call checks. */
   flowFunctions?: FlowFunction[];
+  /** The flow's declared interfaces: enables the required boundary-pin check. */
+  flowInterfaces?: string[];
 };
 
 /**
@@ -413,6 +416,24 @@ export function computeRunPreflightIssues(
       const defRe = new RegExp(`(^|\\n)\\s*def\\s+${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\(`);
       if (entry && (!fn.code || !defRe.test(fn.code))) {
         push(entry, `Function '${name}' has no matching 'def ${name}(...)' in its code`);
+      }
+    }
+  }
+
+  // Declared interfaces: every On Flow Start / On Flow End must carry the
+  // pins the contract requires (a host binds its inputs and reads its
+  // outputs by these ids). Advisory — the flow still runs, but a host
+  // started through the interface would send or read nothing there.
+  const interfacePins = interfaceBoundaryPins(options.flowInterfaces);
+  if (interfacePins.start.length > 0 || interfacePins.end.length > 0) {
+    for (const n of nodes) {
+      for (const pin of missingInterfacePins(n.data, interfacePins)) {
+        const side = n.data.nodeType === 'on_flow_start' ? 'output' : 'input';
+        push(
+          n,
+          `Missing ${side} pin '${pin.id}' (${pin.type}) required by interface ${pin.interfaceId} — add it back so hosts can ${side === 'output' ? 'send' : 'read'} it`,
+          'warning'
+        );
       }
     }
   }

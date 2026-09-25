@@ -219,3 +219,190 @@ describe('render-fold: the canvas projection never leaks into the document', () 
     expect(nodeIds()).toEqual(['c1', 'c2', 'g1', 'g2']);
   });
 });
+
+// Declaring an interface on the flow being edited must give its On Flow Start
+// / On Flow End nodes the pins the interface requires (operator: "it is
+// critical that it does so, so that a user knows what to fill").
+function interfaceFixture(interfaces: string[] = []): VisualFlow {
+  return {
+    id: 'iface-flow',
+    name: 'Iface flow',
+    interfaces,
+    nodes: [
+      {
+        id: 'start',
+        type: 'on_flow_start',
+        position: { x: 0, y: 0 },
+        data: {
+          nodeType: 'on_flow_start',
+          label: 'On Flow Start',
+          icon: '',
+          headerColor: '',
+          inputs: [],
+          outputs: [
+            { id: 'exec-out', label: '', type: 'execution' },
+            { id: 'prompt', label: 'Question', type: 'string' },
+          ],
+        },
+      },
+      {
+        id: 'end',
+        type: 'on_flow_end',
+        position: { x: 400, y: 0 },
+        data: {
+          nodeType: 'on_flow_end',
+          label: 'On Flow End',
+          icon: '',
+          headerColor: '',
+          inputs: [{ id: 'exec-in', label: '', type: 'execution' }],
+          outputs: [],
+        },
+      },
+    ],
+    edges: [{ id: 'x1', source: 'start', sourceHandle: 'exec-out', target: 'end', targetHandle: 'exec-in' }],
+  } as VisualFlow;
+}
+
+function pinIds(nodeId: string, side: 'inputs' | 'outputs'): string[] {
+  const node = useFlowStore.getState().nodes.find((n) => n.id === nodeId);
+  return (node?.data[side] || []).map((p) => p.id);
+}
+
+describe('setFlowInterfaces: declaring an interface adds its pins', () => {
+  it('adds the missing typed pins to On Flow Start and On Flow End, keeping the authored ones', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    store.loadFlow(interfaceFixture());
+    useFlowStore.getState().setFlowInterfaces(['abstractcode.agent.v1']);
+
+    const s = useFlowStore.getState();
+    expect(s.flowInterfaces).toEqual(['abstractcode.agent.v1']);
+    expect(pinIds('start', 'outputs')).toEqual(['exec-out', 'prompt', 'provider', 'model']);
+    expect(pinIds('end', 'inputs')).toEqual(['exec-in', 'response', 'success', 'meta']);
+    const start = s.nodes.find((n) => n.id === 'start');
+    // The authored pin keeps its label; the added ones carry the contract types.
+    expect(start?.data.outputs.find((p) => p.id === 'prompt')?.label).toBe('Question');
+    expect(start?.data.outputs.find((p) => p.id === 'provider')?.type).toBe('provider_text');
+    expect(s.nodes.find((n) => n.id === 'end')?.data.inputs.find((p) => p.id === 'success')?.type).toBe('boolean');
+    // What Save sends carries both the interfaces and the pins.
+    const saved = s.getFlow();
+    expect(saved.interfaces).toEqual(['abstractcode.agent.v1']);
+    expect(saved.nodes.find((n) => n.id === 'end')?.data.inputs.map((p) => p.id)).toContain('meta');
+  });
+
+  it('is ONE undo step: undo removes the interface and the pins together; redo brings both back', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    store.loadFlow(interfaceFixture());
+    useFlowStore.getState().setFlowInterfaces(['abstractcode.agent.v1']);
+    expect(useFlowStore.getState().past).toHaveLength(1);
+
+    useFlowStore.getState().undo();
+    expect(useFlowStore.getState().flowInterfaces).toEqual([]);
+    expect(pinIds('start', 'outputs')).toEqual(['exec-out', 'prompt']);
+    expect(pinIds('end', 'inputs')).toEqual(['exec-in']);
+
+    useFlowStore.getState().redo();
+    expect(useFlowStore.getState().flowInterfaces).toEqual(['abstractcode.agent.v1']);
+    expect(pinIds('end', 'inputs')).toEqual(['exec-in', 'response', 'success', 'meta']);
+  });
+
+  it('keeps unsaved edits and earlier undo history (no reload)', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    store.loadFlow(interfaceFixture());
+    useFlowStore.getState().updateNodeData('start', { label: 'Edited, not saved' });
+    useFlowStore.getState().setFlowInterfaces(['abstractcode.agent.v1']);
+    const s = useFlowStore.getState();
+    expect(s.nodes.find((n) => n.id === 'start')?.data.label).toBe('Edited, not saved');
+    expect(s.past).toHaveLength(2);
+  });
+
+  it('removing an interface keeps the pins; re-declaring the same set is a no-op (no history entry)', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    store.loadFlow(interfaceFixture());
+    useFlowStore.getState().setFlowInterfaces(['abstractcode.agent.v1']);
+    const nodesAfter = useFlowStore.getState().nodes;
+    useFlowStore.getState().setFlowInterfaces([' abstractcode.agent.v1 ', '']);
+    expect(useFlowStore.getState().past).toHaveLength(1);
+    expect(useFlowStore.getState().nodes).toBe(nodesAfter);
+
+    useFlowStore.getState().setFlowInterfaces([]);
+    expect(useFlowStore.getState().flowInterfaces).toEqual([]);
+    expect(pinIds('end', 'inputs')).toEqual(['exec-in', 'response', 'success', 'meta']);
+  });
+
+  it('refreshes the selected node so the Properties panel shows the new pins', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    store.loadFlow(interfaceFixture());
+    useFlowStore.getState().selectNodeById('end');
+    useFlowStore.getState().setFlowInterfaces(['abstractcode.agent.v1']);
+    expect(useFlowStore.getState().selectedNode?.data.inputs.map((p) => p.id)).toEqual([
+      'exec-in',
+      'response',
+      'success',
+      'meta',
+    ]);
+  });
+
+  it('open-flow interface update (Toolbar sequence): pins added => unsaved; nothing to add => still clean', () => {
+    // Mirrors Toolbar.handleUpdateInterfaces for the OPEN flow after the PUT:
+    // a clean editor re-baselines to what the gateway now holds (the document
+    // with the new interfaces), then the store adds the pins.
+    const applyAsToolbar = (interfaces: string[], baseline: string) => {
+      const current = toolbarSignature(useFlowStore.getState().getFlow());
+      const next = current === baseline
+        ? toolbarSignature({ ...useFlowStore.getState().getFlow(), interfaces })
+        : baseline;
+      useFlowStore.getState().setFlowInterfaces(interfaces);
+      return next;
+    };
+
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    let baseline = toolbarSignature(store.loadFlow(interfaceFixture()));
+    baseline = applyAsToolbar(['abstractcode.agent.v1'], baseline);
+    expect(toolbarSignature(useFlowStore.getState().getFlow())).not.toEqual(baseline);
+
+    // Save sends interfaces + pins; reopening the saved document keeps every
+    // pin, adds none, and is clean against the Toolbar's load baseline.
+    const sent = useFlowStore.getState().getFlow();
+    const reopened = useFlowStore.getState().loadFlow(sent);
+    expect(toolbarSignature(useFlowStore.getState().getFlow())).toEqual(toolbarSignature(reopened));
+    expect(pinIds('start', 'outputs').sort()).toEqual(['exec-out', 'model', 'prompt', 'provider']);
+    expect(pinIds('end', 'inputs')).toEqual(['exec-in', 'response', 'success', 'meta']);
+
+    // A domain marker requires no pin: the gateway copy equals the editor copy.
+    baseline = toolbarSignature(reopened);
+    baseline = applyAsToolbar(['abstractcode.agent.v1', 'abstractresearch.deep.v1'], baseline);
+    expect(toolbarSignature(useFlowStore.getState().getFlow())).toEqual(baseline);
+  });
+});
+
+describe('loadFlow: a saved flow that declares an interface opens with its pins', () => {
+  it('adds the missing pins of a legacy flow and bakes them into the loaded document (no dirty loop)', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    const loaded = store.loadFlow(interfaceFixture(['abstractcode.agent.v1']));
+    expect(pinIds('start', 'outputs')).toEqual(expect.arrayContaining(['prompt', 'provider', 'model']));
+    expect(pinIds('end', 'inputs')).toEqual(['exec-in', 'response', 'success', 'meta']);
+    expect(useFlowStore.getState().past).toEqual([]);
+
+    // The Toolbar baselines on the returned document: it already carries the
+    // pins, so the editor is clean after open ...
+    expect(toolbarSignature(useFlowStore.getState().getFlow())).toEqual(toolbarSignature(loaded));
+    // ... and the next Save persists them: re-opening that document changes nothing.
+    const reloaded = useFlowStore.getState().loadFlow(loaded);
+    expect(toolbarSignature(reloaded)).toEqual(toolbarSignature(loaded));
+  });
+
+  it('leaves flows without interfaces untouched', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    store.loadFlow(interfaceFixture());
+    expect(pinIds('start', 'outputs')).toEqual(['exec-out', 'prompt']);
+    expect(pinIds('end', 'inputs')).toEqual(['exec-in']);
+  });
+});

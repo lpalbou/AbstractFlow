@@ -19,6 +19,7 @@ import { inferRouteOverrideRouteKey, validateConnection } from '../utils/validat
 import { computeFoldedGetters } from '../utils/foldedGetters';
 import { inferEntryNode, isRouteOverrideEdge, routeKey as buildRouteKey, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from '../utils/visualFlowCompat';
+import { applyInterfacePins, interfaceBoundaryPins, normalizeInterfaces, withInterfacePins } from '../utils/flowFamilies';
 import {
   applyFlowAuthoringCommands,
   type FlowAuthoringApplyResult,
@@ -92,6 +93,10 @@ interface FlowState {
   // Actions
   setFlowId: (id: string | null) => void;
   setFlowName: (name: string) => void;
+  /**
+   * Declare the flow's interfaces AND add the pins they require to the
+   * On Flow Start / On Flow End nodes — one undo step. Existing pins are kept.
+   */
   setFlowInterfaces: (interfaces: string[]) => void;
   setNodes: (nodes: Node<FlowNodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -500,7 +505,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Setters
   setFlowId: (id) => set({ flowId: id }),
   setFlowName: (name) => set({ flowName: name }),
-  setFlowInterfaces: (interfaces) => set({ flowInterfaces: Array.isArray(interfaces) ? interfaces : [] }),
+  setFlowInterfaces: (interfaces) => {
+    const state = get();
+    const flowInterfaces = normalizeInterfaces(interfaces);
+    const nodes = applyInterfacePins(state.nodes, flowInterfaces);
+    const sameInterfaces =
+      flowInterfaces.length === state.flowInterfaces.length &&
+      flowInterfaces.every((id, index) => id === state.flowInterfaces[index]);
+    if (sameInterfaces && nodes === state.nodes) return;
+    get()._captureHistory();
+    const selectedNode = state.selectedNode
+      ? nodes.find((node) => node.id === state.selectedNode?.id) || state.selectedNode
+      : null;
+    set({ flowInterfaces, nodes, selectedNode });
+  },
   setNodes: (nodes) => {
     syncNodeIdCounter(nodes);
     set({ nodes });
@@ -1195,12 +1213,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     }
 
+    // Declared interfaces require boundary pins: a saved flow that declares
+    // one but lacks some of its pins gets them on open (added pins are part of
+    // the loaded document, so they persist with the next save).
+    const interfacePins = interfaceBoundaryPins(flow.interfaces);
+
     const nodes: Node<FlowNodeData>[] = flowNodes.map((vn) => {
       const authoredType = (vn.data as FlowNodeData | undefined)?.nodeType;
       const template = getNodeTemplate(authoredType || vn.type) || getNodeTemplate(vn.type);
       let data: FlowNodeData = template
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
+      data = withInterfacePins(data, interfacePins);
 
       if (data.nodeType === 'make_object' && data.label === 'Create JSON') {
         data = { ...data, label: 'Build JSON' };

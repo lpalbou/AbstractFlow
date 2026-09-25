@@ -40,6 +40,7 @@ import { computeRunPreflightIssues } from '../utils/preflight';
 import { waitNotificationText } from '../utils/waitClassification';
 import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateFlowFamily';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
+import { normalizeInterfaces } from '../utils/flowFamilies';
 import { errorSnippet } from '../utils/errorSnippet';
 import { saveButtonDisabled, saveGateTooltip, type SaveGateInput } from '../utils/saveGate';
 import { savedBaselineSnapshot, shouldRebaselineOnIdentityChange } from '../utils/saveBaseline';
@@ -372,6 +373,7 @@ export function Toolbar() {
     nodes,
     edges,
     flowInterfaces,
+    setFlowInterfaces,
     flowFunctions,
     execView,
     setExecView,
@@ -780,15 +782,27 @@ export function Toolbar() {
       }
       const updated = await renameFlow(id, name, gatewayContracts);
       if (flowId && id === flowId) {
-        const loaded = loadFlow(updated);
-        setFlowName(updated.name);
-        resetLoadedDocument();
-        setSavedFlowSignature(flowSignatureFor(loaded));
+        // Update the open document in place (never reload it: that would
+        // discard unsaved edits and the undo history). A clean editor stays
+        // clean — the gateway now holds this name.
+        const savedName = updated.name || name;
+        if (!hasUnsavedChanges) setSavedFlowSignature(flowSignatureFor({ ...getFlow(), name: savedName }));
+        setFlowName(savedName);
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Renamed');
     },
-    [bundledFlowIdSet, duplicateBundledFamily, flowId, gatewayContracts, loadFlow, queryClient, setFlowName]
+    [
+      bundledFlowIdSet,
+      duplicateBundledFamily,
+      flowId,
+      gatewayContracts,
+      getFlow,
+      hasUnsavedChanges,
+      loadFlow,
+      queryClient,
+      setFlowName,
+    ]
   );
 
   const handleUpdateDescription = useCallback(
@@ -797,19 +811,14 @@ export function Toolbar() {
         toast.error('Bundled flows are read-only. Load or duplicate first.');
         return;
       }
-      const updated = await updateFlowDescription(id, nextDescription, gatewayContracts);
-      // If we are currently editing that flow, keep the in-editor description in sync by reloading.
-      if (flowId && id === flowId) {
-        resetLoadedDocument();
-        // We only have the flow name in store; description lives in the saved flow object.
-        // Loading is the simplest way to keep all metadata consistent.
-        const loaded = loadFlow(updated);
-        setSavedFlowSignature(flowSignatureFor(loaded));
-      }
+      // The description lives only in the saved flow (the editor document has
+      // no description field), so the open document needs no update — and
+      // must not be reloaded, which would discard unsaved edits.
+      await updateFlowDescription(id, nextDescription, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Description updated');
     },
-    [bundledFlowIdSet, flowId, gatewayContracts, loadFlow, queryClient]
+    [bundledFlowIdSet, gatewayContracts, queryClient]
   );
 
   const handleUpdateInterfaces = useCallback(
@@ -820,14 +829,19 @@ export function Toolbar() {
       }
       const updated = await updateFlowInterfaces(id, nextInterfaces, gatewayContracts);
       if (flowId && id === flowId) {
-        resetLoadedDocument();
-        const loaded = loadFlow(updated);
-        setSavedFlowSignature(flowSignatureFor(loaded));
+        // Update the open document in place: unsaved edits and undo history
+        // are kept, and the On Flow Start / On Flow End nodes receive the pins
+        // the interfaces require (one undo step). The gateway holds the new
+        // interfaces but not those pins yet, so the flow shows unsaved changes
+        // until Save stores both.
+        const interfaces = normalizeInterfaces(Array.isArray(updated?.interfaces) ? updated.interfaces : nextInterfaces);
+        if (!hasUnsavedChanges) setSavedFlowSignature(flowSignatureFor({ ...getFlow(), interfaces }));
+        setFlowInterfaces(interfaces);
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Interfaces updated');
     },
-    [bundledFlowIdSet, flowId, gatewayContracts, loadFlow, queryClient]
+    [bundledFlowIdSet, flowId, gatewayContracts, getFlow, hasUnsavedChanges, queryClient, setFlowInterfaces]
   );
 
   const handleDeleteFlow = useCallback(
@@ -1207,6 +1221,7 @@ export function Toolbar() {
       gatewayCapabilitiesLoading: gatewayCapabilitiesQuery.isLoading,
       gatewayCapabilitiesKnown: Boolean(gatewayContracts && !gatewayCapabilitiesQuery.isError),
       flowFunctions: useFlowStore.getState().flowFunctions,
+      flowInterfaces: useFlowStore.getState().flowInterfaces,
     });
     // Only DEFINITE defects block the Run button; advisory 'warning' issues
     // (heuristics that admit uncertainty) surface in the panel but never gate.

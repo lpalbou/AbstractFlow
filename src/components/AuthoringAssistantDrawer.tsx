@@ -1236,7 +1236,10 @@ export function computeAuthoringReadiness(
     }
   }
 
-  for (const issue of computeRunPreflightIssues(flow.nodes, flow.edges, preflightOptions)) {
+  for (const issue of computeRunPreflightIssues(flow.nodes, flow.edges, {
+    ...preflightOptions,
+    flowInterfaces: flow.interfaces,
+  })) {
     issues.push(`${issue.nodeLabel}: ${issue.message}`);
   }
 

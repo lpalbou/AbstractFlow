@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { VisualFlow } from '../types/flow';
+import type { Node } from 'reactflow';
+import type { FlowNodeData, Pin } from '../types/flow';
 import {
+  KNOWN_INTERFACES,
+  applyInterfacePins,
   buildFlowFamilyIndex,
+  interfaceBoundaryPins,
   isExecutableFlow,
+  missingInterfacePins,
   normalizeInterfaces,
 } from './flowFamilies';
 import { buildLibraryRows } from './flowLibraryRows';
@@ -217,5 +223,129 @@ describe('library rows', () => {
     });
     expect(rows.rows[0].missingCount).toBe(1);
     expect(rows.rows[0].expandable).toBe(true);
+  });
+});
+
+// Declaring an interface must give On Flow Start / On Flow End the pins the
+// contract requires, so the author sees what a host sends in and reads back.
+function boundaryNode(id: string, nodeType: 'on_flow_start' | 'on_flow_end' | 'code', pins: Pin[] = []): Node<FlowNodeData> {
+  const exec: Pin =
+    nodeType === 'on_flow_start' ? { id: 'exec-out', label: '', type: 'execution' } : { id: 'exec-in', label: '', type: 'execution' };
+  return {
+    id,
+    type: 'custom',
+    position: { x: 0, y: 0 },
+    data: {
+      nodeType,
+      label: id,
+      icon: '',
+      headerColor: '',
+      inputs: nodeType === 'on_flow_start' ? [] : [exec, ...pins],
+      outputs: nodeType === 'on_flow_start' ? [exec, ...pins] : [],
+    } as FlowNodeData,
+  };
+}
+
+const AGENT = 'abstractcode.agent.v1';
+
+describe('interface boundary pins', () => {
+  it('every known interface pin is fully typed (id, label, type) with unique ids per side', () => {
+    for (const iface of KNOWN_INTERFACES) {
+      for (const side of [iface.requiredStartPins || [], iface.requiredEndPins || []]) {
+        for (const pin of side) {
+          expect(pin.id).toMatch(/^[a-z_]+$/);
+          expect(pin.label).toBeTruthy();
+          expect(pin.type).toBeTruthy();
+          expect(pin.type).not.toBe('execution');
+        }
+        expect(new Set(side.map((pin) => pin.id)).size).toBe(side.length);
+      }
+    }
+  });
+
+  it('pins the typed agent.v1 contract hosts rely on', () => {
+    const pins = interfaceBoundaryPins([AGENT]);
+    expect(pins.start.map((p) => [p.id, p.type])).toEqual([
+      ['provider', 'provider_text'],
+      ['model', 'model'],
+      ['prompt', 'string'],
+    ]);
+    expect(pins.end.map((p) => [p.id, p.type])).toEqual([
+      ['response', 'string'],
+      ['success', 'boolean'],
+      ['meta', 'object'],
+    ]);
+  });
+
+  it('merges several interfaces in declaration order; first declaration of an id wins; unknown ids add nothing', () => {
+    const pins = interfaceBoundaryPins(['abstractcode.coding.v1', AGENT, 'unknown.custom.v1', 'abstractresearch.deep.v1']);
+    expect(pins.start.map((p) => p.id)).toEqual(['request', 'provider', 'model', 'prompt']);
+    expect(pins.end.map((p) => `${p.interfaceId}:${p.id}`)).toEqual([
+      'abstractcode.coding.v1:report',
+      'abstractcode.coding.v1:passed',
+      `${AGENT}:response`,
+      `${AGENT}:success`,
+      `${AGENT}:meta`,
+    ]);
+    expect(interfaceBoundaryPins(['abstractresearch.deep.v1', '', 'nope'])).toEqual({ start: [], end: [] });
+  });
+
+  it('adds the missing typed pins: outputs on On Flow Start, inputs on On Flow End', () => {
+    const nodes = [boundaryNode('start', 'on_flow_start'), boundaryNode('end', 'on_flow_end')];
+    const next = applyInterfacePins(nodes, [AGENT]);
+    expect(next[0].data.outputs).toEqual([
+      { id: 'exec-out', label: '', type: 'execution' },
+      expect.objectContaining({ id: 'provider', label: 'provider', type: 'provider_text' }),
+      expect.objectContaining({ id: 'model', label: 'model', type: 'model' }),
+      expect.objectContaining({ id: 'prompt', label: 'prompt', type: 'string' }),
+    ]);
+    expect(next[0].data.inputs).toEqual([]);
+    expect(next[1].data.inputs.map((p) => [p.id, p.type])).toEqual([
+      ['exec-in', 'execution'],
+      ['response', 'string'],
+      ['success', 'boolean'],
+      ['meta', 'object'],
+    ]);
+    expect(next[1].data.outputs).toEqual([]);
+    // Inputs are never mutated.
+    expect(nodes[0].data.outputs).toHaveLength(1);
+    expect(nodes[1].data.inputs).toHaveLength(1);
+  });
+
+  it('keeps existing pins as authored (label, type, order) and never duplicates them', () => {
+    const userPrompt: Pin = { id: 'prompt', label: 'Ask me', type: 'any', description: 'mine' };
+    const userExtra: Pin = { id: 'workspace_root', label: 'workspace_root', type: 'string' };
+    const nodes = [boundaryNode('start', 'on_flow_start', [userExtra, userPrompt])];
+    const next = applyInterfacePins(nodes, [AGENT]);
+    const outputs = next[0].data.outputs;
+    expect(outputs.map((p) => p.id)).toEqual(['exec-out', 'workspace_root', 'prompt', 'provider', 'model']);
+    expect(outputs[2]).toBe(userPrompt);
+    expect(outputs.filter((p) => p.id === 'prompt')).toHaveLength(1);
+  });
+
+  it('returns the SAME array (and node objects) when nothing is missing', () => {
+    const once = applyInterfacePins([boundaryNode('start', 'on_flow_start'), boundaryNode('end', 'on_flow_end')], [AGENT]);
+    expect(applyInterfacePins(once, [AGENT])).toBe(once);
+    const plain = [boundaryNode('code', 'code')];
+    expect(applyInterfacePins(plain, [AGENT])).toBe(plain);
+    const unrelated = [boundaryNode('start', 'on_flow_start')];
+    expect(applyInterfacePins(unrelated, [])).toBe(unrelated);
+    expect(applyInterfacePins(unrelated, ['abstractresearch.deep.v1'])).toBe(unrelated);
+  });
+
+  it('fills every On Flow End (a flow may end on several branches) and leaves other nodes alone', () => {
+    const code = boundaryNode('code', 'code');
+    const nodes = [boundaryNode('end_a', 'on_flow_end'), code, boundaryNode('end_b', 'on_flow_end')];
+    const next = applyInterfacePins(nodes, ['abstractcode.coding.v1']);
+    expect(next[0].data.inputs.map((p) => p.id)).toEqual(['exec-in', 'report', 'passed']);
+    expect(next[2].data.inputs.map((p) => p.id)).toEqual(['exec-in', 'report', 'passed']);
+    expect(next[1]).toBe(code);
+  });
+
+  it('reports what a boundary node is missing', () => {
+    const pins = interfaceBoundaryPins([AGENT]);
+    const end = boundaryNode('end', 'on_flow_end', [{ id: 'response', label: 'response', type: 'string' }]);
+    expect(missingInterfacePins(end.data, pins).map((p) => p.id)).toEqual(['success', 'meta']);
+    expect(missingInterfacePins(boundaryNode('code', 'code').data, pins)).toEqual([]);
   });
 });
