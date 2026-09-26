@@ -1,12 +1,25 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-07-26
-- Planned: 0
+- Updated: 2026-09-26
+- Planned: 1
 - Proposed: 46 (39 numbered + 7 legacy-named; the prior snapshot said 40 and
   had drifted from the directory contents)
 - Completed: 53
 - Deprecated: 0
+
+## 2026-09-26 Automations v1: trigger bindings (0158)
+Item 0158 (`abstractflow-0158`, PLANNED): Flow mission F of the Automations
+plan (untracked/design/automations-PLAN.md, 2026-09-26). Discovery client for
+the gateway's `GET /trigger-sources`, a trigger-binding editor driven by each
+source's `config_schema`, export of
+`manifest.metadata.automation_defaults[flow_id]` through publish, and an
+optional `trigger` pin on On Flow Start for flows declaring
+`abstractframework.triggerable.v1`. The in-run timing nodes (`on_schedule`,
+`on_event`, `wait_event`, `emit_event`, `wait_until`) stay; they do not
+schedule automations. Depends on gateway routes + publish metadata; related
+root item `abstractframework backlog 0928`. Supersedes the direction of
+`proposed/0119` for Flow.
 
 ## 2026-07-26 pin expressions tier-2 hold + amendments (0154)
 Item 0154 (`abstractflow-0154`): decision record — tier 1 (anonymous inline
@@ -183,7 +196,10 @@ item's "Current code reality".
   Codespace; provider credentials and Gateway auth must remain separated.
 
 ## Planned Ledger
-- None at the moment.
+- `planned/0158_automations_trigger_bindings_source_discovery_and_defaults.md`:
+  trigger-source discovery, binding editor, `automation_defaults` export and
+  the optional `trigger` pin (Automations v1 minor wave; waits on gateway
+  `/trigger-sources` and publish metadata).
 
 ## Proposed Ledger (2026-07-11 review wave)
 - `proposed/0117_effect_error_branch_retry_timeout.md`: error exec-branch +
