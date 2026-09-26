@@ -50,14 +50,17 @@ for compatible models only; Flow itself does not impose that default.
 
 ## Local Development
 
+A local checkout needs Node.js 20+ and a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout: the editor builds the shared UI packages (`@abstractframework/ui-kit` and the monitor widgets) from `../abstractuic`.
+
 ```bash
-git clone https://github.com/lpalbou/AbstractFlow.git
-cd AbstractFlow
+git clone https://github.com/lpalbou/AbstractUIC.git abstractuic
+git clone https://github.com/lpalbou/AbstractFlow.git abstractflow
+cd abstractflow
 npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/api/*` to the Gateway URL selected in the connection UI or configured with `ABSTRACTGATEWAY_URL` / `ABSTRACTFLOW_GATEWAY_URL`.
+The Vite dev server proxies `/api/*` to the Gateway URL selected in the connection UI or configured with `ABSTRACTGATEWAY_URL` / `ABSTRACTFLOW_GATEWAY_URL`. It does not set the forwarding headers the built server sends to the Gateway, so serve the built editor (below) when browsers on other machines use it.
 
 ## Build
 
@@ -67,3 +70,11 @@ npm start -- --gateway-url http://127.0.0.1:8080
 ```
 
 The static server in `bin/cli.js` serves `dist/` and proxies API/SSE calls to Gateway with browser-session auth injection.
+
+## Next Steps
+
+- [Web editor](web-editor.md): the editor's features, including flow interfaces and the About dialog.
+- [VisualFlow JSON](visualflow.md): the workflow document format.
+- [Architecture](architecture.md): how the editor, the Flow server, and Gateway fit together.
+- [Troubleshooting](troubleshooting.md): sign-in, proxy, and build problems.
+- [README](../README.md): project overview.

@@ -32,7 +32,7 @@ Server/operator bearer tokens such as `ABSTRACTGATEWAY_AUTH_TOKEN` are not brows
 
 Remote browser-supplied Gateway URL changes are blocked by default. A hosted Flow instance should proxy only to its configured Gateway unless the operator explicitly enables `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` behind their own access control.
 
-Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the address the browser connected from, and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own machine. Forwarding headers sent by the browser itself (`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`) and any browser-supplied `X-AbstractFramework-App-Proxy` are dropped. Behind a reverse proxy the Gateway therefore sees the reverse proxy's address, not the end user's.
+Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the address the browser connected from, and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own machine. Forwarding headers sent by the browser itself (`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`) and any browser-supplied `X-AbstractFramework-App-Proxy` are dropped. Behind a reverse proxy the Gateway therefore sees the reverse proxy's address, not the end user's. The Vite development server (`npm run dev`) drops browser-supplied forwarding headers but does not add these two headers; serve the built editor (`npm start` or `npx @abstractframework/flow`) when browsers on other machines use it. See [Troubleshooting](troubleshooting.md#sign-in-and-connection) for sign-in and proxy errors.
 
 ## About
 
@@ -323,7 +323,7 @@ Unconnected artifact input pins expose a browser upload affordance directly on t
 
 `Listen Voice` waits are handled as Gateway/Runtime waits. Flow only captures audio in the browser, uploads it to Gateway as an audio artifact, and resumes the waiting run with that artifact ref; transcription and downstream execution remain Gateway/Runtime work.
 
-For the vision routes, the Properties drawer now follows the Gateway media
+For the vision routes, the Properties drawer follows the Gateway media
 contract closely:
 
 - `Generate Image`, `Edit Image`, `Generate Video`, and `Image To Video` expose
@@ -356,7 +356,7 @@ Flow uses one explicit source model for file-like work:
   `Workspace File` / `Workspace Folder` path such as `docs/report.md` or
   `mount_alias/reports`.
 
-The run modal and node defaults now expose workspace path browsing for
+The run modal and node defaults expose workspace path browsing for
 `Workspace File` / `Workspace Folder` pins, plus artifact-backed local intake
 for one file, many files, or one or more local folders. Typical graph patterns are:
 
@@ -376,6 +376,8 @@ for one file, many files, or one or more local folders. Typical graph patterns a
 
 ## Development
 
+A local checkout builds the shared UI packages from a sibling AbstractUIC checkout; see [Getting started > Local Development](getting-started.md#local-development).
+
 ```bash
 npm install
 npm run dev
@@ -385,7 +387,8 @@ Useful environment variables:
 
 - `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL`: default Gateway target for the proxy.
 - `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: allow non-local browsers to change the Gateway URL.
-- `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1`: honor forwarded host/proto headers behind a trusted reverse proxy.
+
+See [API and contracts](api.md#cli) for the complete list of options and environment variables.
 
 ## Build And Serve
 

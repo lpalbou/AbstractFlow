@@ -3,18 +3,21 @@
 `deep-research` is the shipped production research WorkflowBundle family for
 Gateway-hosted runs. Flow ids, display names, files, and the bundle id all use
 the `deep-` vocabulary (`deep-research`, `deep-plan`, `deep-investigate`,
-`deep-review`, `deep-render`) — the historical `dp-` prefix was fully retired
-on 2026-07-16 (operator ruling); older `dp-research@0.1.x` bundles remain on
-disk only for completed-run history. It is authored as editable VisualFlow
+`deep-review`, `deep-render`). It is authored as editable VisualFlow
 JSON in `examples/flows/deep-*.json` and packed as `deep-research@0.1.7.flow`
-(version lineage continues from the dp era; bundle versions are immutable by
-sha).
+(bundle versions are immutable by sha). Older `dp-research@0.1.x` bundles are
+kept only so completed runs stay readable.
+
+The root flow declares `abstractcode.agent.v1` and `abstractresearch.deep.v1`,
+so agent hosts such as AbstractCode can run it like any other agent workflow.
 
 ## User Inputs
 
 The public entrypoint is `deep-research`. It exposes product-facing inputs:
 
 - `request`: what should be researched.
+- `prompt`: the message an agent host sends (`abstractcode.agent.v1`). It is
+  researched when `request` is empty; a non-empty `request` wins.
 - `viewpoint`: the angle, thesis, audience stance, or evaluation lens.
 - `effort`: one of `quick`, `standard`, or `thorough`.
 - `provider` / `model`: optional overrides. Leave both blank to use the current
@@ -75,7 +78,9 @@ The root flow returns direct paths for:
 - Iteration log: `<derived-output-prefix>-<timestamp>.iterations.json`
 - Warnings: `<derived-output-prefix>-<timestamp>.warnings.json`
 
-The root outputs also include actual PDF/DOCX `sha256` values and an
+The root outputs also include `response` and `meta` for agent hosts, `success`
+(true when a Markdown report was produced), artifact ids for the Markdown, PDF
+and DOCX reports, actual PDF/DOCX `sha256` values and an
 `export_manifest` object built after file writes complete. The manifest combines
 the model-rendered research manifest with real export paths, byte counts, hashes,
 and content types.
@@ -85,9 +90,9 @@ evidence, limitations, open questions, and cited source ids. The JSON audit
 files exist so operators can inspect provenance and completeness without
 parsing the prose report.
 
-The derived `include_images` setting currently asks the writer for visual briefs
-such as tables, Mermaid-style diagrams, and illustration slots in Markdown. It
-does not run a bitmap image generation node in `0.1.0`.
+The derived `include_images` setting asks the writer for visual briefs
+such as tables, Mermaid-style diagrams, and illustration slots in Markdown. The
+workflow does not run a bitmap image generation node.
 
 ## Rebuild And Validate
 

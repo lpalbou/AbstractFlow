@@ -19,10 +19,15 @@ const files = [
   'docs/api.md',
   'docs/visualflow.md',
   'docs/cli.md',
+  'docs/shipped-workflow-sources.md',
+  'docs/deep-research.md',
+  'docs/entity-brain.md',
   'docs/faq.md',
+  'docs/troubleshooting.md',
   'CHANGELOG.md',
   'CONTRIBUTING.md',
   'SECURITY.md',
+  'CODE_OF_CONDUCT.md',
 ];
 
 const parts = [

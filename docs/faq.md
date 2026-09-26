@@ -26,11 +26,36 @@ Create a provider endpoint profile in Gateway with its base URL, API key, descri
 
 The editor can load its static UI, but discovery, save, publish, run, artifact, and history features require Gateway.
 
-## Where Did The Python `abstractflow` Package Go?
+## Is There A Python `abstractflow` Package?
 
-Its responsibilities were moved to their owners:
+No. AbstractFlow is the web editor only. The responsibilities of a workflow
+backend belong to these packages:
 
 - visual execution and bundle semantics: AbstractRuntime
 - users, auth, runtime routing, workflow registry, runs, artifacts: AbstractGateway
 - provider calls and capability plugins: AbstractCore
 - visual authoring UI: `@abstractframework/flow`
+
+## What Does Declaring An Interface Do?
+
+An interface such as `abstractcode.agent.v1` tells hosts (AbstractCode,
+AbstractAssistant, entity phases) that they can start the workflow and which
+pins they send and read. Declaring one in the Flow Library adds the pins it
+requires to `On Flow Start` and `On Flow End`; you then wire them. See
+[VisualFlow JSON > Interfaces](visualflow.md#interfaces) for every interface
+and its pins.
+
+## Why Does A Node Show "N hidden"?
+
+The stored workflow wires pins the canvas cannot draw, such as a code node's
+returned keys. Those connections run and are saved as stored. See
+[Web editor > Hidden Connections](web-editor.md#hidden-connections).
+
+## Where Do I Find The AbstractFlow And Gateway Versions?
+
+Open the About dialog (the `i` button in the top bar). See
+[Web editor > About](web-editor.md#about).
+
+## Something Does Not Work
+
+See [Troubleshooting](troubleshooting.md) for symptoms, causes, and fixes.

@@ -19,7 +19,7 @@ stays textual for compatibility.
 
 ## File-like sources
 
-Flow now teaches one explicit file-like vocabulary across the editor, run modal,
+Flow uses one explicit file-like vocabulary across the editor, run modal,
 and authoring docs:
 
 - `Artifact`: a saved Runtime-owned durable payload.
@@ -38,26 +38,31 @@ The canvas reflects that split:
 
 ## Pages
 
-- [Getting started](getting-started.md)
-- [Web editor](web-editor.md)
-- [Workflow authoring skill](workflow-authoring-skill.md)
-- [Workflow node catalog](workflow-node-catalog.md)
-- [Production research workflow](deep-research.md)
-- [Shipped workflow sources](shipped-workflow-sources.md)
-- [The entity brain (entity-life family)](entity-brain.md)
-- [Entity brain report (2026-07-24)](reports/entity-brain-report.md)
-- [Architecture](architecture.md)
-- [API and contracts](api.md)
-- [VisualFlow JSON](visualflow.md)
-- [CLI](cli.md)
-- [FAQ](faq.md)
+Start here:
 
-## Documentation Upkeep
+- [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, discovery, Resources, flow interfaces, hidden connections, the authoring assistant, media and file nodes.
+- [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
+- [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
-- Keep docs written around the web package layout: `src/`, `bin/`, `examples/flows/`, `docs/`.
-- Do not add Python package or local server launch instructions; those surfaces were removed from this repository.
-- Regenerate the LLM context after doc changes:
+Reference:
 
-```bash
-npm run docs:llms
-```
+- [Architecture](architecture.md): components, boundaries, and diagrams of the editor, the Flow server, and Gateway.
+- [API and contracts](api.md): CLI options, environment variables, proxy contract, and the main frontend modules.
+- [CLI](cli.md): the `abstractflow-editor` command.
+- [VisualFlow JSON](visualflow.md): the workflow document format, interfaces and their boundary pins, pin expressions, and sharing.
+
+Workflow authoring:
+
+- [Workflow authoring skill](workflow-authoring-skill.md): the command contract and patterns the Workflow Authoring Assistant follows; also useful to human authors.
+- [Workflow node catalog](workflow-node-catalog.md): every node template with its pins and configuration fields (generated from `src/types/nodes.ts`).
+
+Shipped workflows:
+
+- [Shipped workflow sources](shipped-workflow-sources.md): the editable flows and generators behind the coder, deep-research, and co-scientist bundles that AbstractGateway serves.
+- [Production research workflow](deep-research.md): the `deep-research` family in depth.
+- [The entity brain](entity-brain.md): the `entity-life` workflow family that animates persistent entities.
+
+Project policies live at the repository root: [CHANGELOG.md](../CHANGELOG.md),
+[CONTRIBUTING.md](../CONTRIBUTING.md), [SECURITY.md](../SECURITY.md), and
+[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md).

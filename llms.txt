@@ -1,71 +1,64 @@
-# AbstractFlow LLM Guide
+# AbstractFlow
 
-> AbstractFlow is the web visual workflow editor for AbstractFramework.
-
-Use this repo as an npm/web package:
-
-- Package: `@abstractframework/flow`
-- Source: `src/`
-- CLI/proxy: `bin/cli.js`
-- Examples: `examples/flows/`
-- Docs: `docs/`
+> AbstractFlow is the web visual workflow editor for AbstractFramework, distributed as the npm package `@abstractframework/flow`. It serves a browser editor and a small Node server that proxies `/api/*` to AbstractGateway.
 
 Do not assume a Python package, FastAPI backend, or local execution host exists in AbstractFlow. Execution, provider configuration, user auth, workflow persistence, runs, ledgers, artifacts, and runtime isolation are owned by AbstractGateway and AbstractRuntime.
 
-Useful files:
+Repository map: `src/` (React/Vite editor), `bin/cli.js` (CLI, static server, Gateway proxy), `bin/gateway_forwarding.js` (forwarding headers), `examples/flows/` (sample and shipped VisualFlow JSON), `scripts/` (workflow generators and doc generators), `docs/`.
 
-- [README](README.md)
-- [Getting started](docs/getting-started.md)
-- [Web editor](docs/web-editor.md)
-- [Workflow authoring skill](docs/workflow-authoring-skill.md)
-- [Workflow node catalog](docs/workflow-node-catalog.md)
-- [Shipped workflow sources](docs/shipped-workflow-sources.md): editable flows + generators behind Gateway's out-of-the-box coder, deep-research, and co-scientist bundles
-- [Production research workflow](docs/deep-research.md)
-- [The entity brain](docs/entity-brain.md): the `entity-life` workflow family
-- [Architecture](docs/architecture.md)
-- [API and contracts](docs/api.md)
-- [VisualFlow JSON](docs/visualflow.md)
-- [CLI](docs/cli.md)
-- [FAQ](docs/faq.md)
-- [Gateway client](src/utils/gatewayClient.ts)
-- [Gateway catalog helpers](src/utils/gatewayCatalog.ts)
-- [Run modal](src/components/RunFlowModal.tsx)
-- [Connection modal](src/components/GatewayConnectionModal.tsx)
-- [Node templates](src/types/nodes.ts)
+Key behavior:
 
-Workflow authoring assistant context:
+- Gateway is the only execution boundary. Flow may capture browser-local files or microphone audio, but uploads them to Gateway as artifacts before start/resume.
+- The Flow server sets `X-Forwarded-For` (the browser connection's address) and `X-AbstractFramework-App-Proxy: abstractflow` on every Gateway-bound request and drops browser-supplied forwarding headers. The Vite dev server does not add these headers.
+- A workflow's `interfaces` list declares the contracts it implements. Declaring an interface adds its typed pins to `On Flow Start` / `On Flow End`; opening a workflow adds missing pins and shows unsaved changes; Run preflight warns about missing, unconnected, or mistyped interface pins. Eight interfaces carry pin contracts, including `abstractcode.agent.v1`, `abstractassistant.agent.v1`, and `abstractcode.goal.v1`.
+- Opening or importing a workflow keeps every stored connection. Connections the canvas cannot draw are kept, saved, and listed in an "N hidden" node badge; only connections to missing nodes are removed, with a notice.
+- The About dialog shows the AbstractFlow version and the versions from `GET /api/gateway/about`.
+- Unconnected LLM Call and Agent `resp_schema` pins can be edited inline; schema-active nodes expose structured output on `data` while `response` stays textual.
+- Agent and LLM Call nodes expose an MTP depth setting and a `speculation` pin. Precedence: connected pin, node setting, run override, host default.
 
-- Use [Workflow authoring skill](docs/workflow-authoring-skill.md) for the
-  command contract, validation rules, repair loop, and workflow composition
-  patterns.
-- Use [Workflow node catalog](docs/workflow-node-catalog.md) for all visible
-  node templates, pins, dynamic pin policy, Gateway capability requirements,
-  and command-authorable config fields.
+## Core Docs
 
-Current media/editor behavior:
+- [README.md](README.md): project overview, install, and feature summary
+- [docs/README.md](docs/README.md): documentation index
+- [docs/getting-started.md](docs/getting-started.md): start a Gateway, run the editor, sign in, local development
+- [docs/web-editor.md](docs/web-editor.md): editor features, sign-in, About, interfaces, hidden connections, authoring assistant, media and file nodes
+- [docs/architecture.md](docs/architecture.md): components, boundaries, and diagrams
+- [docs/api.md](docs/api.md): CLI options, environment variables, proxy contract, frontend modules
+- [docs/visualflow.md](docs/visualflow.md): VisualFlow JSON format, interfaces and their boundary pins, pin expressions
+- [docs/cli.md](docs/cli.md): the `abstractflow-editor` command
+- [docs/faq.md](docs/faq.md): short answers about scope and behavior
+- [docs/troubleshooting.md](docs/troubleshooting.md): sign-in, proxy, editor, and build symptoms with fixes
 
-- Gateway is the only execution boundary. Flow may capture browser-local files
-  or microphone audio, but uploads them to Gateway as artifacts before
-  start/resume.
-- Unconnected artifact input pins expose node-level upload controls.
-- Direct image, image-edit, image-upscale, video, and image-to-video child-run
-  progress is rendered from Gateway `abstract.progress` ledger records when
-  available.
-- Unconnected LLM Call and Agent `resp_schema` pins can be edited inline.
-  Builder Choice fields are saved as JSON Schema enums in `pinDefaults`, and
-  schema-active nodes expose structured object output on `data` while `response`
-  stays textual. Wire `data` into Break Object; enum-backed Break Object
-  outputs can be synced into explicit Switch cases.
-- Connection previews must use canonical pin types; execution handles only
-  preview/connect to execution handles.
-- Agent and LLM Call nodes expose an MTP depth setting (inherit, Off, or an
-  advertised depth) plus a `speculation` pin; the Run dialog offers a run-scoped
-  override. Precedence: connected pin, node setting, run override, host default.
+## Workflow Authoring
 
-Validation:
+- [docs/workflow-authoring-skill.md](docs/workflow-authoring-skill.md): command contract, validation rules, repair loop, and composition patterns for the Workflow Authoring Assistant
+- [docs/workflow-node-catalog.md](docs/workflow-node-catalog.md): every node template with pins, dynamic pin policy, Gateway capability requirements, and config fields
 
-```bash
-npm run build
-npm run lint
-npm run docs:llms
-```
+## Topic Deep Dives
+
+- [docs/shipped-workflow-sources.md](docs/shipped-workflow-sources.md): editable flows and generators behind Gateway's coder, deep-research, and co-scientist bundles
+- [docs/deep-research.md](docs/deep-research.md): the `deep-research` workflow family
+- [docs/entity-brain.md](docs/entity-brain.md): the `entity-life` workflow family
+
+## Source Entry Points
+
+- [src/utils/gatewayClient.ts](src/utils/gatewayClient.ts): Gateway HTTP/SSE client
+- [src/utils/gatewayCatalog.ts](src/utils/gatewayCatalog.ts): provider/model/media catalog normalization
+- [src/utils/flowFamilies.ts](src/utils/flowFamilies.ts): known interfaces and their typed boundary pins
+- [src/utils/preflight.ts](src/utils/preflight.ts): Run preflight checks
+- [src/hooks/useFlow.ts](src/hooks/useFlow.ts): editor store and `loadFlow`
+- [src/components/RunFlowModal.tsx](src/components/RunFlowModal.tsx): run modal
+- [src/components/GatewayConnectionModal.tsx](src/components/GatewayConnectionModal.tsx): sign-in
+- [src/types/nodes.ts](src/types/nodes.ts): node templates
+
+## Contributing
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): setup (Node.js 20+, sibling AbstractUIC checkout), `npm run build`, `npm run lint`, `npm test`, `npm run docs:llms`
+- [SECURITY.md](SECURITY.md): vulnerability reporting
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): participation rules
+
+## Optional
+
+- [CHANGELOG.md](CHANGELOG.md): release history
+- [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md): credits
+- [llms-full.txt](llms-full.txt): the documentation set in one file

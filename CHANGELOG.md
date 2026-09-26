@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pin required by a declared interface, when a required `On Flow End` pin is
   not connected (hosts would read `null`), and when a required pin has
   another type than the interface expects.
+- Documentation: a [troubleshooting guide](docs/troubleshooting.md) for
+  sign-in, proxy, editor and local-development problems, component and
+  load-path diagrams in [Architecture](docs/architecture.md), the complete
+  server environment reference in [API and contracts](docs/api.md#cli), and a
+  [Code of Conduct](CODE_OF_CONDUCT.md). Local development requires Node.js 20
+  or later.
 
 ### Security
 - The `abstractflow-editor` server now tells the gateway which machine each

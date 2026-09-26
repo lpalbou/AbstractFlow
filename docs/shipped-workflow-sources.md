@@ -6,7 +6,7 @@ page maps each shipped bundle back to the editable VisualFlow JSON and the
 generator that packs it, so you can study, fork, or extend them here.
 
 For what those workflows do and how to run them, see
-[AbstractGateway's shipped workflows](../../abstractgateway/docs/shipped-workflows.md).
+[AbstractGateway's shipped workflows](https://github.com/lpalbou/AbstractGateway/blob/main/docs/shipped-workflows.md).
 
 ## Sources
 
@@ -29,10 +29,19 @@ bundles.
 ## Forking one
 
 Open a flow in the editor ([web editor](web-editor.md)), change what you need,
-and pack it under your own bundle id:
+export it with its subflows, and pack it under your own bundle id with
+AbstractRuntime's bundle packer (the same function the generators here use):
 
-```bash
-abstractflow bundle pack /path/to/root.json --out /path/to/bundles/my-agent.flow --flows-dir /path/to/flows
+```python
+from abstractruntime.workflow_bundle import pack_workflow_bundle
+
+pack_workflow_bundle(
+    root_flow_json="/path/to/flows/my-agent.json",
+    out_path="/path/to/bundles/my-agent@0.1.0.flow",
+    bundle_id="my-agent",
+    bundle_version="0.1.0",
+    flows_dir="/path/to/flows",
+)
 ```
 
 Point `ABSTRACTGATEWAY_FLOWS_DIR` at that directory, or publish through the

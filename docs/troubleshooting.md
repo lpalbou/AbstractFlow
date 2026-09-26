@@ -1,0 +1,168 @@
+# Troubleshooting
+
+This page maps common AbstractFlow symptoms to their cause and fix. For setup
+steps, see [Getting started](getting-started.md); for the server options and
+environment variables, see [API and contracts](api.md) and [CLI](cli.md); for
+recurring conceptual questions, see the [FAQ](faq.md).
+
+Two quick checks help with most problems:
+
+```bash
+# Is the Flow server up, and which Gateway does it proxy to?
+curl -s http://localhost:3003/api/health
+
+# Is the Gateway reachable?
+curl -s http://127.0.0.1:8080/api/health
+```
+
+The Flow health payload reports `status: "healthy"` and the `gateway_url` the
+server uses by default.
+
+## Sign-In And Connection
+
+### "Gateway sign-in required" (HTTP 401) on every editor call
+
+- **Cause:** the browser has no Flow session yet, or its session cookie expired
+  or was cleared.
+- **Fix:** open the connection pill in the top bar and sign in with the Gateway
+  URL, your Gateway user id and that user's token. On a first local install the
+  user is `admin` and the token is the `agw_...` value stored in
+  `$ABSTRACTGATEWAY_DATA_DIR/auth/bootstrap-admin-token`.
+- **Verify:** the connection pill shows the signed-in user and the Flow Library
+  lists workflows.
+
+See [Web editor > Browser Auth](web-editor.md#browser-auth).
+
+### Sign-in is refused ("Only Gateway user tokens can be used for browser sign-in", "Gateway token resolved to user ...")
+
+- **Cause:** the token is not a Gateway *user* token, or it belongs to another
+  user than the user id you entered. Server/operator bearer
+  tokens such as `ABSTRACTGATEWAY_AUTH_TOKEN` are not browser sign-in tokens.
+  The Gateway must also run with `ABSTRACTGATEWAY_USER_AUTH=1`.
+- **Fix:** use the user token for the user id you entered, and start the
+  Gateway with user auth enabled as shown in
+  [Getting started](getting-started.md#1-start-gateway).
+
+### "Browser-supplied Gateway URL changes are disabled for this non-local Flow connection" (HTTP 403)
+
+- **Cause:** a browser that does not run on the Flow server's machine asked to
+  connect to a Gateway URL other than the one the server was started with. The
+  Flow server decides this from the connection's own address, so a hosted Flow
+  instance proxies only to its configured Gateway.
+- **Fix:** keep the server-configured Gateway URL in the connection form, or
+  restart the server with the right `--gateway-url`. Operators who deliberately
+  want remote browsers to choose a Gateway can set
+  `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` behind their own access
+  control.
+
+### "Cannot determine the client address of this connection" (HTTP 400)
+
+- **Cause:** the Flow server could not read the address of the browser
+  connection, so it cannot tell the Gateway where the browser runs and refuses
+  the request instead of forwarding it without that information.
+- **Fix:** connect to the Flow server directly or through a reverse proxy that
+  opens a normal TCP connection to it. See
+  [Web editor > Browser Auth](web-editor.md#browser-auth) for the forwarding
+  headers the server sends.
+
+### "Flow browser session CSRF token missing or invalid" (HTTP 403)
+
+- **Cause:** a mutating request (save, publish, run) arrived without the
+  session's CSRF cookie, typically after cookies were partially cleared or when
+  the page is served from another origin than the Flow server.
+- **Fix:** sign out and sign in again from the same origin you use to open the
+  editor.
+
+### A remote browser is treated as if it ran on the Gateway's machine
+
+- **Cause:** the Vite development server (`npm run dev`) drops browser-supplied
+  forwarding headers but does not add `X-Forwarded-For` or the
+  `X-AbstractFramework-App-Proxy` marker, so the Gateway sees the development
+  server's own local address.
+- **Fix:** when remote browsers use the editor, serve it with the built server
+  (`npm run build` then `npm start -- --gateway-url ...`, or
+  `npx @abstractframework/flow`), which sets both headers on every
+  Gateway-bound request.
+
+## Editor Behavior
+
+### A workflow opens with unsaved changes and "Interface pins were added to On Flow Start/End; save to store them"
+
+- **Cause:** the workflow declares an interface (for example
+  `abstractcode.agent.v1`) and its `On Flow Start` or `On Flow End` node lacked
+  one of the pins that interface requires. The editor adds the missing pins
+  when it opens the workflow.
+- **Fix:** review the added pins, wire them, and **Save**. After saving, the
+  workflow opens without changes.
+
+See [VisualFlow JSON > Interfaces](visualflow.md#interfaces).
+
+### A node shows an "N hidden" badge, or a notice says connections are "kept and saved but not drawn"
+
+- **Cause:** the stored workflow has connections the canvas cannot draw: pins
+  resolved by name at run time (a code node's returned keys, a subflow's
+  `child_output`) or pairs the editor's connection rules refuse.
+- **Fix:** nothing is required. These connections run as stored and are saved
+  back unchanged. Hover the badge to list them (`source.pin -> target.pin`).
+  They are removed only when you delete one of their nodes.
+- **When the notice says connections "were dropped":** the connection points to
+  a node that does not exist in the document. Restore the missing node from the
+  original file if the connection mattered.
+
+See [Web editor > Hidden Connections](web-editor.md#hidden-connections).
+
+### Run preflight warns about interface pins
+
+| Warning | Meaning | Fix |
+|---|---|---|
+| `'<pin>' (<type>) is required by <interface>: hosts send/read it` | The boundary node lacks a pin the declared interface requires. | Add the pin (re-declaring the interface adds it) or remove the interface. |
+| `'<pin>' is not connected; hosts will read null` | A required `On Flow End` pin has no connection, pin default or pin expression. | Wire the pin to the value the host should receive. |
+| `'<pin>' is typed <type>, the interface expects <type>` | The pin exists with another type. | Change the pin type to the one listed in [VisualFlow JSON > Interfaces](visualflow.md#interfaces). |
+
+These warnings are advisory: the workflow still runs, but a host that starts
+it through the interface receives missing or mistyped values.
+
+### The About dialog shows "Gateway: unavailable (...)"
+
+- **Cause:** the request to `GET /api/gateway/about` failed. The text in
+  parentheses gives the HTTP status or network error. A Gateway release that
+  does not serve that route, a signed-out session, or an unreachable Gateway
+  all produce this row.
+- **Fix:** sign in, check that the Gateway is reachable, and update the Gateway
+  if the route returns HTTP 404. The AbstractFlow version shown in the dialog is
+  independent of the Gateway.
+
+### Discovery, save, publish or run fail while the editor itself loads
+
+- **Cause:** the Gateway is stopped or unreachable from the Flow server. The
+  editor's static UI does not need the Gateway, but every data feature does.
+- **Fix:** start the Gateway and confirm the Flow server targets it (the
+  `gateway_url` in `/api/health`).
+
+### Edited example flows do not appear in the Flow Library
+
+- **Cause:** the example flows under `examples/flows/` are bundled into the
+  editor at build time.
+- **Fix:** run `npm run build` again and reload the editor tab.
+
+## Local Development
+
+### The build cannot resolve `@abstractframework/ui-kit` or a monitor package
+
+- **Cause:** a local checkout builds the shared UI packages from a sibling
+  AbstractUIC checkout at `../abstractuic`.
+- **Fix:**
+
+```bash
+git clone https://github.com/lpalbou/AbstractUIC.git ../abstractuic
+npm install
+npm run build
+```
+
+### `npm test` fails to start
+
+- **Cause:** the test runner (Vitest 4) requires Node.js 20 or later.
+- **Fix:** use Node.js 20, 22 or 24 (the CI uses 24), then run `npm test`
+  again.
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contributor workflow.

@@ -67,7 +67,7 @@ capabilities. During `Listen Voice` waits, Flow records in the browser,
 uploads the captured audio artifact, and resumes the Gateway run; Flow does not
 execute local audio or transcription logic itself.
 
-Vision media nodes now surface Gateway/Core's richer route contract directly in
+Vision media nodes surface Gateway/Core's route contract directly in
 authoring:
 
 - task-scoped provider/model discovery for `text_to_image`, `image_to_image`,
@@ -95,6 +95,15 @@ editor diffs it against the draft canvas and applies only validated edits. It ca
 create or refine common workflows such as internet research, deep research, news
 digests, and job searches; Save, Publish, and Run remain explicit user actions.
 
+Workflows can declare the interfaces they implement (for example
+`abstractcode.agent.v1`, so AbstractCode and AbstractAssistant can run them as
+agents). Declaring an interface adds its typed pins to `On Flow Start` and
+`On Flow End`, and Run preflight warns about missing, unconnected, or mistyped
+interface pins. See [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
+
+The About button in the top bar shows the AbstractFlow version and the versions
+the connected Gateway reports.
+
 ## Gateway Setup
 
 ```bash
@@ -114,7 +123,8 @@ Use:
 
 - `src/` - React/Vite visual editor.
 - `bin/cli.js` - npm CLI/static server and Gateway proxy.
-- `examples/flows/` - sample VisualFlow JSON files kept for reference/import tests.
+- `examples/flows/` - sample and shipped VisualFlow JSON files.
+- `scripts/` - generators and packers for the shipped workflows, and the documentation generators.
 - `docs/` - external documentation for users and contributors.
 
 AbstractFlow does not ship a Python package or local execution host. VisualFlow compilation, bundle execution, runtime state, and provider calls are handled by AbstractGateway and AbstractRuntime.
@@ -131,13 +141,17 @@ npm run docs:llms
 
 ## Documentation
 
+- [Documentation index](docs/README.md)
 - [Getting started](docs/getting-started.md)
 - [Web editor](docs/web-editor.md)
 - [Architecture](docs/architecture.md)
 - [API and contracts](docs/api.md)
 - [VisualFlow JSON](docs/visualflow.md)
 - [CLI](docs/cli.md)
+- [Workflow authoring skill](docs/workflow-authoring-skill.md)
+- [Shipped workflow sources](docs/shipped-workflow-sources.md)
 - [FAQ](docs/faq.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ## Related Projects
 
@@ -151,6 +165,8 @@ npm run docs:llms
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security: [SECURITY.md](SECURITY.md)
+- Code of conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Acknowledgments: [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md)
 - License: [LICENSE](LICENSE)
 
 ## docs/README.md
@@ -176,7 +192,7 @@ stays textual for compatibility.
 
 ## File-like sources
 
-Flow now teaches one explicit file-like vocabulary across the editor, run modal,
+Flow uses one explicit file-like vocabulary across the editor, run modal,
 and authoring docs:
 
 - `Artifact`: a saved Runtime-owned durable payload.
@@ -195,29 +211,34 @@ The canvas reflects that split:
 
 ## Pages
 
-- [Getting started](getting-started.md)
-- [Web editor](web-editor.md)
-- [Workflow authoring skill](workflow-authoring-skill.md)
-- [Workflow node catalog](workflow-node-catalog.md)
-- [Production research workflow](deep-research.md)
-- [Shipped workflow sources](shipped-workflow-sources.md)
-- [The entity brain (entity-life family)](entity-brain.md)
-- [Entity brain report (2026-07-24)](reports/entity-brain-report.md)
-- [Architecture](architecture.md)
-- [API and contracts](api.md)
-- [VisualFlow JSON](visualflow.md)
-- [CLI](cli.md)
-- [FAQ](faq.md)
+Start here:
 
-## Documentation Upkeep
+- [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, discovery, Resources, flow interfaces, hidden connections, the authoring assistant, media and file nodes.
+- [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
+- [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
-- Keep docs written around the web package layout: `src/`, `bin/`, `examples/flows/`, `docs/`.
-- Do not add Python package or local server launch instructions; those surfaces were removed from this repository.
-- Regenerate the LLM context after doc changes:
+Reference:
 
-```bash
-npm run docs:llms
-```
+- [Architecture](architecture.md): components, boundaries, and diagrams of the editor, the Flow server, and Gateway.
+- [API and contracts](api.md): CLI options, environment variables, proxy contract, and the main frontend modules.
+- [CLI](cli.md): the `abstractflow-editor` command.
+- [VisualFlow JSON](visualflow.md): the workflow document format, interfaces and their boundary pins, pin expressions, and sharing.
+
+Workflow authoring:
+
+- [Workflow authoring skill](workflow-authoring-skill.md): the command contract and patterns the Workflow Authoring Assistant follows; also useful to human authors.
+- [Workflow node catalog](workflow-node-catalog.md): every node template with its pins and configuration fields (generated from `src/types/nodes.ts`).
+
+Shipped workflows:
+
+- [Shipped workflow sources](shipped-workflow-sources.md): the editable flows and generators behind the coder, deep-research, and co-scientist bundles that AbstractGateway serves.
+- [Production research workflow](deep-research.md): the `deep-research` family in depth.
+- [The entity brain](entity-brain.md): the `entity-life` workflow family that animates persistent entities.
+
+Project policies live at the repository root: [CHANGELOG.md](../CHANGELOG.md),
+[CONTRIBUTING.md](../CONTRIBUTING.md), [SECURITY.md](../SECURITY.md), and
+[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md).
 
 ## docs/getting-started.md
 
@@ -273,14 +294,17 @@ for compatible models only; Flow itself does not impose that default.
 
 ## Local Development
 
+A local checkout needs Node.js 20+ and a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout: the editor builds the shared UI packages (`@abstractframework/ui-kit` and the monitor widgets) from `../abstractuic`.
+
 ```bash
-git clone https://github.com/lpalbou/AbstractFlow.git
-cd AbstractFlow
+git clone https://github.com/lpalbou/AbstractUIC.git abstractuic
+git clone https://github.com/lpalbou/AbstractFlow.git abstractflow
+cd abstractflow
 npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/api/*` to the Gateway URL selected in the connection UI or configured with `ABSTRACTGATEWAY_URL` / `ABSTRACTFLOW_GATEWAY_URL`.
+The Vite dev server proxies `/api/*` to the Gateway URL selected in the connection UI or configured with `ABSTRACTGATEWAY_URL` / `ABSTRACTFLOW_GATEWAY_URL`. It does not set the forwarding headers the built server sends to the Gateway, so serve the built editor (below) when browsers on other machines use it.
 
 ## Build
 
@@ -290,6 +314,14 @@ npm start -- --gateway-url http://127.0.0.1:8080
 ```
 
 The static server in `bin/cli.js` serves `dist/` and proxies API/SSE calls to Gateway with browser-session auth injection.
+
+## Next Steps
+
+- [Web editor](web-editor.md): the editor's features, including flow interfaces and the About dialog.
+- [VisualFlow JSON](visualflow.md): the workflow document format.
+- [Architecture](architecture.md): how the editor, the Flow server, and Gateway fit together.
+- [Troubleshooting](troubleshooting.md): sign-in, proxy, and build problems.
+- [README](../README.md): project overview.
 
 ## docs/web-editor.md
 
@@ -327,7 +359,7 @@ Server/operator bearer tokens such as `ABSTRACTGATEWAY_AUTH_TOKEN` are not brows
 
 Remote browser-supplied Gateway URL changes are blocked by default. A hosted Flow instance should proxy only to its configured Gateway unless the operator explicitly enables `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` behind their own access control.
 
-Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the address the browser connected from, and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own machine. Forwarding headers sent by the browser itself (`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`) and any browser-supplied `X-AbstractFramework-App-Proxy` are dropped. Behind a reverse proxy the Gateway therefore sees the reverse proxy's address, not the end user's.
+Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the address the browser connected from, and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own machine. Forwarding headers sent by the browser itself (`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`) and any browser-supplied `X-AbstractFramework-App-Proxy` are dropped. Behind a reverse proxy the Gateway therefore sees the reverse proxy's address, not the end user's. The Vite development server (`npm run dev`) drops browser-supplied forwarding headers but does not add these two headers; serve the built editor (`npm start` or `npx @abstractframework/flow`) when browsers on other machines use it. See [Troubleshooting](troubleshooting.md#sign-in-and-connection) for sign-in and proxy errors.
 
 ## About
 
@@ -618,7 +650,7 @@ Unconnected artifact input pins expose a browser upload affordance directly on t
 
 `Listen Voice` waits are handled as Gateway/Runtime waits. Flow only captures audio in the browser, uploads it to Gateway as an audio artifact, and resumes the waiting run with that artifact ref; transcription and downstream execution remain Gateway/Runtime work.
 
-For the vision routes, the Properties drawer now follows the Gateway media
+For the vision routes, the Properties drawer follows the Gateway media
 contract closely:
 
 - `Generate Image`, `Edit Image`, `Generate Video`, and `Image To Video` expose
@@ -651,7 +683,7 @@ Flow uses one explicit source model for file-like work:
   `Workspace File` / `Workspace Folder` path such as `docs/report.md` or
   `mount_alias/reports`.
 
-The run modal and node defaults now expose workspace path browsing for
+The run modal and node defaults expose workspace path browsing for
 `Workspace File` / `Workspace Folder` pins, plus artifact-backed local intake
 for one file, many files, or one or more local folders. Typical graph patterns are:
 
@@ -671,6 +703,8 @@ for one file, many files, or one or more local folders. Typical graph patterns a
 
 ## Development
 
+A local checkout builds the shared UI packages from a sibling AbstractUIC checkout; see [Getting started > Local Development](getting-started.md#local-development).
+
 ```bash
 npm install
 npm run dev
@@ -680,7 +714,8 @@ Useful environment variables:
 
 - `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL`: default Gateway target for the proxy.
 - `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: allow non-local browsers to change the Gateway URL.
-- `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1`: honor forwarded host/proto headers behind a trusted reverse proxy.
+
+See [API and contracts](api.md#cli) for the complete list of options and environment variables.
 
 ## Build And Serve
 
@@ -3652,21 +3687,105 @@ Save/Publish/Run remain user-controlled Gateway operations.
 
 ```mermaid
 flowchart LR
-  Browser[Browser editor] --> Flow[AbstractFlow Node server]
-  Flow --> Gateway[AbstractGateway]
+  Browser[Browser editor] -->|HTTP, SSE, WebSocket under /api/*| Flow[AbstractFlow Node server<br/>bin/cli.js]
+  Flow -->|session headers + X-Forwarded-For + app-proxy marker| Gateway[AbstractGateway]
   Gateway --> Runtime[AbstractRuntime]
   Runtime --> Core[AbstractCore]
   Gateway --> Stores[(Users / Workflows / Runs / Ledgers / Artifacts)]
 ```
 
-Flow serves static assets and proxies HTTP/SSE calls. The browser does not talk directly to provider APIs or runtime stores.
+Flow serves static assets and proxies HTTP, SSE, and WebSocket calls. The browser does not talk directly to provider APIs or runtime stores.
+
+## Components
+
+```mermaid
+flowchart TB
+  subgraph Browser["Browser editor (src/)"]
+    TopBar["Top bar<br/>connection pill, About dialog (ui-kit)"]
+    Toolbar["Toolbar + Flow Library<br/>open, save, publish, interfaces"]
+    Canvas["Canvas + nodes<br/>hidden-connection badges"]
+    Store["Editor store (hooks/useFlow.ts)<br/>loadFlow, undo/redo, preservedEdges"]
+    Interfaces["Interface contracts (utils/flowFamilies.ts)<br/>KNOWN_INTERFACES, applyInterfacePins"]
+    Preflight["Run preflight (utils/preflight.ts)"]
+    Assistant["Workflow Authoring Assistant drawer"]
+    Client["Gateway client (utils/gatewayClient.ts)"]
+  end
+  subgraph Server["Flow server (bin/)"]
+    Cli["cli.js<br/>static files, /api/health, sign-in, /api/* proxy"]
+    Fwd["gateway_forwarding.js<br/>X-Forwarded-For, X-AbstractFramework-App-Proxy"]
+  end
+  Gateway[AbstractGateway]
+
+  Toolbar --> Store
+  Canvas --> Store
+  Assistant --> Store
+  Store --> Interfaces
+  Preflight --> Interfaces
+  Preflight --> Store
+  Toolbar --> Client
+  TopBar --> Client
+  Assistant --> Client
+  Client --> Cli
+  Cli --> Fwd
+  Cli --> Gateway
+```
+
+## Opening A Workflow
+
+Every way a document enters the editor (open, duplicate, rename-copy, file
+import) goes through the store's `loadFlow`, which never discards a stored
+connection silently:
+
+```mermaid
+flowchart LR
+  Doc[VisualFlow JSON from Gateway or a file] --> Load[loadFlow]
+  Load --> Pins["applyInterfacePins<br/>add missing boundary pins of declared interfaces"]
+  Load --> Edges{Each stored connection}
+  Edges -->|both pins drawable| Drawn[Drawn on the canvas]
+  Edges -->|undeclared pin or refused type| Kept["Kept and saved, not drawn<br/>N hidden badge"]
+  Edges -->|node missing| Dropped[Removed]
+  Pins --> Notice[Load notices]
+  Kept --> Notice
+  Dropped --> Notice
+```
+
+Pins added on open are compared against the document as stored, so the
+workflow shows unsaved changes until you save it. See
+[Web editor > Hidden Connections](web-editor.md#hidden-connections) and
+[VisualFlow JSON > Interfaces](visualflow.md#interfaces).
+
+## Workflow Interfaces
+
+A workflow's top-level `interfaces` list declares the contracts it implements.
+The known interfaces and their typed boundary pins live in
+`src/utils/flowFamilies.ts`. Eight of them carry pin contracts
+(`abstractcode.agent.v1`, `abstractassistant.agent.v1`,
+`abstractcode.goal.v1`, `abstractcode.coding.v1`,
+`abstractresearch.coscientist.v1`, `abstractreview.adversarial.v1`,
+`abstractextract.structured.v1`, `abstractbatch.mapreduce.v1`); two are
+family markers without pins (`abstractresearch.deep.v1`,
+`abstractmeta.intelligence.v1`). Entry-point interfaces make a workflow
+executable by hosts.
+
+The same contract is applied in four places: when interfaces are declared
+(one undo step), when a workflow is opened, when an `On Flow Start` or
+`On Flow End` node is added, and when the authoring assistant sets interfaces.
+Existing pins are never removed, retyped, or reordered. Run preflight reports
+missing pins, unconnected required `On Flow End` pins, and type mismatches as
+warnings; the workflow still runs.
+
+When the Flow Library changes the name, description, or interfaces of the
+workflow open in the editor, the change is applied to that document only if it
+is still the open one, so unsaved edits and undo history are kept.
 
 ## Repository Layout
 
 ```
-bin/                  npm CLI and Gateway proxy
+bin/                  npm CLI, Gateway proxy, forwarding headers
 src/                  React editor source
-examples/flows/       sample VisualFlow JSON files
+examples/flows/       sample and shipped VisualFlow JSON files
+scripts/              workflow generators, bundle packers, doc generators
+test/                 server-level tests (unit tests sit next to src/ modules)
 docs/                 user and contributor docs
 package.json          npm package manifest
 ```
@@ -3677,7 +3796,22 @@ There is intentionally no Python package, no FastAPI host, and no local executio
 
 The Flow connection form collects a Gateway URL, Gateway user id, and Gateway user token. The Node proxy validates/exchanges that token with Gateway and stores only opaque browser-session cookies. Mutating proxy calls carry the Gateway CSRF token.
 
-Hosted Flow deployments block arbitrary browser-supplied Gateway URLs by default so the Flow server cannot become a user-directed same-origin proxy.
+Hosted Flow deployments block arbitrary browser-supplied Gateway URLs by default so the Flow server cannot become a user-directed same-origin proxy. That decision uses the address of the browser's connection, never the `Host` header.
+
+Every request the Flow server sends to the Gateway carries `X-Forwarded-For`
+set to the browser connection's address and
+`X-AbstractFramework-App-Proxy: abstractflow`
+(`bin/gateway_forwarding.js`). Browser-supplied forwarding headers are dropped,
+so the Gateway can decide reliably whether a browser runs on its own machine.
+See [API and contracts > Proxy Contract](api.md#proxy-contract).
+
+## About Dialog
+
+The top bar's About button uses the shared AbstractFramework About dialog from
+`@abstractframework/ui-kit`. The AbstractFlow version is injected from
+`package.json` at build time; the Gateway rows come from
+`GET /api/gateway/about` when the dialog opens and are formatted by the ui-kit
+`gatewayVersionRows` helper, the same way in every AbstractFramework app.
 
 ## Discovery Boundary
 
@@ -3739,6 +3873,13 @@ through endpoints Gateway advertises in its contracts. It does not edit
 capability defaults. Gateway Console and the Core/Gateway config CLIs own
 default route configuration.
 
+## Related
+
+- [API and contracts](api.md): CLI options, environment variables, proxy routes, and frontend modules.
+- [VisualFlow JSON](visualflow.md): the document format the editor reads and writes.
+- [Web editor](web-editor.md): the user-facing features built on these components.
+- [Troubleshooting](troubleshooting.md): symptoms and fixes.
+
 ## docs/api.md
 
 # API And Contracts
@@ -3751,27 +3892,46 @@ AbstractFlow's public package surface is the npm package `@abstractframework/flo
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
+The installed command is `abstractflow-editor`. See [CLI](cli.md).
+
 Options:
 
-- `--host <host>`: host for the Flow static/proxy server.
-- `--port <port>`: port for the Flow static/proxy server.
-- `--gateway-url <url>`: Gateway target used by the proxy.
+- `--host <host>`: host for the Flow static/proxy server (default `0.0.0.0`).
+- `--port <port>`: port for the Flow static/proxy server (default `3003`).
+- `--gateway-url <url>`: Gateway target used by the proxy (default `http://127.0.0.1:8080`).
+- `--help`, `-h`: print usage.
 
 Environment:
 
-- `HOST`
-- `PORT`
-- `ABSTRACTGATEWAY_URL`
-- `ABSTRACTFLOW_GATEWAY_URL`
-- `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG`
-- `ABSTRACTFLOW_TRUST_PROXY_HEADERS`
+- `HOST`, `PORT`: defaults for `--host` and `--port`.
+- `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL`: default Gateway target. When neither is set, the server reads `gateway_url` from `~/.abstractflow/gateway_connection.json` if that file exists, then falls back to `http://127.0.0.1:8080`. `--gateway-url` overrides all of these.
+- `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: let browsers that do not run on the Flow server's machine sign in to another Gateway URL than the configured one. Only enable it behind your own access control.
+- `ABSTRACTFLOW_ALLOW_BROWSER_GATEWAY_URL_COOKIE=1`: honor the Gateway URL stored in a browser's session cookie for every browser, not only local ones.
+- `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` (or `ABSTRACTGATEWAY_TRUST_PROXY_HEADERS=1`): name the host from `X-Forwarded-Host` in the message shown when a Gateway URL change is refused. Access decisions never use forwarded headers; they use the connection's own address.
+
+Session cookies are marked `Secure` when the request carries `X-Forwarded-Proto: https`.
 
 ## Proxy Contract
 
-The Flow server proxies browser calls under `/api/*` to the configured Gateway. The important Gateway surfaces are:
+The Flow server answers these routes itself:
+
+- `GET /api/health` and `GET /health`: Flow server readiness (`status`, `service`, `mode`, `gateway_url`). No sign-in required.
+- `/api/connection/gateway`: browser sign-in (`POST` with `gateway_url`, `gateway_user_id`, `gateway_token`), connection status (`GET`), and sign-out (`DELETE`).
+
+Every other `/api/*` request, including WebSocket upgrades, is proxied to the Gateway of the browser's session. It requires a signed-in browser session (HTTP 401 otherwise) and, for mutating methods, the session's CSRF token (HTTP 403 otherwise). The server replaces browser cookies and `Authorization` with the Gateway session headers.
+
+Forwarding headers on every Gateway-bound request (proxied calls, sign-in, sign-out, the signed-in check, streams, and WebSocket connections):
+
+- `X-Forwarded-For`: the address of the browser's connection to the Flow server.
+- `X-AbstractFramework-App-Proxy: abstractflow`.
+
+Browser-supplied `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`, and `X-AbstractFramework-App-Proxy` headers are dropped, in any letter case. A connection whose address cannot be determined is refused with HTTP 400. The Gateway uses these headers to decide whether a browser runs on its own machine.
+
+The important Gateway surfaces are:
 
 - `/api/gateway/session/login`
 - `/api/gateway/me`
+- `/api/gateway/about` (versions shown in the About dialog)
 - `/api/gateway/discovery/capabilities`
 - `/api/gateway/providers`
 - `/api/gateway/config/capability-defaults`
@@ -3788,9 +3948,11 @@ Gateway planner runs and read their terminal responses.
 
 Flow treats Gateway as the source of truth. Any local fallback must be visible in UI state and should be limited to degraded editor display, not execution.
 
+For error messages returned by these routes, see [Troubleshooting](troubleshooting.md).
+
 ## VisualFlow JSON
 
-The editor imports and exports VisualFlow JSON. See [visualflow.md](visualflow.md).
+The editor imports and exports VisualFlow JSON. See [visualflow.md](visualflow.md), including [Interfaces](visualflow.md#interfaces) for the boundary pins each declared interface requires.
 
 Execution semantics are not implemented in this package. Gateway/Runtime execute the workflow after publish/start.
 
@@ -3810,6 +3972,12 @@ High-value source modules:
 - `src/components/JsonSchemaEditor.tsx` and `src/components/JsonSchemaPinEditorModal.tsx`: inline schema-pin editing for unconnected JSON Schema inputs.
 - `src/components/nodes/BaseNode.tsx`: node rendering, connection feedback, unconnected artifact-input upload affordances, and schema-pin edit buttons.
 - `src/types/nodes.ts`: editor node templates and pins.
+- `src/utils/flowFamilies.ts`: the known interfaces (`KNOWN_INTERFACES`) with their typed boundary pins, `applyInterfacePins` / `missingInterfacePins`, and the Flow Library family index.
+- `src/utils/preflight.ts`: Run preflight checks, including the interface pin warnings.
+- `src/hooks/useFlow.ts`: the editor store; `loadFlow` adds missing interface pins and keeps connections the canvas cannot draw (`preservedEdges`, `loadEdgeNotice`).
+- `src/hooks/openFlowMetadata.ts`: applies a Flow Library name, description or interface change to the open document only when that document is still open.
+- `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time, Gateway rows from `GET /api/gateway/about` through the ui-kit `gatewayVersionRows` helper).
+- `bin/gateway_forwarding.js`: the forwarding headers the Flow server sets on Gateway-bound requests.
 
 Schema pin defaults are stored under `node.data.pinDefaults`, for example
 `pinDefaults.resp_schema` on LLM Call and Agent nodes. Gateway persists and
@@ -4166,14 +4334,391 @@ npm install -g @abstractframework/flow
 abstractflow-editor --gateway-url http://127.0.0.1:8080
 ```
 
+`npx @abstractframework/flow --help` prints the options. Defaults: host
+`0.0.0.0`, port `3003`, Gateway `http://127.0.0.1:8080`. See
+[API and contracts](api.md#cli) for the environment variables and the order in
+which the Gateway URL is resolved.
+
 ## What The CLI Does
 
 - Serves `dist/` static assets.
-- Proxies Gateway HTTP and SSE routes.
+- Answers `GET /api/health` (and `/health`) with its own readiness and the Gateway URL it targets.
+- Proxies Gateway HTTP, SSE, and WebSocket routes under `/api/*`.
 - Handles browser-session cookie forwarding and CSRF headers.
+- Sets `X-Forwarded-For` (the browser connection's address) and `X-AbstractFramework-App-Proxy: abstractflow` on every Gateway-bound request, dropping any forwarding headers the browser sends.
 - Rejects unsafe hosted Gateway URL changes by default.
 
 It does not execute workflows locally. Workflow execution is a Gateway/Runtime responsibility.
+
+For error messages and fixes, see [Troubleshooting](troubleshooting.md).
+
+## docs/shipped-workflow-sources.md
+
+# Shipped Workflow Sources
+
+AbstractGateway serves a set of workflow bundles out of the box, so users get a
+working coder, deep research, and co-scientist without authoring anything. This
+page maps each shipped bundle back to the editable VisualFlow JSON and the
+generator that packs it, so you can study, fork, or extend them here.
+
+For what those workflows do and how to run them, see
+[AbstractGateway's shipped workflows](https://github.com/lpalbou/AbstractGateway/blob/main/docs/shipped-workflows.md).
+
+## Sources
+
+| Bundle | Editable flows (`examples/flows/`) | Generator (`scripts/`) |
+| --- | --- | --- |
+| `coding-agent@0.2.6` | `coder.json`, `coding-agent.json`, `coding-verify-gates.json` | `build_coding_agent_workflow.py` |
+| `deep-research@0.1.7` | `deep-research.json`, `deep-plan.json`, `deep-investigate.json`, `deep-review.json`, `deep-render.json` | `build_deep_research_workflows.py`, packed by `pack_deep_research_bundle.py` |
+| `co-scientist@0.2.0` | `co-scientist.json`, `deep-plan.json`, `deep-investigate.json`, `diagram-render.json` | `build_co_scientist_workflow.py` |
+
+The generators are the source of truth for bundle id and version; each writes
+its `.flow` into `abstractgateway/flows/bundles/`. Bundle versions are
+immutable by sha, so publishing a changed graph means bumping the version in
+the generator and updating the packaging pin in
+`abstractgateway/pyproject.toml`.
+
+`co-scientist` reuses the `deep-plan` and `deep-investigate` flows to ground
+its hypotheses in real literature, which is why those files appear under two
+bundles.
+
+## Forking one
+
+Open a flow in the editor ([web editor](web-editor.md)), change what you need,
+export it with its subflows, and pack it under your own bundle id with
+AbstractRuntime's bundle packer (the same function the generators here use):
+
+```python
+from abstractruntime.workflow_bundle import pack_workflow_bundle
+
+pack_workflow_bundle(
+    root_flow_json="/path/to/flows/my-agent.json",
+    out_path="/path/to/bundles/my-agent@0.1.0.flow",
+    bundle_id="my-agent",
+    bundle_version="0.1.0",
+    flows_dir="/path/to/flows",
+)
+```
+
+Point `ABSTRACTGATEWAY_FLOWS_DIR` at that directory, or publish through the
+Gateway API, to serve it alongside or instead of the shipped set. Keep your own
+bundle id rather than reusing a shipped one — a version collision on an
+immutable id is refused.
+
+## Related
+
+- [Production research workflow](deep-research.md) — the `deep-research` family in depth
+- [Workflow authoring skill](workflow-authoring-skill.md) — conventions these flows follow
+- [Workflow node catalog](workflow-node-catalog.md) — the nodes they are built from
+
+## docs/deep-research.md
+
+# `deep-research` Workflow Family
+
+`deep-research` is the shipped production research WorkflowBundle family for
+Gateway-hosted runs. Flow ids, display names, files, and the bundle id all use
+the `deep-` vocabulary (`deep-research`, `deep-plan`, `deep-investigate`,
+`deep-review`, `deep-render`). It is authored as editable VisualFlow
+JSON in `examples/flows/deep-*.json` and packed as `deep-research@0.1.7.flow`
+(bundle versions are immutable by sha). Older `dp-research@0.1.x` bundles are
+kept only so completed runs stay readable.
+
+The root flow declares `abstractcode.agent.v1` and `abstractresearch.deep.v1`,
+so agent hosts such as AbstractCode can run it like any other agent workflow.
+
+## User Inputs
+
+The public entrypoint is `deep-research`. It exposes product-facing inputs:
+
+- `request`: what should be researched.
+- `prompt`: the message an agent host sends (`abstractcode.agent.v1`). It is
+  researched when `request` is empty; a non-empty `request` wins.
+- `viewpoint`: the angle, thesis, audience stance, or evaluation lens.
+- `effort`: one of `quick`, `standard`, or `thorough`.
+- `provider` / `model`: optional overrides. Leave both blank to use the current
+  Gateway/AbstractCore defaults.
+
+All other controls are derived from `effort`, including per-pass agent
+iterations, review-round count, source budget guidance, deadline guidance,
+source/citation policy, export title, export prefix, and reasoning intensity
+when the selected model is known to support reasoning controls.
+
+The same optional provider/model override is used by planner, researcher,
+adversarial critics, and writer. There are intentionally no separate
+critic/writer model fields in the public entrypoint.
+
+Effort presets:
+
+| Effort | Behavior |
+| --- | --- |
+| `quick` | One review round, small source budget, concise report. |
+| `standard` | Balanced source budget, two review rounds, full report and audit files. |
+| `thorough` | Larger source budget, three review rounds, stricter triangulation and disconfirmation search. |
+
+## Workflow Stages
+
+- `deep-plan`: turns the request, viewpoint, and derived effort settings into a
+  research plan and quality gates.
+- `deep-investigate`: uses a read-only evidence tool allowlist to gather and
+  structure sources. Each pass receives the previous investigation and latest
+  adversarial review, so review findings drive the next pass.
+- `deep-review`: runs three adversarial lenses: evidence skeptic, user relevance
+  critic, and gap hunter, then synthesizes which insights matter and what to
+  investigate next.
+- `deep-render`: writes the final Markdown report and machine-readable audit
+  objects.
+- `deep-research`: derives the effort settings, orchestrates the subflows with a
+  review-gated loop, then exports files.
+
+Research agents are limited to read-only evidence tools:
+`web_search`, `fetch_url`, `skim_websearch`, `skim_url`, `read_file`, and
+`skim_files`. Export is deterministic via `Write File`, `Write PDF`, and
+`Write DOCX` nodes, not model tool calls.
+
+Derived `deadline_minutes` and `max_sources` are passed into the research
+prompts and audit outputs. They do not interrupt a running provider request
+mid-call; the deterministic hard gate is the derived review-round count, plus
+the per-agent iteration cap.
+
+## Outputs
+
+The root flow returns direct paths for:
+
+- Markdown report: `<derived-output-prefix>-<timestamp>.md`
+- PDF report: `<derived-output-prefix>-<timestamp>.pdf`
+- DOCX report: `<derived-output-prefix>-<timestamp>.docx`
+- Run manifest: `<derived-output-prefix>-<timestamp>.manifest.json`
+- Source ledger: `<derived-output-prefix>-<timestamp>.sources.json`
+- Claim-evidence matrix: `<derived-output-prefix>-<timestamp>.claims.json`
+- Iteration log: `<derived-output-prefix>-<timestamp>.iterations.json`
+- Warnings: `<derived-output-prefix>-<timestamp>.warnings.json`
+
+The root outputs also include `response` and `meta` for agent hosts, `success`
+(true when a Markdown report was produced), artifact ids for the Markdown, PDF
+and DOCX reports, actual PDF/DOCX `sha256` values and an
+`export_manifest` object built after file writes complete. The manifest combines
+the model-rendered research manifest with real export paths, byte counts, hashes,
+and content types.
+
+The final report should include method, findings, evidence tables, contrary
+evidence, limitations, open questions, and cited source ids. The JSON audit
+files exist so operators can inspect provenance and completeness without
+parsing the prose report.
+
+The derived `include_images` setting asks the writer for visual briefs
+such as tables, Mermaid-style diagrams, and illustration slots in Markdown. The
+workflow does not run a bitmap image generation node.
+
+## Rebuild And Validate
+
+Regenerate the editable flows and bundle:
+
+```bash
+python abstractflow/scripts/build_deep_research_workflows.py
+```
+
+Validate the shipped bundle contract from the workspace root:
+
+```bash
+PYTHONPATH=abstractgateway/src:abstractruntime/src:abstractcore \
+  pytest -q abstractgateway/tests/test_deep_research_bundle_contract.py
+```
+
+## docs/entity-brain.md
+
+# The Entity Brain — a visual, observable mind for persistent entities
+
+`entity-life` is a master executable VisualFlow that ANIMATES a persistent
+entity — identity, self-evolving memory, diary, feelings — through its four
+mutually-exclusive phases (**visit / work / personal / sleep**). It is the
+entity's brain drawn as clean graphs: every cognition process is a named
+subflow you can open, read, and edit in the AbstractFlow editor.
+
+It converges on the two served blueprints (never forks them):
+
+- the PHASE LAW — `GET /api/gateway/entities/spec/phases` (v21; structural
+  transitions ⊕ the operator overlay),
+- the MIND MAP — `GET /api/gateway/entities/spec/cognition-graph` (v5; the
+  25-node/47-edge cognition graph; the constitutional relations it names —
+  seven, and the artifact itself calls the set PROPOSED — are honored
+  structurally, no toggle exists here either).
+
+## The hierarchy (three levels, one glance each)
+
+```
+entity-life (master)                 LEVEL 1 — the life loop
+ └─ THE DAY GATE  ──────────────►    what does this moment call for?
+     stop > close-the-visit > visit > work > granted personal > sleep > park
+       ├─ entity-visit ──┐           LEVEL 2 — one conversational moment
+       ├─ entity-work ───┤           the task, turns until DONE
+       ├─ entity-personal┤           own time, bounded self-ticks
+       │                 └─ entity-cognition-turn   LEVEL 3 — ONE lived moment:
+       │                     passive recall + deliberate reach → the phase's
+       │                     TOOL GRANT resolves → prompt shelf → the lived
+       │                     turn (entity-tool-rounds) → elections (diary at
+       │                     the LLM boundary, feelings here) → usage-trail
+       │                     commit → the episode forms
+       │                      └─ entity-tool-rounds  LEVEL 3.5 — the mind ACTS:
+       │                          one llm in a bounded while (≤3 calls); each
+       │                          native tool batch executes UNDER THE GRANT;
+       │                          results return before words; the final round
+       │                          declares no tools (the moment ends in words)
+       ├─ entity-sleep               the night: the engine's six-phase
+       │                             sleep_pass, WIRED (memory_consolidate)
+       └─ entity-session-close       summary + the DETERMINISTIC diary note
+
+entity-chat (agent.v1)               the chat door: one visit moment per prompt
+```
+
+Each subflow is a separate flow in the editor (Flow Library → the
+`entity-*` family). The master shows ONLY the high-level functions; open a
+subflow to see its process; open `entity-cognition-turn` to watch how memory
+and cognition work together in one moment.
+
+The library bundles example flows at build time (`src/utils/bundledFlows.ts`
+glob → `dist/`): after editing or regenerating the family, rebuild the editor
+(`npm run build`) and hard-reload open tabs. The library shows the flows of the
+last build.
+
+## The memory nodes (Entity Mind palette)
+
+Eleven first-class effect nodes make the entity engine VisualFlow-callable —
+find them in the editor palette under **Entity Mind**:
+
+| Node | Effect | What it is |
+|---|---|---|
+| Memory Recall | MEMORY_RECALL | passive/deliberate reconstruction (pure read; identity present by right) |
+| Memory Commit | MEMORY_ACCESS | the involuntary usage trail — the ONLY strengthening path |
+| Memory Form | MEMORY_FORM | typed records (episode/summary/lesson/interest/...) with verbatim → artifacts |
+| Memory Adjust | MEMORY_ADJUST | reinforce / attenuate / refocus / close (reason + turn_id audited) |
+| Memory Appraise | MEMORY_APPRAISE | elected feelings, routine band ±1..3; scars/bonds lifecycle |
+| Diary Write | DIARY_WRITE | the book — sole-author, hash-chained, never purged |
+| Diary Read | DIARY_READ | one entry, with its re-entry key + birth trail |
+| Memory Consolidate | MEMORY_CONSOLIDATE | the night: one engine sleep pass (six phases) |
+| Memory Probe | MEMORY_PROBE | deliberate reach: probe / expand / familiarity (reason audited) |
+| Life Query | LIFE_QUERY | pure life reads: alive_drives / cognition_health / entity_card |
+| Memory Tend | MEMORY_TEND | tending elections (the ONE route shared with the chat driver): pin/silence/refocus/heal_scar/break_bond/revisit/dispose — dream disposal rides `dispose confirm\|reject`; refusals are DATA, never a failure |
+| Entity Tools (grant) | ENTITY_TOOLS_QUERY | the phase's tool grant resolves (tool_policy.yaml or the RULED defaults) into granted names + native declaration specs — pure read, the ONE authority |
+| Entity Tools (execute batch) | ENTITY_TOOLS_EXECUTE | ONE native tool batch runs under the grant RE-RESOLVED at execution (a caller list can never widen it); refusals return as marker lines; `tools_ran` is host-authored |
+
+TOOLS (since bundle 0.0.10): the cognition turn resolves the phase's tool
+grant, teaches the granted names in the shelf prompt ("TOOLS IN HAND"),
+declares them natively on the lived turn, and runs bounded tool rounds in
+`entity-tool-rounds`, so an entity can search, fetch, and read its own memory
+verbatims. `tools_ran` + `tool_rounds` (present even when zero) ride the
+turn → visit → chat outputs so app tool gauges report what actually ran.
+
+CHANNEL AUTHORITY: no flow ever names an entity. These effects resolve to a
+home ONLY through the caller channel — the gateway door's verified stamp, or
+`open_entity_runtime` in-process. On a plain runtime they fail loudly; that
+asymmetry IS the deposit gate.
+
+G1 (diary privacy): diary elections in the LLM's reply are captured AT THE
+RESULT BOUNDARY by the entity runtime (words fly to the book; the reply
+arrives marked `[kept in diary …]`). The flow passes `turn_id` into the LLM
+call so those book writes are replay-safe.
+
+## Steering (events, triggers, hooks)
+
+The master declares a durable mailbox (`events_mailbox`, default
+`entity-life`). Emit durable events to steer the life at any moment:
+
+| Event payload | Effect |
+|---|---|
+| `{"kind":"visit","message":"…"}` | a visitor speaks (wakes a parked life) |
+| `{"kind":"goodbye"}` | closes the visit session (summary + diary note) |
+| `{"kind":"task","task":"…"}` | queues work |
+| `{"kind":"grant_personal"}` | grants one own-time day |
+| `{"kind":"stop"}` | ends the life loop (final close + diary) |
+
+Pause/resume/cancel are the normal run-level gateway verbs. Observation:
+every node start/complete streams on the run ledger (flow UI run modal);
+every memory act is a first-class effect record; the entity's own journal
+streams at `GET /api/gateway/entities/{name}/replay[/stream]`.
+
+## Try it
+
+All commands run from `abstractflow/` with the monorepo runtime on the path:
+
+```bash
+export PYTHONPATH=../abstractruntime/src:../abstractmemory/src
+```
+
+1. **One lived moment against a real (temp) home** — the cognition-turn proof:
+
+```bash
+python3 scripts/entity_life_smoke.py          # 12 checks
+```
+
+2. **A full life** (visit ×2 → goodbye close → sleep → work → personal → stop),
+   steered entirely by durable events:
+
+```bash
+python3 scripts/entity_life_loop_smoke.py     # 15 checks (incl. the tend election + refusal feedback)
+```
+
+3. **A LIVE entity with a real LLM** (LMStudio; born under `lab/entities/`):
+
+```bash
+python3 scripts/entity_live_experiment.py     # the cross-session Tolstoy test
+```
+
+4. **Talk to it** — one visit moment per line, memory persists between
+   sessions:
+
+```bash
+python3 scripts/entity_repl.py florin
+# /diary /memories /bye (deterministic close) /quit
+```
+
+5. **Through the gateway** (the door): the bundle
+   `entity-life@0.0.18.flow` (its version is `BUNDLE_VERSION` in
+   `scripts/build_entity_life_workflow.py`) registers from the gateway bundles dir; summon
+   any entity with the chat door:
+
+```bash
+curl -X POST $GW/api/gateway/entities/<name>/summon \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"prompt": "Hello!", "flow_id": "entity-chat",
+       "bundle_id": "entity-life",
+       "context_window_tokens": 262144,
+       "input_data": {"provider": "lmstudio", "model": "qwen/qwen3.6-35b-a3b"}}'
+```
+
+   The summon renders the identity prelude, stamps the run, and routes every
+   memory effect to the entity's own home. (Requires a Gateway whose runner
+   process carries entity routing.)
+
+## Status
+
+- Everything in the table above is **wired**: the night runs the engine's
+  real six-phase `sleep_pass` (`memory_consolidate`, with `continueOnError`
+  folding an engine death into an honest failed-night settlement — never a
+  dead life), deliberate reach runs (`memory_probe` feeds the prompt shelf,
+  shelf-race-exempt), and the personal day opens on the real alive-drives
+  cue (`life_query`).
+- The only remaining `declared` things are the three `declared` edges in
+  cognition_graph v5 itself (incl. gate→idreview): they render read-only and
+  do not fire — per the artifact's own status.
+- Degradation surfaces honestly: a dead cognition turn answers
+  `[the moment could not be lived: …]` and the visit/chat outputs carry
+  `degraded` + `moment_error` pins so thin clients never confuse "the entity
+  said nothing" with "the turn died". READ `degraded`, never `success` alone:
+  the run-level `success` flag means "the flow executed", and a degraded
+  turn still completes its flow.
+- VERSION CONTRACT: bundle versions are immutable and PINNABLE
+  (`bundle_version` on the summon). The `degraded`/`moment_error` output
+  pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the
+  self-knowledge + election teaching from 0.0.6. An app pinned to 0.0.1
+  gets only `{answer}` and cannot detect degraded turns — pin nothing and
+  the gateway serves the latest published version.
+
+## Regenerate / verify
+
+```bash
+python3 scripts/build_entity_life_workflow.py         # emit + audit + compile
+python3 scripts/build_entity_life_workflow.py --pack  # + pack the .flow bundle
+```
 
 ## docs/faq.md
 
@@ -4205,14 +4750,210 @@ Create a provider endpoint profile in Gateway with its base URL, API key, descri
 
 The editor can load its static UI, but discovery, save, publish, run, artifact, and history features require Gateway.
 
-## Where Did The Python `abstractflow` Package Go?
+## Is There A Python `abstractflow` Package?
 
-Its responsibilities were moved to their owners:
+No. AbstractFlow is the web editor only. The responsibilities of a workflow
+backend belong to these packages:
 
 - visual execution and bundle semantics: AbstractRuntime
 - users, auth, runtime routing, workflow registry, runs, artifacts: AbstractGateway
 - provider calls and capability plugins: AbstractCore
 - visual authoring UI: `@abstractframework/flow`
+
+## What Does Declaring An Interface Do?
+
+An interface such as `abstractcode.agent.v1` tells hosts (AbstractCode,
+AbstractAssistant, entity phases) that they can start the workflow and which
+pins they send and read. Declaring one in the Flow Library adds the pins it
+requires to `On Flow Start` and `On Flow End`; you then wire them. See
+[VisualFlow JSON > Interfaces](visualflow.md#interfaces) for every interface
+and its pins.
+
+## Why Does A Node Show "N hidden"?
+
+The stored workflow wires pins the canvas cannot draw, such as a code node's
+returned keys. Those connections run and are saved as stored. See
+[Web editor > Hidden Connections](web-editor.md#hidden-connections).
+
+## Where Do I Find The AbstractFlow And Gateway Versions?
+
+Open the About dialog (the `i` button in the top bar). See
+[Web editor > About](web-editor.md#about).
+
+## Something Does Not Work
+
+See [Troubleshooting](troubleshooting.md) for symptoms, causes, and fixes.
+
+## docs/troubleshooting.md
+
+# Troubleshooting
+
+This page maps common AbstractFlow symptoms to their cause and fix. For setup
+steps, see [Getting started](getting-started.md); for the server options and
+environment variables, see [API and contracts](api.md) and [CLI](cli.md); for
+recurring conceptual questions, see the [FAQ](faq.md).
+
+Two quick checks help with most problems:
+
+```bash
+# Is the Flow server up, and which Gateway does it proxy to?
+curl -s http://localhost:3003/api/health
+
+# Is the Gateway reachable?
+curl -s http://127.0.0.1:8080/api/health
+```
+
+The Flow health payload reports `status: "healthy"` and the `gateway_url` the
+server uses by default.
+
+## Sign-In And Connection
+
+### "Gateway sign-in required" (HTTP 401) on every editor call
+
+- **Cause:** the browser has no Flow session yet, or its session cookie expired
+  or was cleared.
+- **Fix:** open the connection pill in the top bar and sign in with the Gateway
+  URL, your Gateway user id and that user's token. On a first local install the
+  user is `admin` and the token is the `agw_...` value stored in
+  `$ABSTRACTGATEWAY_DATA_DIR/auth/bootstrap-admin-token`.
+- **Verify:** the connection pill shows the signed-in user and the Flow Library
+  lists workflows.
+
+See [Web editor > Browser Auth](web-editor.md#browser-auth).
+
+### Sign-in is refused ("Only Gateway user tokens can be used for browser sign-in", "Gateway token resolved to user ...")
+
+- **Cause:** the token is not a Gateway *user* token, or it belongs to another
+  user than the user id you entered. Server/operator bearer
+  tokens such as `ABSTRACTGATEWAY_AUTH_TOKEN` are not browser sign-in tokens.
+  The Gateway must also run with `ABSTRACTGATEWAY_USER_AUTH=1`.
+- **Fix:** use the user token for the user id you entered, and start the
+  Gateway with user auth enabled as shown in
+  [Getting started](getting-started.md#1-start-gateway).
+
+### "Browser-supplied Gateway URL changes are disabled for this non-local Flow connection" (HTTP 403)
+
+- **Cause:** a browser that does not run on the Flow server's machine asked to
+  connect to a Gateway URL other than the one the server was started with. The
+  Flow server decides this from the connection's own address, so a hosted Flow
+  instance proxies only to its configured Gateway.
+- **Fix:** keep the server-configured Gateway URL in the connection form, or
+  restart the server with the right `--gateway-url`. Operators who deliberately
+  want remote browsers to choose a Gateway can set
+  `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` behind their own access
+  control.
+
+### "Cannot determine the client address of this connection" (HTTP 400)
+
+- **Cause:** the Flow server could not read the address of the browser
+  connection, so it cannot tell the Gateway where the browser runs and refuses
+  the request instead of forwarding it without that information.
+- **Fix:** connect to the Flow server directly or through a reverse proxy that
+  opens a normal TCP connection to it. See
+  [Web editor > Browser Auth](web-editor.md#browser-auth) for the forwarding
+  headers the server sends.
+
+### "Flow browser session CSRF token missing or invalid" (HTTP 403)
+
+- **Cause:** a mutating request (save, publish, run) arrived without the
+  session's CSRF cookie, typically after cookies were partially cleared or when
+  the page is served from another origin than the Flow server.
+- **Fix:** sign out and sign in again from the same origin you use to open the
+  editor.
+
+### A remote browser is treated as if it ran on the Gateway's machine
+
+- **Cause:** the Vite development server (`npm run dev`) drops browser-supplied
+  forwarding headers but does not add `X-Forwarded-For` or the
+  `X-AbstractFramework-App-Proxy` marker, so the Gateway sees the development
+  server's own local address.
+- **Fix:** when remote browsers use the editor, serve it with the built server
+  (`npm run build` then `npm start -- --gateway-url ...`, or
+  `npx @abstractframework/flow`), which sets both headers on every
+  Gateway-bound request.
+
+## Editor Behavior
+
+### A workflow opens with unsaved changes and "Interface pins were added to On Flow Start/End; save to store them"
+
+- **Cause:** the workflow declares an interface (for example
+  `abstractcode.agent.v1`) and its `On Flow Start` or `On Flow End` node lacked
+  one of the pins that interface requires. The editor adds the missing pins
+  when it opens the workflow.
+- **Fix:** review the added pins, wire them, and **Save**. After saving, the
+  workflow opens without changes.
+
+See [VisualFlow JSON > Interfaces](visualflow.md#interfaces).
+
+### A node shows an "N hidden" badge, or a notice says connections are "kept and saved but not drawn"
+
+- **Cause:** the stored workflow has connections the canvas cannot draw: pins
+  resolved by name at run time (a code node's returned keys, a subflow's
+  `child_output`) or pairs the editor's connection rules refuse.
+- **Fix:** nothing is required. These connections run as stored and are saved
+  back unchanged. Hover the badge to list them (`source.pin -> target.pin`).
+  They are removed only when you delete one of their nodes.
+- **When the notice says connections "were dropped":** the connection points to
+  a node that does not exist in the document. Restore the missing node from the
+  original file if the connection mattered.
+
+See [Web editor > Hidden Connections](web-editor.md#hidden-connections).
+
+### Run preflight warns about interface pins
+
+| Warning | Meaning | Fix |
+|---|---|---|
+| `'<pin>' (<type>) is required by <interface>: hosts send/read it` | The boundary node lacks a pin the declared interface requires. | Add the pin (re-declaring the interface adds it) or remove the interface. |
+| `'<pin>' is not connected; hosts will read null` | A required `On Flow End` pin has no connection, pin default or pin expression. | Wire the pin to the value the host should receive. |
+| `'<pin>' is typed <type>, the interface expects <type>` | The pin exists with another type. | Change the pin type to the one listed in [VisualFlow JSON > Interfaces](visualflow.md#interfaces). |
+
+These warnings are advisory: the workflow still runs, but a host that starts
+it through the interface receives missing or mistyped values.
+
+### The About dialog shows "Gateway: unavailable (...)"
+
+- **Cause:** the request to `GET /api/gateway/about` failed. The text in
+  parentheses gives the HTTP status or network error. A Gateway release that
+  does not serve that route, a signed-out session, or an unreachable Gateway
+  all produce this row.
+- **Fix:** sign in, check that the Gateway is reachable, and update the Gateway
+  if the route returns HTTP 404. The AbstractFlow version shown in the dialog is
+  independent of the Gateway.
+
+### Discovery, save, publish or run fail while the editor itself loads
+
+- **Cause:** the Gateway is stopped or unreachable from the Flow server. The
+  editor's static UI does not need the Gateway, but every data feature does.
+- **Fix:** start the Gateway and confirm the Flow server targets it (the
+  `gateway_url` in `/api/health`).
+
+### Edited example flows do not appear in the Flow Library
+
+- **Cause:** the example flows under `examples/flows/` are bundled into the
+  editor at build time.
+- **Fix:** run `npm run build` again and reload the editor tab.
+
+## Local Development
+
+### The build cannot resolve `@abstractframework/ui-kit` or a monitor package
+
+- **Cause:** a local checkout builds the shared UI packages from a sibling
+  AbstractUIC checkout at `../abstractuic`.
+- **Fix:**
+
+```bash
+git clone https://github.com/lpalbou/AbstractUIC.git ../abstractuic
+npm install
+npm run build
+```
+
+### `npm test` fails to start
+
+- **Cause:** the test runner (Vitest 4) requires Node.js 20 or later.
+- **Fix:** use Node.js 20, 22 or 24 (the CI uses 24), then run `npm test`
+  again.
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full contributor workflow.
 
 ## CHANGELOG.md
 
@@ -4269,6 +5010,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pin required by a declared interface, when a required `On Flow End` pin is
   not connected (hosts would read `null`), and when a required pin has
   another type than the interface expects.
+- Documentation: a [troubleshooting guide](docs/troubleshooting.md) for
+  sign-in, proxy, editor and local-development problems, component and
+  load-path diagrams in [Architecture](docs/architecture.md), the complete
+  server environment reference in [API and contracts](docs/api.md#cli), and a
+  [Code of Conduct](CODE_OF_CONDUCT.md). Local development requires Node.js 20
+  or later.
 
 ### Security
 - The `abstractflow-editor` server now tells the gateway which machine each
@@ -4854,11 +5601,13 @@ Thanks for contributing to AbstractFlow.
 
 Requirements:
 
-- Node.js 18+
+- Node.js 20+ (the CI uses Node.js 24)
 - npm
+- a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout at `../abstractuic`: the editor builds the shared UI packages (`@abstractframework/ui-kit` and the monitor widgets) from it
 - a reachable AbstractGateway for integration testing
 
 ```bash
+git clone https://github.com/lpalbou/AbstractUIC.git ../abstractuic
 npm install
 npm run dev
 ```
@@ -4868,24 +5617,37 @@ Run quality checks:
 ```bash
 npm run build
 npm run lint
+npm test
 ```
+
+`npm run build` first checks the bundled multi-agent coding workflow
+(`npm run verify:multiagent`, Python 3).
 
 ## Repository Shape
 
 - `src/`: React/Vite editor.
-- `bin/cli.js`: static server and Gateway proxy.
-- `examples/flows/`: sample VisualFlow JSON files.
-- `docs/`: user and contributor docs.
+- `bin/cli.js`: static server and Gateway proxy; `bin/gateway_forwarding.js` holds the forwarding headers it sets on Gateway-bound requests.
+- `examples/flows/`: sample and shipped VisualFlow JSON files.
+- `scripts/`: workflow generators, bundle packers, and documentation generators.
+- `docs/`: user and contributor docs (see [docs/README.md](docs/README.md)).
 
 Do not add local Python execution/server code to this repository. Runtime execution belongs to AbstractGateway and AbstractRuntime.
 
+Read [docs/architecture.md](docs/architecture.md) for component boundaries and
+[docs/api.md](docs/api.md) for the server and module surface before changing them.
+
 ## Docs
 
-After doc changes:
+- Write the docs around the web package layout: `src/`, `bin/`, `examples/flows/`, `docs/`.
+- List every `docs/*.md` page in [docs/README.md](docs/README.md).
+- Regenerate the node catalog and the LLM context in the same change as any doc edit:
 
 ```bash
 npm run docs:llms
 ```
+
+This rewrites `docs/workflow-node-catalog.md` from `src/types/nodes.ts` and
+`llms-full.txt` from the documentation set.
 
 ## Releases
 
@@ -4895,14 +5657,18 @@ For a release:
 
 1. Update `package.json`.
 2. Add the matching `CHANGELOG.md` entry.
-3. Run `npm run build` and `npm run lint`.
+3. Run `npm run build`, `npm run lint` and `npm test`.
 4. Publish through the GitHub release workflow to npm.
 
 ## Pull Request Checklist
 
 - `npm run build` passes.
 - `npm run lint` passes or any failures are explicitly documented.
+- `npm test` passes.
 - User-facing behavior changes are reflected in docs and changelog.
+- Security-relevant changes follow [SECURITY.md](SECURITY.md).
+
+Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## SECURITY.md
 
@@ -4932,3 +5698,32 @@ Gateway authentication, provider secrets, runtime isolation, workflow execution,
 ## Supported Versions
 
 AbstractFlow is pre-1.0. Use the latest released version.
+
+## CODE_OF_CONDUCT.md
+
+# Code of Conduct
+
+AbstractFlow follows the [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/),
+version 2.1.
+
+## Our standards
+
+Be respectful, constructive and inclusive in issues, pull requests, discussions and any other
+project space. Harassment, personal attacks, discriminatory language and publishing others'
+private information are not acceptable.
+
+## Reporting
+
+Report unacceptable behavior privately to the maintainer through GitHub
+([@lpalbou](https://github.com/lpalbou)). Reports are handled confidentially. For security
+vulnerabilities, follow [`SECURITY.md`](./SECURITY.md) instead.
+
+## Enforcement
+
+The maintainer may remove, edit or reject contributions that do not follow this code of conduct,
+and may temporarily or permanently restrict participation in project spaces.
+
+## Related docs
+
+- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Security policy: [`SECURITY.md`](./SECURITY.md)

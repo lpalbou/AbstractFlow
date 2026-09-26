@@ -47,11 +47,10 @@ Each subflow is a separate flow in the editor (Flow Library → the
 subflow to see its process; open `entity-cognition-turn` to watch how memory
 and cognition work together in one moment.
 
-The library bundles example flows at BUILD time (`src/utils/bundledFlows.ts`
+The library bundles example flows at build time (`src/utils/bundledFlows.ts`
 glob → `dist/`): after editing or regenerating the family, rebuild the editor
-(`npm run build`), hard-reload open tabs, and verify with
-`.venv/bin/python scripts/flow_surfacing_check.py` — a stale `dist/` hides
-the family from the library silently (the 2026-07-25 invisibility incident).
+(`npm run build`) and hard-reload open tabs. The library shows the flows of the
+last build.
 
 ## The memory nodes (Entity Mind palette)
 
@@ -74,14 +73,12 @@ find them in the editor palette under **Entity Mind**:
 | Entity Tools (grant) | ENTITY_TOOLS_QUERY | the phase's tool grant resolves (tool_policy.yaml or the RULED defaults) into granted names + native declaration specs — pure read, the ONE authority |
 | Entity Tools (execute batch) | ENTITY_TOOLS_EXECUTE | ONE native tool batch runs under the grant RE-RESOLVED at execution (a caller list can never widen it); refusals return as marker lines; `tools_ran` is host-authored |
 
-TOOLS (0.0.10, operator find 2026-07-25): before this wave the flow lane
-declared no tools at all — an entity could not search, fetch, or read its own
-memory verbatims through the flow brain (Mira told the visitor so). The
-cognition turn now resolves the phase grant, teaches the names in the shelf
-prompt ("TOOLS IN HAND"), declares them NATIVELY on the lived turn, and runs
-bounded tool rounds in `entity-tool-rounds`; `tools_ran` + `tool_rounds`
-(present even when zero) ride the turn → visit → chat outputs so app tool
-gauges stay honest.
+TOOLS (since bundle 0.0.10): the cognition turn resolves the phase's tool
+grant, teaches the granted names in the shelf prompt ("TOOLS IN HAND"),
+declares them natively on the lived turn, and runs bounded tool rounds in
+`entity-tool-rounds`, so an entity can search, fetch, and read its own memory
+verbatims. `tools_ran` + `tool_rounds` (present even when zero) ride the
+turn → visit → chat outputs so app tool gauges report what actually ran.
 
 CHANNEL AUTHORITY: no flow ever names an entity. These effects resolve to a
 home ONLY through the caller channel — the gateway door's verified stamp, or
@@ -147,7 +144,8 @@ python3 scripts/entity_repl.py florin
 ```
 
 5. **Through the gateway** (the door): the bundle
-   `entity-life@0.0.6.flow` registers from the gateway bundles dir; summon
+   `entity-life@0.0.18.flow` (its version is `BUNDLE_VERSION` in
+   `scripts/build_entity_life_workflow.py`) registers from the gateway bundles dir; summon
    any entity with the chat door:
 
 ```bash
@@ -160,19 +158,17 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
 ```
 
    The summon renders the identity prelude, stamps the run, and routes every
-   memory effect to the entity's own home. (Requires the gateway runner
-   process to carry entity routing — flow↔gateway coordination c5166.)
+   memory effect to the entity's own home. (Requires a Gateway whose runner
+   process carries entity routing.)
 
-## Status honesty
+## Status
 
 - Everything in the table above is **wired**: the night runs the engine's
   real six-phase `sleep_pass` (`memory_consolidate`, with `continueOnError`
   folding an engine death into an honest failed-night settlement — never a
   dead life), deliberate reach runs (`memory_probe` feeds the prompt shelf,
   shelf-race-exempt), and the personal day opens on the real alive-drives
-  cue (`life_query`). An earlier revision of this page reported the sleep
-  pass as `declared` — that was stale the same day (the effect landed in the
-  evening wave) and was caught by an adversarial review.
+  cue (`life_query`).
 - The only remaining `declared` things are the three `declared` edges in
   cognition_graph v5 itself (incl. gate→idreview): they render read-only and
   do not fire — per the artifact's own status.
@@ -181,7 +177,7 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
   `degraded` + `moment_error` pins so thin clients never confuse "the entity
   said nothing" with "the turn died". READ `degraded`, never `success` alone:
   the run-level `success` flag means "the flow executed", and a degraded
-  turn still completes its flow (cycle-3 adversary I).
+  turn still completes its flow.
 - VERSION CONTRACT: bundle versions are immutable and PINNABLE
   (`bundle_version` on the summon). The `degraded`/`moment_error` output
   pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the

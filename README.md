@@ -61,7 +61,7 @@ capabilities. During `Listen Voice` waits, Flow records in the browser,
 uploads the captured audio artifact, and resumes the Gateway run; Flow does not
 execute local audio or transcription logic itself.
 
-Vision media nodes now surface Gateway/Core's richer route contract directly in
+Vision media nodes surface Gateway/Core's route contract directly in
 authoring:
 
 - task-scoped provider/model discovery for `text_to_image`, `image_to_image`,
@@ -89,6 +89,15 @@ editor diffs it against the draft canvas and applies only validated edits. It ca
 create or refine common workflows such as internet research, deep research, news
 digests, and job searches; Save, Publish, and Run remain explicit user actions.
 
+Workflows can declare the interfaces they implement (for example
+`abstractcode.agent.v1`, so AbstractCode and AbstractAssistant can run them as
+agents). Declaring an interface adds its typed pins to `On Flow Start` and
+`On Flow End`, and Run preflight warns about missing, unconnected, or mistyped
+interface pins. See [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
+
+The About button in the top bar shows the AbstractFlow version and the versions
+the connected Gateway reports.
+
 ## Gateway Setup
 
 ```bash
@@ -108,7 +117,8 @@ Use:
 
 - `src/` - React/Vite visual editor.
 - `bin/cli.js` - npm CLI/static server and Gateway proxy.
-- `examples/flows/` - sample VisualFlow JSON files kept for reference/import tests.
+- `examples/flows/` - sample and shipped VisualFlow JSON files.
+- `scripts/` - generators and packers for the shipped workflows, and the documentation generators.
 - `docs/` - external documentation for users and contributors.
 
 AbstractFlow does not ship a Python package or local execution host. VisualFlow compilation, bundle execution, runtime state, and provider calls are handled by AbstractGateway and AbstractRuntime.
@@ -125,13 +135,17 @@ npm run docs:llms
 
 ## Documentation
 
+- [Documentation index](docs/README.md)
 - [Getting started](docs/getting-started.md)
 - [Web editor](docs/web-editor.md)
 - [Architecture](docs/architecture.md)
 - [API and contracts](docs/api.md)
 - [VisualFlow JSON](docs/visualflow.md)
 - [CLI](docs/cli.md)
+- [Workflow authoring skill](docs/workflow-authoring-skill.md)
+- [Shipped workflow sources](docs/shipped-workflow-sources.md)
 - [FAQ](docs/faq.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ## Related Projects
 
@@ -145,4 +159,6 @@ npm run docs:llms
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security: [SECURITY.md](SECURITY.md)
+- Code of conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Acknowledgments: [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md)
 - License: [LICENSE](LICENSE)
