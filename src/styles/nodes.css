@@ -240,6 +240,26 @@
   pointer-events: none;
 }
 
+/* Connections kept and saved but not drawn (see HiddenConnectionsBadge). */
+.node-hidden-edges-badge {
+  position: absolute;
+  top: -11px;
+  right: 10px;
+  z-index: 2;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xxs);
+  line-height: 1.4;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.85);
+  background: rgba(38, 26, 4, 0.92);
+  color: #fbbf24;
+  cursor: help;
+  white-space: nowrap;
+  text-transform: none;
+  font-weight: 500;
+}
+
 /* Execution pins in header (UE4 Blueprint style) */
 .exec-pin {
   display: flex;

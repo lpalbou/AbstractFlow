@@ -36,8 +36,9 @@ export interface LoadEdgeNote {
 }
 
 /**
- * Edges loadFlow could not draw. `preserved` ones are kept and saved as-is;
- * `dropped` ones are removed from the document (a save will not write them).
+ * Edges loadFlow could not draw. `preserved` ones are kept and saved as-is
+ * (undeclared pin, or refused by the editor's connection rules); `dropped`
+ * ones reference a node that does not exist (a save will not write them).
  */
 export interface LoadEdgeReport {
   preserved: LoadEdgeNote[];
@@ -62,10 +63,40 @@ export function loadEdgeNotice(report: LoadEdgeReport, limit = 5): string | null
   }
   if (report.preserved.length > 0) {
     parts.push(
-      `${report.preserved.length} connection${report.preserved.length === 1 ? ' uses a pin' : 's use pins'} the node does not declare; kept and saved, but not drawn: ${list(report.preserved, false)}`
+      `${report.preserved.length} connection${report.preserved.length === 1 ? ' is' : 's are'} kept and saved but not drawn (marked on their nodes): ${list(report.preserved, true)}`
     );
   }
   return parts.length > 0 ? parts.join('. ') : null;
+}
+
+/**
+ * Preserved edges that still belong to the document: both endpoint nodes
+ * exist and the canvas does not draw the same connection itself (drawing it
+ * makes the hidden copy redundant, so it is never saved twice).
+ */
+export function liveHiddenEdges(state: Pick<FlowState, 'nodes' | 'edges' | 'preservedEdges'>): Edge[] {
+  if (state.preservedEdges.length === 0) return state.preservedEdges;
+  const nodeIds = new Set(state.nodes.map((n) => n.id));
+  const drawnKeys = new Set(state.edges.map(edgeWiringKey));
+  return state.preservedEdges.filter(
+    (e) => nodeIds.has(e.source) && nodeIds.has(e.target) && !drawnKeys.has(edgeWiringKey(e))
+  );
+}
+
+/**
+ * The hidden (kept, not drawn) connections touching one node, one line each
+ * (`source.handle -> target.handle`), joined by newlines; '' when none. A
+ * string so a per-node store selector stays referentially stable.
+ */
+export function hiddenConnectionsLabel(
+  state: Pick<FlowState, 'nodes' | 'edges' | 'preservedEdges'>,
+  nodeId: string
+): string {
+  if (state.preservedEdges.length === 0) return '';
+  return liveHiddenEdges(state)
+    .filter((e) => e.source === nodeId || e.target === nodeId)
+    .map((e) => `${e.source}.${e.sourceHandle || '?'} -> ${e.target}.${e.targetHandle || '?'}`)
+    .join('\n');
 }
 
 function edgeWiringKey(e: Pick<Edge, 'source' | 'sourceHandle' | 'target' | 'targetHandle'>): string {
@@ -2852,8 +2883,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     //   runtime resolves such handles by key (a code node's returned dict,
     //   a subflow's `child_output`), so the edge is real wiring: it is kept
     //   verbatim and re-emitted by getFlow, just not drawn on the canvas;
-    // - dropped: an endpoint node is missing, or the editor's connection
-    //   contract refuses it. Reported with the reason.
+    //   Edges the editor's connection rules refuse (e.g. model -> string)
+    //   are preserved the same way, with that reason;
+    // - dropped: an endpoint node is missing (the only case). Reported.
     const edgeReport: LoadEdgeReport = { preserved: [], dropped: [] };
     const describeEdge = (e: Edge) => `${e.source}.${e.sourceHandle || '?'} -> ${e.target}.${e.targetHandle || '?'}`;
     const structurallyValidEdges: Edge[] = [];
@@ -2871,17 +2903,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         structurallyValidEdges.push(e);
         continue;
       }
-      if (!e.sourceHandle || !e.targetHandle) {
-        edgeReport.dropped.push({ id: e.id, edge: describeEdge(e), reason: 'the connection has no pin id' });
-        continue;
-      }
       preservedEdges.push(e);
       edgeReport.preserved.push({
         id: e.id,
         edge: describeEdge(e),
-        reason: !sourceHasHandle
-          ? `'${e.sourceHandle}' is not a declared output of ${e.source}`
-          : `'${e.targetHandle}' is not a declared input of ${e.target}`,
+        reason: !e.sourceHandle || !e.targetHandle
+          ? 'the connection has no pin id'
+          : !sourceHasHandle
+            ? `'${e.sourceHandle}' is not a declared output of ${e.source}`
+            : `'${e.targetHandle}' is not a declared input of ${e.target}`,
       });
     }
     const validEdges = structurallyValidEdges.filter((edge) => {
@@ -2893,10 +2923,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
       const others = structurallyValidEdges.filter((candidate) => candidate.id !== edge.id);
       if (validateConnection(nodes, others, connection)) return true;
-      edgeReport.dropped.push({
+      // The editor's connection rules are stricter than the runtime (e.g. a
+      // model id into a string pin: it IS a string when the flow runs). The
+      // stored wiring is kept and saved; it is just not drawn.
+      preservedEdges.push(edge);
+      edgeReport.preserved.push({
         id: edge.id,
         edge: describeEdge(edge),
-        reason: getConnectionError(nodes, others, connection) || 'the editor refuses this connection',
+        reason: `kept (type not accepted by the editor): ${getConnectionError(nodes, others, connection) || 'the editor refuses this connection'}`,
       });
       return false;
     });
@@ -3035,11 +3069,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }));
     // Re-emit the preserved (undrawn) edges whose endpoints still exist and
     // that the canvas has not since drawn itself.
-    const nodeIds = new Set(state.nodes.map((n) => n.id));
-    const drawnKeys = new Set(state.edges.map(edgeWiringKey));
-    const keptPreserved = state.preservedEdges.filter(
-      (e) => nodeIds.has(e.source) && nodeIds.has(e.target) && !drawnKeys.has(edgeWiringKey(e))
-    );
+    const keptPreserved = liveHiddenEdges(state);
     const visualEdges = [...state.edges.filter((e) => !isRouteOverrideEdge(e)), ...keptPreserved]
       .map((e) => ({
         id: e.id,

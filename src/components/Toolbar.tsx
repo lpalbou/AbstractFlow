@@ -452,18 +452,13 @@ export function Toolbar() {
   }, [currentFlowSignature, flowId, isEmptyFlow]);
 
   const saveJustSucceededRef = useRef(false);
-  // Flow id a load just published its baseline for (see adoptLoadedDocument).
-  const loadBaselineFlowIdRef = useRef<string | null>(null);
 
   /**
-   * Baseline a freshly loaded document: `loadFlow` returns the flow AS STORED,
-   * so pins it added for the declared interfaces show as unsaved changes,
-   * with a one-line notice. The identity-change effect keeps this baseline.
+   * What the last loadFlow changed or could not draw — shown after EVERY way a
+   * document enters the editor (open, duplicate, rename-copy, file import).
    */
-  const adoptLoadedDocument = useCallback((loaded: VisualFlow) => {
+  const showLoadNotices = useCallback(() => {
     const state = useFlowStore.getState();
-    loadBaselineFlowIdRef.current = state.flowId || null;
-    setSavedFlowSignature(flowSignatureFor(loaded));
     if (state.interfacePinsAddedOnLoad > 0) toast(INTERFACE_PINS_ADDED_NOTICE);
     // Edges the canvas could not draw are never lost silently.
     const edgeNotice = loadEdgeNotice(state.loadEdgeReport);
@@ -473,6 +468,19 @@ export function Toolbar() {
       console.warn('[AbstractFlow] load: connections not drawn', state.loadEdgeReport);
     }
   }, []);
+  // Flow id a load just published its baseline for (see adoptLoadedDocument).
+  const loadBaselineFlowIdRef = useRef<string | null>(null);
+
+  /**
+   * Baseline a freshly loaded document: `loadFlow` returns the flow AS STORED,
+   * so pins it added for the declared interfaces show as unsaved changes,
+   * with a one-line notice. The identity-change effect keeps this baseline.
+   */
+  const adoptLoadedDocument = useCallback((loaded: VisualFlow) => {
+    loadBaselineFlowIdRef.current = useFlowStore.getState().flowId || null;
+    setSavedFlowSignature(flowSignatureFor(loaded));
+    showLoadNotices();
+  }, [showLoadNotices]);
 
   const formatValue = useCallback((value: unknown) => {
     if (value == null) return '';
@@ -1559,13 +1567,14 @@ export function Toolbar() {
         resetLoadedDocument();
         setSavedFlowSignature('');
         toast.success('Flow imported as a new draft — Save stores it');
+        showLoadNotices();
       } catch (err) {
         toast.error('Failed to import flow');
       }
     };
 
     input.click();
-  }, [loadFlow, setFlowId]);
+  }, [loadFlow, setFlowId, showLoadNotices]);
 
   // Handle import
   const handleImport = useCallback(() => {

@@ -43,6 +43,48 @@ describe('loadFlow edge round trip', () => {
     expect(silent).toEqual([]);
   });
 
+  it('nothing in the shipped corpus is dropped: every stored edge is saved back', () => {
+    const lost: string[] = [];
+    for (const flow of corpus()) {
+      useFlowStore.getState().loadFlow(flow);
+      expect(useFlowStore.getState().loadEdgeReport.dropped, flow.id).toEqual([]);
+      const saved = new Set(useFlowStore.getState().getFlow().edges.map((e) => e.id));
+      for (const edge of flow.edges) if (!saved.has(edge.id)) lost.push(`${flow.id}: ${edge.id}`);
+    }
+    expect(lost).toEqual([]);
+  });
+
+  it('edges refused only by the editor\'s type rules are kept, saved and reported as such', () => {
+    const flow = JSON.parse(readFileSync(resolve(FLOWS_DIR, '4050e15e.json'), 'utf8')) as VisualFlow;
+    useFlowStore.getState().loadFlow(flow);
+    const report = useFlowStore.getState().loadEdgeReport;
+    const typed = report.preserved.filter((n) => n.reason.startsWith('kept (type not accepted by the editor): '));
+    expect(typed.length).toBe(7);
+    expect(typed[0].reason).toContain('cannot connect model to string');
+    expect(report.dropped).toEqual([]);
+    const saved = new Set(useFlowStore.getState().getFlow().edges.map((e) => e.id));
+    expect(typed.every((n) => saved.has(n.id))).toBe(true);
+  });
+
+  it('a hidden edge is never saved twice once the same connection is drawn', () => {
+    const flow = listBundledFlows().find((f) => f.id === 'entity-chat')!;
+    useFlowStore.getState().loadFlow(flow);
+    // Declare the runtime-resolved output, then draw the very same connection.
+    const guard = useFlowStore.getState().nodes.find((n) => n.id === 'visit_guard')!;
+    useFlowStore.getState().updateNodeData('visit_guard', {
+      outputs: [...guard.data.outputs, { id: 'value', label: 'value', type: 'string' }],
+    });
+    useFlowStore.getState().onConnect({ source: 'visit_guard', sourceHandle: 'value', target: 'end', targetHandle: 'answer' });
+    expect(
+      useFlowStore.getState().edges.some((e) => e.source === 'visit_guard' && e.sourceHandle === 'value' && e.targetHandle === 'answer')
+    ).toBe(true);
+    const saved = useFlowStore.getState().getFlow().edges.filter(
+      (e) => e.source === 'visit_guard' && e.sourceHandle === 'value' && e.target === 'end' && e.targetHandle === 'answer'
+    );
+    expect(saved).toHaveLength(1);
+    expect(useFlowStore.getState().getFlow().edges).toHaveLength(22);
+  });
+
   it('the round trip is stable: re-loading the saved document keeps the same edges', () => {
     for (const flow of corpus()) {
       useFlowStore.getState().loadFlow(flow);
@@ -75,7 +117,7 @@ describe('loadFlow edge round trip', () => {
     const saved = state.getFlow();
     expect(saved.edges.map((e) => e.id).sort()).toEqual(flow.edges.map((e) => e.id).sort());
     expect(loaded.edges.map((e) => e.id).sort()).toEqual(saved.edges.map((e) => e.id).sort());
-    expect(loadEdgeNotice(state.loadEdgeReport)).toMatch(/^8 connections use pins the node does not declare; kept and saved, but not drawn: /);
+    expect(loadEdgeNotice(state.loadEdgeReport)).toMatch(/^8 connections are kept and saved but not drawn \(marked on their nodes\): /);
   });
 
   it('preserved edges follow their nodes: deleting an endpoint removes them from the save', () => {

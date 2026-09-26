@@ -28,6 +28,7 @@ import {
 } from '../../utils/agentToolsPin';
 import { hasSecretLikeValue } from '../../utils/flowAuthoringCommands';
 import { useFlowStore } from '../../hooks/useFlow';
+import { HiddenConnectionsBadge } from './HiddenConnectionsBadge';
 import { useModels, useProviders } from '../../hooks/useProviders';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../../utils/capabilityRoutes';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../../hooks/useGatewayCapabilities';
@@ -3929,6 +3930,7 @@ export const BaseNode = memo(function BaseNode({
         />
         <span className="node-title">{data.label}</span>
         {loopBadge ? <span className="node-progress-badge" title="Loop progress">{loopBadge}</span> : null}
+        <HiddenConnectionsBadge nodeId={id} />
 
         {/* Execution output pins (right side of header) */}
         {outputExecs.length === 1 && !isSwitchNode && (
