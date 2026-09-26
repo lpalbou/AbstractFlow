@@ -3603,6 +3603,117 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "resolve_request",
+      "type": "code",
+      "position": {
+        "x": 0.0,
+        "y": 600.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Research request (request, else prompt)",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "text = str(request or \"\").strip()\nif not text:\n    text = str(prompt or \"\").strip()\nreturn text"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_success",
+      "type": "code",
+      "position": {
+        "x": 6160.0,
+        "y": 1560.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Report produced?",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "report_markdown",
+            "label": "report_markdown",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "boolean"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return bool(str(report_markdown or \"\").strip())"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -4719,9 +4830,9 @@
       "animated": false
     },
     {
-      "id": "e-start-request-plan_input-request",
-      "source": "start",
-      "sourceHandle": "request",
+      "id": "e-resolve_request-output-plan_input-request",
+      "source": "resolve_request",
+      "sourceHandle": "output",
       "target": "plan_input",
       "targetHandle": "request",
       "animated": false
@@ -4759,9 +4870,9 @@
       "animated": false
     },
     {
-      "id": "e-start-request-investigate_input-request",
-      "source": "start",
-      "sourceHandle": "request",
+      "id": "e-resolve_request-output-investigate_input-request",
+      "source": "resolve_request",
+      "sourceHandle": "output",
       "target": "investigate_input",
       "targetHandle": "request",
       "animated": false
@@ -4799,9 +4910,9 @@
       "animated": false
     },
     {
-      "id": "e-start-request-review_input-request",
-      "source": "start",
-      "sourceHandle": "request",
+      "id": "e-resolve_request-output-review_input-request",
+      "source": "resolve_request",
+      "sourceHandle": "output",
       "target": "review_input",
       "targetHandle": "request",
       "animated": false
@@ -4839,9 +4950,9 @@
       "animated": false
     },
     {
-      "id": "e-start-request-render_input-request",
-      "source": "start",
-      "sourceHandle": "request",
+      "id": "e-resolve_request-output-render_input-request",
+      "source": "resolve_request",
+      "sourceHandle": "output",
       "target": "render_input",
       "targetHandle": "request",
       "animated": false
@@ -4876,6 +4987,38 @@
       "sourceHandle": "model",
       "target": "render_input",
       "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-resolve_request-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "resolve_request",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-resolve_request-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "resolve_request",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-get_report_markdown-value-report_success-report_markdown",
+      "source": "get_report_markdown",
+      "sourceHandle": "value",
+      "target": "report_success",
+      "targetHandle": "report_markdown",
+      "animated": false
+    },
+    {
+      "id": "e-report_success-output-end-success",
+      "source": "report_success",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "success",
       "animated": false
     }
   ],

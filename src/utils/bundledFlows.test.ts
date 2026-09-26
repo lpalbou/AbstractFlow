@@ -280,3 +280,57 @@ describe('bundled flows honour the interfaces they declare', () => {
     }
   });
 });
+
+describe('bundled agent.v1 flows use what agent hosts send and read', () => {
+  // Known gaps recorded as a backlog follow-up (unwired pins kept on purpose).
+  const KNOWN_GAPS = new Set(['entity-chat:success', 'entity-goodbye:prompt', 'entity-goodbye:success']);
+
+  it('On Flow Start `prompt` feeds the graph and every On Flow End sets `success`', () => {
+    const gaps: string[] = [];
+    const agentFlows = listBundledFlows().filter((flow) => (flow.interfaces || []).includes('abstractcode.agent.v1'));
+    expect(agentFlows.map((flow) => flow.id)).toContain('deep-research');
+    for (const flow of agentFlows) {
+      for (const node of flow.nodes) {
+        const type = node.data?.nodeType;
+        if (type === 'on_flow_start') {
+          const fed = flow.edges.some((e) => e.source === node.id && e.sourceHandle === 'prompt');
+          if (!fed) gaps.push(`${flow.id}:prompt`);
+        }
+        if (type === 'on_flow_end') {
+          const data = node.data as { pinDefaults?: Record<string, unknown>; pinExpressions?: Record<string, unknown> };
+          const set =
+            flow.edges.some((e) => e.target === node.id && e.targetHandle === 'success') ||
+            Object.prototype.hasOwnProperty.call(data.pinDefaults || {}, 'success') ||
+            Object.prototype.hasOwnProperty.call(data.pinExpressions || {}, 'success');
+          if (!set) gaps.push(`${flow.id}:success`);
+        }
+      }
+    }
+    expect(gaps.filter((gap) => !KNOWN_GAPS.has(gap))).toEqual([]);
+  });
+
+  it('deep-research researches the host `prompt` when no `request` is given (request still wins)', () => {
+    const flow = listBundledFlows().find((f) => f.id === 'deep-research');
+    expect(flow).toBeTruthy();
+    const edges = flow!.edges;
+    const resolve = flow!.nodes.find((n) => n.id === 'resolve_request');
+    expect(resolve?.data?.nodeType).toBe('code');
+    // Both host fields enter the resolver ...
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: 'start', sourceHandle: 'request', target: 'resolve_request', targetHandle: 'request' }),
+        expect.objectContaining({ source: 'start', sourceHandle: 'prompt', target: 'resolve_request', targetHandle: 'prompt' }),
+      ])
+    );
+    // ... and every request consumer reads the resolved value, never the raw start pin.
+    const consumers = edges.filter((e) => e.targetHandle === 'request' && e.target !== 'resolve_request');
+    expect(consumers.map((e) => e.target).sort()).toEqual(['investigate_input', 'plan_input', 'render_input', 'review_input']);
+    expect(consumers.every((e) => e.source === 'resolve_request' && e.sourceHandle === 'output')).toBe(true);
+    const body = String((resolve?.data as { codeBody?: string }).codeBody);
+    expect(body).toContain('request');
+    expect(body).toContain('prompt');
+    expect(edges).toEqual(
+      expect.arrayContaining([expect.objectContaining({ source: 'report_success', sourceHandle: 'output', target: 'end', targetHandle: 'success' })])
+    );
+  });
+});

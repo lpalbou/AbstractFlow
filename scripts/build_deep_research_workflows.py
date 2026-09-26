@@ -39,11 +39,25 @@ START_PINS = [
 ]
 
 
-# abstractcode.agent.v1 boundary pins the root flow declares (the AbstractFlow
-# editor adds them to any flow declaring the interface; keep them here so a
-# regenerated flow matches). Not wired: the research request is `request`.
+# abstractcode.agent.v1 boundary pins the root flow declares. Agent hosts
+# (AbstractCode web and TUI) send the user's text as `prompt`; direct callers
+# send `request`. `resolve_request` feeds every request consumer with
+# `request`, falling back to `prompt`; `report_success` sets `success`.
 AGENT_V1_PROMPT_PIN = _pin("prompt", "prompt", "string", "The user message the host sends to this workflow.")
 AGENT_V1_SUCCESS_PIN = _pin("success", "success", "boolean", "True when the workflow completed its task.")
+
+
+RESOLVE_REQUEST_CODE = """
+text = str(request or "").strip()
+if not text:
+    text = str(prompt or "").strip()
+return text
+""".strip()
+
+
+REPORT_SUCCESS_CODE = """
+return bool(str(report_markdown or "").strip())
+""".strip()
 
 
 START_DEFAULTS = {
@@ -1778,11 +1792,38 @@ def build_root_flow() -> dict[str, Any]:
     _wire_start_fields(flow, "investigate_input", investigate_fields)
     _wire_start_fields(flow, "review_input", review_fields)
     _wire_start_fields(flow, "render_input", render_fields)
+    # agent.v1: every request consumer reads `request`, else the host's `prompt`.
+    flow["nodes"].append(
+        _code_data_node(
+            "resolve_request",
+            "Research request (request, else prompt)",
+            RESOLVE_REQUEST_CODE,
+            [_pin("request", "request", "string"), _pin("prompt", "prompt", "string")],
+            output_type="string",
+        )
+    )
+    for index, edge in enumerate(flow["edges"]):
+        if edge["source"] == "start" and edge["sourceHandle"] == "request":
+            flow["edges"][index] = _edge("resolve_request", "output", edge["target"], edge["targetHandle"])
+    flow["edges"].append(_edge("start", "request", "resolve_request", "request"))
+    flow["edges"].append(_edge("start", "prompt", "resolve_request", "prompt"))
+    # agent.v1 `success`: true when the run produced a report (the normal path).
+    flow["nodes"].append(
+        _code_data_node(
+            "report_success",
+            "Report produced?",
+            REPORT_SUCCESS_CODE,
+            [_pin("report_markdown", "report_markdown", "string")],
+            output_type="boolean",
+        )
+    )
+    flow["edges"].append(_edge("get_report_markdown", "value", "report_success", "report_markdown"))
+    flow["edges"].append(_edge("report_success", "output", "end", "success"))
     _apply_layout(
         flow,
         [
             # Stage: request intake + effort budget.
-            {"spine": ["start"], "below": ["run_timestamp"]},
+            {"spine": ["start"], "below": ["run_timestamp", "resolve_request"]},
             {"spine": ["derive_settings"], "below": ["timestamp_no_colons", "timestamp_safe"]},
             # Stage: plan.
             {"above": ["plan_input"], "spine": ["set_export_timestamp"]},
@@ -1818,6 +1859,7 @@ def build_root_flow() -> dict[str, Any]:
                     "get_iteration_log",
                     "get_warnings",
                     "get_model_export_status",
+                    "report_success",
                 ],
             },
             # Stage: export path composition.
