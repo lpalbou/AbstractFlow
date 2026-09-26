@@ -20,11 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or `On Flow End` node added to a workflow that declares interfaces arrives
   with their pins. See
   [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
-- Opening a workflow keeps every stored connection. Connections that use a
-  pin their node does not declare (a code node's returned key, a subflow's
-  `child_output`) are kept and saved as stored, though not drawn; connections
-  the editor refuses (a missing node, a type mismatch) are removed. Either
-  case is reported in a notice that lists the connections and the reason.
+- Opening or importing a workflow keeps every stored connection. Connections
+  that use a pin their node does not declare (a code node's returned key, a
+  subflow's `child_output`) or a pair the editor's connection rules refuse
+  (e.g. a model into a plain string pin) are kept and saved as stored, though
+  not drawn; each node with such connections shows an "N hidden" badge whose
+  tooltip lists them. Only a connection to a node that does not exist is
+  removed. A notice lists what was kept or removed and why.
 - Changing the name, description or interfaces of the workflow open in the
   editor from the Flow Library keeps your unsaved edits and undo history.
 - The bundled `deep-research` workflow researches the `prompt` an agent host
