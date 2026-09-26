@@ -6,6 +6,9 @@
  *
  * NOTE: The editor UI expects a gateway API at `/api/*`.
  * This CLI proxies `/api/*` (HTTP + SSE) to a configurable gateway URL.
+ * Every gateway-bound request carries `X-Forwarded-For: <browser socket peer>`
+ * and `X-AbstractFramework-App-Proxy: abstractflow`, overwriting any client
+ * value (see ./gateway_forwarding.js).
  */
 
 import * as http from 'http';
@@ -14,6 +17,12 @@ import { existsSync, readFileSync, statSync } from 'fs';
 import { join, extname, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
+import {
+  UNKNOWN_PEER_DETAIL,
+  applyGatewayForwarding,
+  gatewayForwardingHeaders,
+  socketPeerAddress,
+} from './gateway_forwarding.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = join(__dirname, '..', 'dist');
@@ -402,7 +411,7 @@ function readRequestJson(req) {
   });
 }
 
-function checkGatewayConnection(gatewayUrl = CONNECTION.gatewayUrl, gatewayToken = '') {
+function checkGatewayConnection(gatewayUrl = CONNECTION.gatewayUrl, gatewayToken = '', peer = '') {
   return new Promise((resolve) => {
     let backend;
     try {
@@ -427,6 +436,7 @@ function checkGatewayConnection(gatewayUrl = CONNECTION.gatewayUrl, gatewayToken
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
+          ...gatewayForwardingHeaders(peer),
         },
         timeout: 4000,
       },
@@ -465,7 +475,7 @@ function checkGatewayConnection(gatewayUrl = CONNECTION.gatewayUrl, gatewayToken
   });
 }
 
-function checkGatewaySession(gatewayUrl = CONNECTION.gatewayUrl, sessionId = '') {
+function checkGatewaySession(gatewayUrl = CONNECTION.gatewayUrl, sessionId = '', peer = '') {
   return new Promise((resolve) => {
     let backend;
     try {
@@ -490,6 +500,7 @@ function checkGatewaySession(gatewayUrl = CONNECTION.gatewayUrl, sessionId = '')
         headers: {
           'X-AbstractGateway-Session': session,
           Accept: 'application/json',
+          ...gatewayForwardingHeaders(peer),
         },
         timeout: 4000,
       },
@@ -528,7 +539,7 @@ function checkGatewaySession(gatewayUrl = CONNECTION.gatewayUrl, sessionId = '')
   });
 }
 
-function createGatewayBrowserSession(gatewayUrl, userId, token, remember) {
+function createGatewayBrowserSession(gatewayUrl, userId, token, remember, peer) {
   return new Promise((resolve) => {
     let backend;
     try {
@@ -556,6 +567,7 @@ function createGatewayBrowserSession(gatewayUrl, userId, token, remember) {
           Accept: 'application/json',
           'Content-Type': 'application/json',
           'Content-Length': String(body.length),
+          ...gatewayForwardingHeaders(peer),
         },
         timeout: 4000,
       },
@@ -595,7 +607,7 @@ function createGatewayBrowserSession(gatewayUrl, userId, token, remember) {
   });
 }
 
-function logoutGatewayBrowserSession(gatewayUrl, sessionId, csrfToken) {
+function logoutGatewayBrowserSession(gatewayUrl, sessionId, csrfToken, peer) {
   return new Promise((resolve) => {
     let backend;
     try {
@@ -618,6 +630,7 @@ function logoutGatewayBrowserSession(gatewayUrl, sessionId, csrfToken) {
           'Content-Length': String(body.length),
           'X-AbstractGateway-Session': String(sessionId || ''),
           'X-AbstractGateway-CSRF': String(csrfToken || ''),
+          ...gatewayForwardingHeaders(peer),
         },
         timeout: 2000,
       },
@@ -636,10 +649,10 @@ function logoutGatewayBrowserSession(gatewayUrl, sessionId, csrfToken) {
   });
 }
 
-async function connectionStatusPayload(req) {
+async function connectionStatusPayload(req, peer) {
   const session = browserSession(req);
   const gateway = session.token
-    ? await checkGatewaySession(session.gatewayUrl, session.token)
+    ? await checkGatewaySession(session.gatewayUrl, session.token, peer)
     : { ok: false, error: 'Gateway sign-in required', gateway_url: session.gatewayUrl, auth_checked: false };
   return {
     ok: Boolean(gateway.ok),
@@ -653,8 +666,13 @@ async function connectionStatusPayload(req) {
 }
 
 async function handleConnectionApi(req, res) {
+  const peer = socketPeerAddress(req);
+  if (!peer) {
+    sendJson(res, 400, { detail: UNKNOWN_PEER_DETAIL });
+    return;
+  }
   if (req.method === 'GET') {
-    sendJson(res, 200, await connectionStatusPayload(req));
+    sendJson(res, 200, await connectionStatusPayload(req, peer));
     return;
   }
   if (req.method === 'POST') {
@@ -672,7 +690,7 @@ async function handleConnectionApi(req, res) {
       sendJson(res, 403, { detail: browserGatewayConnectionConfigDenial(req) });
       return;
     }
-    const gateway = await checkGatewayConnection(candidateUrl, candidateToken);
+    const gateway = await checkGatewayConnection(candidateUrl, candidateToken, peer);
     if (!gateway.ok) {
       sendJson(res, 401, { detail: gateway.error || 'Gateway connection failed', gateway });
       return;
@@ -697,7 +715,8 @@ async function handleConnectionApi(req, res) {
       candidateUrl,
       String(payload.gateway_user_id || '').trim(),
       candidateToken,
-      payload.persist === true
+      payload.persist === true,
+      peer
     );
     const sessionData =
       browserSessionValue && typeof browserSessionValue === 'object' && typeof browserSessionValue.session === 'object'
@@ -722,7 +741,7 @@ async function handleConnectionApi(req, res) {
   if (req.method === 'DELETE') {
     const session = browserSession(req);
     if (session.token) {
-      await logoutGatewayBrowserSession(session.gatewayUrl, session.token, session.csrfToken);
+      await logoutGatewayBrowserSession(session.gatewayUrl, session.token, session.csrfToken, peer);
     }
     clearSessionCookies(res, req);
     sendJson(res, 200, { ok: true });
@@ -735,6 +754,11 @@ function proxyApiRequest(req, res) {
   const session = browserSession(req);
   if (!session.token) {
     sendJson(res, 401, { detail: 'Gateway sign-in required' });
+    return;
+  }
+  const peer = socketPeerAddress(req);
+  if (!peer) {
+    sendJson(res, 400, { detail: UNKNOWN_PEER_DETAIL });
     return;
   }
   if (!flowCsrfValid(req, session)) {
@@ -753,9 +777,9 @@ function proxyApiRequest(req, res) {
   delete headers.Cookie;
   delete headers.authorization;
   delete headers.Authorization;
-  delete headers['x-forwarded-for'];
-  delete headers['x-forwarded-host'];
-  delete headers['x-forwarded-proto'];
+  // Client forwarding headers and app-proxy marker are dropped (any case);
+  // X-Forwarded-For = the socket peer, marker = abstractflow.
+  applyGatewayForwarding(headers, peer);
   headers['x-abstractgateway-session'] = session.token;
   if (session.csrfToken && mutatingMethod(req.method)) {
     headers['x-abstractgateway-csrf'] = session.csrfToken;
@@ -808,6 +832,16 @@ function proxyApiWebSocket(req, socket, head) {
     }
     return;
   }
+  const peer = socketPeerAddress(req);
+  if (!peer) {
+    try {
+      socket.write(`HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ detail: UNKNOWN_PEER_DETAIL })}`);
+      socket.destroy();
+    } catch {
+      // ignore
+    }
+    return;
+  }
   let backend;
   try {
     backend = resolveBackend(session.gatewayUrl);
@@ -824,9 +858,9 @@ function proxyApiWebSocket(req, socket, head) {
   delete headers.Cookie;
   delete headers.authorization;
   delete headers.Authorization;
-  delete headers['x-forwarded-for'];
-  delete headers['x-forwarded-host'];
-  delete headers['x-forwarded-proto'];
+  // Client forwarding headers and app-proxy marker are dropped (any case);
+  // X-Forwarded-For = the socket peer, marker = abstractflow.
+  applyGatewayForwarding(headers, peer);
   headers['x-abstractgateway-session'] = session.token;
 
   const proxyReq = backend.client.request({

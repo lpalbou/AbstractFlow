@@ -32,6 +32,8 @@ Server/operator bearer tokens such as `ABSTRACTGATEWAY_AUTH_TOKEN` are not brows
 
 Remote browser-supplied Gateway URL changes are blocked by default. A hosted Flow instance should proxy only to its configured Gateway unless the operator explicitly enables `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` behind their own access control.
 
+Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the address the browser connected from, and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own machine. Forwarding headers sent by the browser itself (`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`) and any browser-supplied `X-AbstractFramework-App-Proxy` are dropped. Behind a reverse proxy the Gateway therefore sees the reverse proxy's address, not the end user's.
+
 ## About
 
 The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About dialog: the AbstractFlow version, the author and license, and links to the website, source, documentation, issue tracker and feedback form. When the dialog opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`) and lists the gateway, AbstractFramework and package versions it reports. If that request fails, the dialog shows `Gateway: unavailable (...)` with the HTTP status or error.

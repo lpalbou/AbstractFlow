@@ -45,6 +45,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not connected (hosts would read `null`), and when a required pin has
   another type than the interface expects.
 
+### Security
+- The `abstractflow-editor` server now tells the gateway which machine each
+  browser connects from, the same way the other AbstractFramework apps do.
+  Every request it sends to the gateway (sign-in, sign-out, the signed-in
+  check, API calls, live streams and WebSocket connections) carries
+  `X-Forwarded-For` set to the browser connection's own address and
+  `X-AbstractFramework-App-Proxy: abstractflow`. Values a browser sends for
+  `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`,
+  `Forwarded` or `X-AbstractFramework-App-Proxy` are dropped, so a remote
+  browser cannot pass itself off as the gateway's own machine. A connection
+  whose address cannot be determined is refused with HTTP 400.
+
 ## [0.3.20] - 2026-09-23
 
 This release brings pin expressions and a per-flow function library, canvas
