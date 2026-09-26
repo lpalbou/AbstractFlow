@@ -429,7 +429,7 @@ describe('declared interface boundary pins', () => {
       ],
     });
     const issues = computeRunPreflightIssues([startNode(), end], [], { flowInterfaces: ['abstractcode.agent.v1'] });
-    const pinIssues = issues.filter((i) => i.message.includes('required by interface abstractcode.agent.v1'));
+    const pinIssues = issues.filter((i) => i.message.includes('is required by abstractcode.agent.v1'));
     expect(pinIssues.map((i) => `${i.nodeId}:${i.message.split("'")[1]}`).sort()).toEqual([
       'end:meta',
       'end:success',
@@ -438,14 +438,15 @@ describe('declared interface boundary pins', () => {
       'start:provider',
     ]);
     expect(pinIssues.every((i) => i.severity === 'warning')).toBe(true);
-    expect(pinIssues.find((i) => i.nodeId === 'end' && i.message.includes("'success'"))?.message).toContain(
-      "Missing input pin 'success' (boolean)"
+    expect(pinIssues.find((i) => i.nodeId === 'end' && i.message.includes("'success'"))?.message).toBe(
+      "'success' (boolean) is required by abstractcode.agent.v1: hosts read it. Add it to On Flow End or remove the interface"
     );
+    expect(issues.some((i) => /add it back/i.test(i.message))).toBe(false);
   });
 
   it('is silent without declared interfaces or when every pin is present', () => {
     expect(
-      computeRunPreflightIssues([startNode(), endNode({})], []).some((i) => i.message.includes('required by interface'))
+      computeRunPreflightIssues([startNode(), endNode({})], []).some((i) => /is required by|not connected|the interface expects/.test(i.message))
     ).toBe(false);
     const start = startNode();
     start.data.outputs.push({ id: 'items', label: 'items', type: 'array' });
@@ -456,7 +457,59 @@ describe('declared interface boundary pins', () => {
         { id: 'synthesis', label: 'synthesis', type: 'string' },
       ],
     });
-    const issues = computeRunPreflightIssues([start, end], [], { flowInterfaces: ['abstractbatch.mapreduce.v1'] });
-    expect(issues.some((i) => i.message.includes('required by interface'))).toBe(false);
+    const toEnd = (pin: string) => ({ id: `w-${pin}`, source: 'start', sourceHandle: 'items', target: 'end', targetHandle: pin }) as Edge;
+    const issues = computeRunPreflightIssues([start, end], [toEnd('results'), toEnd('synthesis')], {
+      flowInterfaces: ['abstractbatch.mapreduce.v1'],
+    });
+    expect(issues.some((i) => /is required by|not connected|the interface expects/.test(i.message))).toBe(false);
+  });
+});
+
+describe('declared interface pins: connection and type', () => {
+  function agentEnd(extra: Partial<FlowNodeData> = {}) {
+    return endNode({
+      inputs: [
+        { id: 'exec-in', label: '', type: 'execution' },
+        { id: 'response', label: 'response', type: 'string' },
+        { id: 'success', label: 'success', type: 'string' },
+        { id: 'meta', label: 'meta', type: 'object' },
+      ],
+      ...extra,
+    });
+  }
+  function agentStart() {
+    const start = startNode();
+    start.data.outputs.push(
+      { id: 'provider', label: 'provider', type: 'provider' }, // documented legacy alias: accepted
+      { id: 'model', label: 'model', type: 'string' },
+      { id: 'prompt', label: 'prompt', type: 'string' }
+    );
+    return start;
+  }
+  const wired: Edge[] = [
+    { id: 'w1', source: 'x', sourceHandle: 'out', target: 'end', targetHandle: 'response' } as Edge,
+  ];
+
+  it('warns for a required end pin that is not connected (hosts read null)', () => {
+    const issues = computeRunPreflightIssues([agentStart(), agentEnd()], wired, { flowInterfaces: ['abstractcode.agent.v1'] });
+    const messages = issues.filter((i) => i.severity === 'warning').map((i) => i.message);
+    expect(messages).toContain("'success' is not connected; hosts will read null (abstractcode.agent.v1)");
+    expect(messages).toContain("'meta' is not connected; hosts will read null (abstractcode.agent.v1)");
+    expect(messages.some((m) => m.startsWith("'response' is not connected"))).toBe(false);
+  });
+
+  it('a pin default or a pin expression counts as set', () => {
+    const end = agentEnd({ pinDefaults: { success: true }, pinExpressions: { meta: '{}' } } as Partial<FlowNodeData>);
+    const issues = computeRunPreflightIssues([agentStart(), end], wired, { flowInterfaces: ['abstractcode.agent.v1'] });
+    expect(issues.some((i) => i.message.includes('not connected'))).toBe(false);
+  });
+
+  it('warns when a same-id pin has another type than the contract; legacy aliases pass', () => {
+    const issues = computeRunPreflightIssues([agentStart(), agentEnd()], wired, { flowInterfaces: ['abstractcode.agent.v1'] });
+    const typeIssues = issues.filter((i) => i.message.includes('the interface expects')).map((i) => i.message).sort();
+    expect(typeIssues).toEqual([
+      "'model' is typed string, the interface expects model (abstractcode.agent.v1)",
+      "'success' is typed string, the interface expects boolean (abstractcode.agent.v1)",
+    ]);
   });
 });

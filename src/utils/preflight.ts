@@ -3,7 +3,7 @@ import type { FlowFunction, FlowNodeData, Pin } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import type { GatewayFlowEditorReadiness } from './gatewayClient';
 import { gatewayAuthoringCapabilityStatus } from './gatewayClient';
-import { interfaceBoundaryPins, missingInterfacePins } from './flowFamilies';
+import { interfaceBoundaryPins, interfacePinTypeMatches, missingInterfacePins } from './flowFamilies';
 import { getArtifactConnectionError, getConfiguredArtifactInputError } from './mediaArtifacts';
 import { gatewayCapabilityForNodeType } from './nodeCapabilities';
 
@@ -420,20 +420,41 @@ export function computeRunPreflightIssues(
     }
   }
 
-  // Declared interfaces: every On Flow Start / On Flow End must carry the
-  // pins the contract requires (a host binds its inputs and reads its
-  // outputs by these ids). Advisory — the flow still runs, but a host
-  // started through the interface would send or read nothing there.
+  // Declared interfaces: a host binds its inputs to On Flow Start and reads
+  // its results from On Flow End BY PIN ID. Advisory (the flow still runs),
+  // but each of these is a value the host sends into nothing, reads as null,
+  // or receives with the wrong type.
   const interfacePins = interfaceBoundaryPins(options.flowInterfaces);
   if (interfacePins.start.length > 0 || interfacePins.end.length > 0) {
     for (const n of nodes) {
+      const isStart = n.data.nodeType === 'on_flow_start';
+      if (!isStart && n.data.nodeType !== 'on_flow_end') continue;
+      const nodeName = isStart ? 'On Flow Start' : 'On Flow End';
       for (const pin of missingInterfacePins(n.data, interfacePins)) {
-        const side = n.data.nodeType === 'on_flow_start' ? 'output' : 'input';
         push(
           n,
-          `Missing ${side} pin '${pin.id}' (${pin.type}) required by interface ${pin.interfaceId} — add it back so hosts can ${side === 'output' ? 'send' : 'read'} it`,
+          `'${pin.id}' (${pin.type}) is required by ${pin.interfaceId}: hosts ${isStart ? 'send' : 'read'} it. Add it to ${nodeName} or remove the interface`,
           'warning'
         );
+      }
+      const required = isStart ? interfacePins.start : interfacePins.end;
+      const present = isStart ? n.data.outputs : n.data.inputs;
+      const defaults = (n.data.pinDefaults || {}) as Record<string, unknown>;
+      const expressions = (n.data.pinExpressions || {}) as Record<string, unknown>;
+      for (const spec of required) {
+        const pin = present.find((p) => p.id === spec.id);
+        if (!pin) continue;
+        if (!interfacePinTypeMatches(pin.type, spec.type)) {
+          push(n, `'${pin.id}' is typed ${pin.type}, the interface expects ${spec.type} (${spec.interfaceId})`, 'warning');
+        }
+        if (
+          !isStart &&
+          !inputConnected(edges, n.id, pin.id) &&
+          !Object.prototype.hasOwnProperty.call(defaults, pin.id) &&
+          !Object.prototype.hasOwnProperty.call(expressions, pin.id)
+        ) {
+          push(n, `'${pin.id}' is not connected; hosts will read null (${spec.interfaceId})`, 'warning');
+        }
       }
     }
   }

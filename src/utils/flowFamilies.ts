@@ -244,6 +244,18 @@ export function interfaceBoundaryPins(interfaces: unknown): { start: InterfaceBo
   return { start, end };
 }
 
+// Documented compatibility aliases (types/flow.ts PinType): old flows spell
+// the text provider `provider` and the model `model_text`.
+const INTERFACE_TYPE_ALIASES: Readonly<Record<string, string>> = {
+  provider: 'provider_text',
+  model_text: 'model',
+};
+
+/** Does an existing pin's type satisfy the type an interface expects? */
+export function interfacePinTypeMatches(actual: PinType, expected: PinType): boolean {
+  return actual === expected || INTERFACE_TYPE_ALIASES[actual] === expected;
+}
+
 function pinFromSpec(spec: InterfacePinSpec): Pin {
   const pin: Pin = { id: spec.id, label: spec.label, type: spec.type };
   if (spec.description) pin.description = spec.description;
