@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.21] - 2026-09-26
+
 ### Changed
 - **Declaring an interface adds its pins.** Declaring an interface on a
   workflow (Flow Library > Interfaces, or the authoring assistant's
