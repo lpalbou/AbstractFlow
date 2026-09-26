@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useFlowStore } from '../hooks/useFlow';
+import { loadEdgeNotice, useFlowStore } from '../hooks/useFlow';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
 import { RunHistoryModal } from './RunHistoryModal';
@@ -465,6 +465,13 @@ export function Toolbar() {
     loadBaselineFlowIdRef.current = state.flowId || null;
     setSavedFlowSignature(flowSignatureFor(loaded));
     if (state.interfacePinsAddedOnLoad > 0) toast(INTERFACE_PINS_ADDED_NOTICE);
+    // Edges the canvas could not draw are never lost silently.
+    const edgeNotice = loadEdgeNotice(state.loadEdgeReport);
+    if (edgeNotice) {
+      if (state.loadEdgeReport.dropped.length > 0) toast.error(edgeNotice, { duration: 12000 });
+      else toast(edgeNotice, { duration: 8000 });
+      console.warn('[AbstractFlow] load: connections not drawn', state.loadEdgeReport);
+    }
   }, []);
 
   const formatValue = useCallback((value: unknown) => {

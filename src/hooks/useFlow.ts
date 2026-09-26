@@ -15,7 +15,7 @@ import {
 } from 'reactflow';
 import type { FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
-import { inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
+import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { computeFoldedGetters } from '../utils/foldedGetters';
 import { inferEntryNode, isRouteOverrideEdge, routeKey as buildRouteKey, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from '../utils/visualFlowCompat';
@@ -25,6 +25,52 @@ import {
   type FlowAuthoringApplyResult,
   type FlowAuthoringSnapshot,
 } from '../utils/flowAuthoringCommands';
+
+/** One stored edge and why loadFlow did not draw it. */
+export interface LoadEdgeNote {
+  /** The stored edge id. */
+  id: string;
+  /** `source.handle -> target.handle` */
+  edge: string;
+  reason: string;
+}
+
+/**
+ * Edges loadFlow could not draw. `preserved` ones are kept and saved as-is;
+ * `dropped` ones are removed from the document (a save will not write them).
+ */
+export interface LoadEdgeReport {
+  preserved: LoadEdgeNote[];
+  dropped: LoadEdgeNote[];
+}
+
+/**
+ * The notice shown after a load that could not draw every stored edge, or
+ * null when every edge was drawn. Lists up to `limit` edges per bucket.
+ */
+export function loadEdgeNotice(report: LoadEdgeReport, limit = 5): string | null {
+  const parts: string[] = [];
+  const list = (notes: LoadEdgeNote[], withReason: boolean) => {
+    const shown = notes.slice(0, limit).map((n) => (withReason ? `${n.edge} (${n.reason})` : n.edge));
+    if (notes.length > limit) shown.push(`… ${notes.length - limit} more`);
+    return shown.join('; ');
+  };
+  if (report.dropped.length > 0) {
+    parts.push(
+      `${report.dropped.length} connection${report.dropped.length === 1 ? ' was' : 's were'} dropped and will not be saved: ${list(report.dropped, true)}`
+    );
+  }
+  if (report.preserved.length > 0) {
+    parts.push(
+      `${report.preserved.length} connection${report.preserved.length === 1 ? ' uses a pin' : 's use pins'} the node does not declare; kept and saved, but not drawn: ${list(report.preserved, false)}`
+    );
+  }
+  return parts.length > 0 ? parts.join('. ') : null;
+}
+
+function edgeWiringKey(e: Pick<Edge, 'source' | 'sourceHandle' | 'target' | 'targetHandle'>): string {
+  return `${e.source}|${e.sourceHandle || ''}|${e.target}|${e.targetHandle || ''}`;
+}
 
 interface FlowState {
   // Flow data
@@ -40,6 +86,15 @@ interface FlowState {
    * document excludes them, so such a flow opens with unsaved changes.
    */
   interfacePinsAddedOnLoad: number;
+  /**
+   * Stored edges the canvas cannot draw because a handle is not a declared
+   * pin (the runtime resolves it by key: code-node dict returns, a subflow's
+   * `child_output`). Kept verbatim and re-emitted by getFlow while both
+   * endpoint nodes exist.
+   */
+  preservedEdges: Edge[];
+  /** What the last loadFlow did with edges it could not draw (see LoadEdgeReport). */
+  loadEdgeReport: LoadEdgeReport;
   // Flow-level named helper functions (tier 2). Owned by the document like
   // nodes/edges: load/save round-trips them, undo/redo covers edits.
   flowFunctions: FlowFunction[];
@@ -489,6 +544,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   edges: [],
   flowFunctions: [],
   interfacePinsAddedOnLoad: 0,
+  preservedEdges: [],
+  loadEdgeReport: { preserved: [], dropped: [] },
   selectedNode: null,
   selectedEdge: null,
   focusNodeRequest: null,
@@ -2787,17 +2844,46 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       return { ...e, sourceHandle: nextSourceHandle, targetHandle: nextTargetHandle };
     });
 
-    // Drop edges that reference missing pins or violate the canonical
-    // connection contract (prevents invisible/stale invalid edges).
-    const structurallyValidEdges = migratedEdges.filter((e) => {
+    // Sort every stored edge into exactly one bucket — nothing is lost
+    // silently (a load→save round trip used to drop every edge it could not
+    // draw, e.g. 8 of entity-chat's 22):
+    // - drawn: both endpoints and handles exist and the connection is valid;
+    // - preserved: both nodes exist but a handle is not a DECLARED pin. The
+    //   runtime resolves such handles by key (a code node's returned dict,
+    //   a subflow's `child_output`), so the edge is real wiring: it is kept
+    //   verbatim and re-emitted by getFlow, just not drawn on the canvas;
+    // - dropped: an endpoint node is missing, or the editor's connection
+    //   contract refuses it. Reported with the reason.
+    const edgeReport: LoadEdgeReport = { preserved: [], dropped: [] };
+    const describeEdge = (e: Edge) => `${e.source}.${e.sourceHandle || '?'} -> ${e.target}.${e.targetHandle || '?'}`;
+    const structurallyValidEdges: Edge[] = [];
+    const preservedEdges: Edge[] = [];
+    for (const e of migratedEdges) {
       const source = nodeById.get(e.source);
       const target = nodeById.get(e.target);
-      if (!source || !target) return false;
-      if (!e.sourceHandle || !e.targetHandle) return false;
-      const sourceHasHandle = source.data.outputs.some((p) => p.id === e.sourceHandle);
-      const targetHasHandle = target.data.inputs.some((p) => p.id === e.targetHandle);
-      return sourceHasHandle && targetHasHandle;
-    });
+      if (!source || !target) {
+        edgeReport.dropped.push({ id: e.id, edge: describeEdge(e), reason: `node '${!source ? e.source : e.target}' does not exist` });
+        continue;
+      }
+      const sourceHasHandle = Boolean(e.sourceHandle) && source.data.outputs.some((p) => p.id === e.sourceHandle);
+      const targetHasHandle = Boolean(e.targetHandle) && target.data.inputs.some((p) => p.id === e.targetHandle);
+      if (sourceHasHandle && targetHasHandle) {
+        structurallyValidEdges.push(e);
+        continue;
+      }
+      if (!e.sourceHandle || !e.targetHandle) {
+        edgeReport.dropped.push({ id: e.id, edge: describeEdge(e), reason: 'the connection has no pin id' });
+        continue;
+      }
+      preservedEdges.push(e);
+      edgeReport.preserved.push({
+        id: e.id,
+        edge: describeEdge(e),
+        reason: !sourceHasHandle
+          ? `'${e.sourceHandle}' is not a declared output of ${e.source}`
+          : `'${e.targetHandle}' is not a declared input of ${e.target}`,
+      });
+    }
     const validEdges = structurallyValidEdges.filter((edge) => {
       const connection: Connection = {
         source: edge.source,
@@ -2805,7 +2891,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         target: edge.target,
         targetHandle: edge.targetHandle ?? null,
       };
-      return validateConnection(nodes, structurallyValidEdges.filter((candidate) => candidate.id !== edge.id), connection);
+      const others = structurallyValidEdges.filter((candidate) => candidate.id !== edge.id);
+      if (validateConnection(nodes, others, connection)) return true;
+      edgeReport.dropped.push({
+        id: edge.id,
+        edge: describeEdge(edge),
+        reason: getConnectionError(nodes, others, connection) || 'the editor refuses this connection',
+      });
+      return false;
     });
 
     // Route-specific data overrides are persisted as node.data.inputRouteOverrides,
@@ -2881,8 +2974,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       position: n.position,
       data: n.data,
     }));
-    const visualEdges = displayEdges
-      .filter((e) => !isRouteOverrideEdge(e))
+    const visualEdges = [...displayEdges.filter((e) => !isRouteOverrideEdge(e)), ...preservedEdges]
       .map((e) => ({
         id: e.id,
         source: e.source,
@@ -2910,6 +3002,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowInterfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes,
       edges: displayEdges,
+      preservedEdges,
+      loadEdgeReport: edgeReport,
       flowFunctions,
       interfacePinsAddedOnLoad,
       selectedNode: null,
@@ -2939,8 +3033,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       position: n.position,
       data: n.data,
     }));
-    const visualEdges = state.edges
-      .filter((e) => !isRouteOverrideEdge(e))
+    // Re-emit the preserved (undrawn) edges whose endpoints still exist and
+    // that the canvas has not since drawn itself.
+    const nodeIds = new Set(state.nodes.map((n) => n.id));
+    const drawnKeys = new Set(state.edges.map(edgeWiringKey));
+    const keptPreserved = state.preservedEdges.filter(
+      (e) => nodeIds.has(e.source) && nodeIds.has(e.target) && !drawnKeys.has(edgeWiringKey(e))
+    );
+    const visualEdges = [...state.edges.filter((e) => !isRouteOverrideEdge(e)), ...keptPreserved]
       .map((e) => ({
         id: e.id,
         source: e.source,
@@ -2973,6 +3073,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: [],
       flowFunctions: [],
       interfacePinsAddedOnLoad: 0,
+      preservedEdges: [],
+      loadEdgeReport: { preserved: [], dropped: [] },
       selectedNode: null,
       selectedEdge: null,
       clipboard: null,
