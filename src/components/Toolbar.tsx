@@ -40,7 +40,8 @@ import { computeRunPreflightIssues } from '../utils/preflight';
 import { waitNotificationText } from '../utils/waitClassification';
 import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateFlowFamily';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
-import { INTERFACE_PINS_ADDED_NOTICE, normalizeInterfaces } from '../utils/flowFamilies';
+import { INTERFACE_PINS_ADDED_NOTICE } from '../utils/flowFamilies';
+import { interfacesFromPutResponse, updateOpenFlowMetadata } from '../hooks/openFlowMetadata';
 import { errorSnippet } from '../utils/errorSnippet';
 import { saveButtonDisabled, saveGateTooltip, type SaveGateInput } from '../utils/saveGate';
 import { savedBaselineSnapshot, shouldRebaselineOnIdentityChange } from '../utils/saveBaseline';
@@ -373,7 +374,6 @@ export function Toolbar() {
     nodes,
     edges,
     flowInterfaces,
-    setFlowInterfaces,
     flowFunctions,
     execView,
     setExecView,
@@ -796,33 +796,20 @@ export function Toolbar() {
         }
         return;
       }
-      const isOpenFlow = Boolean(flowId && id === flowId);
-      // Snapshot BEFORE the request: edits made while it is in flight must
-      // stay unsaved (see utils/saveBaseline.ts).
-      const cleanBefore = isOpenFlow && !hasUnsavedChanges ? getFlow() : null;
-      const updated = await renameFlow(id, name, gatewayContracts);
-      if (isOpenFlow) {
-        // Update the open document in place (never reload it: that would
-        // discard unsaved edits and the undo history). A clean editor stays
-        // clean — the gateway now holds this name.
-        const savedName = updated.name || name;
-        if (cleanBefore) setSavedFlowSignature(flowSignatureFor({ ...cleanBefore, name: savedName }));
-        setFlowName(savedName);
-      }
+      // If this flow is (still) the open document when the PUT returns, update
+      // it in place — never reload it, which would discard unsaved edits and
+      // the undo history. A clean editor stays clean: the gateway holds this name.
+      const { baseline } = await updateOpenFlowMetadata({
+        id,
+        hasUnsavedChanges,
+        request: () => renameFlow(id, name, gatewayContracts),
+        patchFrom: (updated) => ({ name: updated.name || name }),
+      });
+      if (baseline) setSavedFlowSignature(flowSignatureFor(baseline));
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Renamed');
     },
-    [
-      bundledFlowIdSet,
-      duplicateBundledFamily,
-      flowId,
-      gatewayContracts,
-      getFlow,
-      hasUnsavedChanges,
-      loadFlow,
-      queryClient,
-      setFlowName,
-    ]
+    [bundledFlowIdSet, duplicateBundledFamily, gatewayContracts, hasUnsavedChanges, loadFlow, queryClient]
   );
 
   const handleUpdateDescription = useCallback(
@@ -847,25 +834,23 @@ export function Toolbar() {
         toast.error('Bundled flows are read-only. Load or duplicate first.');
         return;
       }
-      const isOpenFlow = Boolean(flowId && id === flowId);
-      // Snapshot BEFORE the request: edits made while it is in flight must
-      // stay unsaved (see utils/saveBaseline.ts).
-      const cleanBefore = isOpenFlow && !hasUnsavedChanges ? getFlow() : null;
-      const updated = await updateFlowInterfaces(id, nextInterfaces, gatewayContracts);
-      if (isOpenFlow) {
-        // Update the open document in place: unsaved edits and undo history
-        // are kept, and the On Flow Start / On Flow End nodes receive the pins
-        // the interfaces require (one undo step). The gateway holds the new
-        // interfaces but not those pins yet, so the flow shows unsaved changes
-        // until Save stores both; a clean editor with nothing to add stays clean.
-        const interfaces = normalizeInterfaces(Array.isArray(updated?.interfaces) ? updated.interfaces : nextInterfaces);
-        if (cleanBefore) setSavedFlowSignature(flowSignatureFor({ ...cleanBefore, interfaces }));
-        setFlowInterfaces(interfaces);
-      }
+      // If this flow is (still) the open document when the PUT returns, update
+      // it in place: unsaved edits and undo history are kept, and the On Flow
+      // Start / On Flow End nodes receive the pins the interfaces require (one
+      // undo step). The gateway holds the new interfaces but not those pins
+      // yet, so the flow shows unsaved changes until Save stores both; a clean
+      // editor with nothing to add stays clean.
+      const { baseline } = await updateOpenFlowMetadata({
+        id,
+        hasUnsavedChanges,
+        request: () => updateFlowInterfaces(id, nextInterfaces, gatewayContracts),
+        patchFrom: (updated) => ({ interfaces: interfacesFromPutResponse(updated) }),
+      });
+      if (baseline) setSavedFlowSignature(flowSignatureFor(baseline));
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Interfaces updated');
     },
-    [bundledFlowIdSet, flowId, gatewayContracts, getFlow, hasUnsavedChanges, queryClient, setFlowInterfaces]
+    [bundledFlowIdSet, gatewayContracts, hasUnsavedChanges, queryClient]
   );
 
   const handleDeleteFlow = useCallback(
