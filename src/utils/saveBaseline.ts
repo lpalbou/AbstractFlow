@@ -40,15 +40,23 @@ export interface RebaselineInput {
   isEmptyFlow: boolean;
   /** A create just published its own baseline; this transition is its echo. */
   saveJustSucceeded: boolean;
+  /**
+   * The flow id a load just published its own baseline for (the document AS
+   * STORED), or null. When it is this transition's flow, the load's baseline
+   * stands: re-baselining to the current graph would hide the pins the load
+   * added for the flow's interfaces (the flow must open with unsaved changes).
+   */
+  loadBaselineFlowId?: string | null;
 }
 
 /**
  * May the identity-change effect overwrite the saved baseline?
  *
- * Yes for identity changes the effect actually owns — load, import, new,
- * delete. No when a save already published the authoritative baseline.
+ * Yes for identity changes the effect actually owns — import, new, delete.
+ * No when a save or a load already published the authoritative baseline.
  */
 export function shouldRebaselineOnIdentityChange(input: RebaselineInput): boolean {
   if (input.saveJustSucceeded) return false;
+  if (input.loadBaselineFlowId != null && input.loadBaselineFlowId === input.nextFlowId) return false;
   return Boolean(input.nextFlowId) || input.isEmptyFlow;
 }

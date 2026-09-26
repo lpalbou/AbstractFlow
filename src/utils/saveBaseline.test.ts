@@ -96,3 +96,30 @@ describe('in-flight edits survive a first save', () => {
     expect(signature(s0)).toBe(signature(savedBaselineSnapshot(s0, 'abc')));
   });
 });
+
+describe('shouldRebaselineOnIdentityChange after a load', () => {
+  it('keeps the baseline a load published for this flow (pins added on open stay unsaved)', () => {
+    expect(
+      shouldRebaselineOnIdentityChange({
+        nextFlowId: 'abc',
+        isEmptyFlow: false,
+        saveJustSucceeded: false,
+        loadBaselineFlowId: 'abc',
+      })
+    ).toBe(false);
+  });
+
+  it('a load baseline for another flow does not block re-baselining', () => {
+    expect(
+      shouldRebaselineOnIdentityChange({
+        nextFlowId: 'xyz',
+        isEmptyFlow: false,
+        saveJustSucceeded: false,
+        loadBaselineFlowId: 'abc',
+      })
+    ).toBe(true);
+    expect(
+      shouldRebaselineOnIdentityChange({ nextFlowId: null, isEmptyFlow: true, saveJustSucceeded: false, loadBaselineFlowId: null })
+    ).toBe(true);
+  });
+});

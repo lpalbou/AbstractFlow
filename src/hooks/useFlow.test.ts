@@ -383,26 +383,38 @@ describe('setFlowInterfaces: declaring an interface adds its pins', () => {
 });
 
 describe('loadFlow: a saved flow that declares an interface opens with its pins', () => {
-  it('adds the missing pins of a legacy flow and bakes them into the loaded document (no dirty loop)', () => {
+  it('adds the missing pins of a legacy flow and opens it UNSAVED; after the save nothing is added again', () => {
     const store = useFlowStore.getState();
     store.clearFlow();
-    const loaded = store.loadFlow(interfaceFixture(['abstractcode.agent.v1']));
+    const stored = interfaceFixture(['abstractcode.agent.v1']);
+    const loaded = store.loadFlow(stored);
     expect(pinIds('start', 'outputs')).toEqual(expect.arrayContaining(['prompt', 'provider', 'model']));
     expect(pinIds('end', 'inputs')).toEqual(['exec-in', 'response', 'success', 'meta']);
     expect(useFlowStore.getState().past).toEqual([]);
+    expect(useFlowStore.getState().interfacePinsAddedOnLoad).toBe(5);
 
-    // The Toolbar baselines on the returned document: it already carries the
-    // pins, so the editor is clean after open ...
-    expect(toolbarSignature(useFlowStore.getState().getFlow())).toEqual(toolbarSignature(loaded));
-    // ... and the next Save persists them: re-opening that document changes nothing.
-    const reloaded = useFlowStore.getState().loadFlow(loaded);
-    expect(toolbarSignature(reloaded)).toEqual(toolbarSignature(loaded));
+    // The Toolbar baselines on the returned document = the flow AS STORED
+    // (without the added pins), so the editor shows unsaved changes.
+    const baseline = toolbarSignature(loaded);
+    expect(loaded.nodes.find((n) => n.id === 'end')?.data.inputs.map((p) => p.id)).toEqual(['exec-in']);
+    expect(toolbarSignature(useFlowStore.getState().getFlow())).not.toEqual(baseline);
+
+    // Save: the baseline becomes what was sent. Re-opening that stored
+    // document adds nothing, reports nothing and is clean — no save/dirty loop.
+    const sent = useFlowStore.getState().getFlow();
+    const reopened = useFlowStore.getState().loadFlow(sent);
+    expect(useFlowStore.getState().interfacePinsAddedOnLoad).toBe(0);
+    expect(toolbarSignature(useFlowStore.getState().getFlow())).toEqual(toolbarSignature(reopened));
+    const again = useFlowStore.getState().loadFlow(reopened);
+    expect(useFlowStore.getState().interfacePinsAddedOnLoad).toBe(0);
+    expect(toolbarSignature(again)).toEqual(toolbarSignature(reopened));
   });
 
   it('leaves flows without interfaces untouched', () => {
     const store = useFlowStore.getState();
     store.clearFlow();
     store.loadFlow(interfaceFixture());
+    expect(useFlowStore.getState().interfacePinsAddedOnLoad).toBe(0);
     expect(pinIds('start', 'outputs')).toEqual(['exec-out', 'prompt']);
     expect(pinIds('end', 'inputs')).toEqual(['exec-in']);
   });

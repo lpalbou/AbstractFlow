@@ -40,7 +40,7 @@ import { computeRunPreflightIssues } from '../utils/preflight';
 import { waitNotificationText } from '../utils/waitClassification';
 import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateFlowFamily';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
-import { normalizeInterfaces } from '../utils/flowFamilies';
+import { INTERFACE_PINS_ADDED_NOTICE, normalizeInterfaces } from '../utils/flowFamilies';
 import { errorSnippet } from '../utils/errorSnippet';
 import { saveButtonDisabled, saveGateTooltip, type SaveGateInput } from '../utils/saveGate';
 import { savedBaselineSnapshot, shouldRebaselineOnIdentityChange } from '../utils/saveBaseline';
@@ -444,12 +444,28 @@ export function Toolbar() {
     // document, on the first save: the end of a long authoring session.
     const saveJustSucceeded = saveJustSucceededRef.current;
     saveJustSucceededRef.current = false;
-    if (shouldRebaselineOnIdentityChange({ nextFlowId, isEmptyFlow, saveJustSucceeded })) {
+    const loadBaselineFlowId = loadBaselineFlowIdRef.current;
+    loadBaselineFlowIdRef.current = null;
+    if (shouldRebaselineOnIdentityChange({ nextFlowId, isEmptyFlow, saveJustSucceeded, loadBaselineFlowId })) {
       setSavedFlowSignature(currentFlowSignature);
     }
   }, [currentFlowSignature, flowId, isEmptyFlow]);
 
   const saveJustSucceededRef = useRef(false);
+  // Flow id a load just published its baseline for (see adoptLoadedDocument).
+  const loadBaselineFlowIdRef = useRef<string | null>(null);
+
+  /**
+   * Baseline a freshly loaded document: `loadFlow` returns the flow AS STORED,
+   * so pins it added for the declared interfaces show as unsaved changes,
+   * with a one-line notice. The identity-change effect keeps this baseline.
+   */
+  const adoptLoadedDocument = useCallback((loaded: VisualFlow) => {
+    const state = useFlowStore.getState();
+    loadBaselineFlowIdRef.current = state.flowId || null;
+    setSavedFlowSignature(flowSignatureFor(loaded));
+    if (state.interfacePinsAddedOnLoad > 0) toast(INTERFACE_PINS_ADDED_NOTICE);
+  }, []);
 
   const formatValue = useCallback((value: unknown) => {
     if (value == null) return '';
@@ -690,7 +706,7 @@ export function Toolbar() {
           const loaded = loadFlow(bundled);
           setFlowId(null);
           setLoadedBundledRunTarget(target);
-          setSavedFlowSignature(flowSignatureFor(loaded));
+          adoptLoadedDocument(loaded);
           setShowFlowLibrary(false);
           toast.success(
             target
@@ -702,7 +718,7 @@ export function Toolbar() {
         const flow = await fetchFlow(selectedFlowId, gatewayContracts);
         const loaded = loadFlow(flow);
         resetLoadedDocument();
-        setSavedFlowSignature(flowSignatureFor(loaded));
+        adoptLoadedDocument(loaded);
         setShowFlowLibrary(false);
         toast.success(`Loaded "${flow.name}"`);
       } catch (error) {
@@ -775,7 +791,7 @@ export function Toolbar() {
         if (root) {
           const loaded = loadFlow(root);
           resetLoadedDocument();
-          setSavedFlowSignature(flowSignatureFor(loaded));
+          adoptLoadedDocument(loaded);
           setShowFlowLibrary(false);
         }
         return;
@@ -894,7 +910,7 @@ export function Toolbar() {
                 if (root) {
                   const loaded = loadFlow(root);
                   resetLoadedDocument();
-                  setSavedFlowSignature(flowSignatureFor(loaded));
+                  adoptLoadedDocument(loaded);
                   setShowFlowLibrary(false);
                 }
                 return;
@@ -903,7 +919,7 @@ export function Toolbar() {
               queryClient.invalidateQueries({ queryKey: ['flows'] });
               const loaded = loadFlow(created);
               resetLoadedDocument();
-              setSavedFlowSignature(flowSignatureFor(loaded));
+              adoptLoadedDocument(loaded);
               setShowFlowLibrary(false);
               toast.success(`Duplicated as "${created.name}"`);
             } catch (e) {
@@ -1640,7 +1656,7 @@ export function Toolbar() {
               if (root) {
                 const loaded = loadFlow(root);
                 resetLoadedDocument();
-                setSavedFlowSignature(flowSignatureFor(loaded));
+                adoptLoadedDocument(loaded);
               }
             } catch (e) {
               toast.error(e instanceof Error ? e.message : 'Duplicate failed');
@@ -1661,7 +1677,7 @@ export function Toolbar() {
             queryClient.invalidateQueries({ queryKey: ['flows'] });
             const loaded = loadFlow(created);
             resetLoadedDocument();
-            setSavedFlowSignature(flowSignatureFor(loaded));
+            adoptLoadedDocument(loaded);
             toast.success(`Duplicated as "${created.name}"`);
           } catch (e) {
             toast.error(e instanceof Error ? e.message : 'Duplicate failed');

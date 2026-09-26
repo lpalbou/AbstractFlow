@@ -34,6 +34,12 @@ interface FlowState {
   flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
+  /**
+   * Pins the last `loadFlow` added to On Flow Start / On Flow End because the
+   * flow's declared interfaces require them (0 = none). The returned loaded
+   * document excludes them, so such a flow opens with unsaved changes.
+   */
+  interfacePinsAddedOnLoad: number;
   // Flow-level named helper functions (tier 2). Owned by the document like
   // nodes/edges: load/save round-trips them, undo/redo covers edits.
   flowFunctions: FlowFunction[];
@@ -482,6 +488,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: [],
   edges: [],
   flowFunctions: [],
+  interfacePinsAddedOnLoad: 0,
   selectedNode: null,
   selectedEdge: null,
   focusNodeRequest: null,
@@ -1215,18 +1222,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     }
 
-    // Declared interfaces require boundary pins: a saved flow that declares
-    // one but lacks some of its pins gets them on open (added pins are part of
-    // the loaded document, so they persist with the next save).
-    const interfacePins = interfaceBoundaryPins(flow.interfaces);
-
-    const nodes: Node<FlowNodeData>[] = flowNodes.map((vn) => {
+    const loadedNodes: Node<FlowNodeData>[] = flowNodes.map((vn) => {
       const authoredType = (vn.data as FlowNodeData | undefined)?.nodeType;
       const template = getNodeTemplate(authoredType || vn.type) || getNodeTemplate(vn.type);
       let data: FlowNodeData = template
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
-      data = withInterfacePins(data, interfacePins);
 
       if (data.nodeType === 'make_object' && data.label === 'Create JSON') {
         data = { ...data, label: 'Build JSON' };
@@ -2734,6 +2735,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
     });
 
+    // Declared interfaces require boundary pins. A saved flow that lacks some
+    // of them gets them in the editor, but the returned document (the
+    // Toolbar's saved baseline) is the flow AS STORED, so the flow opens with
+    // unsaved changes until the user saves the added pins. After that save
+    // the stored flow has them and nothing is added again (no dirty loop).
+    const nodes = applyInterfacePins(loadedNodes, flow.interfaces);
+    let interfacePinsAddedOnLoad = 0;
+    nodes.forEach((node, index) => {
+      const before = loadedNodes[index].data;
+      if (node.data === before) return;
+      interfacePinsAddedOnLoad +=
+        node.data.inputs.length + node.data.outputs.length - before.inputs.length - before.outputs.length;
+    });
+
     const edges: Edge[] = rawEdges.map((ve) => ({
       id: ve.id,
       source: ve.source,
@@ -2858,8 +2873,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
     nodeIdCounter = maxNodeId;
 
-    const nodesWithRoutes = withMultiEntryRouteData(nodes, displayEdges);
-    const entryNode = inferEntryNode(nodes, displayEdges);
+    const nodesWithRoutes = withMultiEntryRouteData(loadedNodes, displayEdges);
+    const entryNode = inferEntryNode(loadedNodes, displayEdges);
     const visualNodes = nodesWithRoutes.map((n) => ({
       id: n.id,
       type: n.data.nodeType,
@@ -2896,6 +2911,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes,
       edges: displayEdges,
       flowFunctions,
+      interfacePinsAddedOnLoad,
       selectedNode: null,
       selectedEdge: null,
       // Always fit the camera to a freshly loaded flow — a zoomed-in camera
@@ -2956,6 +2972,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: [],
       edges: [],
       flowFunctions: [],
+      interfacePinsAddedOnLoad: 0,
       selectedNode: null,
       selectedEdge: null,
       clipboard: null,

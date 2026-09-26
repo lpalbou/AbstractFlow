@@ -215,6 +215,9 @@ export function normalizeInterfaces(value: unknown): string[] {
   return out;
 }
 
+/** One-line notice shown when opening a flow adds missing interface pins. */
+export const INTERFACE_PINS_ADDED_NOTICE = 'Interface pins were added to On Flow Start/End; save to store them';
+
 /** A required boundary pin together with the interface that requires it. */
 export interface InterfaceBoundaryPin extends InterfacePinSpec {
   interfaceId: string;
