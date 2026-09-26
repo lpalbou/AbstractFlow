@@ -1566,8 +1566,9 @@ def build_chat() -> dict:
     N.append(start_node("Prompt arrives", [
         pin("prompt", "prompt", "string"),
         pin("system", "system", "string"),
-        pin("provider", "provider", "string"),
-        pin("model", "model", "string"),
+        # agent.v1 types (hosts pick from the provider/model catalogs).
+        pin("provider", "provider", "provider_text"),
+        pin("model", "model", "model"),
         pin("state", "state", "object"),
         pin("participants", "participants", "array"),
     ], 80, 260, pin_defaults={"participants": []}))
@@ -1580,7 +1581,7 @@ def build_chat() -> dict:
         {"context": var_expr("context")}))
     N.append(make_obj("visit_in", "Compose the visit", [
         ("message", "string"), ("state", "object"), ("system", "string"),
-        ("provider", "string"), ("model", "string"),
+        ("provider", "provider_text"), ("model", "model"),
         ("participants", "array"),
     ], 620, 100))
     N.append(subflow_node("visit", "VISIT — a conversational moment", VISIT_ID, 620, 260))

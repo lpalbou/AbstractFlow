@@ -38,12 +38,12 @@
           {
             "id": "provider",
             "label": "provider",
-            "type": "string"
+            "type": "provider_text"
           },
           {
             "id": "model",
             "label": "model",
-            "type": "string"
+            "type": "model"
           },
           {
             "id": "state",
@@ -158,12 +158,12 @@
           {
             "id": "provider",
             "label": "provider",
-            "type": "string"
+            "type": "provider_text"
           },
           {
             "id": "model",
             "label": "model",
-            "type": "string"
+            "type": "model"
           },
           {
             "id": "participants",
