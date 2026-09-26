@@ -45,7 +45,7 @@ export async function fetchGatewayAboutRows(
   try {
     payload = await fetcher(GATEWAY_ABOUT_PATH);
   } catch (error) {
-    return gatewayVersionRows({ error: gatewayAboutErrorReason(error) });
+    return gatewayVersionRows(null, gatewayAboutErrorReason(error));
   }
   return gatewayVersionRows(payload);
 }

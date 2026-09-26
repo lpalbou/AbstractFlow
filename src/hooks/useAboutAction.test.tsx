@@ -140,7 +140,7 @@ describe('gateway versions for the About dialog', () => {
     const rows = await fetchGatewayAboutRows(async () => {
       throw new GatewayHttpError('HTTP 404 Not Found: Not Found', 404, null);
     });
-    expect(vi.mocked(gatewayVersionRows)).toHaveBeenCalledWith({ error: 'HTTP 404 Not Found: Not Found' });
+    expect(vi.mocked(gatewayVersionRows)).toHaveBeenCalledWith(null, 'HTTP 404 Not Found: Not Found');
     expect(rows).toEqual([['Gateway', 'unavailable (HTTP 404 Not Found: Not Found)']]);
   });
 
