@@ -14,16 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the `On Flow Start` and `On Flow End` nodes, typed per the contract (for
   `abstractcode.agent.v1`: `provider`, `model`, `prompt` in; `response`,
   `success`, `meta` out). Existing pins are kept as authored. Saved workflows
-  that declare an interface receive any missing pin when opened. The interface
+  that declare an interface receive any missing pin when opened and then show
+  unsaved changes with a notice until you save them. The interface
   editor lists the typed pins of each selected interface. An `On Flow Start`
   or `On Flow End` node added to a workflow that declares interfaces arrives
   with their pins. See
   [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
 - Changing the name, description or interfaces of the workflow open in the
   editor from the Flow Library keeps your unsaved edits and undo history.
-- The bundled `deep-research`, `entity-chat`, `entity-goodbye` and
-  `multiagent-coding` workflows declare the pins their interfaces require
-  (unwired).
+- The bundled `deep-research` workflow researches the `prompt` an agent host
+  sends (AbstractCode) when no `request` is given, and reports `success`
+  (true when a report was produced). The bundled `entity-chat`,
+  `entity-goodbye` and `multiagent-coding` workflows declare the pins their
+  interfaces require; some of them are not connected yet.
 
 ### Added
 - **About dialog.** The top-bar cluster has an About button (shared
@@ -38,7 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `provider`, `model`, `tools` in; `result`, `success`, `cycles_used`,
   `stopped_reason` out) can be declared from the Flow Library.
 - Run preflight warns when an `On Flow Start` or `On Flow End` node lacks a
-  pin required by a declared interface.
+  pin required by a declared interface, when a required `On Flow End` pin is
+  not connected (hosts would read `null`), and when a required pin has
+  another type than the interface expects.
 
 ## [0.3.20] - 2026-09-23
 
