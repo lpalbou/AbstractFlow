@@ -403,7 +403,8 @@ Entry and terminal:
 
 - `on_flow_start`: standard run entry; add runtime input outputs here.
 - `on_user_request`: chat entry (user `message` and `context`).
-- `on_schedule`, `on_event`, `on_agent_message`: event entries.
+- `on_schedule`, `on_event`, `on_agent_message`: waits inside a running flow
+  (they do not start it; recurring runs are automations).
 - `on_flow_end`: terminal; add an input for every output the run exposes.
 
 Common chains:
@@ -435,12 +436,19 @@ The catalog gives exact pins; this section explains usage.
 
 `on_flow_start` (default manual entry), `on_flow_end` (final boundary),
 `on_user_request` (chat), `on_agent_message`, `on_schedule` (configure
-`event.schedule`/`event.recurrent`), `on_event` (durable custom events),
+`event.schedule` as an interval such as `5m` or an ISO timestamp, never cron,
+and `event.recurrent`), `on_event` (durable custom events),
 `wait_event` (pause for event), `emit_event`, `wait_until` (delay),
 `system_datetime` (pure current-time metadata for prompts/filenames/digests).
 
-Scheduled digest pattern: `on_schedule` -> prompt builder -> Agent/LLM ->
-write/report -> `on_flow_end`, with `system_datetime.iso` in prompt variables.
+`on_schedule` and `on_event` time or signal work INSIDE a run that is already
+started; they never start a flow. To run a flow every N minutes, publish it and
+create an automation from it (its trigger defaults live in the flow's
+`automation_defaults`); each run then starts at `on_flow_start`.
+
+Scheduled digest pattern (run by an automation): `on_flow_start` -> prompt
+builder -> Agent/LLM -> write/report -> `on_flow_end`, with
+`system_datetime.iso` in prompt variables.
 
 ### LLM And Agent Nodes
 

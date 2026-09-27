@@ -411,6 +411,18 @@ config CLIs; changing a default does not load or unload a model.
 
 Open the **Flow Library**, select a workflow and use the edit button next to **Interfaces** to declare the contracts it implements (for example **Runnable agent (v1)** for AbstractCode). The editor lists the typed pins each selected interface requires. Saving adds the missing ones to the `On Flow Start` and `On Flow End` nodes: right away when the workflow is open in the editor (your unsaved edits and undo history are kept, and the flow shows unsaved changes until you **Save**), otherwise the next time you open it. Wire the added pins on the canvas so hosts get real values. See [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for the pins of every interface.
 
+## Automation Defaults
+
+An automation runs a published workflow again and again: on a fixed interval, once at a given time, or only when you ask. Automations are created and managed in AbstractObserver or the Assistant; the editor stores what an automation created from a workflow starts with.
+
+Open the **Flow Library**, select a runnable workflow (one that declares a runnable interface) and use the edit button next to **Automation**:
+
+- **Trigger**: the trigger sources your gateway serves (`GET /api/gateway/trigger-sources`), today **Schedule** and **Manual**. A source the gateway cannot load is listed disabled with its reason; **Refresh sources** asks the gateway again. The source's settings form comes from the gateway, so a new source appears here without an editor update. Schedules are fixed intervals in UTC: `every` is a whole number of seconds, minutes, hours or days (for example every 5 minutes or every 24 hours; cron expressions are not supported). Without `every` the schedule fires once at `start_at`.
+- **Context**: *Independent* (every run starts fresh, the default) or *Growing* (every run continues the same conversation).
+- **Title** (optional) and **Default input_data**: the inputs of the workflow's `On Flow Start` node, as a JSON object. A text `prompt` is prefixed with a line naming the trigger and the run number.
+
+Saving validates the settings against the source and stores them in the workflow as `automation_defaults` (see [VisualFlow JSON](visualflow.md)); publishing the workflow carries them to the gateway catalog. The `On Schedule` and `On Event` nodes are different: they wait inside a run that has already started and never start a workflow.
+
 ## Hidden Connections
 
 Some workflows wire pins the editor cannot draw: a code node's returned keys and a subflow's `child_output` are resolved by name when the workflow runs, but they are not declared pins, and a few connections (for example a model into a plain string pin) are refused by the editor's connection rules. AbstractFlow keeps these connections exactly as stored and saves them back. A node that has any shows an **N hidden** badge in its header; hover it to list the connections (`source.pin -> target.pin`). They disappear from the saved workflow only when you delete one of their nodes. Opening or importing such a workflow also shows a notice listing them. Only a connection to a node that does not exist is removed, and the notice says so. Drawing these connections as editable pins is planned (backlog 0157).
@@ -1131,7 +1143,8 @@ Entry and terminal:
 
 - `on_flow_start`: standard run entry; add runtime input outputs here.
 - `on_user_request`: chat entry (user `message` and `context`).
-- `on_schedule`, `on_event`, `on_agent_message`: event entries.
+- `on_schedule`, `on_event`, `on_agent_message`: waits inside a running flow
+  (they do not start it; recurring runs are automations).
 - `on_flow_end`: terminal; add an input for every output the run exposes.
 
 Common chains:
@@ -1163,12 +1176,19 @@ The catalog gives exact pins; this section explains usage.
 
 `on_flow_start` (default manual entry), `on_flow_end` (final boundary),
 `on_user_request` (chat), `on_agent_message`, `on_schedule` (configure
-`event.schedule`/`event.recurrent`), `on_event` (durable custom events),
+`event.schedule` as an interval such as `5m` or an ISO timestamp, never cron,
+and `event.recurrent`), `on_event` (durable custom events),
 `wait_event` (pause for event), `emit_event`, `wait_until` (delay),
 `system_datetime` (pure current-time metadata for prompts/filenames/digests).
 
-Scheduled digest pattern: `on_schedule` -> prompt builder -> Agent/LLM ->
-write/report -> `on_flow_end`, with `system_datetime.iso` in prompt variables.
+`on_schedule` and `on_event` time or signal work INSIDE a run that is already
+started; they never start a flow. To run a flow every N minutes, publish it and
+create an automation from it (its trigger defaults live in the flow's
+`automation_defaults`); each run then starts at `on_flow_start`.
+
+Scheduled digest pattern (run by an automation): `on_flow_start` -> prompt
+builder -> Agent/LLM -> write/report -> `on_flow_end`, with
+`system_datetime.iso` in prompt variables.
 
 ### LLM And Agent Nodes
 
@@ -2665,7 +2685,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `on_event`
 - Document node: `{"id":"<unique_id>","type":"on_event"}`
-- Utility: Entry point triggered by a durable custom event. Outputs event metadata + payload.
+- Utility: Waits inside a running flow for a durable custom event, then continues. It does not start the flow: only runs already waiting receive the event. Outputs event metadata + payload.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`; event settings with `event`
@@ -2706,7 +2726,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `on_schedule`
 - Document node: `{"id":"<unique_id>","type":"on_schedule"}`
-- Utility: Entry point triggered by a schedule (timestamp or recurring). Outputs the trigger time.
+- Utility: Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Flow Library > Automation defaults). Outputs the fire time.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`; event settings with `event`
@@ -4048,6 +4068,26 @@ Each interface requires these boundary pins:
 
 When you declare an interface in the editor (Flow Library > Interfaces), AbstractFlow adds every missing required pin to the flow's `On Flow Start` and `On Flow End` nodes, with the type shown above. Pins you already have keep their id, label, type and order; nothing is removed. The change is one undo step, and **Save** stores the interfaces together with the new pins. Opening a saved workflow that declares an interface also adds any pin it is missing; the workflow then opens with unsaved changes and the notice "Interface pins were added to On Flow Start/End; save to store them", and after you save nothing is added again. An `On Flow Start` or `On Flow End` node you add to such a workflow arrives with the pins already in place. The added pins are declarations: wire each one on the canvas so the host receives real values. Removing an interface keeps its pins, so you can delete the ones you no longer need. The Run preflight warns when a required pin is missing from an `On Flow Start` or `On Flow End` node, when a required `On Flow End` pin has no connection, pin default or pin expression (hosts would read `null`), and when a pin has the required id but another type than the interface expects. The legacy spellings `provider` (for `provider_text`) and `model_text` (for `model`) are accepted.
 
+## Automation Defaults
+
+A runnable workflow can carry the defaults of the automations created from it in a top-level `automation_defaults` object (edited in Flow Library > Automation, see [Web Editor > Automation Defaults](web-editor.md#automation-defaults)):
+
+```json
+"automation_defaults": {
+  "schema_version": 1,
+  "title": "Memory watch",
+  "trigger": { "source_id": "schedule", "source_version": 1, "config": { "every": "2m" } },
+  "context": { "mode": "independent" },
+  "input_data": { "prompt": "Report this computer's memory usage." }
+}
+```
+
+- `trigger.source_id` / `source_version` name a trigger source served by the gateway (`GET /api/gateway/trigger-sources`); `config` must match that source's `config_schema`. For `schedule` v1: `start_at`, `until` and `anchor` are RFC 3339 timestamps, `every` is a whole number followed by `s`, `m`, `h` or `d`, `count` is an integer of at least 1. `manual` v1 takes `{}`.
+- `context.mode` is `independent` (default) or `growing`; `title` is optional; `input_data` (default `{}`) holds the `On Flow Start` inputs.
+- No other field is accepted: binding ids, credentials and automation ids are created by the gateway when an automation is created, never stored in the workflow.
+
+Publishing copies the object into the bundle manifest as `metadata.automation_defaults[<flow id>]`.
+
 ## Authoring Rules
 
 - Nodes contain editor data and runtime-facing pin defaults.
@@ -4965,6 +5005,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+- **Automation defaults.** Flow Library > **Automation** stores what an
+  automation created from a runnable workflow starts with: a trigger source
+  discovered from the gateway (`GET /api/gateway/trigger-sources`; today
+  Schedule and Manual), its settings in a form built from the source's own
+  schema, the context mode (independent or growing), an optional title and the
+  default `input_data`. Settings are validated before they are saved; an
+  unknown, unavailable or outdated source is refused with a message. The
+  values are saved in the workflow as `automation_defaults` and published with
+  it. Needs a gateway with Automations v1. See
+  [Web Editor > Automation Defaults](docs/web-editor.md#automation-defaults).
+
+### Fixed
+- `On Schedule` and `On Event` no longer claim to be entry points that start a
+  workflow: they wait inside a run that has already started. The schedule
+  setting accepts an interval (`15s`, `5m`, `2h`, `1d`) or an ISO timestamp;
+  cron expressions were never supported and are no longer suggested.
 
 ## [0.3.21] - 2026-09-26
 

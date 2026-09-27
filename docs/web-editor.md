@@ -84,6 +84,18 @@ config CLIs; changing a default does not load or unload a model.
 
 Open the **Flow Library**, select a workflow and use the edit button next to **Interfaces** to declare the contracts it implements (for example **Runnable agent (v1)** for AbstractCode). The editor lists the typed pins each selected interface requires. Saving adds the missing ones to the `On Flow Start` and `On Flow End` nodes: right away when the workflow is open in the editor (your unsaved edits and undo history are kept, and the flow shows unsaved changes until you **Save**), otherwise the next time you open it. Wire the added pins on the canvas so hosts get real values. See [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for the pins of every interface.
 
+## Automation Defaults
+
+An automation runs a published workflow again and again: on a fixed interval, once at a given time, or only when you ask. Automations are created and managed in AbstractObserver or the Assistant; the editor stores what an automation created from a workflow starts with.
+
+Open the **Flow Library**, select a runnable workflow (one that declares a runnable interface) and use the edit button next to **Automation**:
+
+- **Trigger**: the trigger sources your gateway serves (`GET /api/gateway/trigger-sources`), today **Schedule** and **Manual**. A source the gateway cannot load is listed disabled with its reason; **Refresh sources** asks the gateway again. The source's settings form comes from the gateway, so a new source appears here without an editor update. Schedules are fixed intervals in UTC: `every` is a whole number of seconds, minutes, hours or days (for example every 5 minutes or every 24 hours; cron expressions are not supported). Without `every` the schedule fires once at `start_at`.
+- **Context**: *Independent* (every run starts fresh, the default) or *Growing* (every run continues the same conversation).
+- **Title** (optional) and **Default input_data**: the inputs of the workflow's `On Flow Start` node, as a JSON object. A text `prompt` is prefixed with a line naming the trigger and the run number.
+
+Saving validates the settings against the source and stores them in the workflow as `automation_defaults` (see [VisualFlow JSON](visualflow.md)); publishing the workflow carries them to the gateway catalog. The `On Schedule` and `On Event` nodes are different: they wait inside a run that has already started and never start a workflow.
+
 ## Hidden Connections
 
 Some workflows wire pins the editor cannot draw: a code node's returned keys and a subflow's `child_output` are resolved by name when the workflow runs, but they are not declared pins, and a few connections (for example a model into a plain string pin) are refused by the editor's connection rules. AbstractFlow keeps these connections exactly as stored and saves them back. A node that has any shows an **N hidden** badge in its header; hover it to list the connections (`source.pin -> target.pin`). They disappear from the saved workflow only when you delete one of their nodes. Opening or importing such a workflow also shows a notice listing them. Only a connection to a node that does not exist is removed, and the notice says so. Drawing these connections as editable pins is planned (backlog 0157).

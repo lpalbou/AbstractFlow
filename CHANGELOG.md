@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Automation defaults.** Flow Library > **Automation** stores what an
+  automation created from a runnable workflow starts with: a trigger source
+  discovered from the gateway (`GET /api/gateway/trigger-sources`; today
+  Schedule and Manual), its settings in a form built from the source's own
+  schema, the context mode (independent or growing), an optional title and the
+  default `input_data`. Settings are validated before they are saved; an
+  unknown, unavailable or outdated source is refused with a message. The
+  values are saved in the workflow as `automation_defaults` and published with
+  it. Needs a gateway with Automations v1. See
+  [Web Editor > Automation Defaults](docs/web-editor.md#automation-defaults).
+
+### Fixed
+- `On Schedule` and `On Event` no longer claim to be entry points that start a
+  workflow: they wait inside a run that has already started. The schedule
+  setting accepts an interval (`15s`, `5m`, `2h`, `1d`) or an ISO timestamp;
+  cron expressions were never supported and are no longer suggested.
+
 ## [0.3.21] - 2026-09-26
 
 ### Changed

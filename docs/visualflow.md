@@ -55,6 +55,26 @@ Each interface requires these boundary pins:
 
 When you declare an interface in the editor (Flow Library > Interfaces), AbstractFlow adds every missing required pin to the flow's `On Flow Start` and `On Flow End` nodes, with the type shown above. Pins you already have keep their id, label, type and order; nothing is removed. The change is one undo step, and **Save** stores the interfaces together with the new pins. Opening a saved workflow that declares an interface also adds any pin it is missing; the workflow then opens with unsaved changes and the notice "Interface pins were added to On Flow Start/End; save to store them", and after you save nothing is added again. An `On Flow Start` or `On Flow End` node you add to such a workflow arrives with the pins already in place. The added pins are declarations: wire each one on the canvas so the host receives real values. Removing an interface keeps its pins, so you can delete the ones you no longer need. The Run preflight warns when a required pin is missing from an `On Flow Start` or `On Flow End` node, when a required `On Flow End` pin has no connection, pin default or pin expression (hosts would read `null`), and when a pin has the required id but another type than the interface expects. The legacy spellings `provider` (for `provider_text`) and `model_text` (for `model`) are accepted.
 
+## Automation Defaults
+
+A runnable workflow can carry the defaults of the automations created from it in a top-level `automation_defaults` object (edited in Flow Library > Automation, see [Web Editor > Automation Defaults](web-editor.md#automation-defaults)):
+
+```json
+"automation_defaults": {
+  "schema_version": 1,
+  "title": "Memory watch",
+  "trigger": { "source_id": "schedule", "source_version": 1, "config": { "every": "2m" } },
+  "context": { "mode": "independent" },
+  "input_data": { "prompt": "Report this computer's memory usage." }
+}
+```
+
+- `trigger.source_id` / `source_version` name a trigger source served by the gateway (`GET /api/gateway/trigger-sources`); `config` must match that source's `config_schema`. For `schedule` v1: `start_at`, `until` and `anchor` are RFC 3339 timestamps, `every` is a whole number followed by `s`, `m`, `h` or `d`, `count` is an integer of at least 1. `manual` v1 takes `{}`.
+- `context.mode` is `independent` (default) or `growing`; `title` is optional; `input_data` (default `{}`) holds the `On Flow Start` inputs.
+- No other field is accepted: binding ids, credentials and automation ids are created by the gateway when an automation is created, never stored in the workflow.
+
+Publishing copies the object into the bundle manifest as `metadata.automation_defaults[<flow id>]`.
+
 ## Authoring Rules
 
 - Nodes contain editor data and runtime-facing pin defaults.

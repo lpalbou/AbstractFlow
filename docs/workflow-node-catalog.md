@@ -1002,7 +1002,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `on_event`
 - Document node: `{"id":"<unique_id>","type":"on_event"}`
-- Utility: Entry point triggered by a durable custom event. Outputs event metadata + payload.
+- Utility: Waits inside a running flow for a durable custom event, then continues. It does not start the flow: only runs already waiting receive the event. Outputs event metadata + payload.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`; event settings with `event`
@@ -1043,7 +1043,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `on_schedule`
 - Document node: `{"id":"<unique_id>","type":"on_schedule"}`
-- Utility: Entry point triggered by a schedule (timestamp or recurring). Outputs the trigger time.
+- Utility: Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Flow Library > Automation defaults). Outputs the fire time.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`; event settings with `event`
