@@ -276,3 +276,12 @@ Plus: `flowFamilies.test.ts` and `bundledFlows.test.ts` stay green.
   that path (runtime controller, no parallel scheduler); 0119's catalog-text
   honesty fix is folded into this item. 0119 should be re-scoped to v2 external
   admission or closed when this item lands.
+
+## Contracts pass (2026-09-27)
+
+Final contracts: untracked/design/automations-CONTRACTS.md (root repo; rev 2 with Astra turn-6 amendments 1–11). They supersede the contract text copied above; earlier text is kept as history. Concrete changes for this item:
+
+- Dropped for v1: the optional `trigger` pin and `abstractframework.triggerable.v1` (an optional-pin notion is not trivial: `missingInterfacePins` drives insertion and preflight). The trigger reaches the target rendered into the prompt.
+- `automation_defaults` = one top-level object on the VisualFlow: `{schema_version:1, title?, trigger:{source_id,source_version,config}, context:{mode}, input_data}`; the gateway accepts it on save and projects it at publish as `metadata.automation_defaults[root flow_id]`.
+- Discovery endpoint from capabilities `automations.trigger_sources_endpoint` (`/api/gateway/trigger-sources`); built-in sources are always served, third-party ones may be `available:false`.
+- schedule@1 is fixed UTC intervals: labels say "every 24 hours", never "daily at … local"; a one-shot binding has exactly one tick at `start_at`.

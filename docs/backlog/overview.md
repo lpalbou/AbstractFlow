@@ -8,6 +8,9 @@
 - Completed: 53
 - Deprecated: 0
 
+## 2026-09-27 Automations contracts pass (0158)
+Item 0158 gained a "Contracts pass (2026-09-27)" section: optional `trigger` pin and `triggerable.v1` dropped for v1, `automation_defaults` shape fixed, fixed-interval labels. Source: root `untracked/design/automations-CONTRACTS.md`.
+
 ## 2026-09-26 Automations v1: trigger bindings (0158)
 Item 0158 (`abstractflow-0158`, PLANNED): Flow mission F of the Automations
 plan (untracked/design/automations-PLAN.md, 2026-09-26). Discovery client for
