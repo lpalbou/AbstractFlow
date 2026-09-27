@@ -88,6 +88,29 @@ function baselineWith(flow: VisualFlow, patch: OpenFlowMetadataPatch): VisualFlo
 }
 
 /**
+ * PUT a flow's automation defaults and check the answer EVERY time — whether
+ * or not the flow is open in the editor (a gateway that drops the field must
+ * never read as "saved") — then patch the open document if it is this flow.
+ */
+export async function putAutomationDefaults(options: {
+  id: string;
+  next: AutomationDefaults | null;
+  hasUnsavedChanges: boolean;
+  put: () => Promise<VisualFlow>;
+}): Promise<OpenFlowMetadataResult> {
+  return updateOpenFlowMetadata({
+    id: options.id,
+    hasUnsavedChanges: options.hasUnsavedChanges,
+    request: async () => {
+      const updated = await options.put();
+      automationDefaultsFromPutResponse(updated, options.next);
+      return updated;
+    },
+    patchFrom: (updated) => ({ automation_defaults: automationDefaultsFromPutResponse(updated, options.next) }),
+  });
+}
+
+/**
  * The automation defaults a PUT stored — the server's value, never a local
  * guess. A gateway that answers without echoing the field did not store it
  * (it predates Automations v1): fail loudly instead of showing a save that

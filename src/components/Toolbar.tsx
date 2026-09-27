@@ -43,8 +43,8 @@ import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateF
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
 import { INTERFACE_PINS_ADDED_NOTICE } from '../utils/flowFamilies';
 import {
-  automationDefaultsFromPutResponse,
   interfacesFromPutResponse,
+  putAutomationDefaults,
   updateOpenFlowMetadata,
 } from '../hooks/openFlowMetadata';
 import { errorSnippet } from '../utils/errorSnippet';
@@ -908,11 +908,11 @@ export function Toolbar() {
       }
       // Same metadata path as interfaces: PUT, then patch the open document
       // (if it is still this flow) with what the gateway stored.
-      const { baseline } = await updateOpenFlowMetadata({
+      const { baseline } = await putAutomationDefaults({
         id,
+        next,
         hasUnsavedChanges,
-        request: () => updateFlowAutomationDefaults(id, next, gatewayContracts),
-        patchFrom: (updated) => ({ automation_defaults: automationDefaultsFromPutResponse(updated, next) }),
+        put: () => updateFlowAutomationDefaults(id, next, gatewayContracts),
       });
       if (baseline) setSavedFlowSignature(flowSignatureFor(baseline));
       queryClient.invalidateQueries({ queryKey: ['flows'] });

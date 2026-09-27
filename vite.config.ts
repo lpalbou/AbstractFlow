@@ -1,4 +1,6 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -494,5 +496,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+  },
+  // untracked/ holds ignored scratch and audit copies of the repo: never collect them.
+  test: {
+    exclude: [...configDefaults.exclude, 'untracked/**'],
   },
 });

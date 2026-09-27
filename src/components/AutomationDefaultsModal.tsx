@@ -22,6 +22,7 @@ import {
   configFormFields,
   configFromFormValues,
   formValuesFromConfig,
+  unsupportedSchemaKeywords,
   AutomationDefaultsError,
   type AutomationDefaultsIssue,
   type ConfigFormField,
@@ -201,7 +202,12 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
       items.find((s): s is AvailableTriggerSource => s.available && `${s.id}@${s.version}` === sourceKey) || null,
     [items, sourceKey]
   );
-  const fields = useMemo(() => (selected ? configFormFields(selected.config_schema) : []), [selected]);
+  // A schema the editor cannot fully check makes the source unbindable here.
+  const unsupported = useMemo(() => (selected ? unsupportedSchemaKeywords(selected.config_schema) : []), [selected]);
+  const fields = useMemo(
+    () => (selected && !unsupported.length ? configFormFields(selected.config_schema) : []),
+    [selected, unsupported]
+  );
   const currentConfig = useMemo(
     () =>
       existing && selected && existing.trigger.source_id === selected.id && existing.trigger.source_version === selected.version
@@ -227,7 +233,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     existing && discovery?.status === 'ok' && !selected && sourceKey === `${existing.trigger.source_id}@${existing.trigger.source_version}`;
 
   const handleSave = async () => {
-    if (!selected || discovery?.status !== 'ok') return;
+    if (!selected || unsupported.length || discovery?.status !== 'ok') return;
     const found: AutomationDefaultsIssue[] = [];
     let inputData: unknown;
     try {
@@ -345,7 +351,13 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
                   />
                 ))
               : null}
-            {selected && fields.length === 0 ? (
+            {selected && unsupported.length ? (
+              <div className="property-hint" style={{ color: 'var(--error, #e74c3c)', marginTop: 8 }}>
+                This source cannot be bound in the editor: its settings schema uses JSON Schema keywords the editor
+                cannot check ({unsupported.join('; ')}).
+              </div>
+            ) : null}
+            {selected && !unsupported.length && fields.length === 0 ? (
               <div className="property-hint" style={{ marginTop: 8 }}>
                 This source has no settings.
               </div>
@@ -413,7 +425,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
           <button className="modal-button" onClick={() => void load(true)} disabled={saving || loading}>
             Refresh sources
           </button>
-          <button className="modal-button" onClick={handleSave} disabled={saving || !selected}>
+          <button className="modal-button" onClick={handleSave} disabled={saving || !selected || unsupported.length > 0}>
             Save
           </button>
         </div>

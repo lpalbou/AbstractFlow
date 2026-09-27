@@ -173,6 +173,49 @@ const FORM_KEYWORDS = new Set([
   'examples',
 ]);
 
+/** Keywords the validator implements (annotations included). */
+const VALIDATED_KEYWORDS = new Set([
+  ...FORM_KEYWORDS,
+  'properties',
+  'required',
+  'additionalProperties',
+  '$schema',
+  '$comment',
+]);
+const VALIDATED_FORMATS = new Set(['date-time', 'duration']);
+
+/**
+ * JSON Schema keywords (and formats) in `schema` that this editor does NOT
+ * implement, as `path: keyword`. A config_schema using any of them cannot be
+ * checked here, so its source is refused rather than validated partially.
+ */
+export function unsupportedSchemaKeywords(schema: unknown, path = 'config_schema'): string[] {
+  if (!isRecord(schema)) return [`${path}: not an object`];
+  const found: string[] = [];
+  for (const [key, value] of Object.entries(schema)) {
+    if (!VALIDATED_KEYWORDS.has(key)) found.push(`${path}: ${key}`);
+    else if (key === 'format' && !(typeof value === 'string' && VALIDATED_FORMATS.has(value))) {
+      found.push(`${path}: format ${JSON.stringify(value)}`);
+    } else if (
+      key === 'type' &&
+      !(typeof value === 'string' || (Array.isArray(value) && value.every((t) => typeof t === 'string')))
+    ) {
+      found.push(`${path}: type ${JSON.stringify(value)}`);
+    }
+  }
+  if (isRecord(schema.properties)) {
+    for (const [name, child] of Object.entries(schema.properties)) {
+      found.push(...unsupportedSchemaKeywords(child, `${path}.properties.${name}`));
+    }
+  } else if (schema.properties !== undefined) {
+    found.push(`${path}: properties`);
+  }
+  if (isRecord(schema.additionalProperties)) {
+    found.push(...unsupportedSchemaKeywords(schema.additionalProperties, `${path}.additionalProperties`));
+  }
+  return found;
+}
+
 // RFC 3339 date-time (the JSON Schema `date-time` format), checked by shape.
 const DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -250,6 +293,13 @@ function validateValue(schema: unknown, value: unknown, path: string, issues: Au
 
 /** Validate a trigger config against the source's `config_schema`. */
 export function validateTriggerConfig(schema: JsonSchema, config: unknown): AutomationDefaultsIssue[] {
+  const unsupported = unsupportedSchemaKeywords(schema);
+  if (unsupported.length) {
+    return [{
+      field: 'trigger.config',
+      message: `this source's settings cannot be checked here: its config_schema uses unsupported JSON Schema keywords (${unsupported.join('; ')})`,
+    }];
+  }
   const issues: AutomationDefaultsIssue[] = [];
   validateValue(schema, config, 'trigger.config', issues);
   return issues;
@@ -310,6 +360,8 @@ export function draftAutomationDefaults(source: AvailableTriggerSource): Automat
 // ---------------------------------------------------------------------------
 
 export const DURATION_UNITS = ['s', 'm', 'h', 'd'] as const;
+/** The contract's `every` pattern (schedule@1); a string with it is a duration. */
+export const DURATION_PATTERN = '^[1-9][0-9]*[smhd]$';
 export type DurationUnit = (typeof DURATION_UNITS)[number];
 
 export type ConfigFieldKind = 'string' | 'datetime' | 'duration' | 'integer' | 'number' | 'boolean' | 'enum' | 'readonly';
@@ -337,7 +389,7 @@ function fieldKind(schema: Record<string, unknown>): ConfigFieldKind {
   if (Array.isArray(schema.enum)) return 'enum';
   switch (schema.type) {
     case 'string':
-      if (schema.format === 'duration') return 'duration';
+      if (schema.format === 'duration' || schema.pattern === DURATION_PATTERN) return 'duration';
       if (schema.format === 'date-time') return 'datetime';
       return 'string';
     case 'integer':

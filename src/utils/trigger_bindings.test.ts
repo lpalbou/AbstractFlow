@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import { getNodeTemplate } from '../types/nodes';
 import { useFlowStore } from '../hooks/useFlow';
-import { automationDefaultsFromPutResponse, updateOpenFlowMetadata } from '../hooks/openFlowMetadata';
+import {
+  automationDefaultsFromPutResponse,
+  putAutomationDefaults,
+  updateOpenFlowMetadata,
+} from '../hooks/openFlowMetadata';
 import { KNOWN_INTERFACES } from './flowFamilies';
 import {
   AutomationDefaultsError,
@@ -12,6 +16,7 @@ import {
   draftAutomationDefaults,
   formValuesFromConfig,
   parseAutomationDefaults,
+  unsupportedSchemaKeywords,
   validateAutomationDefaults,
   validateTriggerConfig,
 } from './triggerBindings';
@@ -82,6 +87,73 @@ describe('schema-driven form → schedule@1 config', () => {
   it('accepts a one-shot (no `every`) and an empty config (source defaults)', () => {
     expect(validateTriggerConfig(SCHEDULE.config_schema, { start_at: '2026-09-28T00:00:00+02:00' })).toEqual([]);
     expect(validateTriggerConfig(SCHEDULE.config_schema, {})).toEqual([]);
+  });
+});
+
+describe('a config_schema the editor cannot fully check is refused, never half-validated', () => {
+  // Review 41's nested schema: every keyword here is outside the implemented subset.
+  const NESTED: JsonSchema = {
+    type: 'object',
+    anyOf: [{ required: ['mode'] }, { required: ['list'] }],
+    properties: {
+      mode: { oneOf: [{ const: 'a' }, { const: 'b' }] },
+      list: { type: 'array', items: { type: 'integer' }, minItems: 1 },
+      n: { type: 'integer', exclusiveMinimum: 0, multipleOf: 5 },
+      ref: { $ref: '#/$defs/thing' },
+      email: { type: 'string', format: 'email' },
+      ok: { type: 'integer', minimum: 1 },
+    },
+  };
+
+  it('names every unsupported keyword and format, at its path', () => {
+    expect(unsupportedSchemaKeywords(NESTED)).toEqual([
+      'config_schema: anyOf',
+      'config_schema.properties.mode: oneOf',
+      'config_schema.properties.list: items',
+      'config_schema.properties.list: minItems',
+      'config_schema.properties.n: exclusiveMinimum',
+      'config_schema.properties.n: multipleOf',
+      'config_schema.properties.ref: $ref',
+      'config_schema.properties.email: format "email"',
+    ]);
+  });
+
+  it('rejects any config against such a schema, even one it would otherwise accept', () => {
+    for (const config of [{ mode: 'zzz' }, { list: ['x'] }, { n: 0 }, { ref: 42 }, {}, { ok: 3 }]) {
+      const issues = validateTriggerConfig(NESTED, config);
+      expect(issues).toHaveLength(1);
+      expect(issues[0].field).toBe('trigger.config');
+      expect(issues[0].message).toContain('cannot be checked here');
+      expect(issues[0].message).toContain('oneOf');
+    }
+  });
+
+  it('makes defaults bound to such a source invalid', () => {
+    const sources = parseTriggerSourcesResponse({
+      items: [{ ...TRIGGER_SOURCES_RESPONSE.items[2], id: 'nested', config_schema: NESTED }],
+    });
+    const bound = defaults({ trigger: { source_id: 'nested', source_version: 1, config: {} } });
+    expect(() => assertValidAutomationDefaults(bound, sources)).toThrow('cannot be checked here');
+  });
+
+  it('the served schedule@1 / manual@1 / fixture schemas are fully supported', () => {
+    expect(unsupportedSchemaKeywords(SCHEDULE.config_schema)).toEqual([]);
+    expect(unsupportedSchemaKeywords(MANUAL.config_schema)).toEqual([]);
+    expect(unsupportedSchemaKeywords(FIXTURE.config_schema)).toEqual([]);
+  });
+});
+
+describe('duration widget', () => {
+  it('keys on the contract `every` pattern even without format:"duration"', () => {
+    const patternOnly: JsonSchema = {
+      type: 'object',
+      properties: { every: { type: 'string', pattern: '^[1-9][0-9]*[smhd]$' }, note: { type: 'string', pattern: '^x' } },
+    };
+    expect(fields(patternOnly)).toEqual(['every:duration', 'note:string']);
+    expect(configFromFormValues(patternOnly, { every: '24', 'every#unit': 'h' })).toEqual({
+      config: { every: '24h' },
+      issues: [],
+    });
   });
 });
 
@@ -282,6 +354,40 @@ describe('automation_defaults round-trips through the flow document', () => {
     });
     expect(cleared.baseline && 'automation_defaults' in cleared.baseline).toBe(false);
     expect('automation_defaults' in useFlowStore.getState().getFlow()).toBe(false);
+  });
+
+  it('the PUT answer is checked even when the flow is NOT open in the editor', async () => {
+    useFlowStore.getState().loadFlow({ ...flowDocument(), id: 'another-flow' });
+    // A gateway that accepts the PUT but drops the field must not read as saved.
+    await expect(
+      putAutomationDefaults({
+        id: 'flow-auto',
+        next: defaults(),
+        hasUnsavedChanges: false,
+        put: async () => flowDocument(),
+      })
+    ).rejects.toThrow('without storing them');
+    // ...and a gateway that stored them succeeds without touching the open flow.
+    const ok = await putAutomationDefaults({
+      id: 'flow-auto',
+      next: defaults(),
+      hasUnsavedChanges: false,
+      put: async () => flowDocument(defaults()),
+    });
+    expect(ok.applied).toBe(false);
+    expect('automation_defaults' in useFlowStore.getState().getFlow()).toBe(false);
+  });
+
+  it('putAutomationDefaults patches the open flow with the stored value', async () => {
+    useFlowStore.getState().loadFlow(flowDocument());
+    const res = await putAutomationDefaults({
+      id: 'flow-auto',
+      next: defaults(),
+      hasUnsavedChanges: false,
+      put: async () => flowDocument(defaults()),
+    });
+    expect(res.applied).toBe(true);
+    expect(useFlowStore.getState().getFlow().automation_defaults).toEqual(defaults());
   });
 
   it('a gateway that does not store the field fails loudly', () => {
