@@ -3,7 +3,7 @@
 > **Superseded direction (2026-09-27).** Scheduled and manual starts are now
 > Automations v1: a runtime automation controller started through the gateway
 > (`abstractframework backlog 0928`), with Flow authoring trigger defaults only
-> (`planned/0158`). The publish-registers-a-subscription path below is rejected
+> (`completed/0158`). The publish-registers-a-subscription path below is rejected
 > (no parallel scheduler); the catalog-text honesty fix shipped with 0158.
 > What remains here is v2 external admission (webhooks, events), to re-scope
 > against the runtime `TriggerSource` registry or close.

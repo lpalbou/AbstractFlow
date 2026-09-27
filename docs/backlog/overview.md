@@ -1,12 +1,20 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-09-26
-- Planned: 1
-- Proposed: 46 (39 numbered + 7 legacy-named; the prior snapshot said 40 and
-  had drifted from the directory contents)
-- Completed: 53
+- Updated: 2026-09-27
+- Planned: 0
+- Proposed: 49 (on disk, recursive; the 2026-09-26 snapshot said 46 and had
+  drifted again — not reconciled item by item in this pass)
+- Completed: 54
 - Deprecated: 0
+
+## 2026-09-27 Automations v1 completed (0158), UNRELEASED
+Item 0158 moved to `completed/`: trigger-source discovery, the Automation
+defaults editor and `VisualFlow.automation_defaults` (`c5961d1`…`0d4bf76`;
+review 41 GO, A1/B1 fixed in `9f174c9`). The optional `trigger` pin was
+dropped by the contracts pass. No version bump: the flow minor release is step
+4 of the framework wave (root backlog 0941). Residual: `proposed/0119` is to be
+re-scoped to v2 external admission (root 0929) or closed.
 
 ## 2026-09-27 Automations contracts pass (0158)
 Item 0158 gained a "Contracts pass (2026-09-27)" section: optional `trigger` pin and `triggerable.v1` dropped for v1, `automation_defaults` shape fixed, fixed-interval labels. Source: root `untracked/design/automations-CONTRACTS.md`.
@@ -199,10 +207,7 @@ item's "Current code reality".
   Codespace; provider credentials and Gateway auth must remain separated.
 
 ## Planned Ledger
-- `planned/0158_automations_trigger_bindings_source_discovery_and_defaults.md`:
-  trigger-source discovery, binding editor, `automation_defaults` export and
-  the optional `trigger` pin (Automations v1 minor wave; waits on gateway
-  `/trigger-sources` and publish metadata).
+- None (0158 completed 2026-09-27).
 
 ## Proposed Ledger (2026-07-11 review wave)
 - `proposed/0117_effect_error_branch_retry_timeout.md`: error exec-branch +
@@ -270,6 +275,12 @@ item's "Current code reality".
   folders to start a workflow.
 
 ## Completed Ledger
+- `completed/0158_automations_trigger_bindings_source_discovery_and_defaults.md`
+  (2026-09-27, from planned/, UNRELEASED): trigger-source discovery from the
+  gateway capabilities, the strict `automation_defaults` field and its editor
+  (sent only when present, `null` removes, PUT echo checked). Validation:
+  triggerSources/trigger_bindings tests, `npm test` 1392 passed at review 41,
+  mutations RED; review 41 GO.
 - `completed/0111_run_modal_event_interaction_surface.md` (2026-07-11, from
   planned/): send-event composer on event parks (evt: key parse/compose
   verified against the gateway contract), received-event envelope surfaced as

@@ -1,7 +1,9 @@
 # 0158 — Automations: trigger-source discovery, trigger bindings and `automation_defaults`
 
-- Status: PLANNED 2026-09-26 (operator ruling 7: every package writes its
-  PLANNED items before the Automations v1 minor wave).
+- Status: COMPLETED 2026-09-27 — UNRELEASED (local commits on `main`; package
+  still 0.3.21; the release is in the framework wave, root backlog 0941).
+  Was: PLANNED 2026-09-26 (operator ruling 7).
+- Created: 2026-09-26 · Completed: 2026-09-27
 - Owner: flow (mission F of the Automations plan).
 - Design: untracked/design/automations-PLAN.md (2026-09-26)
 - Related: `abstractframework backlog 0928` (root Automations item);
@@ -285,3 +287,50 @@ Final contracts: untracked/design/automations-CONTRACTS.md (root repo; rev 2 wit
 - `automation_defaults` = one top-level object on the VisualFlow: `{schema_version:1, title?, trigger:{source_id,source_version,config}, context:{mode}, input_data}`; the gateway accepts it on save and projects it at publish as `metadata.automation_defaults[root flow_id]`.
 - Discovery endpoint from capabilities `automations.trigger_sources_endpoint` (`/api/gateway/trigger-sources`); built-in sources are always served, third-party ones may be `available:false`.
 - schedule@1 is fixed UTC intervals: labels say "every 24 hours", never "daily at … local"; a one-shot binding has exactly one tick at `start_at`.
+
+## Completion report (2026-09-27)
+
+**Status: completed — UNRELEASED.** Local commits on `main`, no version bump, not pushed. Umbrella record:
+abstractframework backlog 0928 (completed); release: root 0941.
+
+**Commits:** `c5961d1` … `0d4bf76` (4 commits).
+- **`c5961d1`:** trigger-source discovery (`src/utils/triggerSources.ts`), the Automation defaults editor
+  (`src/utils/triggerBindings.ts` + modal), and `VisualFlow.automation_defaults`.
+- **`5fae933`:** docs; in-run wording for On Schedule / On Event; CHANGELOG `## Unreleased`; 0119 marked superseded by
+  0158 and root 0928.
+- **`9f174c9`:** review 41.
+  - A1: config schemas with keywords the validator does not implement are refused.
+  - B1: the PUT echo is checked for flows that are not open.
+  - The duration widget keys on the `[smhd]` pattern.
+  - vitest excludes `untracked/`.
+- **`0d4bf76`:** docs (automation defaults, trigger-source discovery).
+
+**What shipped:**
+- `automation_defaults = {schema_version: 1, title?, trigger: {source_id, source_version, config}, context: {mode},
+  input_data}`, strict: unknown keys and `binding_id` are refused.
+- The editor sends it only when a flow has defaults; an explicit `null` removes it. The editor raises if the gateway's
+  PUT response does not echo it.
+- Discovery reads `contracts.common.automations.trigger_sources_endpoint` from the capabilities. It is loud on 401 and
+  on non-JSON answers, and reports "unavailable" on a gateway without automations.
+
+**Definition of Done, against what shipped:**
+- **Discovery:** met. Sources come from the gateway, with no vocabulary edits.
+- **Defaults round trip:** the gateway exports `manifest.metadata.automation_defaults[<root flow_id>]` at publish
+  (gateway `57f26b9`, `test_flow_automation_defaults.py`). The reopen-in-editor leg is covered by Flow's echo tests, not
+  by a live walk.
+- **The `trigger` pin:** DROPPED by the contracts pass. The trigger reaches the target rendered into the prompt.
+- **Comments and descriptions:** fixed (`5fae933`).
+- **tsc / vitest / build:** green at review.
+
+**Tests:** `src/utils/triggerSources.test.ts` and `src/utils/trigger_bindings.test.ts`. In-tree `npm test` had 1392
+passed at review 41; the 2 failures were an untracked audit copy, excluded since `9f174c9`. Mutations m1 and m2 were
+RED.
+
+**Review:** 41 GO (root `untracked/missions-2026-09-25/REVIEW/41-flow-automation-defaults.md`). A1, B1 and the LOW
+items were fixed in `9f174c9`.
+
+**Residuals:**
+- The gateway's defaults validator accepts `_meta` / `_runtime` keys in `automation_defaults.input_data` at save. They
+  are stripped at create (gateway review 52 (d)); refusing them at save with a field error would be clearer.
+- `proposed/0119` is to be re-scoped to v2 external admission (root 0929) or closed, as this item's "Conflicts" section
+  says.
