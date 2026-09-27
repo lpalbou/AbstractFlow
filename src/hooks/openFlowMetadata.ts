@@ -1,18 +1,20 @@
 /**
- * Metadata PUTs (name, interfaces) against a flow that may be open in the
+ * Metadata PUTs (name, interfaces, automation defaults) against a flow that may be open in the
  * editor. The request is async: by the time it returns the user may have
  * opened another flow, re-opened this one, or started a new document. The
  * result is applied to the editor ONLY when the same document instance is
  * still open (same flow id AND same `draftInstanceId`, which every load and
  * clear renews) — otherwise flow A's interfaces and pins would land in flow B.
  */
-import type { VisualFlow } from '../types/flow';
+import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import { normalizeInterfaces } from '../utils/flowFamilies';
 import { useFlowStore } from './useFlow';
 
 export interface OpenFlowMetadataPatch {
   name?: string;
   interfaces?: string[];
+  /** Null clears the defaults. */
+  automation_defaults?: AutomationDefaults | null;
 }
 
 export interface OpenFlowMetadataResult {
@@ -61,10 +63,11 @@ export async function updateOpenFlowMetadata(options: {
   const patch = options.patchFrom(updated);
   if (patch.name !== undefined) now.setFlowName(patch.name);
   if (patch.interfaces !== undefined) now.setFlowInterfaces(patch.interfaces);
+  if (patch.automation_defaults !== undefined) now.setFlowAutomationDefaults(patch.automation_defaults);
   return {
     updated,
     applied: true,
-    baseline: ticket.cleanBefore ? { ...ticket.cleanBefore, ...patch } : null,
+    baseline: ticket.cleanBefore ? baselineWith(ticket.cleanBefore, patch) : null,
   };
 }
 
@@ -74,4 +77,31 @@ export function interfacesFromPutResponse(updated: VisualFlow): string[] {
     throw new Error('Gateway answered the interfaces update without an interfaces list');
   }
   return normalizeInterfaces(updated.interfaces);
+}
+
+function baselineWith(flow: VisualFlow, patch: OpenFlowMetadataPatch): VisualFlow {
+  const { automation_defaults, ...rest } = patch;
+  const next: VisualFlow = { ...flow, ...rest };
+  if (automation_defaults === null) delete next.automation_defaults;
+  else if (automation_defaults !== undefined) next.automation_defaults = automation_defaults;
+  return next;
+}
+
+/**
+ * The automation defaults a PUT stored — the server's value, never a local
+ * guess. A gateway that answers without echoing the field did not store it
+ * (it predates Automations v1): fail loudly instead of showing a save that
+ * did not happen.
+ */
+export function automationDefaultsFromPutResponse(
+  updated: VisualFlow,
+  sent: AutomationDefaults | null
+): AutomationDefaults | null {
+  const stored = updated ? (updated as { automation_defaults?: AutomationDefaults | null }).automation_defaults : undefined;
+  if (sent === null) {
+    if (stored) throw new Error('Gateway kept the automation defaults it was asked to clear');
+    return null;
+  }
+  if (!stored) throw new Error('Gateway answered the automation defaults update without storing them');
+  return stored;
 }

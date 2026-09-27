@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AfChip } from '@abstractframework/ui-kit';
-import type { VisualFlow } from '../types/flow';
+import type { AutomationDefaults, VisualFlow } from '../types/flow';
+import type { GatewayContracts } from '../utils/gatewayClient';
+import { describeAutomationDefaults } from '../utils/triggerBindings';
+import { AutomationDefaultsModal } from './AutomationDefaultsModal';
 import { BUNDLED_COMPOSED_ONLY_IDS } from '../utils/bundledFlows';
 import {
   KNOWN_INTERFACES,
   buildFlowFamilyIndex,
+  isExecutableFlow,
   knownInterface,
   normalizeInterfaces,
   type InterfacePinSpec,
@@ -35,6 +39,10 @@ export interface FlowLibraryModalProps {
   onRenameFlow: (flowId: string, nextName: string) => Promise<void> | void;
   onUpdateDescription: (flowId: string, nextDescription: string) => Promise<void> | void;
   onUpdateInterfaces: (flowId: string, nextInterfaces: string[]) => Promise<void> | void;
+  /** Store (or with null, remove) the flow's `automation_defaults`. */
+  onUpdateAutomationDefaults: (flowId: string, next: AutomationDefaults | null) => Promise<void> | void;
+  /** For trigger-source discovery (the endpoint comes from the capabilities). */
+  gatewayContracts: GatewayContracts | null;
   onDuplicateFlow: (flowId: string) => Promise<void> | void;
   onDeleteFlow: (flowId: string) => Promise<void> | void;
 }
@@ -101,6 +109,8 @@ export function FlowLibraryModal({
   onRenameFlow,
   onUpdateDescription,
   onUpdateInterfaces,
+  onUpdateAutomationDefaults,
+  gatewayContracts,
   onDuplicateFlow,
   onDeleteFlow,
 }: FlowLibraryModalProps) {
@@ -124,6 +134,7 @@ export function FlowLibraryModal({
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [isEditingInterfaces, setIsEditingInterfaces] = useState(false);
   const [interfacesDraft, setInterfacesDraft] = useState<string[]>([]);
+  const [isEditingAutomation, setIsEditingAutomation] = useState(false);
   const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
 
   const readonlyFlowIdSet = useMemo(() => new Set(readonlyFlowIds || []), [readonlyFlowIds]);
@@ -296,7 +307,7 @@ export function FlowLibraryModal({
       if (e.key === 'Escape') {
         // While an editor is open, Escape cancels THAT edit (the input's own
         // handler); closing the whole modal in the same keypress lost work.
-        if (isRenaming || isEditingDescription || isEditingInterfaces) return;
+        if (isRenaming || isEditingDescription || isEditingInterfaces || isEditingAutomation) return;
         e.preventDefault();
         onClose();
         return;
@@ -313,7 +324,7 @@ export function FlowLibraryModal({
           return;
         }
       }
-      if (isRenaming || isEditingDescription || isEditingInterfaces) return;
+      if (isRenaming || isEditingDescription || isEditingInterfaces || isEditingAutomation) return;
       if (navigableRows.length === 0) return;
 
       // When focus sits INSIDE the kit tree, the DisclosureList owns
@@ -386,6 +397,7 @@ export function FlowLibraryModal({
     isRenaming,
     isEditingDescription,
     isEditingInterfaces,
+    isEditingAutomation,
     navigableRows,
     onClose,
     onLoadFlow,
@@ -507,7 +519,7 @@ export function FlowLibraryModal({
   }, [onDuplicateFlow, selectedFlow]);
 
   /** Any inline editor open (rename / description / interfaces). */
-  const isEditing = isRenaming || isEditingDescription || isEditingInterfaces;
+  const isEditing = isRenaming || isEditingDescription || isEditingInterfaces || isEditingAutomation;
 
   const cancelEdits = useCallback(() => {
     setIsRenaming(false);
@@ -516,6 +528,7 @@ export function FlowLibraryModal({
     setDescriptionDraft('');
     setIsEditingInterfaces(false);
     setInterfacesDraft([]);
+    setIsEditingAutomation(false);
   }, []);
 
   const jumpToFlow = useCallback(
@@ -733,6 +746,30 @@ export function FlowLibraryModal({
                           onClick={beginEditInterfaces}
                           aria-label="Edit workflow interfaces"
                           title="Edit interfaces"
+                        >
+                          <EditIcon size={13} />
+                        </button>
+                      ) : null}
+                    </span>
+                  </div>
+
+                  <div className="flow-library-preview-row">
+                    <span className="flow-library-preview-key">Automation</span>
+                    <span className="flow-library-preview-val flow-library-preview-inline">
+                      <span>
+                        {selectedFlow.automation_defaults
+                          ? describeAutomationDefaults(selectedFlow.automation_defaults)
+                          : isExecutableFlow(selectedFlow)
+                            ? '—'
+                            : 'Declare a runnable interface first'}
+                      </span>
+                      {!selectedFlowReadonly && !isEditing && (isExecutableFlow(selectedFlow) || selectedFlow.automation_defaults) ? (
+                        <button
+                          type="button"
+                          className="flow-library-edit-icon meta"
+                          onClick={() => setIsEditingAutomation(true)}
+                          aria-label="Edit automation defaults"
+                          title="Edit automation defaults"
                         >
                           <EditIcon size={13} />
                         </button>
@@ -1015,6 +1052,16 @@ export function FlowLibraryModal({
           </button>
         </div>
       </div>
+      {isEditingAutomation && selectedFlow ? (
+        <div onClick={(e) => e.stopPropagation()}>
+          <AutomationDefaultsModal
+            flow={selectedFlow}
+            gatewayContracts={gatewayContracts}
+            onClose={() => setIsEditingAutomation(false)}
+            onSave={(next) => onUpdateAutomationDefaults(selectedFlow.id, next)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -91,6 +91,13 @@ export interface GatewayCommonContract {
     commands?: GatewayEndpointDescriptor & { types?: string[] };
     purge_drafts?: GatewayEndpointDescriptor;
   };
+  /** Automations v1 (contract F): `{available, version, endpoint, trigger_sources_endpoint}`. */
+  automations?: {
+    available?: boolean;
+    version?: number;
+    endpoint?: string;
+    trigger_sources_endpoint?: string;
+  };
   ledger?: {
     replay?: GatewayEndpointDescriptor;
     batch?: GatewayEndpointDescriptor;

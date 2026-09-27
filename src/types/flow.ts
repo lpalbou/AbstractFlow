@@ -153,8 +153,8 @@ export type NodeType =
   | 'on_flow_start'      // Triggered when a flow starts running
   | 'on_user_request'    // Triggered by user input
   | 'on_agent_message'   // Triggered by inter-agent communication
-  | 'on_schedule'        // Triggered by scheduled events
-  | 'on_event'           // Triggered by a custom durable event (session-scoped by default)
+  | 'on_schedule'        // Waits INSIDE a running flow for a time/interval (not how automations are scheduled)
+  | 'on_event'           // Waits INSIDE a running flow for a custom durable event (session-scoped by default)
   // Flow IO nodes
   | 'on_flow_end'        // Terminal node to expose flow outputs
   // Core execution nodes (exec IN and OUT)
@@ -339,7 +339,11 @@ export interface FlowNodeData {
     scope?: 'session' | 'workflow' | 'run' | 'global';
     channel?: string;        // For on_agent_message: channel to listen to
     agentFilter?: string;    // For on_agent_message: specific agent to listen to
-    schedule?: string;       // For on_schedule: cron expression or interval
+    // For on_schedule: an interval `<number><ms|s|m|h|d>` (e.g. '15s', '5m', '2h',
+    // '1d') or an ISO 8601 timestamp. The runtime rejects anything else,
+    // including cron expressions. The wait runs inside an already-started run;
+    // recurring runs of a flow are automations (see `automation_defaults`).
+    schedule?: string;
     recurrent?: boolean;     // For on_schedule: re-arm after firing
     description?: string;    // Description of what triggers this event
   };
@@ -502,8 +506,34 @@ export interface VisualFlow {
    * pinExpressions either, so calling pins fall back to their defaults).
    */
   functions?: FlowFunction[];
+  /**
+   * Defaults for automations created from this flow (Automations v1). The
+   * gateway publishes the object as
+   * `manifest.metadata.automation_defaults[<flow id>]`. Authoring data only:
+   * no binding id, credentials or instantiated ids (those are server-owned).
+   * Shape and validation: `utils/triggerBindings.ts`.
+   */
+  automation_defaults?: AutomationDefaults;
   created_at?: string;
   updated_at?: string;
+}
+
+/** One trigger binding draft: a `TriggerBinding` without the server-minted `binding_id`. */
+export interface AutomationTriggerDefaults {
+  source_id: string;
+  source_version: number;
+  config: Record<string, JsonValue>;
+}
+
+export type AutomationContextMode = 'independent' | 'growing';
+
+/** `VisualFlow.automation_defaults` (contract C6, `schema_version: 1`). */
+export interface AutomationDefaults {
+  schema_version: 1;
+  title?: string;
+  trigger: AutomationTriggerDefaults;
+  context: { mode: AutomationContextMode };
+  input_data: Record<string, JsonValue>;
 }
 
 export interface VisualNode {

@@ -112,7 +112,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_schedule',
     icon: '&#x23F0;', // Alarm clock
     label: 'On Schedule',
-    description: 'Entry point triggered by a schedule (timestamp or recurring). Outputs the trigger time.',
+    description: 'Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Flow Library > Automation defaults). Outputs the fire time.',
     headerColor: '#C0392B',
     inputs: [
       // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.
@@ -129,7 +129,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_event',
     icon: '&#x1F4E3;', // Megaphone
     label: 'On Event',
-    description: 'Entry point triggered by a durable custom event. Outputs event metadata + payload.',
+    description: 'Waits inside a running flow for a durable custom event, then continues. It does not start the flow: only runs already waiting receive the event. Outputs event metadata + payload.',
     headerColor: '#C0392B', // Red for events (like UE4)
     inputs: [
       // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.

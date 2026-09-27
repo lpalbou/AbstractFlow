@@ -35,13 +35,18 @@ import { closeOpenNodes, createLedgerMappingState, mapLedgerRecordToEvents, type
 import { mapGatewayRunSummary } from '../utils/gatewayRuns';
 import { pickFollowUpPromptKey } from '../utils/followUpInputs';
 import { extractPendingApprovalWait, extractReplayTraceEvents } from '../utils/runHistoryReplay';
-import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
+import type { AutomationDefaults, ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
+import { parseAutomationDefaults } from '../utils/triggerBindings';
 import { computeRunPreflightIssues } from '../utils/preflight';
 import { waitNotificationText } from '../utils/waitClassification';
 import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateFlowFamily';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
 import { INTERFACE_PINS_ADDED_NOTICE } from '../utils/flowFamilies';
-import { interfacesFromPutResponse, updateOpenFlowMetadata } from '../hooks/openFlowMetadata';
+import {
+  automationDefaultsFromPutResponse,
+  interfacesFromPutResponse,
+  updateOpenFlowMetadata,
+} from '../hooks/openFlowMetadata';
 import { errorSnippet } from '../utils/errorSnippet';
 import { saveButtonDisabled, saveGateTooltip, type SaveGateInput } from '../utils/saveGate';
 import { savedBaselineSnapshot, shouldRebaselineOnIdentityChange } from '../utils/saveBaseline';
@@ -89,6 +94,29 @@ async function updateFlowDescription(flowId: string, description: string, contra
 async function updateFlowInterfaces(flowId: string, interfaces: string[], contracts: GatewayContracts | null): Promise<VisualFlow> {
   const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
   return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ interfaces }, { method: 'PUT' }));
+}
+
+/** `null` clears the defaults (the gateway must treat an explicit null as "remove"). */
+async function updateFlowAutomationDefaults(
+  flowId: string,
+  automationDefaults: AutomationDefaults | null,
+  contracts: GatewayContracts | null
+): Promise<VisualFlow> {
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  return gatewayJson<VisualFlow>(
+    gatewayPath(endpoint, { flow_id: flowId }),
+    jsonRequest({ automation_defaults: automationDefaults }, { method: 'PUT' })
+  );
+}
+
+/**
+ * The document's automation defaults for a save/duplicate body: omitted when
+ * the flow has none (older gateways reject unknown fields), structurally
+ * validated when present (a malformed value fails the save loudly).
+ */
+function automationDefaultsBody(flow: VisualFlow): { automation_defaults?: AutomationDefaults } {
+  if (!flow.automation_defaults) return {};
+  return { automation_defaults: parseAutomationDefaults(flow.automation_defaults) };
 }
 
 /**
@@ -144,6 +172,7 @@ async function duplicateFlow(source: VisualFlow, newName: string, contracts: Gat
       // The function library is part of the document — omitting it here
       // silently stripped every function on duplicate (adversary P0-2).
       functions: Array.isArray(source.functions) ? source.functions : [],
+      ...automationDefaultsBody(source),
     }, { method: 'POST' }));
 }
 
@@ -165,6 +194,7 @@ function familyDuplicateIO(contracts: GatewayContracts | null): DuplicateFamilyI
             edges: flow.edges,
             entryNode: flow.entryNode,
             functions: Array.isArray(flow.functions) ? flow.functions : [],
+            ...automationDefaultsBody(flow),
           },
           { method: 'PUT' }
         )
@@ -240,6 +270,7 @@ async function saveFlow(
     // Part of the document (adversary P0-1: Save used to toast success
     // while the gateway never received the library).
     functions: Array.isArray(flow.functions) ? flow.functions : [],
+    ...automationDefaultsBody(flow),
   });
 
   if (!existingFlowId) {
@@ -315,6 +346,7 @@ function flowSignatureFor(flow: Partial<VisualFlow> | null | undefined): string 
     functions: Array.isArray((value as any).functions)
       ? (value as any).functions.map(normalizeFunction)
       : [],
+    automation_defaults: value.automation_defaults ?? null,
   });
 }
 
@@ -864,6 +896,27 @@ export function Toolbar() {
       if (baseline) setSavedFlowSignature(flowSignatureFor(baseline));
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Interfaces updated');
+    },
+    [bundledFlowIdSet, gatewayContracts, hasUnsavedChanges, queryClient]
+  );
+
+  const handleUpdateAutomationDefaults = useCallback(
+    async (id: string, next: AutomationDefaults | null) => {
+      if (bundledFlowIdSet.has(id)) {
+        toast.error('Bundled flows are read-only. Load or duplicate first.');
+        return;
+      }
+      // Same metadata path as interfaces: PUT, then patch the open document
+      // (if it is still this flow) with what the gateway stored.
+      const { baseline } = await updateOpenFlowMetadata({
+        id,
+        hasUnsavedChanges,
+        request: () => updateFlowAutomationDefaults(id, next, gatewayContracts),
+        patchFrom: (updated) => ({ automation_defaults: automationDefaultsFromPutResponse(updated, next) }),
+      });
+      if (baseline) setSavedFlowSignature(flowSignatureFor(baseline));
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
+      toast.success(next ? 'Automation defaults saved' : 'Automation defaults removed');
     },
     [bundledFlowIdSet, gatewayContracts, hasUnsavedChanges, queryClient]
   );
@@ -2040,6 +2093,8 @@ export function Toolbar() {
         onRenameFlow={handleRenameFlow}
         onUpdateDescription={handleUpdateDescription}
         onUpdateInterfaces={handleUpdateInterfaces}
+        onUpdateAutomationDefaults={handleUpdateAutomationDefaults}
+        gatewayContracts={gatewayContracts}
         onDuplicateFlow={handleDuplicateFlow}
         onDeleteFlow={handleDeleteFlow}
       />

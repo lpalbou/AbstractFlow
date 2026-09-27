@@ -1124,7 +1124,7 @@ export function computeAuthoringReadiness(
   for (const node of nodesByType('on_schedule')) {
     const schedule = (node.data.eventConfig as { schedule?: unknown } | undefined)?.schedule;
     if (!isNonEmptyString(schedule)) {
-      issues.push(`${node.data.label || node.id} (${node.id}) has no schedule — set event.schedule (cron or interval) or omit the node.`);
+      issues.push(`${node.data.label || node.id} (${node.id}) has no schedule — set event.schedule (an interval such as 5m, or an ISO timestamp; cron is not supported) or omit the node.`);
     }
   }
 

@@ -127,6 +127,8 @@ function Harness() {
       onRenameFlow={() => undefined}
       onUpdateDescription={() => undefined}
       onUpdateInterfaces={() => undefined}
+      onUpdateAutomationDefaults={() => undefined}
+      gatewayContracts={null}
       onDuplicateFlow={() => undefined}
       onDeleteFlow={() => undefined}
     />

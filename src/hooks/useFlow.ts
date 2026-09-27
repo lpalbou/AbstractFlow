@@ -13,7 +13,7 @@ import {
   NodeChange,
   EdgeChange,
 } from 'reactflow';
-import type { FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
+import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { computeFoldedGetters } from '../utils/foldedGetters';
@@ -129,6 +129,12 @@ interface FlowState {
   // Flow-level named helper functions (tier 2). Owned by the document like
   // nodes/edges: load/save round-trips them, undo/redo covers edits.
   flowFunctions: FlowFunction[];
+  /**
+   * `VisualFlow.automation_defaults` as the document holds it (null = none).
+   * Edited through the Flow Library (a metadata PUT, like interfaces) and
+   * carried unchanged by load/save; validated by utils/triggerBindings.ts.
+   */
+  flowAutomationDefaults: AutomationDefaults | null;
 
   // Selection
   selectedNode: Node<FlowNodeData> | null;
@@ -190,6 +196,7 @@ interface FlowState {
    * On Flow Start / On Flow End nodes — one undo step. Existing pins are kept.
    */
   setFlowInterfaces: (interfaces: string[]) => void;
+  setFlowAutomationDefaults: (defaults: AutomationDefaults | null) => void;
   setNodes: (nodes: Node<FlowNodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
   /** Create or update a named function (undoable). Returns an error string on refusal. */
@@ -574,6 +581,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   nodes: [],
   edges: [],
   flowFunctions: [],
+  flowAutomationDefaults: null,
   interfacePinsAddedOnLoad: 0,
   preservedEdges: [],
   loadEdgeReport: { preserved: [], dropped: [] },
@@ -614,6 +622,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       : null;
     set({ flowInterfaces, nodes, selectedNode });
   },
+  setFlowAutomationDefaults: (defaults) => set({ flowAutomationDefaults: defaults ? deepClone(defaults) : null }),
   setNodes: (nodes) => {
     syncNodeIdCounter(nodes);
     set({ nodes });
@@ -3019,6 +3028,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }));
     const canonicalFlow = normalizeLegacyMusicCompatVisualFlow(visualNodes, visualEdges);
     const flowFunctions = normalizeFlowFunctions((flow as VisualFlow).functions);
+    const flowAutomationDefaults = flow.automation_defaults ? deepClone(flow.automation_defaults) : null;
     const loadedFlow: VisualFlow = {
       id: flow.id,
       name: flow.name,
@@ -3027,6 +3037,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: canonicalFlow.edges,
       entryNode,
       ...(flowFunctions.length ? { functions: flowFunctions } : {}),
+      ...(flowAutomationDefaults ? { automation_defaults: deepClone(flowAutomationDefaults) } : {}),
     };
 
     set((state) => ({
@@ -3039,6 +3050,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       preservedEdges,
       loadEdgeReport: edgeReport,
       flowFunctions,
+      flowAutomationDefaults,
       interfacePinsAddedOnLoad,
       selectedNode: null,
       selectedEdge: null,
@@ -3089,6 +3101,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: normalizedFlow.edges,
       entryNode,
       ...(state.flowFunctions.length ? { functions: deepClone(state.flowFunctions) } : {}),
+      ...(state.flowAutomationDefaults ? { automation_defaults: deepClone(state.flowAutomationDefaults) } : {}),
     };
   },
 
@@ -3102,6 +3115,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: [],
       edges: [],
       flowFunctions: [],
+      flowAutomationDefaults: null,
       interfacePinsAddedOnLoad: 0,
       preservedEdges: [],
       loadEdgeReport: { preserved: [], dropped: [] },
