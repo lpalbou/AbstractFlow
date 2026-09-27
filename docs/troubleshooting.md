@@ -139,6 +139,16 @@ it through the interface receives missing or mistyped values.
 - **Fix:** start the Gateway and confirm the Flow server targets it (the
   `gateway_url` in `/api/health`).
 
+### The Automation dialog cannot save automation defaults
+
+| Message | Cause | Fix |
+| --- | --- | --- |
+| Trigger sources are unavailable on this gateway / Automations are not available on this gateway | The Gateway does not serve `/api/gateway/trigger-sources` (HTTP 404) or reports automations as unavailable in its capabilities. | Connect to a Gateway with automations enabled, then press **Refresh sources**. |
+| Trigger-source discovery failed: ... | The request failed for another reason, or the answer does not match the trigger-source contract. | Check that the Gateway is reachable; the message names the failing field. |
+| This source cannot be bound in the editor: its settings schema uses JSON Schema keywords the editor cannot check (...) | The source's `config_schema` uses a keyword or format outside the subset the editor validates. | Choose another source; the listed paths name each unsupported keyword. See [Web editor > Settings Validation](web-editor.md#settings-validation). |
+| trigger source "..." is not served / is unavailable / version ... is not served | The stored defaults name a source or version the connected Gateway does not offer. | Pick a served source and save again. |
+| Gateway answered the automation defaults update without storing them | The Gateway accepted the update but does not store `automation_defaults`. | Update the Gateway to a release with automations. |
+
 ### Edited example flows do not appear in the Flow Library
 
 - **Cause:** the example flows under `examples/flows/` are bundled into the

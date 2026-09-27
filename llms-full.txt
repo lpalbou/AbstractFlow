@@ -101,6 +101,12 @@ agents). Declaring an interface adds its typed pins to `On Flow Start` and
 `On Flow End`, and Run preflight warns about missing, unconnected, or mistyped
 interface pins. See [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
 
+A runnable workflow can also store automation defaults (Flow Library >
+**Automation**): the trigger source and settings discovered from the Gateway,
+the context mode, and default inputs that an automation created from the
+published workflow starts with. See
+[Web editor > Automation Defaults](docs/web-editor.md#automation-defaults).
+
 The About button in the top bar shows the AbstractFlow version and the versions
 the connected Gateway reports.
 
@@ -214,16 +220,16 @@ The canvas reflects that split:
 Start here:
 
 - [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
-- [Web editor](web-editor.md): the editor's features: sign-in, About, discovery, Resources, flow interfaces, hidden connections, the authoring assistant, media and file nodes.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, discovery, Resources, flow interfaces, automation defaults and trigger-source discovery, hidden connections, the authoring assistant, media and file nodes.
 - [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
 - [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
 Reference:
 
-- [Architecture](architecture.md): components, boundaries, and diagrams of the editor, the Flow server, and Gateway.
+- [Architecture](architecture.md): components, boundaries, and diagrams of the editor, the Flow server, and Gateway, including the automation-defaults path from document to automation.
 - [API and contracts](api.md): CLI options, environment variables, proxy contract, and the main frontend modules.
 - [CLI](cli.md): the `abstractflow-editor` command.
-- [VisualFlow JSON](visualflow.md): the workflow document format, interfaces and their boundary pins, pin expressions, and sharing.
+- [VisualFlow JSON](visualflow.md): the workflow document format, interfaces and their boundary pins, the `automation_defaults` field, pin expressions, and sharing.
 
 Workflow authoring:
 
@@ -317,7 +323,7 @@ The static server in `bin/cli.js` serves `dist/` and proxies API/SSE calls to Ga
 
 ## Next Steps
 
-- [Web editor](web-editor.md): the editor's features, including flow interfaces and the About dialog.
+- [Web editor](web-editor.md): the editor's features, including flow interfaces, automation defaults, and the About dialog.
 - [VisualFlow JSON](visualflow.md): the workflow document format.
 - [Architecture](architecture.md): how the editor, the Flow server, and Gateway fit together.
 - [Troubleshooting](troubleshooting.md): sign-in, proxy, and build problems.
@@ -413,15 +419,31 @@ Open the **Flow Library**, select a workflow and use the edit button next to **I
 
 ## Automation Defaults
 
-An automation runs a published workflow again and again: on a fixed interval, once at a given time, or only when you ask. Automations are created and managed in AbstractObserver or the Assistant; the editor stores what an automation created from a workflow starts with.
+An automation runs a published workflow again and again: on a fixed interval, once at a given time, or only when you ask. You create and manage automations in AbstractObserver or the Assistant. The editor stores what an automation created from a workflow starts with, in the workflow's `automation_defaults` field.
 
-Open the **Flow Library**, select a runnable workflow (one that declares a runnable interface) and use the edit button next to **Automation**:
+Open the **Flow Library** and select a workflow. The **Automation** row summarizes its defaults (for example `Schedule v1 · every 5m · growing context`). The edit button next to it is offered for runnable workflows, those that declare an entry-point interface; a workflow without one shows "Declare a runnable interface first". The dialog has these fields:
 
-- **Trigger**: the trigger sources your gateway serves (`GET /api/gateway/trigger-sources`), today **Schedule** and **Manual**. A source the gateway cannot load is listed disabled with its reason; **Refresh sources** asks the gateway again. The source's settings form comes from the gateway, so a new source appears here without an editor update. Schedules are fixed intervals in UTC: `every` is a whole number of seconds, minutes, hours or days (for example every 5 minutes or every 24 hours; cron expressions are not supported). Without `every` the schedule fires once at `start_at`.
+- **Trigger**: the trigger sources your gateway serves. The gateway ships **Schedule** and **Manual**; trigger adapters installed on the gateway appear in the same list with no editor update, because the list and each source's settings form come from the gateway. A source the gateway lists but cannot load is shown disabled with its reason. **Refresh sources** asks the gateway again.
+- **Settings**: a form built from the selected source's `config_schema`. For **Schedule**, `every` is a whole number of seconds, minutes, hours or days (for example 5 minutes or 24 hours), `start_at` and `until` are RFC 3339 timestamps, and `count` limits the number of runs. Schedules are fixed intervals in UTC; cron expressions are not supported. Without `every` the schedule fires once, at `start_at`. Leave a field empty to use the source's default. **Manual** has no settings.
 - **Context**: *Independent* (every run starts fresh, the default) or *Growing* (every run continues the same conversation).
-- **Title** (optional) and **Default input_data**: the inputs of the workflow's `On Flow Start` node, as a JSON object. A text `prompt` is prefixed with a line naming the trigger and the run number.
+- **Title** (optional) and **Default input_data**: the inputs of the workflow's `On Flow Start` node, as a JSON object. When an automation runs, a text `prompt` is prefixed with a line naming the trigger and the run number.
 
-Saving validates the settings against the source and stores them in the workflow as `automation_defaults` (see [VisualFlow JSON](visualflow.md)); publishing the workflow carries them to the gateway catalog. The `On Schedule` and `On Event` nodes are different: they wait inside a run that has already started and never start a workflow.
+**Save** checks the settings against the source, sends them to the gateway (`PUT` on the workflow), and confirms that the gateway's answer contains the stored defaults. When the gateway does not store the field, the dialog shows an error instead of reporting a save. **Remove defaults** clears the field. If the workflow is open in the editor, the change is applied to the open document and your unsaved edits are kept. **Save**, **Duplicate** and **Publish** carry the field with the workflow; see [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults) for the stored shape and what the gateway does with it.
+
+The dialog does not set tool approval. When an automation is created, the gateway applies its default policy, in which creating the automation counts as consent for the tools the workflow uses; a creation request that sets `policy.tool_approval` to `ask` makes every run wait for approval instead. Questions from `Ask User` nodes always wait for a person.
+
+### Trigger-Source Discovery
+
+The editor reads the discovery path from the gateway's capabilities (`contracts.common.automations.trigger_sources_endpoint`) and falls back to `GET /api/gateway/trigger-sources`. The answer is kept per gateway URL until you press **Refresh sources**; a failed request is not kept, so the next attempt asks again.
+
+- When the capabilities report automations as unavailable, or the gateway does not serve the route (HTTP 404), the dialog shows that trigger sources are unavailable on this gateway.
+- Any other failure, including an answer that does not match the trigger-source contract (`id`, `version`, `label`, `config_schema`, `event_schema`, `capabilities.kind` of `time`, `manual` or `event`, `available`), is shown as a discovery error.
+
+### Settings Validation
+
+The editor validates settings with a subset of JSON Schema: `type`, `properties`, `required`, `additionalProperties`, `enum`, `pattern`, `minimum`, `maximum`, `minLength`, `maxLength`, the formats `date-time` and `duration`, and the annotations `title`, `description`, `default`, `examples`, `$schema` and `$comment`. A source whose `config_schema` uses any other keyword or format cannot be checked in the editor: the dialog names each unsupported keyword and its path, and **Save** stays disabled for that source. A defaults object that names an unknown source, an unavailable source, or a version the gateway does not serve is refused with a message. The gateway validates the defaults again when you save and when an automation is created.
+
+`On Schedule`, `On Event` and `Delay` (`wait_until`) are different: they wait inside a run that has already started and never start a workflow. See [Workflow node catalog](workflow-node-catalog.md).
 
 ## Hidden Connections
 
@@ -1181,8 +1203,9 @@ and `event.recurrent`), `on_event` (durable custom events),
 `wait_event` (pause for event), `emit_event`, `wait_until` (delay),
 `system_datetime` (pure current-time metadata for prompts/filenames/digests).
 
-`on_schedule` and `on_event` time or signal work INSIDE a run that is already
-started; they never start a flow. To run a flow every N minutes, publish it and
+`on_schedule`, `on_event` and `wait_until` wait INSIDE a run that is already
+started; they never start a flow and are not how automations are scheduled.
+To run a flow every N minutes, give it a runnable interface, publish it, and
 create an automation from it (its trigger defaults live in the flow's
 `automation_defaults`); each run then starts at `on_flow_start`.
 
@@ -3722,11 +3745,12 @@ Flow serves static assets and proxies HTTP, SSE, and WebSocket calls. The browse
 flowchart TB
   subgraph Browser["Browser editor (src/)"]
     TopBar["Top bar<br/>connection pill, About dialog (ui-kit)"]
-    Toolbar["Toolbar + Flow Library<br/>open, save, publish, interfaces"]
+    Toolbar["Toolbar + Flow Library<br/>open, save, publish, interfaces, automation defaults"]
     Canvas["Canvas + nodes<br/>hidden-connection badges"]
     Store["Editor store (hooks/useFlow.ts)<br/>loadFlow, undo/redo, preservedEdges"]
     Interfaces["Interface contracts (utils/flowFamilies.ts)<br/>KNOWN_INTERFACES, applyInterfacePins"]
     Preflight["Run preflight (utils/preflight.ts)"]
+    Triggers["Trigger sources + automation defaults<br/>(utils/triggerSources.ts, utils/triggerBindings.ts)"]
     Assistant["Workflow Authoring Assistant drawer"]
     Client["Gateway client (utils/gatewayClient.ts)"]
   end
@@ -3742,6 +3766,8 @@ flowchart TB
   Store --> Interfaces
   Preflight --> Interfaces
   Preflight --> Store
+  Toolbar --> Triggers
+  Triggers --> Client
   Toolbar --> Client
   TopBar --> Client
   Assistant --> Client
@@ -3794,9 +3820,49 @@ Existing pins are never removed, retyped, or reordered. Run preflight reports
 missing pins, unconnected required `On Flow End` pins, and type mismatches as
 warnings; the workflow still runs.
 
-When the Flow Library changes the name, description, or interfaces of the
+When the Flow Library changes the name, description, interfaces, or automation defaults of the
 workflow open in the editor, the change is applied to that document only if it
 is still the open one, so unsaved edits and undo history are kept.
+
+## Automation Defaults
+
+A runnable workflow can carry `automation_defaults`: what an automation created
+from it starts with (trigger source and settings, context mode, title, default
+`input_data`). Flow authors the field; Gateway stores, publishes and applies it;
+Runtime owns the trigger sources and runs the automation.
+
+```mermaid
+flowchart LR
+  Doc["VisualFlow document<br/>automation_defaults"] -->|Save: PUT, validated| Store[(Gateway workflow store)]
+  Store -->|Publish| Manifest["Bundle manifest<br/>metadata.automation_defaults[flow id]"]
+  Manifest --> Catalog["Workflow catalog and /bundles<br/>automation_defaults by flow id"]
+  App["Observer or Assistant"] -->|POST /api/gateway/automations<br/>trigger or title omitted| Create[Automation creation]
+  Manifest -->|missing trigger, context, title, input_data| Create
+  Create --> Automation["Automation<br/>runs the workflow per trigger"]
+```
+
+- **Discovery** (`src/utils/triggerSources.ts`): the trigger sources come from
+  the Gateway (the `trigger_sources_endpoint` advertised in the capabilities,
+  else `GET /api/gateway/trigger-sources`). Flow keeps no local list, so a
+  trigger source added to the Runtime registry appears in the editor without a
+  Flow change. Answers are cached per Gateway URL; **Refresh sources**
+  re-fetches.
+- **Validation** (`src/utils/triggerBindings.ts`): the field's shape is
+  checked (unknown keys refused, so no automation id or credential is stored in
+  a workflow), then the trigger settings are checked against the source's
+  `config_schema` using a JSON Schema subset. A schema that uses a keyword
+  outside the subset is refused rather than partly checked.
+- **Editing** (`src/components/AutomationDefaultsModal.tsx`): the settings form
+  is built from the source's schema; saving is a `PUT` whose answer must echo
+  the stored field.
+- **Gateway**: validates the field again on save, exports it on publish as
+  `metadata.automation_defaults[<flow id>]`, and fills a creation request's
+  missing trigger, context, title and `input_data` from it.
+
+The `On Schedule`, `On Event` and `Delay` nodes are unrelated to this path:
+they wait inside a run that has already started. See
+[Web editor > Automation Defaults](web-editor.md#automation-defaults) and
+[VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults).
 
 ## Repository Layout
 
@@ -3842,6 +3908,7 @@ Flow must discover capabilities from Gateway instead of hardcoding local provide
 - media providers and task-specific model lists
 - tool inventory and approval policy
 - workspace and artifact affordances
+- automation trigger sources and their settings schemas
 
 Provider secrets stay in Gateway.
 
@@ -3956,7 +4023,9 @@ The important Gateway surfaces are:
 - `/api/gateway/providers`
 - `/api/gateway/config/capability-defaults`
 - `/api/gateway/visualflows`
+- `/api/gateway/visualflows/{flow_id}` (`PUT` also stores `automation_defaults`)
 - `/api/gateway/visualflows/{flow_id}/publish`
+- `/api/gateway/trigger-sources` (automation trigger sources; the path is read from `contracts.common.automations.trigger_sources_endpoint` when the capabilities advertise it)
 - `/api/gateway/runs/start`
 - `/api/gateway/runs/{run_id}/ledger`
 - `/api/gateway/runs/{run_id}/ledger/stream`
@@ -3975,6 +4044,8 @@ For error messages returned by these routes, see [Troubleshooting](troubleshooti
 The editor imports and exports VisualFlow JSON. See [visualflow.md](visualflow.md), including [Interfaces](visualflow.md#interfaces) for the boundary pins each declared interface requires.
 
 Execution semantics are not implemented in this package. Gateway/Runtime execute the workflow after publish/start.
+
+The optional `automation_defaults` field is described in [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults).
 
 ## Frontend Modules
 
@@ -3995,7 +4066,10 @@ High-value source modules:
 - `src/utils/flowFamilies.ts`: the known interfaces (`KNOWN_INTERFACES`) with their typed boundary pins, `applyInterfacePins` / `missingInterfacePins`, and the Flow Library family index.
 - `src/utils/preflight.ts`: Run preflight checks, including the interface pin warnings.
 - `src/hooks/useFlow.ts`: the editor store; `loadFlow` adds missing interface pins and keeps connections the canvas cannot draw (`preservedEdges`, `loadEdgeNotice`).
-- `src/hooks/openFlowMetadata.ts`: applies a Flow Library name, description or interface change to the open document only when that document is still open.
+- `src/hooks/openFlowMetadata.ts`: applies a Flow Library name, description, interface or automation-defaults change to the open document only when that document is still open; `putAutomationDefaults` checks that the Gateway's answer echoes the stored `automation_defaults`.
+- `src/utils/triggerSources.ts`: trigger-source discovery (`fetchTriggerSources`, `TriggerSourceCache`), contract parsing, and the `ok` / `unavailable` outcomes.
+- `src/utils/triggerBindings.ts`: the `automation_defaults` shape (`parseAutomationDefaults`), the JSON Schema subset validator (`validateTriggerConfig`, `unsupportedSchemaKeywords`), and the schema-driven form conversion.
+- `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog.
 - `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time, Gateway rows from `GET /api/gateway/about` through the ui-kit `gatewayVersionRows` helper).
 - `bin/gateway_forwarding.js`: the forwarding headers the Flow server sets on Gateway-bound requests.
 
@@ -4086,7 +4160,13 @@ A runnable workflow can carry the defaults of the automations created from it in
 - `context.mode` is `independent` (default) or `growing`; `title` is optional; `input_data` (default `{}`) holds the `On Flow Start` inputs.
 - No other field is accepted: binding ids, credentials and automation ids are created by the gateway when an automation is created, never stored in the workflow.
 
-Publishing copies the object into the bundle manifest as `metadata.automation_defaults[<flow id>]`.
+The gateway validates the field when you save the workflow (the same structural rules as the editor, then the trigger source's own check) and answers HTTP 422 with the failing field otherwise. Publishing copies the object into the bundle manifest as `metadata.automation_defaults[<flow id>]`, and the gateway's workflow catalog and bundle listings expose it keyed by entrypoint flow id.
+
+When an app creates an automation from the published workflow (`POST /api/gateway/automations`) and leaves out the trigger or the title, the gateway takes the missing values from these defaults: the trigger, the context mode, the title, and `input_data`, merged under the request's own `input_data` so the request's keys win. The published defaults are validated again at that point. Tool approval is not part of `automation_defaults`: the gateway applies its default policy, in which creating the automation is consent for the tools the workflow uses, unless the creation request sets `policy.tool_approval` to `ask`.
+
+See [Architecture > Automation Defaults](architecture.md#automation-defaults) for the path from the document to an automation.
+
+`On Schedule`, `On Event` and `Delay` (`wait_until`) nodes wait inside a run that has already started. They are not how automations are scheduled.
 
 ## Authoring Rules
 
@@ -4809,6 +4889,21 @@ requires to `On Flow Start` and `On Flow End`; you then wire them. See
 [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for every interface
 and its pins.
 
+## How Do I Run A Workflow Every Few Minutes?
+
+Create an automation from the published workflow in AbstractObserver or the
+Assistant. In the editor, you can store the automation's defaults (trigger,
+interval, context mode, inputs) in Flow Library > **Automation**; they are
+published with the workflow. The `On Schedule`, `On Event` and `Delay` nodes
+wait inside a run that has already started and do not start runs. See
+[Web editor > Automation Defaults](web-editor.md#automation-defaults).
+
+## Why Does The Automation Dialog Say Trigger Sources Are Unavailable?
+
+The connected Gateway does not serve automations (it reports them as
+unavailable or does not serve `/api/gateway/trigger-sources`). Connect to a
+Gateway with automations enabled, then press **Refresh sources**.
+
 ## Why Does A Node Show "N hidden"?
 
 The stored workflow wires pins the canvas cannot draw, such as a code node's
@@ -4967,6 +5062,16 @@ it through the interface receives missing or mistyped values.
 - **Fix:** start the Gateway and confirm the Flow server targets it (the
   `gateway_url` in `/api/health`).
 
+### The Automation dialog cannot save automation defaults
+
+| Message | Cause | Fix |
+| --- | --- | --- |
+| Trigger sources are unavailable on this gateway / Automations are not available on this gateway | The Gateway does not serve `/api/gateway/trigger-sources` (HTTP 404) or reports automations as unavailable in its capabilities. | Connect to a Gateway with automations enabled, then press **Refresh sources**. |
+| Trigger-source discovery failed: ... | The request failed for another reason, or the answer does not match the trigger-source contract. | Check that the Gateway is reachable; the message names the failing field. |
+| This source cannot be bound in the editor: its settings schema uses JSON Schema keywords the editor cannot check (...) | The source's `config_schema` uses a keyword or format outside the subset the editor validates. | Choose another source; the listed paths name each unsupported keyword. See [Web editor > Settings Validation](web-editor.md#settings-validation). |
+| trigger source "..." is not served / is unavailable / version ... is not served | The stored defaults name a source or version the connected Gateway does not offer. | Pick a served source and save again. |
+| Gateway answered the automation defaults update without storing them | The Gateway accepted the update but does not store `automation_defaults`. | Update the Gateway to a release with automations. |
+
 ### Edited example flows do not appear in the Flow Library
 
 - **Cause:** the example flows under `examples/flows/` are bundled into the
@@ -5009,20 +5114,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Automation defaults.** Flow Library > **Automation** stores what an
   automation created from a runnable workflow starts with: a trigger source
-  discovered from the gateway (`GET /api/gateway/trigger-sources`; today
-  Schedule and Manual), its settings in a form built from the source's own
-  schema, the context mode (independent or growing), an optional title and the
-  default `input_data`. Settings are validated before they are saved; an
-  unknown, unavailable or outdated source is refused with a message. The
-  values are saved in the workflow as `automation_defaults` and published with
-  it. Needs a gateway with Automations v1. See
+  discovered from the gateway, its settings in a form built from the source's
+  own schema, the context mode (independent or growing), an optional title and
+  the default `input_data`. The values are saved in the workflow as
+  `automation_defaults`, carried by save, duplicate and publish, and published
+  in the bundle manifest as `metadata.automation_defaults[<flow id>]`. A save
+  succeeds only when the gateway's answer contains the stored defaults. Needs
+  a gateway with automations. See
   [Web Editor > Automation Defaults](docs/web-editor.md#automation-defaults).
+- **Trigger-source discovery.** The editor lists the trigger sources the
+  gateway serves (the path advertised in its capabilities, else
+  `GET /api/gateway/trigger-sources`), so sources added on the gateway appear
+  without an editor update. Sources the gateway cannot load are listed
+  disabled with their reason; **Refresh sources** asks again.
+- Trigger settings are validated against the source's `config_schema` with a
+  documented JSON Schema subset. A source whose schema uses any other keyword
+  or format is refused with each unsupported keyword named, and an unknown,
+  unavailable or unserved source version is refused with a message.
 
 ### Fixed
-- `On Schedule` and `On Event` no longer claim to be entry points that start a
-  workflow: they wait inside a run that has already started. The schedule
-  setting accepts an interval (`15s`, `5m`, `2h`, `1d`) or an ISO timestamp;
-  cron expressions were never supported and are no longer suggested.
+- `On Schedule` and `On Event` are described as what they are: waits inside a
+  run that has already started. They do not start a workflow; recurring runs
+  are automations. The schedule setting accepts an interval (`15s`, `5m`,
+  `2h`, `1d`) or an ISO timestamp; cron expressions are not supported.
 
 ## [0.3.21] - 2026-09-26
 

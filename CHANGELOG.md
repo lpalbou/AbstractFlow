@@ -10,20 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Automation defaults.** Flow Library > **Automation** stores what an
   automation created from a runnable workflow starts with: a trigger source
-  discovered from the gateway (`GET /api/gateway/trigger-sources`; today
-  Schedule and Manual), its settings in a form built from the source's own
-  schema, the context mode (independent or growing), an optional title and the
-  default `input_data`. Settings are validated before they are saved; an
-  unknown, unavailable or outdated source is refused with a message. The
-  values are saved in the workflow as `automation_defaults` and published with
-  it. Needs a gateway with Automations v1. See
+  discovered from the gateway, its settings in a form built from the source's
+  own schema, the context mode (independent or growing), an optional title and
+  the default `input_data`. The values are saved in the workflow as
+  `automation_defaults`, carried by save, duplicate and publish, and published
+  in the bundle manifest as `metadata.automation_defaults[<flow id>]`. A save
+  succeeds only when the gateway's answer contains the stored defaults. Needs
+  a gateway with automations. See
   [Web Editor > Automation Defaults](docs/web-editor.md#automation-defaults).
+- **Trigger-source discovery.** The editor lists the trigger sources the
+  gateway serves (the path advertised in its capabilities, else
+  `GET /api/gateway/trigger-sources`), so sources added on the gateway appear
+  without an editor update. Sources the gateway cannot load are listed
+  disabled with their reason; **Refresh sources** asks again.
+- Trigger settings are validated against the source's `config_schema` with a
+  documented JSON Schema subset. A source whose schema uses any other keyword
+  or format is refused with each unsupported keyword named, and an unknown,
+  unavailable or unserved source version is refused with a message.
 
 ### Fixed
-- `On Schedule` and `On Event` no longer claim to be entry points that start a
-  workflow: they wait inside a run that has already started. The schedule
-  setting accepts an interval (`15s`, `5m`, `2h`, `1d`) or an ISO timestamp;
-  cron expressions were never supported and are no longer suggested.
+- `On Schedule` and `On Event` are described as what they are: waits inside a
+  run that has already started. They do not start a workflow; recurring runs
+  are automations. The schedule setting accepts an interval (`15s`, `5m`,
+  `2h`, `1d`) or an ISO timestamp; cron expressions are not supported.
 
 ## [0.3.21] - 2026-09-26
 

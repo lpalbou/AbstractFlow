@@ -57,11 +57,12 @@ Flow serves static assets and proxies HTTP, SSE, and WebSocket calls. The browse
 flowchart TB
   subgraph Browser["Browser editor (src/)"]
     TopBar["Top bar<br/>connection pill, About dialog (ui-kit)"]
-    Toolbar["Toolbar + Flow Library<br/>open, save, publish, interfaces"]
+    Toolbar["Toolbar + Flow Library<br/>open, save, publish, interfaces, automation defaults"]
     Canvas["Canvas + nodes<br/>hidden-connection badges"]
     Store["Editor store (hooks/useFlow.ts)<br/>loadFlow, undo/redo, preservedEdges"]
     Interfaces["Interface contracts (utils/flowFamilies.ts)<br/>KNOWN_INTERFACES, applyInterfacePins"]
     Preflight["Run preflight (utils/preflight.ts)"]
+    Triggers["Trigger sources + automation defaults<br/>(utils/triggerSources.ts, utils/triggerBindings.ts)"]
     Assistant["Workflow Authoring Assistant drawer"]
     Client["Gateway client (utils/gatewayClient.ts)"]
   end
@@ -77,6 +78,8 @@ flowchart TB
   Store --> Interfaces
   Preflight --> Interfaces
   Preflight --> Store
+  Toolbar --> Triggers
+  Triggers --> Client
   Toolbar --> Client
   TopBar --> Client
   Assistant --> Client
@@ -129,9 +132,49 @@ Existing pins are never removed, retyped, or reordered. Run preflight reports
 missing pins, unconnected required `On Flow End` pins, and type mismatches as
 warnings; the workflow still runs.
 
-When the Flow Library changes the name, description, or interfaces of the
+When the Flow Library changes the name, description, interfaces, or automation defaults of the
 workflow open in the editor, the change is applied to that document only if it
 is still the open one, so unsaved edits and undo history are kept.
+
+## Automation Defaults
+
+A runnable workflow can carry `automation_defaults`: what an automation created
+from it starts with (trigger source and settings, context mode, title, default
+`input_data`). Flow authors the field; Gateway stores, publishes and applies it;
+Runtime owns the trigger sources and runs the automation.
+
+```mermaid
+flowchart LR
+  Doc["VisualFlow document<br/>automation_defaults"] -->|Save: PUT, validated| Store[(Gateway workflow store)]
+  Store -->|Publish| Manifest["Bundle manifest<br/>metadata.automation_defaults[flow id]"]
+  Manifest --> Catalog["Workflow catalog and /bundles<br/>automation_defaults by flow id"]
+  App["Observer or Assistant"] -->|POST /api/gateway/automations<br/>trigger or title omitted| Create[Automation creation]
+  Manifest -->|missing trigger, context, title, input_data| Create
+  Create --> Automation["Automation<br/>runs the workflow per trigger"]
+```
+
+- **Discovery** (`src/utils/triggerSources.ts`): the trigger sources come from
+  the Gateway (the `trigger_sources_endpoint` advertised in the capabilities,
+  else `GET /api/gateway/trigger-sources`). Flow keeps no local list, so a
+  trigger source added to the Runtime registry appears in the editor without a
+  Flow change. Answers are cached per Gateway URL; **Refresh sources**
+  re-fetches.
+- **Validation** (`src/utils/triggerBindings.ts`): the field's shape is
+  checked (unknown keys refused, so no automation id or credential is stored in
+  a workflow), then the trigger settings are checked against the source's
+  `config_schema` using a JSON Schema subset. A schema that uses a keyword
+  outside the subset is refused rather than partly checked.
+- **Editing** (`src/components/AutomationDefaultsModal.tsx`): the settings form
+  is built from the source's schema; saving is a `PUT` whose answer must echo
+  the stored field.
+- **Gateway**: validates the field again on save, exports it on publish as
+  `metadata.automation_defaults[<flow id>]`, and fills a creation request's
+  missing trigger, context, title and `input_data` from it.
+
+The `On Schedule`, `On Event` and `Delay` nodes are unrelated to this path:
+they wait inside a run that has already started. See
+[Web editor > Automation Defaults](web-editor.md#automation-defaults) and
+[VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults).
 
 ## Repository Layout
 
@@ -177,6 +220,7 @@ Flow must discover capabilities from Gateway instead of hardcoding local provide
 - media providers and task-specific model lists
 - tool inventory and approval policy
 - workspace and artifact affordances
+- automation trigger sources and their settings schemas
 
 Provider secrets stay in Gateway.
 

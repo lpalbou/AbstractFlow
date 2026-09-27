@@ -73,7 +73,7 @@ The static server in `bin/cli.js` serves `dist/` and proxies API/SSE calls to Ga
 
 ## Next Steps
 
-- [Web editor](web-editor.md): the editor's features, including flow interfaces and the About dialog.
+- [Web editor](web-editor.md): the editor's features, including flow interfaces, automation defaults, and the About dialog.
 - [VisualFlow JSON](visualflow.md): the workflow document format.
 - [Architecture](architecture.md): how the editor, the Flow server, and Gateway fit together.
 - [Troubleshooting](troubleshooting.md): sign-in, proxy, and build problems.

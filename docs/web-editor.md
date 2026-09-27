@@ -86,15 +86,31 @@ Open the **Flow Library**, select a workflow and use the edit button next to **I
 
 ## Automation Defaults
 
-An automation runs a published workflow again and again: on a fixed interval, once at a given time, or only when you ask. Automations are created and managed in AbstractObserver or the Assistant; the editor stores what an automation created from a workflow starts with.
+An automation runs a published workflow again and again: on a fixed interval, once at a given time, or only when you ask. You create and manage automations in AbstractObserver or the Assistant. The editor stores what an automation created from a workflow starts with, in the workflow's `automation_defaults` field.
 
-Open the **Flow Library**, select a runnable workflow (one that declares a runnable interface) and use the edit button next to **Automation**:
+Open the **Flow Library** and select a workflow. The **Automation** row summarizes its defaults (for example `Schedule v1 · every 5m · growing context`). The edit button next to it is offered for runnable workflows, those that declare an entry-point interface; a workflow without one shows "Declare a runnable interface first". The dialog has these fields:
 
-- **Trigger**: the trigger sources your gateway serves (`GET /api/gateway/trigger-sources`), today **Schedule** and **Manual**. A source the gateway cannot load is listed disabled with its reason; **Refresh sources** asks the gateway again. The source's settings form comes from the gateway, so a new source appears here without an editor update. Schedules are fixed intervals in UTC: `every` is a whole number of seconds, minutes, hours or days (for example every 5 minutes or every 24 hours; cron expressions are not supported). Without `every` the schedule fires once at `start_at`.
+- **Trigger**: the trigger sources your gateway serves. The gateway ships **Schedule** and **Manual**; trigger adapters installed on the gateway appear in the same list with no editor update, because the list and each source's settings form come from the gateway. A source the gateway lists but cannot load is shown disabled with its reason. **Refresh sources** asks the gateway again.
+- **Settings**: a form built from the selected source's `config_schema`. For **Schedule**, `every` is a whole number of seconds, minutes, hours or days (for example 5 minutes or 24 hours), `start_at` and `until` are RFC 3339 timestamps, and `count` limits the number of runs. Schedules are fixed intervals in UTC; cron expressions are not supported. Without `every` the schedule fires once, at `start_at`. Leave a field empty to use the source's default. **Manual** has no settings.
 - **Context**: *Independent* (every run starts fresh, the default) or *Growing* (every run continues the same conversation).
-- **Title** (optional) and **Default input_data**: the inputs of the workflow's `On Flow Start` node, as a JSON object. A text `prompt` is prefixed with a line naming the trigger and the run number.
+- **Title** (optional) and **Default input_data**: the inputs of the workflow's `On Flow Start` node, as a JSON object. When an automation runs, a text `prompt` is prefixed with a line naming the trigger and the run number.
 
-Saving validates the settings against the source and stores them in the workflow as `automation_defaults` (see [VisualFlow JSON](visualflow.md)); publishing the workflow carries them to the gateway catalog. The `On Schedule` and `On Event` nodes are different: they wait inside a run that has already started and never start a workflow.
+**Save** checks the settings against the source, sends them to the gateway (`PUT` on the workflow), and confirms that the gateway's answer contains the stored defaults. When the gateway does not store the field, the dialog shows an error instead of reporting a save. **Remove defaults** clears the field. If the workflow is open in the editor, the change is applied to the open document and your unsaved edits are kept. **Save**, **Duplicate** and **Publish** carry the field with the workflow; see [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults) for the stored shape and what the gateway does with it.
+
+The dialog does not set tool approval. When an automation is created, the gateway applies its default policy, in which creating the automation counts as consent for the tools the workflow uses; a creation request that sets `policy.tool_approval` to `ask` makes every run wait for approval instead. Questions from `Ask User` nodes always wait for a person.
+
+### Trigger-Source Discovery
+
+The editor reads the discovery path from the gateway's capabilities (`contracts.common.automations.trigger_sources_endpoint`) and falls back to `GET /api/gateway/trigger-sources`. The answer is kept per gateway URL until you press **Refresh sources**; a failed request is not kept, so the next attempt asks again.
+
+- When the capabilities report automations as unavailable, or the gateway does not serve the route (HTTP 404), the dialog shows that trigger sources are unavailable on this gateway.
+- Any other failure, including an answer that does not match the trigger-source contract (`id`, `version`, `label`, `config_schema`, `event_schema`, `capabilities.kind` of `time`, `manual` or `event`, `available`), is shown as a discovery error.
+
+### Settings Validation
+
+The editor validates settings with a subset of JSON Schema: `type`, `properties`, `required`, `additionalProperties`, `enum`, `pattern`, `minimum`, `maximum`, `minLength`, `maxLength`, the formats `date-time` and `duration`, and the annotations `title`, `description`, `default`, `examples`, `$schema` and `$comment`. A source whose `config_schema` uses any other keyword or format cannot be checked in the editor: the dialog names each unsupported keyword and its path, and **Save** stays disabled for that source. A defaults object that names an unknown source, an unavailable source, or a version the gateway does not serve is refused with a message. The gateway validates the defaults again when you save and when an automation is created.
+
+`On Schedule`, `On Event` and `Delay` (`wait_until`) are different: they wait inside a run that has already started and never start a workflow. See [Workflow node catalog](workflow-node-catalog.md).
 
 ## Hidden Connections
 

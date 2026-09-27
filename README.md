@@ -95,6 +95,12 @@ agents). Declaring an interface adds its typed pins to `On Flow Start` and
 `On Flow End`, and Run preflight warns about missing, unconnected, or mistyped
 interface pins. See [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
 
+A runnable workflow can also store automation defaults (Flow Library >
+**Automation**): the trigger source and settings discovered from the Gateway,
+the context mode, and default inputs that an automation created from the
+published workflow starts with. See
+[Web editor > Automation Defaults](docs/web-editor.md#automation-defaults).
+
 The About button in the top bar shows the AbstractFlow version and the versions
 the connected Gateway reports.
 

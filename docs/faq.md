@@ -45,6 +45,21 @@ requires to `On Flow Start` and `On Flow End`; you then wire them. See
 [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for every interface
 and its pins.
 
+## How Do I Run A Workflow Every Few Minutes?
+
+Create an automation from the published workflow in AbstractObserver or the
+Assistant. In the editor, you can store the automation's defaults (trigger,
+interval, context mode, inputs) in Flow Library > **Automation**; they are
+published with the workflow. The `On Schedule`, `On Event` and `Delay` nodes
+wait inside a run that has already started and do not start runs. See
+[Web editor > Automation Defaults](web-editor.md#automation-defaults).
+
+## Why Does The Automation Dialog Say Trigger Sources Are Unavailable?
+
+The connected Gateway does not serve automations (it reports them as
+unavailable or does not serve `/api/gateway/trigger-sources`). Connect to a
+Gateway with automations enabled, then press **Refresh sources**.
+
 ## Why Does A Node Show "N hidden"?
 
 The stored workflow wires pins the canvas cannot draw, such as a code node's

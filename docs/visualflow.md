@@ -73,7 +73,13 @@ A runnable workflow can carry the defaults of the automations created from it in
 - `context.mode` is `independent` (default) or `growing`; `title` is optional; `input_data` (default `{}`) holds the `On Flow Start` inputs.
 - No other field is accepted: binding ids, credentials and automation ids are created by the gateway when an automation is created, never stored in the workflow.
 
-Publishing copies the object into the bundle manifest as `metadata.automation_defaults[<flow id>]`.
+The gateway validates the field when you save the workflow (the same structural rules as the editor, then the trigger source's own check) and answers HTTP 422 with the failing field otherwise. Publishing copies the object into the bundle manifest as `metadata.automation_defaults[<flow id>]`, and the gateway's workflow catalog and bundle listings expose it keyed by entrypoint flow id.
+
+When an app creates an automation from the published workflow (`POST /api/gateway/automations`) and leaves out the trigger or the title, the gateway takes the missing values from these defaults: the trigger, the context mode, the title, and `input_data`, merged under the request's own `input_data` so the request's keys win. The published defaults are validated again at that point. Tool approval is not part of `automation_defaults`: the gateway applies its default policy, in which creating the automation is consent for the tools the workflow uses, unless the creation request sets `policy.tool_approval` to `ask`.
+
+See [Architecture > Automation Defaults](architecture.md#automation-defaults) for the path from the document to an automation.
+
+`On Schedule`, `On Event` and `Delay` (`wait_until`) nodes wait inside a run that has already started. They are not how automations are scheduled.
 
 ## Authoring Rules
 

@@ -441,8 +441,9 @@ and `event.recurrent`), `on_event` (durable custom events),
 `wait_event` (pause for event), `emit_event`, `wait_until` (delay),
 `system_datetime` (pure current-time metadata for prompts/filenames/digests).
 
-`on_schedule` and `on_event` time or signal work INSIDE a run that is already
-started; they never start a flow. To run a flow every N minutes, publish it and
+`on_schedule`, `on_event` and `wait_until` wait INSIDE a run that is already
+started; they never start a flow and are not how automations are scheduled.
+To run a flow every N minutes, give it a runnable interface, publish it, and
 create an automation from it (its trigger defaults live in the flow's
 `automation_defaults`); each run then starts at `on_flow_start`.
 

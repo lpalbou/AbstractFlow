@@ -52,7 +52,9 @@ The important Gateway surfaces are:
 - `/api/gateway/providers`
 - `/api/gateway/config/capability-defaults`
 - `/api/gateway/visualflows`
+- `/api/gateway/visualflows/{flow_id}` (`PUT` also stores `automation_defaults`)
 - `/api/gateway/visualflows/{flow_id}/publish`
+- `/api/gateway/trigger-sources` (automation trigger sources; the path is read from `contracts.common.automations.trigger_sources_endpoint` when the capabilities advertise it)
 - `/api/gateway/runs/start`
 - `/api/gateway/runs/{run_id}/ledger`
 - `/api/gateway/runs/{run_id}/ledger/stream`
@@ -71,6 +73,8 @@ For error messages returned by these routes, see [Troubleshooting](troubleshooti
 The editor imports and exports VisualFlow JSON. See [visualflow.md](visualflow.md), including [Interfaces](visualflow.md#interfaces) for the boundary pins each declared interface requires.
 
 Execution semantics are not implemented in this package. Gateway/Runtime execute the workflow after publish/start.
+
+The optional `automation_defaults` field is described in [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults).
 
 ## Frontend Modules
 
@@ -91,7 +95,10 @@ High-value source modules:
 - `src/utils/flowFamilies.ts`: the known interfaces (`KNOWN_INTERFACES`) with their typed boundary pins, `applyInterfacePins` / `missingInterfacePins`, and the Flow Library family index.
 - `src/utils/preflight.ts`: Run preflight checks, including the interface pin warnings.
 - `src/hooks/useFlow.ts`: the editor store; `loadFlow` adds missing interface pins and keeps connections the canvas cannot draw (`preservedEdges`, `loadEdgeNotice`).
-- `src/hooks/openFlowMetadata.ts`: applies a Flow Library name, description or interface change to the open document only when that document is still open.
+- `src/hooks/openFlowMetadata.ts`: applies a Flow Library name, description, interface or automation-defaults change to the open document only when that document is still open; `putAutomationDefaults` checks that the Gateway's answer echoes the stored `automation_defaults`.
+- `src/utils/triggerSources.ts`: trigger-source discovery (`fetchTriggerSources`, `TriggerSourceCache`), contract parsing, and the `ok` / `unavailable` outcomes.
+- `src/utils/triggerBindings.ts`: the `automation_defaults` shape (`parseAutomationDefaults`), the JSON Schema subset validator (`validateTriggerConfig`, `unsupportedSchemaKeywords`), and the schema-driven form conversion.
+- `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog.
 - `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time, Gateway rows from `GET /api/gateway/about` through the ui-kit `gatewayVersionRows` helper).
 - `bin/gateway_forwarding.js`: the forwarding headers the Flow server sets on Gateway-bound requests.
 
