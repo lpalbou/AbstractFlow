@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.22] - 2026-09-27
+
 ### Added
 - **Automation defaults.** Flow Library > **Automation** stores what an
   automation created from a runnable workflow starts with: a trigger source
