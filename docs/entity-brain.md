@@ -182,6 +182,12 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
   `entity-goodbye` sets `success` when the session close ran and `meta` to
   `{turns, reason}`. The run-level status only says "the flow executed": a
   degraded turn still completes its flow.
+- SESSION HISTORY: the turn prompt's `THIS SESSION SO FAR` block carries
+  every turn of the session, whole. A chat client's replayed history
+  (`use_session_history`) arrives already bounded by the Gateway's replay
+  window (the most recent 50,000 tokens of whole turns; older turns are
+  dropped with a labeled `#TRUNCATION` notice), and the flows add no second,
+  smaller bound.
 - VERSION CONTRACT: bundle versions are immutable and PINNABLE
   (`bundle_version` on the summon). The `degraded`/`moment_error` output
   pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the

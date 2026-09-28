@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - entity-chat and entity-goodbye set the agent.v1 `success` and `meta` end
   pins; multiagent-coding sets the coding.v1 `passed` end pin (the verification
   verdict, `false` on a preflight refusal).
+- CI runs `npm test` and the bundled-flow smokes (the shipped workflows
+  through the real AbstractRuntime with scripted models, no network).
 
 ### Changed
 - The server listens on `127.0.0.1` by default (it was `0.0.0.0`). Pass
@@ -37,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GET /api/connection/gateway` answers `{ok, gateway_url, has_session,
   gateway}` (the shared app-server shape); `/api/health` adds `base_path`.
 - `npm run dev` uses the same server-side Gateway session as the built server.
+- The entity flows keep the whole session history: entity-chat and
+  entity-goodbye fold every replayed message, the turn prompt shows every turn
+  of the session in full, and the session log keeps every turn. The only
+  bound is the Gateway's replay window (the most recent 50,000 tokens of whole
+  turns, with a labeled notice when older turns are dropped). Needs
+  AbstractRuntime 0.7.0 or later.
+- The multi-agent coding workflow's embedded verify gates match
+  `coding-verify-gates` exactly again.
 
 ### Removed
 - WebSocket forwarding under `/api/*` (the editor opens none); upgrades are

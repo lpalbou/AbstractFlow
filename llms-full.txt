@@ -4882,6 +4882,12 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
   `entity-goodbye` sets `success` when the session close ran and `meta` to
   `{turns, reason}`. The run-level status only says "the flow executed": a
   degraded turn still completes its flow.
+- SESSION HISTORY: the turn prompt's `THIS SESSION SO FAR` block carries
+  every turn of the session, whole. A chat client's replayed history
+  (`use_session_history`) arrives already bounded by the Gateway's replay
+  window (the most recent 50,000 tokens of whole turns; older turns are
+  dropped with a labeled `#TRUNCATION` notice), and the flows add no second,
+  smaller bound.
 - VERSION CONTRACT: bundle versions are immutable and PINNABLE
   (`bundle_version` on the summon). The `degraded`/`moment_error` output
   pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the
@@ -5192,6 +5198,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - entity-chat and entity-goodbye set the agent.v1 `success` and `meta` end
   pins; multiagent-coding sets the coding.v1 `passed` end pin (the verification
   verdict, `false` on a preflight refusal).
+- CI runs `npm test` and the bundled-flow smokes (the shipped workflows
+  through the real AbstractRuntime with scripted models, no network).
 
 ### Changed
 - The server listens on `127.0.0.1` by default (it was `0.0.0.0`). Pass
@@ -5203,6 +5211,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GET /api/connection/gateway` answers `{ok, gateway_url, has_session,
   gateway}` (the shared app-server shape); `/api/health` adds `base_path`.
 - `npm run dev` uses the same server-side Gateway session as the built server.
+- The entity flows keep the whole session history: entity-chat and
+  entity-goodbye fold every replayed message, the turn prompt shows every turn
+  of the session in full, and the session log keeps every turn. The only
+  bound is the Gateway's replay window (the most recent 50,000 tokens of whole
+  turns, with a labeled notice when older turns are dropped). Needs
+  AbstractRuntime 0.7.0 or later.
+- The multi-agent coding workflow's embedded verify gates match
+  `coding-verify-gates` exactly again.
 
 ### Removed
 - WebSocket forwarding under `/api/*` (the editor opens none); upgrades are
@@ -5897,6 +5913,21 @@ npm test
 `npm run build` first checks the bundled multi-agent coding workflow
 (`npm run verify:multiagent`, Python 3).
 
+The bundled-flow smokes run the shipped workflows through the real
+AbstractRuntime with scripted models (no network, no provider keys). With
+`pip install "abstractruntime>=0.7.0"`:
+
+```bash
+for smoke in entity_life_smoke entity_life_loop_smoke multiagent_coding_smoke \
+             coding_agent_v2_gates_smoke goal_agent_smoke react_coder_smoke \
+             ralph_coder_smoke coscientist_smoke; do
+  python "scripts/$smoke.py" || break
+done
+```
+
+CI runs the build, lint, `npm test` and these smokes on every push and pull
+request.
+
 ## Repository Shape
 
 - `src/`: React/Vite editor.
@@ -5931,7 +5962,7 @@ For a release:
 
 1. Update `package.json`.
 2. Add the matching `CHANGELOG.md` entry.
-3. Run `npm run build`, `npm run lint` and `npm test`.
+3. Run `npm run build`, `npm run lint`, `npm test` and the bundled-flow smokes.
 4. Publish through the GitHub release workflow to npm.
 
 ## Pull Request Checklist
@@ -5939,6 +5970,7 @@ For a release:
 - `npm run build` passes.
 - `npm run lint` passes or any failures are explicitly documented.
 - `npm test` passes.
+- The bundled-flow smokes pass when you change a shipped workflow or its generator.
 - User-facing behavior changes are reflected in docs and changelog.
 - Security-relevant changes follow [SECURITY.md](SECURITY.md).
 
