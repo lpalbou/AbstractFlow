@@ -1539,6 +1539,13 @@ def main() -> int:
           and "empty request" in str(out.get("report") or ""),
           str(out)[:200])
 
+    # What a host sends with every run (abstractcode.coding.v1 hosts pass the
+    # provider/model they route to). Without them the runtime's Agent node
+    # refuses to start ("Agent node missing provider/model configuration")
+    # and every agent stage returns an error: the scripted agents below would
+    # never run. The values are stub names; the effect handlers answer.
+    HOST_ROUTE = {"provider": "smoke-provider", "model": "smoke-model"}
+
     # ---- layer 6: E2E FULL PATH (wait mode, scripted agents/tools/gates).
     # Exercises: seed -> plan loop (scouts -> planner -> gate1 approve) ->
     # backlog -> git branch -> build loop cycle 1 (green verify, doc DRIFTS ->
@@ -1606,7 +1613,7 @@ def main() -> int:
         },
     )
     run_id2 = runtime2.start(workflow=spec, vars={
-        "request": "build a snake game", "workspace_root": ws, "gating_mode": "wait",
+        "request": "build a snake game", "workspace_root": ws, **HOST_ROUTE, "gating_mode": "wait",
     })
     gate_answers = ["approve", "approve"]  # gate1 plan, gate2 merge
     final = None
@@ -1647,7 +1654,7 @@ def main() -> int:
     set_tool("git-merge", "Merge made by ort\nMERGED_OK main\n")
     progress_lines.clear()
     run_id3 = runtime2.start(workflow=spec, vars={
-        "request": "build a snake game", "workspace_root": ws, "gating_mode": "auto",
+        "request": "build a snake game", "workspace_root": ws, **HOST_ROUTE, "gating_mode": "auto",
     })
     st3 = runtime2.tick(workflow=spec, run_id=run_id3, max_steps=400)
     check("e2e-auto-completes-no-waits", st3.status == RunStatus.COMPLETED,
@@ -1687,7 +1694,7 @@ def main() -> int:
         },
     )
     run_id4 = runtime3.start(workflow=spec, vars={
-        "request": "build a snake game", "workspace_root": ws, "gating_mode": "auto",
+        "request": "build a snake game", "workspace_root": ws, **HOST_ROUTE, "gating_mode": "auto",
     })
     st4 = runtime3.tick(workflow=spec, run_id=run_id4, max_steps=400)
     out4 = st4.output or {}
