@@ -70,8 +70,9 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // New bundle id (dp- retirement); version lineage continues from
     // deep-research@0.1.5 so ordering reads naturally across the rename.
     bundleId: 'deep-research',
-    bundleVersion: '0.1.7',
-    bundleRef: 'deep-research@0.1.7',
+    // 0.1.8 = the version the gateway ships (a fresh install has no 0.1.7).
+    bundleVersion: '0.1.8',
+    bundleRef: 'deep-research@0.1.8',
   },
   '81795ea9': {
     flowId: '81795ea9',
@@ -84,8 +85,9 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // 0.0.4 = 2026-08-01: the status helper subflow gained its missing
     // On Flow End — 0.0.3 runs never terminated (the child run could not
     // reach a terminal state, so the parent waited on it forever).
-    bundleVersion: '0.0.4',
-    bundleRef: 'basic-agent@0.0.4',
+    // 0.0.5 = the version the gateway ships (a fresh install has no 0.0.4).
+    bundleVersion: '0.0.5',
+    bundleRef: 'basic-agent@0.0.5',
   },
   'coding-agent': {
     flowId: 'coding-agent',

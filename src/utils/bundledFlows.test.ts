@@ -22,9 +22,9 @@ describe('bundled deep research flows', () => {
     expect(getBundledRunTarget('deep-research')).toEqual({
       flowId: 'deep-research',
       bundleId: 'deep-research',
-      // 0.1.7 = the 2026-07-20 adversary wave (lineage: 0.1.6 was the deep-* rename release).
-      bundleVersion: '0.1.7',
-      bundleRef: 'deep-research@0.1.7',
+      // 0.1.8 = the version the gateway ships (a fresh install has no 0.1.7).
+      bundleVersion: '0.1.8',
+      bundleRef: 'deep-research@0.1.8',
     });
     // 2026-07-16: ids, names, files, and the bundle id are all deep-* (dp- retired).
     expect(flows.find((flow) => flow.id === 'deep-research')?.name).toBe('deep-research');

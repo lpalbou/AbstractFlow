@@ -158,6 +158,9 @@ Standalone use at `/` works with any supported Gateway.
   unavailable or unserved source version is refused with a message.
 
 ### Fixed
+- The Flow Library's one-click runs of `deep-research` and the basic agent
+  point at the versions a fresh Gateway ships (`deep-research@0.1.8`,
+  `basic-agent@0.0.5`); they asked for 0.1.7 and 0.0.4 and failed with 404.
 - `On Schedule` and `On Event` are described as what they are: waits inside a
   run that has already started. They do not start a workflow; recurring runs
   are automations. The schedule setting accepts an interval (`15s`, `5m`,
