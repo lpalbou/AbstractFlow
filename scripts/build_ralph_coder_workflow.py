@@ -55,7 +55,8 @@ BUNDLE_ID = "ralph-coding"
 # 0.2.0 (2026-08-01, workflow-bench forensics: 109 llm calls for 32 KB output,
 # ~5 of every 8 cycle steps re-deriving state):
 #   1. WARM START — every cycle's prompt now mechanically embeds the tail of
-#      PROGRESS.md (last `warm_entries` WHOLE entries, ADR-0026: never truncate
+#      PROGRESS.md (last `warm_entries` WHOLE entries — 0.2.1: the newest whole
+#      entries up to the 50k-token window, see below — ADR-0026: never truncate
 #      mid-entry, older entries are OMITTED with a stated note) plus a compact
 #      depth-2 workspace listing, gathered by a deterministic execute_command
 #      before the cycle composer. Context stays fresh (no transcript carry) but
@@ -66,7 +67,16 @@ BUNDLE_ID = "ralph-coding"
 #      -newer .ralph_fp.stamp`, memory files excluded), the loop concludes:
 #      a loop that is done twice is done. Guarded by has_verify — with no
 #      verify command, exit 0 is vacuous and must never stop the loop.
-BUNDLE_VERSION = "0.2.0"
+# 0.2.1 (2026-09-28, ADR-0026 operator ruling: no count/char caps on model
+# inputs; replayed history = newest WHOLE messages up to 50,000 tokens):
+#   1. The warm-start progress tail is the newest WHOLE entries up to the
+#      runtime's 50,000-token history window (was: last 3 entries, clamped to
+#      1..10, then a 6,000-char budget, and a 2,500-char tail for a progress
+#      file without '## ' entries). `warm_entries` defaults to 0 = no count
+#      bound; an author who wants one sets it explicitly (no upper clamp).
+#   2. The per-cycle step trace has no default bound (`max_chars` 20000 -> 0),
+#      the same rule react-coding's transcript already follows.
+BUNDLE_VERSION = "0.2.1"
 ROOT_FLOW_ID = "ralph-coding"
 CYCLE_FLOW_ID = "ralph-cycle"
 WRAPPER_FLOW_ID = "ralph-coder"
@@ -279,14 +289,14 @@ verify = str(verify_command or "").strip()
 plan = str(plan_file or "PLAN.md").strip() or "PLAN.md"
 progress = str(progress_file or "PROGRESS.md").strip() or "PROGRESS.md"
 marker = str(done_marker or "DONE:").strip() or "DONE:"
+# ADR-0026: 0 = no count bound (the 50k-token window alone applies); a
+# positive value is an author's explicit bound.
 try:
-    warm = int(warm_entries or 3)
+    warm = int(warm_entries or 0)
 except Exception:
-    warm = 3
-if warm < 1:
-    warm = 1
-if warm > 10:
-    warm = 10
+    warm = 0
+if warm < 0:
+    warm = 0
 problems = []
 if not req:
     problems.append(str(empty_request_text or ""))
@@ -351,13 +361,14 @@ return {"tool_call": {"name": "execute_command", "arguments": {"command": cmd, "
                       "call_id": "ralph-warm"}}
 """.strip()
 
-# ADR-0026: the progress tail is injected as WHOLE entries only. An entry
-# starts at a '## ' heading (the protocol tells the model to head each cycle's
-# entry '## Cycle N — <title>'). If the tail exceeds warm_entries, older
-# entries are OMITTED — with the omission STATED — never clipped mid-entry;
-# the char budget likewise drops the OLDEST whole entries first, and the
-# newest entry is always injected whole. A progress file with no '## '
-# structure degrades to a line-boundary tail (there are no entries to honour).
+# ADR-0026: the progress tail is replayed history, so it follows the runtime's
+# history rule: the newest WHOLE entries up to HISTORY_REPLAY_MAX_TOKENS
+# (50,000 estimated tokens, ~4 chars/token — the runtime's fallback estimate).
+# An entry starts at a '## ' heading (the protocol tells the model to head each
+# cycle's entry '## Cycle N — <title>'). Older entries past the window (or past
+# an explicit warm_entries bound) are OMITTED with the omission STATED, never
+# clipped mid-entry; the newest entry is always injected whole. A progress file
+# with no '## ' structure is one document and is injected whole.
 WARM_FOLD_CODE = r"""
 txt = text_of(result)
 listing = ""
@@ -381,13 +392,10 @@ for ln in listing.splitlines():
 # sat here and hid files the model then "created" a second time.
 listing_out = "\n".join(lines)
 try:
-    n = int(warm_entries or 3)
+    n = int(warm_entries or 0)
 except Exception:
-    n = 3
-if n < 1:
-    n = 1
-if n > 10:
-    n = 10
+    n = 0
+window_tokens = 50000
 entries = []
 cur = []
 in_entry = False
@@ -406,30 +414,21 @@ omitted = 0
 warm = ""
 if entries:
     keep = entries
-    if len(keep) > n:
+    if n > 0 and len(keep) > n:
         omitted = len(keep) - n
         keep = keep[len(keep) - n:]
     total = 0
     for e in keep:
-        total = total + len(e)
-    while len(keep) > 1 and total > 6000:
-        total = total - len(keep[0])
+        total = total + max(1, int(len(e) / 4))
+    while len(keep) > 1 and total > window_tokens:
+        total = total - max(1, int(len(keep[0]) / 4))
         omitted = omitted + 1
         keep = keep[1:]
     warm = "\n\n".join(keep)
     if omitted > 0:
         warm = str(omitted_text or "").replace("{{omitted}}", str(omitted)) + "\n\n" + warm
 else:
-    body = progress.strip()
-    if body:
-        if len(body) > 2500:
-            tail = body[len(body) - 2500:]
-            cut = tail.find("\n")
-            if cut >= 0:
-                tail = tail[cut + 1:]
-            warm = str(omitted_text or "").replace("{{omitted}}", "?") + "\n\n" + tail
-        else:
-            warm = body
+    warm = progress.strip()
 return {"updates": {"warm_listing": listing_out, "warm_progress": warm}}
 """.strip()
 
@@ -511,8 +510,10 @@ CYCLE_LINE_CODE = r"""
 n = int(cycle or 0) + 1
 mx = int(max_cycles or 0)
 note = str(last_summary or "").strip().replace("\n", " ")
+# DISPLAY ONLY: `note` feeds the one-line "ralph cycle N of M" progress message
+# (answer_user); no model reads it, and the whole summary stays in the run.
 if len(note) > 120:
-    note = note[:120]
+    note = note[:120] + "… (truncated)"  #[WARNING:TRUNCATION] labeled progress-line preview
 if not note:
     note = str(start_word or "")
 if int(steer_new or 0) > 0:
@@ -821,7 +822,7 @@ SEED_VARS = {
     "done_marker": "DONE:",
     "max_cycles": 8,
     "max_steps_per_cycle": 8,
-    "warm_entries": 3,
+    "warm_entries": 0,
     "cycle": 0,
     "done": False,
     "complete": False,
@@ -944,7 +945,11 @@ return {"updates": {"step": 0, "step_done": False, "transcript": "", "summary": 
                      outputs=[pin("updates", "updates", "object")], exec_pins=True)
     fold["data"]["pinDefaults"].update({"entry_text": CYCLE_ENTRY_TEXT,
                                         "trim_marker": CYCLE_TRIM_TEXT,
-                                        "max_chars": 20000})
+                                        # ADR-0026: NO default step-trace bound
+                                        # (20000 shipped here). 0 = unbounded;
+                                        # an explicit bound carries the loud
+                                        # trim marker in-band.
+                                        "max_chars": 0})
     N.append(fold)
     E.append(edge("step_llm", "response", "fold", "thought"))
     E.append(edge("calls_json", "result", "fold", "calls_text"))
@@ -1039,7 +1044,7 @@ def build_root() -> dict:
                            pin("model", "model", "model")],
                   pin_defaults={"request": "", "workspace_root": "", "gating_mode": "wait",
                                 "max_cycles": 8, "max_steps_per_cycle": 16,
-                                "warm_entries": 3,
+                                "warm_entries": 0,
                                 "verify_command": "", "plan_file": "PLAN.md",
                                 "progress_file": "PROGRESS.md", "done_marker": "DONE:",
                                 "browser_probe_available": False}))
@@ -1178,7 +1183,7 @@ def build_root() -> dict:
     wfold["data"]["pinDefaults"].update({"omitted_text": RALPH_WARM_OMITTED_TEXT})
     N.append(wfold)
     E.append(edge("warm_call", "raw", "warm_fold", "result"))
-    read_pin(N, E, "warm_fold", "warm_entries", "warm_entries", 3, -260, -320)
+    read_pin(N, E, "warm_fold", "warm_entries", "warm_entries", 0, -260, -320)
     N.append(W.set_vars("set_warm", "Save warm context", -230, 0))
     E.append(edge("warm_fold", "updates", "set_warm", "updates"))
 
@@ -1511,7 +1516,7 @@ def build_wrapper() -> dict:
                   pin_defaults={"prompt": "", "workspace_root": "", "gating_mode": "wait",
                                 "browser_probe_available": True,
                                 "verify_command": "", "max_cycles": 8,
-                                "max_steps_per_cycle": 16, "warm_entries": 3,
+                                "max_steps_per_cycle": 16, "warm_entries": 0,
                                 "plan_file": "PLAN.md",
                                 "progress_file": "PROGRESS.md", "done_marker": "DONE:"}))
     N.append(subflow_node("build", "Run the ralph loop", ROOT_FLOW_ID, -220, 0,
@@ -1653,8 +1658,8 @@ def main() -> int:
                 "purpose": (
                     "Ralph coding loop with NO agent node: while(not done and cycle<max) { drain "
                     "_runtime.inbox -> standing steering, progress line, WARM-START gather "
-                    "(deterministic: depth-2 listing + last warm_entries WHOLE progress entries, "
-                    "ADR-0026, injected into the prompt so fresh context stops re-deriving state), "
+                    "(deterministic: depth-2 listing + the newest WHOLE progress entries up to the "
+                    "50k-token history window, ADR-0026, injected into the prompt so fresh context stops re-deriving state), "
                     "compose the SAME fixed task prompt, run one FRESH session (ralph-cycle "
                     "subflow: llm_call + tool_calls, own vars), then a DETERMINISTIC check — "
                     "verify command exit 0 AND the completion marker in the progress file, plus a "

@@ -64,7 +64,10 @@ from wf_common import (
 )
 
 BUNDLE_ID = "react-coding"
-BUNDLE_VERSION = "0.1.1"
+# 0.1.2 = ADR-0026 labeling (2026-09-28): the progress-line preview of the
+# last action says it is cut ("… (truncated)"); the transcript was already
+# unbounded by default. No model-facing change.
+BUNDLE_VERSION = "0.1.2"
 ROOT_FLOW_ID = "react-coding"
 WRAPPER_FLOW_ID = "react-coder"
 CODING_INTERFACE = "abstractcode.coding.v1"
@@ -355,9 +358,11 @@ except Exception:
     cap = 0
 if cap > 0 and len(trace) > cap:
     trace = str(trim_marker or "") + trace[len(trace) - cap:]
+# DISPLAY ONLY: `last_action` feeds the one-line "react cycle N of M" progress
+# message (answer_user); the model reads the whole calls in the transcript.
 summary = str(calls_text or "").strip()
 if len(summary) > 160:
-    summary = summary[:160]
+    summary = summary[:160] + "… (truncated)"  #[WARNING:TRUNCATION] labeled progress-line preview
 return {"updates": {"transcript": trace, "cycle": n, "last_action": summary, "steer_new": 0}}
 """.strip()
 

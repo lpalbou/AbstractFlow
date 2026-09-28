@@ -178,6 +178,59 @@ def main() -> int:  # noqa: C901 - a smoke is a checklist
           and exhausted["stopped"] == "budget-exhausted"
           and "#FALLBACK" in exhausted["report"], str(exhausted)[:200])
 
+    # ---- ADR-0026 (0.2.1): no count/char cap on what the cycle model reads ----
+    from abstractruntime import HISTORY_REPLAY_MAX_TOKENS
+
+    wf = by_id["warm_fold"]
+    wd = defaults_of(wf)
+
+    def warm(progress_text: str, warm_entries=None) -> str:
+        stdout = ("---RALPH-LISTING---\n./a.py\n---RALPH-PROGRESS---\n" + progress_text
+                  + "\n---RALPH-WARM-END---\n")
+        inputs = {**wd, "result": {"results": [{"output": {"stdout": stdout}}]}}
+        if warm_entries is not None:
+            inputs["warm_entries"] = warm_entries
+        return run_body(wf, inputs)["updates"]["warm_progress"]
+
+    def entries(n: int, size: int) -> list[str]:
+        # each entry is `size` chars of body (~size/4 estimated tokens)
+        return [f"## Cycle {i}\n" + (f"e{i} " * size)[:size] for i in range(1, n + 1)]
+
+    twelve = entries(12, 400)
+    got = warm("\n".join(twelve))
+    check("adr26-warm-every-entry-within-the-window",
+          all(e.strip() in got for e in twelve) and "omitted" not in got, got[:200])
+    check("adr26-warm-window-is-the-runtime-history-window",
+          f"window_tokens = {HISTORY_REPLAY_MAX_TOKENS}" in wf["data"]["codeBody"],
+          str(HISTORY_REPLAY_MAX_TOKENS))
+    # five ~20k-token entries: the newest two fit 50k tokens, the third does not
+    big = entries(5, 80_000)
+    got = warm("\n".join(big))
+    check("adr26-warm-drops-oldest-WHOLE-entries-past-50k-tokens",
+          big[4].strip() in got and big[3].strip() in got and "## Cycle 3" not in got
+          and "(3 entr" in got, got[:160])
+    body = "no headings here " * 800  # ~13,600 chars: the old tail kept 2,500
+    got = warm(body)
+    check("adr26-warm-unstructured-progress-is-whole", got == body.strip(), str(len(got)))
+    got = warm("\n".join(entries(5, 400)), warm_entries=2)
+    check("adr26-warm-explicit-bound-is-honoured-and-stated",
+          "## Cycle 5" in got and "## Cycle 4" in got and "## Cycle 3" not in got
+          and "(3 entr" in got, got[:160])
+    check("adr26-warm-default-has-no-count-bound",
+          by_id["start"]["data"]["pinDefaults"]["warm_entries"] == 0
+          and {n["id"]: n for n in wrapper["nodes"]}["start"]["data"]["pinDefaults"]["warm_entries"] == 0)
+    sfold = cyc_by_id["fold"]
+    check("adr26-step-trace-has-no-default-bound", defaults_of(sfold).get("max_chars") == 0,
+          str(defaults_of(sfold).get("max_chars")))
+    long_obs = "x" * 60_000
+    tr = run_body(sfold, {**defaults_of(sfold), "transcript": "", "step": 0, "thought": "t",
+                          "calls_text": "c", "observations": long_obs})["updates"]["transcript"]
+    check("adr26-step-trace-keeps-a-60k-observation-whole", long_obs in tr, str(len(tr)))
+    cl = by_id["cycle_line"]
+    line = run_body(cl, {**defaults_of(cl), "cycle": 0, "max_cycles": 3, "steer_new": 0,
+                         "last_summary": "s" * 500})["message"]
+    check("adr26-progress-line-preview-is-labeled", line.endswith("… (truncated)"), line[-40:])
+
     # ---- E2E scaffolding ----
     from abstractruntime import Runtime
     from abstractruntime.core.models import EffectType, RunStatus

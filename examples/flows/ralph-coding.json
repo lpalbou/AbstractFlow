@@ -97,7 +97,7 @@
           "gating_mode": "wait",
           "max_cycles": 8,
           "max_steps_per_cycle": 16,
-          "warm_entries": 3,
+          "warm_entries": 0,
           "verify_command": "",
           "plan_file": "PLAN.md",
           "progress_file": "PROGRESS.md",
@@ -229,7 +229,7 @@
           "refusal_header_text": "REFUSED AT THE DOOR — the ralph coding loop did not start:"
         },
         "functionName": "transform",
-        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nmode = str(gating_mode or \"wait\").strip().lower()\ntry:\n    budget = int(max_cycles or 0)\nexcept Exception:\n    budget = 0\nif budget < 1:\n    budget = 1\nif budget > 30:\n    budget = 30\ntry:\n    steps = int(max_steps_per_cycle or 0)\nexcept Exception:\n    steps = 0\nif steps < 1:\n    steps = 1\nif steps > 30:\n    steps = 30\nverify = str(verify_command or \"\").strip()\nplan = str(plan_file or \"PLAN.md\").strip() or \"PLAN.md\"\nprogress = str(progress_file or \"PROGRESS.md\").strip() or \"PROGRESS.md\"\nmarker = str(done_marker or \"DONE:\").strip() or \"DONE:\"\ntry:\n    warm = int(warm_entries or 3)\nexcept Exception:\n    warm = 3\nif warm < 1:\n    warm = 1\nif warm > 10:\n    warm = 10\nproblems = []\nif not req:\n    problems.append(str(empty_request_text or \"\"))\nif not ws:\n    problems.append(str(no_workspace_text or \"\"))\nok = len(problems) == 0\nlines = []\nif not ok:\n    lines.append(str(refusal_header_text or \"\"))\n    for p in problems:\n        lines.append(\"- \" + p)\nreturn {\n    \"updates\": {\n        \"preflight_ok\": ok,\n        \"wait_gating\": mode != \"auto\",\n        \"request\": req,\n        \"workspace_root\": ws,\n        \"verify_command\": verify,\n        \"has_verify\": len(verify) > 0,\n        \"probe_ok\": bool(browser_probe_available),\n        \"plan_file\": plan,\n        \"progress_file\": progress,\n        \"done_marker\": marker,\n        \"max_cycles\": budget,\n        \"max_steps_per_cycle\": steps,\n        \"warm_entries\": warm,\n        \"cycle\": 0,\n        \"done\": False,\n        \"complete\": False,\n        \"verify_ok\": False,\n        \"promise_done\": False,\n        \"prev_verify_ok\": False,\n        \"settled\": False,\n        \"fp_changes\": -1,\n        \"warm_progress\": \"\",\n        \"warm_listing\": \"\",\n        \"steering_notes\": \"\",\n        \"steer_seen\": 0,\n        \"steer_new\": 0,\n        \"last_summary\": \"\",\n        \"last_check\": \"\",\n        \"evidence\": \"\",\n        \"stopped_reason\": \"\",\n    },\n    \"report\": \"\\n\".join(lines),\n}"
+        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nmode = str(gating_mode or \"wait\").strip().lower()\ntry:\n    budget = int(max_cycles or 0)\nexcept Exception:\n    budget = 0\nif budget < 1:\n    budget = 1\nif budget > 30:\n    budget = 30\ntry:\n    steps = int(max_steps_per_cycle or 0)\nexcept Exception:\n    steps = 0\nif steps < 1:\n    steps = 1\nif steps > 30:\n    steps = 30\nverify = str(verify_command or \"\").strip()\nplan = str(plan_file or \"PLAN.md\").strip() or \"PLAN.md\"\nprogress = str(progress_file or \"PROGRESS.md\").strip() or \"PROGRESS.md\"\nmarker = str(done_marker or \"DONE:\").strip() or \"DONE:\"\n# ADR-0026: 0 = no count bound (the 50k-token window alone applies); a\n# positive value is an author's explicit bound.\ntry:\n    warm = int(warm_entries or 0)\nexcept Exception:\n    warm = 0\nif warm < 0:\n    warm = 0\nproblems = []\nif not req:\n    problems.append(str(empty_request_text or \"\"))\nif not ws:\n    problems.append(str(no_workspace_text or \"\"))\nok = len(problems) == 0\nlines = []\nif not ok:\n    lines.append(str(refusal_header_text or \"\"))\n    for p in problems:\n        lines.append(\"- \" + p)\nreturn {\n    \"updates\": {\n        \"preflight_ok\": ok,\n        \"wait_gating\": mode != \"auto\",\n        \"request\": req,\n        \"workspace_root\": ws,\n        \"verify_command\": verify,\n        \"has_verify\": len(verify) > 0,\n        \"probe_ok\": bool(browser_probe_available),\n        \"plan_file\": plan,\n        \"progress_file\": progress,\n        \"done_marker\": marker,\n        \"max_cycles\": budget,\n        \"max_steps_per_cycle\": steps,\n        \"warm_entries\": warm,\n        \"cycle\": 0,\n        \"done\": False,\n        \"complete\": False,\n        \"verify_ok\": False,\n        \"promise_done\": False,\n        \"prev_verify_ok\": False,\n        \"settled\": False,\n        \"fp_changes\": -1,\n        \"warm_progress\": \"\",\n        \"warm_listing\": \"\",\n        \"steering_notes\": \"\",\n        \"steer_seen\": 0,\n        \"steer_new\": 0,\n        \"last_summary\": \"\",\n        \"last_check\": \"\",\n        \"evidence\": \"\",\n        \"stopped_reason\": \"\",\n    },\n    \"report\": \"\\n\".join(lines),\n}"
       },
       "label": null,
       "icon": null,
@@ -287,7 +287,7 @@
             "done_marker": "DONE:",
             "max_cycles": 8,
             "max_steps_per_cycle": 8,
-            "warm_entries": 3,
+            "warm_entries": 0,
             "cycle": 0,
             "done": false,
             "complete": false,
@@ -1307,7 +1307,7 @@
           "steer_word": "steering applied — "
         },
         "functionName": "transform",
-        "codeBody": "n = int(cycle or 0) + 1\nmx = int(max_cycles or 0)\nnote = str(last_summary or \"\").strip().replace(\"\\n\", \" \")\nif len(note) > 120:\n    note = note[:120]\nif not note:\n    note = str(start_word or \"\")\nif int(steer_new or 0) > 0:\n    note = str(steer_word or \"\") + note\nmsg = str(line_text or \"\")\nmsg = msg.replace(\"{{n}}\", str(n)).replace(\"{{max}}\", str(mx)).replace(\"{{note}}\", note)\nreturn {\"message\": msg}"
+        "codeBody": "n = int(cycle or 0) + 1\nmx = int(max_cycles or 0)\nnote = str(last_summary or \"\").strip().replace(\"\\n\", \" \")\n# DISPLAY ONLY: `note` feeds the one-line \"ralph cycle N of M\" progress message\n# (answer_user); no model reads it, and the whole summary stays in the run.\nif len(note) > 120:\n    note = note[:120] + \"… (truncated)\"  #[WARNING:TRUNCATION] labeled progress-line preview\nif not note:\n    note = str(start_word or \"\")\nif int(steer_new or 0) > 0:\n    note = str(steer_word or \"\") + note\nmsg = str(line_text or \"\")\nmsg = msg.replace(\"{{n}}\", str(n)).replace(\"{{max}}\", str(mx)).replace(\"{{note}}\", note)\nreturn {\"message\": msg}"
       },
       "label": null,
       "icon": null,
@@ -1795,7 +1795,7 @@
           "omitted_text": "[older cycles omitted ({{omitted}} entr(y/ies)) — read the progress file for full history]"
         },
         "functionName": "transform",
-        "codeBody": "txt = text_of(result)\nlisting = \"\"\nprogress = \"\"\nif \"---RALPH-LISTING---\" in txt:\n    after = txt.split(\"---RALPH-LISTING---\", 1)[1]\n    if \"---RALPH-PROGRESS---\" in after:\n        parts2 = after.split(\"---RALPH-PROGRESS---\", 1)\n        listing = parts2[0]\n        progress = parts2[1]\n    else:\n        listing = after\nif \"---RALPH-WARM-END---\" in progress:\n    progress = progress.split(\"---RALPH-WARM-END---\", 1)[0]\nlines = []\nfor ln in listing.splitlines():\n    s = ln.strip()\n    if s and s != \".\" and \".ralph_\" not in s:\n        lines.append(s)\n# ADR-0026: the workspace listing the coder reads is WHOLE. A 100-path slice\n# sat here and hid files the model then \"created\" a second time.\nlisting_out = \"\\n\".join(lines)\ntry:\n    n = int(warm_entries or 3)\nexcept Exception:\n    n = 3\nif n < 1:\n    n = 1\nif n > 10:\n    n = 10\nentries = []\ncur = []\nin_entry = False\nfor ln in progress.splitlines():\n    if ln.startswith(\"## \"):\n        if in_entry:\n            entries.append(\"\\n\".join(cur).strip())\n        cur = [ln]\n        in_entry = True\n    else:\n        if in_entry:\n            cur.append(ln)\nif in_entry:\n    entries.append(\"\\n\".join(cur).strip())\nomitted = 0\nwarm = \"\"\nif entries:\n    keep = entries\n    if len(keep) > n:\n        omitted = len(keep) - n\n        keep = keep[len(keep) - n:]\n    total = 0\n    for e in keep:\n        total = total + len(e)\n    while len(keep) > 1 and total > 6000:\n        total = total - len(keep[0])\n        omitted = omitted + 1\n        keep = keep[1:]\n    warm = \"\\n\\n\".join(keep)\n    if omitted > 0:\n        warm = str(omitted_text or \"\").replace(\"{{omitted}}\", str(omitted)) + \"\\n\\n\" + warm\nelse:\n    body = progress.strip()\n    if body:\n        if len(body) > 2500:\n            tail = body[len(body) - 2500:]\n            cut = tail.find(\"\\n\")\n            if cut >= 0:\n                tail = tail[cut + 1:]\n            warm = str(omitted_text or \"\").replace(\"{{omitted}}\", \"?\") + \"\\n\\n\" + tail\n        else:\n            warm = body\nreturn {\"updates\": {\"warm_listing\": listing_out, \"warm_progress\": warm}}"
+        "codeBody": "txt = text_of(result)\nlisting = \"\"\nprogress = \"\"\nif \"---RALPH-LISTING---\" in txt:\n    after = txt.split(\"---RALPH-LISTING---\", 1)[1]\n    if \"---RALPH-PROGRESS---\" in after:\n        parts2 = after.split(\"---RALPH-PROGRESS---\", 1)\n        listing = parts2[0]\n        progress = parts2[1]\n    else:\n        listing = after\nif \"---RALPH-WARM-END---\" in progress:\n    progress = progress.split(\"---RALPH-WARM-END---\", 1)[0]\nlines = []\nfor ln in listing.splitlines():\n    s = ln.strip()\n    if s and s != \".\" and \".ralph_\" not in s:\n        lines.append(s)\n# ADR-0026: the workspace listing the coder reads is WHOLE. A 100-path slice\n# sat here and hid files the model then \"created\" a second time.\nlisting_out = \"\\n\".join(lines)\ntry:\n    n = int(warm_entries or 0)\nexcept Exception:\n    n = 0\nwindow_tokens = 50000\nentries = []\ncur = []\nin_entry = False\nfor ln in progress.splitlines():\n    if ln.startswith(\"## \"):\n        if in_entry:\n            entries.append(\"\\n\".join(cur).strip())\n        cur = [ln]\n        in_entry = True\n    else:\n        if in_entry:\n            cur.append(ln)\nif in_entry:\n    entries.append(\"\\n\".join(cur).strip())\nomitted = 0\nwarm = \"\"\nif entries:\n    keep = entries\n    if n > 0 and len(keep) > n:\n        omitted = len(keep) - n\n        keep = keep[len(keep) - n:]\n    total = 0\n    for e in keep:\n        total = total + max(1, int(len(e) / 4))\n    while len(keep) > 1 and total > window_tokens:\n        total = total - max(1, int(len(keep[0]) / 4))\n        omitted = omitted + 1\n        keep = keep[1:]\n    warm = \"\\n\\n\".join(keep)\n    if omitted > 0:\n        warm = str(omitted_text or \"\").replace(\"{{omitted}}\", str(omitted)) + \"\\n\\n\" + warm\nelse:\n    warm = progress.strip()\nreturn {\"updates\": {\"warm_listing\": listing_out, \"warm_progress\": warm}}"
       },
       "label": null,
       "icon": null,
@@ -1836,7 +1836,7 @@
         ],
         "pinDefaults": {
           "name": "warm_entries",
-          "default": 3
+          "default": 0
         }
       },
       "label": null,
@@ -6662,5 +6662,5 @@
   ],
   "entryNode": "start",
   "created_at": "2026-08-02T13:03:04.702844+00:00",
-  "updated_at": "2026-08-02T13:03:04.702844+00:00"
+  "updated_at": "2026-09-28T03:30:51.965459+00:00"
 }

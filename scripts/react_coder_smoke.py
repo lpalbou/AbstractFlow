@@ -141,6 +141,16 @@ def main() -> int:  # noqa: C901 - a smoke is a checklist
                             "max_chars": 120})["updates"]
     check("fold-tail-bounded", len(tight["transcript"]) <= 120 + len(d["trim_marker"])
           and tight["transcript"].startswith(d["trim_marker"]), str(len(tight["transcript"])))
+    # ADR-0026: the transcript is unbounded by default; the last-action preview
+    # is display-only (progress line) and says it was cut.
+    long_calls = "[" + ("{\"name\": \"write_file\"}, " * 40) + "]"
+    whole = run_body(fold, {**d, "transcript": "", "cycle": 0, "thought": "t",
+                            "calls_text": long_calls, "observations": "o" * 60_000})["updates"]
+    check("adr26-transcript-default-unbounded", d["max_chars"] == 0
+          and ("o" * 60_000) in whole["transcript"] and long_calls in whole["transcript"],
+          str(len(whole["transcript"])))
+    check("adr26-last-action-preview-is-labeled",
+          whole["last_action"] == long_calls[:160] + "… (truncated)", whole["last_action"][-30:])
 
     gf = by_id["gate_fold"]
     gd = defaults_of(gf)

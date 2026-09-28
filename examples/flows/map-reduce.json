@@ -623,7 +623,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "instr = str(reduce_instruction or \"Synthesize the results into one coherent summary.\").strip()\nitems = results or []\nparts = [instr, \"\", \"## Per-item results (\" + str(len(items)) + \")\"]\nfor r in items:\n    if isinstance(r, dict):\n        parts.append(\"- [\" + str(r.get(\"index\")) + \"] \" + str(r.get(\"result\", \"\"))[:1200])\n    else:\n        parts.append(\"- \" + str(r)[:1200])\nreturn \"\\n\".join(parts)"
+        "codeBody": "instr = str(reduce_instruction or \"Synthesize the results into one coherent summary.\").strip()\nitems = results or []\nparts = [instr, \"\", \"## Per-item results (\" + str(len(items)) + \")\"]\n# ADR-0026: the reducer reads every per-item result WHOLE.\nfor r in items:\n    if isinstance(r, dict):\n        parts.append(\"- [\" + str(r.get(\"index\")) + \"] \" + str(r.get(\"result\", \"\")))\n    else:\n        parts.append(\"- \" + str(r))\nreturn \"\\n\".join(parts)"
       },
       "label": null,
       "icon": null,
@@ -1197,5 +1197,5 @@
   ],
   "entryNode": "start",
   "created_at": "2026-07-20T13:28:49.796525+00:00",
-  "updated_at": "2026-07-20T13:28:49.796525+00:00"
+  "updated_at": "2026-09-28T03:30:50.533594+00:00"
 }

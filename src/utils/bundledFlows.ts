@@ -98,14 +98,17 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // prompt behind a run-owned watermark, and emits a "coding round N of M"
     // progress line — the same steering + progress contract the new
     // react-coder / ralph-coder loops ship with.
-    bundleVersion: '0.2.5',
-    bundleRef: 'coding-agent@0.2.5',
+    // 0.2.8 = ADR-0026 (2026-09-28): whole failure text to the fixer, no
+    // verifier output cap. The version the gateway ships (0.2.6 before it;
+    // this pin still named 0.2.5, which a fresh install does not have).
+    bundleVersion: '0.2.8',
+    bundleRef: 'coding-agent@0.2.8',
   },
   coder: {
     flowId: 'coder',
     bundleId: 'coding-agent',
-    bundleVersion: '0.2.5',
-    bundleRef: 'coding-agent@0.2.5',
+    bundleVersion: '0.2.8',
+    bundleRef: 'coding-agent@0.2.8',
   },
   'co-scientist': {
     flowId: 'co-scientist',
@@ -122,14 +125,17 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // 0.1.8 = quality wave vs the Nature paper: hardened grounding + citation
     // allowlist, decoration-free generative views, novelty floor + diversity,
     // structured per-hypothesis protocols, Elo-evolution figure + methodology.
-    bundleVersion: '0.2.0',
-    bundleRef: 'co-scientist@0.2.0',
+    // 0.2.1 = ADR-0026 (2026-09-28): no count/char caps on what a model reads
+    // (feedback, open questions, meta-review, figure prompt, citation titles).
+    bundleVersion: '0.2.1',
+    bundleRef: 'co-scientist@0.2.1',
   },
   'diagram-render': {
     flowId: 'diagram-render',
     bundleId: 'diagram-render',
-    bundleVersion: '0.2.0',
-    bundleRef: 'diagram-render@0.2.0',
+    // 0.2.1 = ADR-0026: #FALLBACK warnings carry the whole error.
+    bundleVersion: '0.2.1',
+    bundleRef: 'diagram-render@0.2.1',
   },
   'adversarial-review': {
     flowId: 'adversarial-review',
@@ -146,8 +152,9 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   'map-reduce': {
     flowId: 'map-reduce',
     bundleId: 'map-reduce',
-    bundleVersion: '0.1.1',
-    bundleRef: 'map-reduce@0.1.1',
+    // 0.1.2 = ADR-0026: the reducer reads every per-item result whole.
+    bundleVersion: '0.1.2',
+    bundleRef: 'map-reduce@0.1.2',
   },
   'meta-consensus': {
     flowId: 'meta-consensus',
@@ -206,8 +213,9 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // class): the inbox is drained again after the model claims it is done,
     // and a steer that landed while it was answering re-opens the loop for
     // one more cycle instead of being dropped silently.
-    bundleVersion: '0.1.1',
-    bundleRef: 'react-coding@0.1.1',
+    // 0.1.2 = ADR-0026 labeling: the progress-line preview says it is cut.
+    bundleVersion: '0.1.2',
+    bundleRef: 'react-coding@0.1.2',
   },
   'ralph-coder': {
     flowId: 'ralph-coder',
@@ -215,8 +223,11 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     // 0.1.1 = the LATE STEER DRAIN (found on live gateway run 07989c5d: the
     // deterministic check passed on cycle 1 and the in-flight steer was never
     // applied). Fresh steering now RE-OPENS a completion.
-    bundleVersion: '0.1.1',
-    bundleRef: 'ralph-coding@0.1.1',
+    // 0.2.0 = warm start + two-green early stop (this pin had stayed 0.1.1).
+    // 0.2.1 = ADR-0026: the warm-start progress tail is the newest whole
+    // entries up to the 50k-token history window; no step-trace default bound.
+    bundleVersion: '0.2.1',
+    bundleRef: 'ralph-coding@0.2.1',
   },
 };
 

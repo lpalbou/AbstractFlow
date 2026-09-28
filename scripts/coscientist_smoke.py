@@ -20,6 +20,11 @@ Layers:
 5. RULE CORPUS: the load-bearing instructions the reports were fought for are
    each asserted present in the composed corpus of the agent that must obey
    them - so a future edit to a pin default cannot quietly delete one.
+6. ADR-0026 (0.2.1): every model-facing prompt carries its inputs WHOLE - each
+   long fixture string fed past a removed cap (feedback 6x400/6x300, open
+   questions 6, meta-review top 5 + literature 2500 + notes 300, figure prompt
+   top 5 + statements 200, citation titles 60/80/70) is asserted present in
+   the composed text. The six `adr26.*` golden cases pin the same bytes.
 """
 from __future__ import annotations
 
@@ -42,6 +47,7 @@ from abstractruntime.visualflow_compiler.visual.pin_expressions import (  # noqa
     compile_pin_expression,
 )
 
+import coscientist_fixtures as FX  # noqa: E402
 from coscientist_fixtures import CASES  # noqa: E402
 
 FLOW_PATH = Path(__file__).resolve().parents[1] / "examples" / "flows" / "co-scientist.json"
@@ -252,6 +258,34 @@ def main() -> int:  # noqa: C901
             drift += 1
     check("every-composed-prompt-and-report-byte-is-preserved", drift == 0,
           f"{drift} case(s) drifted")
+
+    # ---- layer 6: ADR-0026 - model-facing text is never cut ----------------
+    def _composed(case_name: str) -> str:
+        case = next(c for c in CASES if c["name"] == case_name)
+        value = dig(run_node(by_id[case["node"]], case["inputs"]), case.get("new_path", ""))
+        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+
+    ranked = FX.ADR26_RANKED
+    WHOLE = {
+        "adr26.fold.feedback_every_critique_whole":
+            [r["critique"] for r in FX.ADR26_REVIEWS["reviews"]]
+            + [m["reason"] for m in FX.ADR26_MATCHES["matches"]],
+        "adr26.expand_prompt.every_open_question": FX.ADR26_OPEN_QUESTIONS,
+        "adr26.meta_prompt.every_ranked_whole":
+            [FX.ADR26_LONG_LIT] + [h["statement"] for h in ranked]
+            + [h["reviews"]["critique"] for h in ranked],
+        "adr26.fig_spec_prompt.every_ranked_whole": [h["statement"] for h in ranked],
+    }
+    for case_name, needles in WHOLE.items():
+        text = _composed(case_name)
+        cut = [n[:40] for n in needles if n not in text]
+        check(f"whole:{case_name}", not cut, f"{len(cut)} input(s) not whole: {cut[:3]}")
+    reason = json.loads(_composed("adr26.cite_fold.mismatch_whole_titles"))[0]["reason"]
+    check("whole:citation-mismatch-reason-quotes-both-titles",
+          FX.ADR26_LONG_CLAIMED in reason and FX.ADR26_LONG_SERVED in reason, reason)
+    warns = json.loads(_composed("adr26.cite_apply.warning_whole_title"))
+    check("whole:dropped-source-warning-quotes-the-title",
+          any(w.count(FX.ADR26_DROPPED_TITLE) >= 2 for w in warns), str(warns)[:300])
 
     # ---- layer 5: the load-bearing rules survive on their own pins ---------
     # These are the instructions the report-quality wave was fought for. Each

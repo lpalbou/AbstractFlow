@@ -35,7 +35,12 @@ from wf_common import (
 )
 
 BUNDLE_ID = "goal-agent"
-BUNDLE_VERSION = "0.0.1"
+# 0.0.1 = first ship.
+# 0.0.2 = ADR-0026 (operator ruling 2026-09-28): the verifier reads the
+# worker's WHOLE report (no 6000-char cut), the worker reads the WHOLE verified
+# progress log (no last-6 window) and the verifier's whole summary/remaining
+# (no 300/500/240-char cuts), and the run keeps every log entry (no last-20).
+BUNDLE_VERSION = "0.0.2"
 FLOW_ID = "goal-agent"
 GOAL_INTERFACE = "abstractcode.goal.v1"
 STATE_VAR = "ga.state"
@@ -103,7 +108,8 @@ g = str(s.get("goal") or "")
 used = int(s.get("cycles_used", 0) or 0)
 log = s.get("progress_log") if isinstance(s.get("progress_log"), list) else []
 hist = ""
-for entry in log[-6:]:
+# ADR-0026: the WHOLE verified log (one line per cycle, bounded by max_cycles).
+for entry in log:
     hist = hist + "- " + str(entry) + "\n"
 v = s.get("last_verdict") if isinstance(s.get("last_verdict"), dict) else {}
 remaining = str(v.get("remaining") or "").strip()
@@ -121,9 +127,8 @@ return {"prompt": p}
 VERIFIER_PROMPT_CODE = r"""
 s = loop_state if isinstance(loop_state, dict) else {}
 g = str(s.get("goal") or "")
+# ADR-0026: the verifier judges the worker's WHOLE report.
 w = str(worker_response or "").strip()
-if len(w) > 6000:
-    w = w[:6000] + "\n[...truncated #TRUNCATION]"
 p = ("You are the independent VERIFIER for a goal loop. The GOAL:\n" + g +
      "\n\nThe worker's report for this cycle:\n" + w +
      "\n\nJudge STRICTLY on evidence in the report (files named, commands run, outputs shown) - "
@@ -148,19 +153,21 @@ progressed = bool(v.get("progressed")) if "progressed" in v else False
 summary = str(v.get("summary") or "").strip()
 s2["cycles_used"] = int(s.get("cycles_used", 0) or 0) + 1
 s2["done"] = done
+# ADR-0026: the verdict and every log entry are kept whole (the next worker
+# prompt reads them).
 s2["last_verdict"] = {"done": done, "progressed": progressed,
-                      "summary": summary[:300],
-                      "remaining": str(v.get("remaining") or "")[:500]}
+                      "summary": summary,
+                      "remaining": str(v.get("remaining") or "")}
 log = s.get("progress_log") if isinstance(s.get("progress_log"), list) else []
 log = list(log)
 if summary:
-    log.append(("cycle " + str(s2["cycles_used"]) + ": " + summary)[:240])
-s2["progress_log"] = log[-20:]
+    log.append("cycle " + str(s2["cycles_used"]) + ": " + summary)
+s2["progress_log"] = log
 if "done" not in v:
     s2["no_progress"] = int(s.get("no_progress", 0) or 0) + 1
     lw = list(s2.get("progress_log") or [])
     lw.append("cycle " + str(s2["cycles_used"]) + ": verifier returned no verdict (#FALLBACK)")
-    s2["progress_log"] = lw[-20:]
+    s2["progress_log"] = lw
 elif progressed:
     s2["no_progress"] = 0
 else:

@@ -32,11 +32,12 @@ REDUCE_PROMPT_CODE = """
 instr = str(reduce_instruction or "Synthesize the results into one coherent summary.").strip()
 items = results or []
 parts = [instr, "", "## Per-item results (" + str(len(items)) + ")"]
+# ADR-0026: the reducer reads every per-item result WHOLE.
 for r in items:
     if isinstance(r, dict):
-        parts.append("- [" + str(r.get("index")) + "] " + str(r.get("result", ""))[:1200])
+        parts.append("- [" + str(r.get("index")) + "] " + str(r.get("result", "")))
     else:
-        parts.append("- " + str(r)[:1200])
+        parts.append("- " + str(r))
 return "\\n".join(parts)
 """.strip()
 
@@ -171,7 +172,9 @@ def main():
     out = W.pack_bundle(
         root_flow_id="map-reduce",
         bundle_id="map-reduce",
-        bundle_version="0.1.1",
+        # 0.1.2 = ADR-0026 (operator ruling 2026-09-28): the reduce prompt
+        # carries every per-item result whole (a 1200-char cut sat here).
+        bundle_version="0.1.2",
         entrypoints=["map-reduce"],
         metadata={"family": "map-reduce", "purpose": "map-reduce"},
     )

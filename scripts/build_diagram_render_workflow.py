@@ -90,12 +90,13 @@ ok = bool(chart_rendered)
 out_warnings = []
 for w in (chart_warnings or []):
     out_warnings.append(str(w))
+# ADR-0026: warnings carry the WHOLE spec/render error (callers surface them).
 spec_error = str(p.get("error") or "").strip()
 if spec_error:
-    out_warnings.append("#FALLBACK: invalid diagram spec: " + spec_error[:200])
+    out_warnings.append("#FALLBACK: invalid diagram spec: " + spec_error)
 elif not ok:
     head = str(chart_error or "").strip()
-    out_warnings.append("#FALLBACK: diagram render did not complete (" + head[:300] + ") — the caller should keep its text fallback.")
+    out_warnings.append("#FALLBACK: diagram render did not complete (" + head + ") — the caller should keep its text fallback.")
 return {
     "rendered": ok,
     "png_path": str(chart_png or "") if ok else "",
@@ -214,7 +215,9 @@ def main() -> int:
         # approval prompt; figures now render in-process via the runtime's
         # write_chart effect node (write_pdf trust class — no shell). The
         # python_bin input is gone with the subprocess.
-        bundle_version="0.2.0",
+        # 0.2.1 = ADR-0026 (operator ruling 2026-09-28): the #FALLBACK warnings
+        # carry the whole spec/render error (200/300-char cuts sat here).
+        bundle_version="0.2.1",
         entrypoints=["diagram-render"],
         metadata={
             "family": "diagram-render",

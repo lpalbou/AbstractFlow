@@ -105,6 +105,27 @@ def main() -> int:
     o = run(B["pace_dur"], {"loop_state": {"pace_seconds": 12}})
     check("pace-duration", o["duration"] == 12.0)
 
+    # ADR-0026 (0.0.2): no count/char cap on what the worker or verifier reads
+    report = "evidence line " * 1500  # ~21,000 chars: the old verifier cut at 6,000
+    o = run(B["verifier_prompt"], {"loop_state": {"goal": "g"}, "worker_response": report})
+    check("adr26-verifier-reads-the-whole-report",
+          report.strip() in o["prompt"] and "#TRUNCATION" not in o["prompt"], str(len(o["prompt"])))
+    long_summary, long_remaining = "did " * 200, "todo " * 300
+    o = run(B["fold"], {"verdict": {"done": False, "progressed": True, "summary": long_summary,
+                                    "remaining": long_remaining},
+                        "loop_state": {"cycles_used": 24, "no_progress": 0,
+                                       "progress_log": [f"cycle {i}: x" for i in range(1, 25)]}})
+    st = o["state"]
+    check("adr26-fold-keeps-verdict-and-log-whole",
+          st["last_verdict"]["summary"] == long_summary.strip()
+          and st["last_verdict"]["remaining"] == long_remaining
+          and len(st["progress_log"]) == 25
+          and st["progress_log"][-1] == "cycle 25: " + long_summary.strip(), str(st)[:200])
+    o = run(B["worker_prompt"], {"loop_state": {**st, "goal": "g"}})
+    check("adr26-worker-reads-every-log-entry-and-the-whole-remaining",
+          all(("- " + e) in o["prompt"] for e in st["progress_log"])
+          and long_remaining.strip() in o["prompt"], o["prompt"][:200])
+
     # refuse
     o = run(B["refuse"], {"failures": ["goal-agent: empty goal"]})
     check("refuse", o["ok"] is False and o["cycles"] == 0 and "empty goal" in o["result"])

@@ -31,7 +31,11 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.2.6.flow"
+# 0.2.8, not 0.2.7: an unregistered dev artifact coding-agent@0.2.7.flow
+# (2026-08-04) sits in the gateway checkout's bundles dir and a gateway that
+# loaded it refuses a different 0.2.7 (bundle versions are immutable by sha).
+BUNDLE_VERSION = "0.2.8"
+BUNDLE_FILENAME = f"coding-agent@{BUNDLE_VERSION}.flow"
 
 AGENT_INTERFACE = "abstractcode.agent.v1"
 
@@ -2960,6 +2964,19 @@ def build_chat_entrypoint_flow() -> dict[str, Any]:
 
 
 def write_json(path: Path, data: dict[str, Any]) -> None:
+    # A regenerated flow keeps its original created_at (only updated_at moves,
+    # and only when the content changed).
+    if path.is_file() and "created_at" in data:
+        try:
+            prior = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            prior = {}
+        if isinstance(prior, dict) and prior.get("created_at"):
+            data = {**data, "created_at": prior["created_at"]}
+            # An unchanged graph keeps its updated_at too: a rebuild then
+            # rewrites only the flows whose content actually changed.
+            if {**data, "updated_at": None} == {**prior, "updated_at": None}:
+                data = {**data, "updated_at": prior.get("updated_at")}
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
@@ -3009,6 +3026,12 @@ def main() -> int:
     sys.path.insert(0, str(ROOT / "abstractruntime" / "src"))
     from abstractruntime.workflow_bundle import pack_workflow_bundle
     from abstractruntime.visualflow_compiler import compiler as _compiler
+    from wf_common import bundles_dir_from_argv
+
+    # `--bundles-dir DIR` stages the artifact elsewhere (a release staging
+    # folder); the default stays the sibling gateway checkout.
+    bundles_dir = bundles_dir_from_argv(default=BUNDLES_DIR)
+    bundle_path = bundles_dir / BUNDLE_FILENAME
 
     # Self-check: compile the tree through the real runtime compiler so a
     # broken graph fails the build, not a live run (adversary P1). Both
@@ -3018,12 +3041,12 @@ def main() -> int:
     _compiler.compile_visualflow_tree(root_id="coding-agent", flows_by_id=flows_by_id)
     _compiler.compile_visualflow_tree(root_id="coder", flows_by_id=flows_by_id)
 
-    BUNDLES_DIR.mkdir(parents=True, exist_ok=True)
+    bundles_dir.mkdir(parents=True, exist_ok=True)
     pack_workflow_bundle(
         # The chat wrapper is the packing root so its subflow tree (coding-agent
         # -> coding-verify-gates) rides along; both entrypoints are declared.
         root_flow_json=FLOWS_DIR / "coder.json",
-        out_path=BUNDLE_PATH,
+        out_path=bundle_path,
         bundle_id="coding-agent",
         # 0.2.0 = deterministic-gates redesign (R-Type post-mortem, agora
         # c2725/c2735/c2736): delivery + integration gates before the LLM,
@@ -3080,7 +3103,13 @@ def main() -> int:
         # the task; (b) PROGRESS — one `answer_user` line per round
         # ("coding round N of M: <mode>"), the stable-prefix contract the
         # multiagent pipeline's "build cycle N of M" already gives clients.
-        bundle_version="0.2.6",
+        # 0.2.8 = ADR-0026 (operator ruling 2026-09-28): every failure line the
+        # builder is reprompted with carries the WHOLE tool/error text (no
+        # snippet cuts in GATE0/1/3/5, MERGE, NEXT_STATE) and the verifier has
+        # no max_output_tokens default (the model default applies; 4000 had
+        # truncated multi-feature verdicts). 0.2.7 is skipped (see
+        # BUNDLE_VERSION).
+        bundle_version=BUNDLE_VERSION,
         flows_dir=FLOWS_DIR,
         entrypoints=["coding-agent", "coder"],
         default_entrypoint="coding-agent",
@@ -3097,7 +3126,7 @@ def main() -> int:
         },
     )
     print(f"Wrote {len(flows)} flows to {FLOWS_DIR}")
-    print(f"Packed {BUNDLE_PATH}")
+    print(f"Packed {bundle_path}")
     return 0
 
 

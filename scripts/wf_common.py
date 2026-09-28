@@ -18,7 +18,28 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 # This repository's own examples (any checkout location).
 FLOWS_DIR = Path(__file__).resolve().parents[1] / "examples" / "flows"
+# Default pack destination: the sibling gateway checkout's bundles dir. A
+# builder run that must NOT touch that checkout (staging a release, a worktree)
+# passes `--bundles-dir DIR` (see bundles_dir_from_argv).
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
+
+
+def bundles_dir_from_argv(argv: list[str] | None = None, default: Path = BUNDLES_DIR) -> Path:
+    """The `--bundles-dir DIR` launch flag (also `--bundles-dir=DIR`): where
+    pack_bundle writes the .flow artifact. Absent = `default`. A flag given
+    without a value is an error, never a silent fallback to the default."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    for i, a in enumerate(args):
+        if a.startswith("--bundles-dir="):
+            value = a.split("=", 1)[1]
+        elif a == "--bundles-dir":
+            value = args[i + 1] if i + 1 < len(args) else ""
+        else:
+            continue
+        if not value or value.startswith("--"):
+            raise SystemExit("--bundles-dir needs a directory")
+        return Path(value).expanduser().resolve()
+    return default
 
 AGENT_INTERFACE = "abstractcode.agent.v1"
 
@@ -1126,6 +1147,19 @@ def layout_overlap_findings(flow: dict[str, Any]) -> list[str]:
 
 
 def write_json(path: Path, data: dict[str, Any]) -> None:
+    # A regenerated flow keeps its original created_at (only updated_at moves,
+    # and only when the content changed), so a rebuild diff shows what changed.
+    if path.is_file() and "created_at" in data:
+        try:
+            prior = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            prior = {}
+        if isinstance(prior, dict) and prior.get("created_at"):
+            data = {**data, "created_at": prior["created_at"]}
+            # An unchanged graph keeps its updated_at too: a rebuild then
+            # rewrites only the flows whose content actually changed.
+            if {**data, "updated_at": None} == {**prior, "updated_at": None}:
+                data = {**data, "updated_at": prior.get("updated_at")}
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
@@ -1189,12 +1223,15 @@ def validate_edges(flow: dict[str, Any]) -> list[str]:
     return problems
 
 
-def pack_bundle(*, root_flow_id, bundle_id, bundle_version, entrypoints, metadata):
+def pack_bundle(*, root_flow_id, bundle_id, bundle_version, entrypoints, metadata, out_dir=None):
+    """Pack `<bundle_id>@<bundle_version>.flow` into `out_dir` (default: the
+    `--bundles-dir` launch flag, else BUNDLES_DIR)."""
     sys.path.insert(0, str(ROOT / "abstractruntime" / "src"))
     from abstractruntime.workflow_bundle import pack_workflow_bundle
 
-    BUNDLES_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = BUNDLES_DIR / f"{bundle_id}@{bundle_version}.flow"
+    target_dir = Path(out_dir) if out_dir is not None else bundles_dir_from_argv()
+    target_dir.mkdir(parents=True, exist_ok=True)
+    out_path = target_dir / f"{bundle_id}@{bundle_version}.flow"
     pack_workflow_bundle(
         root_flow_json=FLOWS_DIR / f"{root_flow_id}.json",
         out_path=out_path,

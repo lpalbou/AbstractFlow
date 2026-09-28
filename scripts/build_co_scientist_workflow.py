@@ -769,14 +769,14 @@ elif is_arxiv:
         reason = "arXiv title matches"
     else:
         verdict = "mismatch"
-        reason = 'claimed "' + claimed[:60] + '" but the arXiv id serves "' + (fetched_title[:80] or '?') + '"'
+        reason = 'claimed "' + claimed + '" but the arXiv id serves "' + (fetched_title or '?') + '"'
 else:
     if contain >= 0.34:
         verdict = "verified"
         reason = "page title matches"
     elif fetched_title and contain == 0.0:
         verdict = "mismatch"
-        reason = 'claimed "' + claimed[:60] + '" but the page serves "' + fetched_title[:80] + '"'
+        reason = 'claimed "' + claimed + '" but the page serves "' + fetched_title + '"'
     else:
         verdict = "unverified"
         reason = "page title too generic to confirm (kept, labeled)"
@@ -825,7 +825,7 @@ for s in new_sources:
             fetched_count = fetched_count + 1
 warns = list(warnings or [])
 for d in dropped:
-    warns.append(str(dropped_warning_text or "").replace("{{title}}", d["title"][:70]).replace("{{reason}}", d["reason"]))
+    warns.append(str(dropped_warning_text or "").replace("{{title}}", d["title"]).replace("{{reason}}", d["reason"]))
 parts = [str(lit_text or "")]
 # Only claim verification when at least one URL was actually checked: on a
 # zero-source run the loop body never executes and an unconditional "every
@@ -1142,18 +1142,22 @@ debate = []
 for m in match_list:
     if isinstance(m, dict) and str(m.get("reason") or "").strip():
         debate.append(str(m.get("reason")).strip())
+# ADR-0026: the next cycle reads EVERY critique and debate reason, whole.
 fb_parts = []
 if crits:
     fb_parts.append(str(critique_heading_text or ""))
-    for c in crits[:6]:
-        fb_parts.append("- " + c[:400])
+    for c in crits:
+        fb_parts.append("- " + c)
 if debate:
     fb_parts.append(str(debate_heading_text or ""))
-    for d in debate[:6]:
-        fb_parts.append("- " + d[:300])
+    for d in debate:
+        fb_parts.append("- " + d)
 fb = "\\n".join(fb_parts).strip()
 
 ranked = sorted(by_id.values(), key=lambda h: -float(h.get("elo", 0)))
+# Tournament SURVIVOR SELECTION (the paper's evolving population), not a cut of
+# content: whole hypotheses below the top 8 by Elo leave the pool; nothing kept
+# is shortened. ADR-0026 audit 2026-09-28: kept, listed for the operator.
 cap = 8
 ranked = ranked[:cap]
 # Snapshot the tournament standing this cycle so the report can render the
@@ -1509,7 +1513,7 @@ if fb:
 oq = open_questions or []
 if oq:
     parts += ["", str(open_questions_heading_text or "")]
-    for q in oq[:6]:
+    for q in oq:
         parts.append("- " + str(q))
 parts += ["", str(goal_heading_text or ""), str(research_goal or "").strip()]
 lit = str(literature or "").strip()
@@ -1529,17 +1533,19 @@ return {"prompt": "\\n".join(parts)}
 TERM_RANK_PROMPT_CODE = TERM_REFLECT_PROMPT_CODE
 
 META_PROMPT_CODE = """
-top = (ranked_hypotheses or [])[:5]
+# ADR-0026: the meta-review reads every ranked hypothesis, the whole literature
+# base and every reviewer note whole.
+top = ranked_hypotheses or []
 parts = [str(brief_text or ""), "", str(goal_heading_text or ""),
          str(research_goal or "").strip()]
 if not bool(grounding_ok):
     # Zero-source runs: the meta-review is the highest-visibility fabrication
     # surface (it writes the "Relation to Current Literature" prose), so the
-    # ban is repeated at meta level, not only in the (possibly truncated) text.
+    # ban is repeated at meta level, not only in the literature text.
     parts += ["", str(zero_sources_text or "")]
 lit = str(literature or "").strip()
 if lit:
-    parts += ["", str(literature_heading_text or ""), lit[:2500]]
+    parts += ["", str(literature_heading_text or ""), lit]
 parts += ["", str(ranked_heading_text or "")]
 for h in top:
     parts.append("### #" + str(h.get("rank")) + " " + str(h.get("title")) + " (Elo " + str(h.get("elo")) + ")")
@@ -1559,17 +1565,18 @@ for h in top:
     if fl:
         parts.append(str(flags_line_text or "").replace("{{flags}}", ", ".join(fl)))
     if rv.get("critique"):
-        parts.append("Reviewer note (corr=" + str(rv.get("correctness")) + ", nov=" + str(rv.get("novelty")) + ", safety_ok=" + str(rv.get("safety_ok")) + "): " + str(rv.get("critique"))[:300])
+        parts.append("Reviewer note (corr=" + str(rv.get("correctness")) + ", nov=" + str(rv.get("novelty")) + ", safety_ok=" + str(rv.get("safety_ok")) + "): " + str(rv.get("critique")))
     parts.append("")
 return {"prompt": "\\n".join(parts)}
 """.strip()
 
 FIG_SPEC_PROMPT_CODE = """
-top = (ranked_hypotheses or [])[:5]
+# ADR-0026: every ranked hypothesis, each statement whole.
+top = ranked_hypotheses or []
 parts = [str(brief_text or ""), "", str(goal_heading_text or ""),
          str(research_goal or "").strip(), "", str(top_heading_text or "")]
 for h in top:
-    parts.append("- " + str(h.get("title")) + ": " + str(h.get("statement") or "")[:200])
+    parts.append("- " + str(h.get("title")) + ": " + str(h.get("statement") or ""))
 return {"prompt": "\\n".join(parts)}
 """.strip()
 
@@ -1580,6 +1587,10 @@ return {"prompt": "\\n".join(parts)}
 # ===========================================================================
 
 FIG_SPEC_FOLD_CODE = """
+# #[WARNING:TRUNCATION] figure-layout bounds on the spec the MODEL WROTE (not a
+# model input): at most 4 layers x 4 nodes and 16 edges, node/layer/edge labels
+# 60/34/20 chars, title 110 and caption 300 chars, so the rendered diagram stays
+# legible. Kept under ADR-0026 as a render bound; listed for the operator.
 s = data if isinstance(data, dict) else {}
 layers = []
 ids = set()
@@ -1775,7 +1786,7 @@ lines.append("")
 # The document title for the PDF/DOCX metadata is the same derived title,
 # clamped; it falls back to the product title only when the model returned no
 # TITLE line (the caveat above records that case).
-doc = derived_title[:160] if derived_title else fallback
+doc = derived_title[:160] if derived_title else fallback  #[WARNING:TRUNCATION] PDF/DOCX metadata title only; the heading above keeps the whole title
 return {"lines": lines, "title": title, "doc_title": doc}
 """.strip()
 
@@ -1860,7 +1871,8 @@ def _cell(v):
     s = str(v if v is not None else "\\u2014")
     s = s.replace("|", "/").replace("\\n", " ").strip() or "\\u2014"
     # Width cap: junk/nested values stringify safely but an arbitrarily wide
-    # cell breaks table layout in the PDF.
+    # cell breaks table layout in the PDF. #[WARNING:TRUNCATION] display-only
+    # at-a-glance table cell, labeled "..."; the full row text follows below.
     return s[:117] + "..." if len(s) > 120 else s
 if ranked:
     lines.append(str(glance_heading_text or ""))
@@ -2874,7 +2886,18 @@ def main():
         # pin expressions. NO OUTPUT CHANGED: scripts/coscientist_smoke.py
         # replays 63 golden cases captured from 0.1.16 through the real runtime
         # code lane and fails on a single byte of drift.
-        bundle_version="0.2.0",
+        # 0.2.1 = ADR-0026 (operator ruling 2026-09-28): no count or char caps
+        # on what a model reads. The next cycle's feedback carries every
+        # critique and debate reason whole (was 6 x 400 / 6 x 300 chars); the
+        # expansion prompt lists every open question (was 6); the meta-review
+        # and the figure-spec prompt read every ranked hypothesis (was top 5)
+        # with the whole literature base (was 2500 chars), reviewer notes (was
+        # 300) and statements (was 200); citation-check reasons and the
+        # dropped-source warning quote whole titles (was 60/80/70). The golden
+        # values those cuts shaped were re-captured deliberately (see
+        # scripts/coscientist_fixtures.py, "ADR-0026 re-capture"). The embedded
+        # diagram-render subflow is 0.2.1 (whole #FALLBACK errors).
+        bundle_version="0.2.1",
         entrypoints=["co-scientist"],
         metadata={
             "family": "co-scientist",

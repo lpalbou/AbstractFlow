@@ -610,3 +610,100 @@ CASES: list[dict] = [
      "new_inputs": {"iso": "2026-07-31T09:00:00.123456+00:00"},
      "old_path": "timestamp", "new_path": "updates.run_timestamp"},
 ]
+
+
+# --------------------------------------------------------------------------
+# ADR-0026 re-capture (co-scientist 0.2.1, operator ruling 2026-09-28)
+# --------------------------------------------------------------------------
+# 0.2.1 removes every count and char cap on what a model reads (and the cuts in
+# the citation-check strings). NONE of the 63 cases above changes by a single
+# byte: no fixture above reached a removed cap (the longest literature is far
+# under 2,500 chars, no pool has more than 5 ranked rows, no critique is over
+# 300 chars, ...). So the removals would pass the golden unseen. The cases
+# below feed inputs PAST each removed cap. Their golden values were captured
+# from the 0.2.1 flow and checked against the 0.2.0 flow: on 0.2.0 each one
+# differs exactly by the cut it names (verified by a scratch capture that
+# rebuilt the 0.2.0 value, applied the old slice to the 0.2.1 inputs, and
+# compared). They have no 0.1.16 counterpart, so `node` IS the shipped node.
+
+def _words(tag, n):
+    return " ".join(f"{tag}{i}" for i in range(n))
+
+
+# a claimed title over 60 chars and an arXiv page title over 80 chars, no overlap
+ADR26_LONG_CLAIMED = "Continual Skill Retention Under Unbounded Task Streams With Entropy Gating"
+ADR26_LONG_SERVED = ("[2101.00001] Photonic Lattice Solitons in Nonlinear Waveguide Arrays: "
+                     "A Comprehensive Experimental Survey")
+# a dropped source whose title is over 70 chars
+ADR26_DROPPED_TITLE = ("Vendor Whitepaper on Retrieval-Augmented Consolidation for Enterprise "
+                       "Knowledge Workers, Second Edition")
+ADR26_CHECKS = [
+    {"url": "https://example.com/long", "claimed": ADR26_DROPPED_TITLE,
+     "fetched_title": "Unrelated", "verdict": "mismatch",
+     "reason": 'claimed "' + ADR26_DROPPED_TITLE + '" but the page serves "Unrelated"'},
+]
+ADR26_SOURCES = [{"title": ADR26_DROPPED_TITLE, "url": "https://example.com/long",
+                  "fetched": True, "takeaway": "enterprise claims"}]
+
+# eight reviews with critiques over 400 chars, eight debates with reasons over
+# 300 chars (the old fold kept 6 of each, cut to 400 / 300)
+ADR26_REVIEWS = {"reviews": [
+    {"id": i % 5, "correctness": 7, "novelty": 7, "testability": 7, "safety_ok": True,
+     "critique": f"Critique {i}: " + _words(f"c{i}w", 80)}
+    for i in range(8)]}
+ADR26_MATCHES = {"matches": [
+    {"a": i % 5, "b": (i + 1) % 5, "winner": i % 5, "reason": f"Debate {i}: " + _words(f"d{i}w", 60)}
+    for i in range(8)]}
+
+# nine open questions (the old expansion prompt listed 6)
+ADR26_OPEN_QUESTIONS = [f"Open question {i}: does mechanism {i} scale?" for i in range(9)]
+
+# a literature base over 2,500 chars (the old meta-review cut it there)
+ADR26_LONG_LIT = LIT_TEXT + "\n" + "\n".join(
+    f"- Finding {i}: " + _words(f"lit{i}w", 30) for i in range(20))
+
+
+def _ranked_row(rank, elo):
+    # statements over 200 chars, reviewer notes over 300 chars
+    return {"rank": rank, "elo": elo, "reviewed": True, "flags": [],
+            "title": f"Direction {rank}",
+            "statement": f"Statement {rank}: " + _words(f"s{rank}w", 50),
+            "rationale": "", "experiment": "", "design": "", "metric": "",
+            "expected_effect": "", "falsification": "",
+            "reviews": {"correctness": 7, "novelty": 7, "testability": 7, "safety_ok": True,
+                        "critique": f"Note {rank}: " + _words(f"n{rank}w", 70)}}
+
+
+# seven ranked hypotheses (the old meta-review and figure prompt read the top 5)
+ADR26_RANKED = [_ranked_row(r, 1300 - 10 * r) for r in range(1, 8)]
+
+_FOLD_ADR26_INPUTS = {"pool": POOL, "cycle": 2, "next_id": 5,
+                      "elo_history": STATE["elo_history"], "reviews": ADR26_REVIEWS,
+                      "matches": ADR26_MATCHES, "evolved": {"hypotheses": []},
+                      "expanded": {"hypotheses": []}}
+
+CASES += [
+    {"name": "adr26.cite_fold.mismatch_whole_titles", "node": "cite_fold",
+     "inputs": {"item": {"url": "https://arxiv.org/abs/2101.00001", "title": ADR26_LONG_CLAIMED},
+                "raw": {"results": [{"success": True, "output": {
+                    "status_code": 200, "title": ADR26_LONG_SERVED, "description": "Optics."}}]},
+                "acc": []},
+     "new_path": "updates.cite_checks"},
+    {"name": "adr26.cite_apply.warning_whole_title", "node": "cite_apply",
+     "inputs": {"lit_text": LIT_TEXT, "sources": ADR26_SOURCES, "warnings": [],
+                "checks": ADR26_CHECKS},
+     "new_path": "updates.lit_warnings"},
+    {"name": "adr26.fold.feedback_every_critique_whole", "node": "fold",
+     "inputs": _FOLD_ADR26_INPUTS, "new_path": "updates.feedback"},
+    {"name": "adr26.expand_prompt.every_open_question", "node": "expand_prompt",
+     "inputs": {"research_goal": GOAL, "pool_text": "POOLTEXT", "literature": "",
+                "open_questions": ADR26_OPEN_QUESTIONS, "feedback": ""},
+     "new_path": "prompt"},
+    {"name": "adr26.meta_prompt.every_ranked_whole", "node": "meta_prompt",
+     "inputs": {"research_goal": GOAL, "ranked_hypotheses": ADR26_RANKED,
+                "literature": ADR26_LONG_LIT, "grounding_ok": True},
+     "new_path": "prompt"},
+    {"name": "adr26.fig_spec_prompt.every_ranked_whole", "node": "fig_spec_prompt",
+     "inputs": {"ranked_hypotheses": ADR26_RANKED, "research_goal": GOAL},
+     "new_path": "prompt"},
+]

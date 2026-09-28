@@ -2171,7 +2171,7 @@
           "max_chars": 0
         },
         "functionName": "transform",
-        "codeBody": "n = int(cycle or 0) + 1\nentry = str(entry_text or \"\")\nentry = entry.replace(\"{{n}}\", str(n))\nentry = entry.replace(\"{{thought}}\", str(thought or \"\").strip())\nentry = entry.replace(\"{{calls}}\", str(calls_text or \"\"))\nentry = entry.replace(\"{{obs}}\", str(observations or \"\"))\ntrace = str(transcript or \"\")\ntrace = trace + (\"\\n\" if trace else \"\") + entry\ntry:\n    cap = int(max_chars or 0)\nexcept Exception:\n    cap = 0\nif cap > 0 and len(trace) > cap:\n    trace = str(trim_marker or \"\") + trace[len(trace) - cap:]\nsummary = str(calls_text or \"\").strip()\nif len(summary) > 160:\n    summary = summary[:160]\nreturn {\"updates\": {\"transcript\": trace, \"cycle\": n, \"last_action\": summary, \"steer_new\": 0}}"
+        "codeBody": "n = int(cycle or 0) + 1\nentry = str(entry_text or \"\")\nentry = entry.replace(\"{{n}}\", str(n))\nentry = entry.replace(\"{{thought}}\", str(thought or \"\").strip())\nentry = entry.replace(\"{{calls}}\", str(calls_text or \"\"))\nentry = entry.replace(\"{{obs}}\", str(observations or \"\"))\ntrace = str(transcript or \"\")\ntrace = trace + (\"\\n\" if trace else \"\") + entry\ntry:\n    cap = int(max_chars or 0)\nexcept Exception:\n    cap = 0\nif cap > 0 and len(trace) > cap:\n    trace = str(trim_marker or \"\") + trace[len(trace) - cap:]\n# DISPLAY ONLY: `last_action` feeds the one-line \"react cycle N of M\" progress\n# message (answer_user); the model reads the whole calls in the transcript.\nsummary = str(calls_text or \"\").strip()\nif len(summary) > 160:\n    summary = summary[:160] + \"… (truncated)\"  #[WARNING:TRUNCATION] labeled progress-line preview\nreturn {\"updates\": {\"transcript\": trace, \"cycle\": n, \"last_action\": summary, \"steer_new\": 0}}"
       },
       "label": null,
       "icon": null,
@@ -5224,5 +5224,5 @@
   ],
   "entryNode": "start",
   "created_at": "2026-08-02T13:03:06.552030+00:00",
-  "updated_at": "2026-08-02T13:03:06.552030+00:00"
+  "updated_at": "2026-09-28T03:30:51.471890+00:00"
 }
