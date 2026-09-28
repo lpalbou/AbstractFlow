@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
-FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
+# This repository's own examples (any checkout location).
+FLOWS_DIR = Path(__file__).resolve().parents[1] / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
 
 AGENT_INTERFACE = "abstractcode.agent.v1"

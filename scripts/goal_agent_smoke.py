@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from abstractruntime.visualflow_compiler.visual.code_executor import create_code_handler  # noqa: E402
 from abstractruntime.visualflow_compiler.visual.executor import _generate_code_from_body  # noqa: E402
 
-FLOWS = ROOT / "abstractflow" / "examples" / "flows"
+FLOWS = Path(__file__).resolve().parents[1] / "examples" / "flows"
 FAILURES: list[str] = []
 _H: dict[str, object] = {}
 

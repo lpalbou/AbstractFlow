@@ -40,7 +40,7 @@ from abstractruntime.visualflow_compiler.visual.pin_expressions import (  # noqa
     compile_pin_expression,
 )
 
-FLOWS = ROOT / "abstractflow" / "examples" / "flows"
+FLOWS = Path(__file__).resolve().parents[1] / "examples" / "flows"
 FAILURES: list[str] = []
 
 
@@ -171,8 +171,12 @@ def main() -> int:  # noqa: C901 - a smoke is a checklist
     cmd = run_body(vc, {"workspace_root": "/tmp/w s", "verify_command": "npm test"})["tool_call"]
     shell = cmd["arguments"]["command"]
     check("verify-quotes-workspace", "cd '/tmp/w s'" in shell, shell[:120])
-    check("verify-exit-before-pipe", 'echo "VERIFY_EXIT=$?"' in shell
-          and shell.index("VERIFY_EXIT") < shell.index("tail -n 40"), shell[:200])
+    # The exit code is captured before the log is printed, and the WHOLE log
+    # is printed (ADR-0026: no tail/head clip of the verify output).
+    check("verify-exit-before-log", 'echo "VERIFY_EXIT=$?"' in shell
+          and "cat .react_verify.log" in shell
+          and shell.index("VERIFY_EXIT") < shell.index("cat .react_verify.log"), shell[:200])
+    check("verify-log-whole", "tail -n" not in shell and "head -n" not in shell, shell[:300])
 
     # ---- E2E scaffolding -----------------------------------------------------
     from abstractruntime import Runtime

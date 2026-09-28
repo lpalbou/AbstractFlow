@@ -43,7 +43,7 @@ from abstractruntime.visualflow_compiler.visual.pin_expressions import (  # noqa
     compile_pin_expression,
 )
 
-FLOWS = ROOT / "abstractflow" / "examples" / "flows"
+FLOWS = Path(__file__).resolve().parents[1] / "examples" / "flows"
 FAILURES: list[str] = []
 
 
@@ -123,8 +123,12 @@ def main() -> int:  # noqa: C901 - a smoke is a checklist
                           "done_marker": "DONE:", "verify_command": "npm test"})["tool_call"]
     cmd = shell["arguments"]["command"]
     check("check-quotes-workspace", "cd '/tmp/w s'" in cmd, cmd[:120])
-    check("check-exit-before-pipe", 'echo "VERIFY_EXIT=$?"' in cmd
-          and cmd.index("VERIFY_EXIT") < cmd.index("tail -n 30"), cmd[:200])
+    # The exit code is captured before any output is printed, and the verify
+    # log, progress file and change list are printed WHOLE (ADR-0026).
+    check("check-exit-before-log", 'echo "VERIFY_EXIT=$?"' in cmd
+          and "cat .ralph_verify.log" in cmd
+          and cmd.index("VERIFY_EXIT") < cmd.index("cat .ralph_verify.log"), cmd[:200])
+    check("check-output-whole", "tail -n" not in cmd and "head -n" not in cmd, cmd[:300])
     check("check-marker-is-fixed-string", "grep -qF" in cmd, cmd[:250])
     no_verify = run_body(cc, {"workspace_root": "/w", "progress_file": "P.md",
                               "done_marker": "DONE:", "verify_command": ""})["tool_call"]
@@ -243,6 +247,7 @@ def main() -> int:  # noqa: C901 - a smoke is a checklist
             self.cycle_prompts: list[str] = []
             self.lines: list[str] = []
             self.bootstrapped = 0
+            self.warm = 0
             self.on_cycle = None
 
         def child(self, run, effect, default_next_node):
@@ -260,6 +265,11 @@ def main() -> int:  # noqa: C901 - a smoke is a checklist
             if cid == "ralph-bootstrap":
                 self.bootstrapped += 1
                 stdout = "RALPH_MEMORY_READY\n"
+            elif cid == "ralph-warm":
+                # The per-cycle warm-start gather (0.2.0) runs before the
+                # prompt: it is not the completion check.
+                self.warm += 1
+                stdout = "---RALPH-LISTING---\n.\n---RALPH-PROGRESS---\n\n---RALPH-WARM-END---\n"
             else:
                 stdout = self.checks.pop(0) if self.checks else "VERIFY_EXIT=1\nPROMISE=0\n"
             return EffectOutcome.completed({"mode": "executed", "results": [
@@ -294,6 +304,7 @@ def main() -> int:  # noqa: C901 - a smoke is a checklist
           f"status={final and final.status} err={final and final.error}")
     check("e2e-root-false-claim-bought-another-cycle", len(h.cycle_prompts) == 2,
           f"cycles={len(h.cycle_prompts)}")
+    check("e2e-root-warm-start-once-per-cycle", h.warm == len(h.cycle_prompts), f"warm={h.warm}")
     check("e2e-root-completed-deterministically", out.get("passed") is True
           and out.get("success") is True and out.get("stopped_reason") == "verified-complete"
           and out.get("cycles_used") == 2, str(out)[:220])
@@ -302,8 +313,10 @@ def main() -> int:  # noqa: C901 - a smoke is a checklist
           [x for x in h.lines if x.startswith("ralph cycle")][0]
           == "ralph cycle 1 of 5: fresh context, re-reading the workspace"
           and [x for x in h.lines if x.startswith("ralph check")]
-          == ["ralph check 1: verify=fail promise=pass",
-              "ralph check 2: verify=pass promise=pass"], str(h.lines))
+          # changes= is the files-changed count since the previous check
+          # (0.2.0 fingerprint); these scripted checks report no change list.
+          == ["ralph check 1: verify=fail promise=pass changes=0",
+              "ralph check 2: verify=pass promise=pass changes=0"], str(h.lines))
     # THE FRESH-CONTEXT PROOF: the standing task is byte-identical between
     # cycles; only the counter and the machine check differ, and NOTHING from
     # the previous cycle's conversation appears.

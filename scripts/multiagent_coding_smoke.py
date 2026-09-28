@@ -46,7 +46,7 @@ from abstractruntime.visualflow_compiler.visual.pin_expressions import (  # noqa
     compile_pin_expression,
 )
 
-FLOWS = ROOT / "abstractflow" / "examples" / "flows"
+FLOWS = Path(__file__).resolve().parents[1] / "examples" / "flows"
 
 FAILURES: list[str] = []
 
