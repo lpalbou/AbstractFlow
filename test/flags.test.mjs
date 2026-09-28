@@ -14,8 +14,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseFlowFlags, savedGatewayUrl } from '../bin/flags.js';
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'cli.js');
-// A dead port: nothing here may ever reach a real gateway.
-const POINTER_URL = 'http://127.0.0.1:18899';
+// Dead ports only (discard/echo/daytime/chargen): nothing here may ever reach a real gateway.
+const POINTER_URL = 'http://127.0.0.1:9';
 
 let home;
 const warnings = [];
@@ -66,27 +66,27 @@ describe('parseFlowFlags', () => {
   it('--gateway-url and its aliases win over everything, and never move', () => {
     writePointer();
     for (const flag of ['--gateway-url', '--gateway', '--url']) {
-      const { flags, gatewayUrl } = parseFlowFlags([flag, 'http://127.0.0.1:18898/'], { env: { ABSTRACTFLOW_GATEWAY_URL: 'http://127.0.0.1:18897' }, home, warn });
-      expect(flags).toMatchObject({ gatewayUrl: 'http://127.0.0.1:18898', gatewayUrlSource: 'flag' });
-      expect(gatewayUrl).toBe('http://127.0.0.1:18898');
+      const { flags, gatewayUrl } = parseFlowFlags([flag, 'http://127.0.0.1:7/'], { env: { ABSTRACTFLOW_GATEWAY_URL: 'http://127.0.0.1:13' }, home, warn });
+      expect(flags).toMatchObject({ gatewayUrl: 'http://127.0.0.1:7', gatewayUrlSource: 'flag' });
+      expect(gatewayUrl).toBe('http://127.0.0.1:7');
     }
   });
 
   it('legacy environment (how the gateway launches managed apps): PORT, HOST, ABSTRACTFLOW_GATEWAY_URL', () => {
     writePointer();
     const { flags, gatewayUrl } = parseFlowFlags([], {
-      env: { PORT: '18960', HOST: '127.0.0.1', ABSTRACTFLOW_GATEWAY_URL: 'http://127.0.0.1:18897' },
+      env: { PORT: '18960', HOST: '127.0.0.1', ABSTRACTFLOW_GATEWAY_URL: 'http://127.0.0.1:13' },
       home,
       warn,
     });
     expect(flags).toMatchObject({ port: 18960, host: '127.0.0.1', gatewayUrlSource: 'env:ABSTRACTFLOW_GATEWAY_URL' });
-    expect(gatewayUrl).toBe('http://127.0.0.1:18897');
+    expect(gatewayUrl).toBe('http://127.0.0.1:13');
   });
 
   it('a saved login beats the pointer; a saved old default does not', () => {
     writePointer();
-    writeSaved('http://127.0.0.1:18896');
-    expect(parseFlowFlags([], { env: {}, home, warn }).gatewayUrl.current()).toBe('http://127.0.0.1:18896');
+    writeSaved('http://127.0.0.1:19');
+    expect(parseFlowFlags([], { env: {}, home, warn }).gatewayUrl.current()).toBe('http://127.0.0.1:19');
     writeSaved('http://127.0.0.1:8080');
     expect(parseFlowFlags([], { env: {}, home, warn }).gatewayUrl.current()).toBe(POINTER_URL);
   });
