@@ -132,7 +132,7 @@ export async function resolveLatestPublishedBundleForFlow(
   if (capabilityUnavailable(listDescriptor)) return null;
   const url = endpointFromDescriptor(
     listDescriptor,
-    '/api/gateway/bundles',
+    'api/gateway/bundles',
     {},
     { all_versions: true, include_drafts: false }
   );

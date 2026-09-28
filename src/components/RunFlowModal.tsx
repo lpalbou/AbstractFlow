@@ -2715,12 +2715,12 @@ export function RunFlowModal({
       const sessionId = promptCacheSessionId.trim();
       const endpoint =
         operation === 'status'
-          ? promptCacheSessionEndpoints.status || '/api/gateway/sessions/{session_id}/prompt_cache/status'
+          ? promptCacheSessionEndpoints.status || 'api/gateway/sessions/{session_id}/prompt_cache/status'
           : operation === 'prepare'
-            ? promptCacheSessionEndpoints.prepare || '/api/gateway/sessions/{session_id}/prompt_cache/prepare'
+            ? promptCacheSessionEndpoints.prepare || 'api/gateway/sessions/{session_id}/prompt_cache/prepare'
             : operation === 'clear'
-              ? promptCacheSessionEndpoints.clear || '/api/gateway/sessions/{session_id}/prompt_cache/clear'
-              : promptCacheSessionEndpoints.rebuild || '/api/gateway/sessions/{session_id}/prompt_cache/rebuild';
+              ? promptCacheSessionEndpoints.clear || 'api/gateway/sessions/{session_id}/prompt_cache/clear'
+              : promptCacheSessionEndpoints.rebuild || 'api/gateway/sessions/{session_id}/prompt_cache/rebuild';
       const payload = buildPromptCachePayload();
       setPromptCacheBusy(true);
       setPromptCacheError(null);
@@ -2800,12 +2800,12 @@ export function RunFlowModal({
                     durableBlocPromptCacheContract,
                     operation,
                     operation === 'record'
-                      ? '/api/gateway/blocs/record'
+                      ? 'api/gateway/blocs/record'
                       : operation === 'list'
-                        ? '/api/gateway/blocs'
+                        ? 'api/gateway/blocs'
                         : operation === 'kv_manifest'
-                          ? '/api/gateway/blocs/kv/manifest'
-                          : '/api/gateway/blocs/kv/list'
+                          ? 'api/gateway/blocs/kv/manifest'
+                          : 'api/gateway/blocs/kv/list'
                   ),
                   {},
                   query
@@ -2816,7 +2816,7 @@ export function RunFlowModal({
                   durableBlocEndpoint(
                     durableBlocPromptCacheContract,
                     operation,
-                    operation === 'kv_ensure' ? '/api/gateway/blocs/kv/ensure' : '/api/gateway/blocs/kv/load'
+                    operation === 'kv_ensure' ? 'api/gateway/blocs/kv/ensure' : 'api/gateway/blocs/kv/load'
                   )
                 ),
                 jsonRequest(
@@ -3639,12 +3639,12 @@ export function RunFlowModal({
   const runWorkspaceOpenEndpoint = useMemo(() => {
     if (!runWorkspaceRunId) return '';
     if (descriptorEndpointAvailable(runWorkspaceOpenDescriptor)) {
-      return endpointFromDescriptor(runWorkspaceOpenDescriptor, '/api/gateway/runs/{run_id}/workspace/open', {
+      return endpointFromDescriptor(runWorkspaceOpenDescriptor, 'api/gateway/runs/{run_id}/workspace/open', {
         run_id: runWorkspaceRunId,
       });
     }
     if (!strictGatewayContract || !runWorkspaceOpenCapabilityMessage) {
-      return gatewayPath('/api/gateway/runs/{run_id}/workspace/open', { run_id: runWorkspaceRunId });
+      return gatewayPath('api/gateway/runs/{run_id}/workspace/open', { run_id: runWorkspaceRunId });
     }
     return '';
   }, [runWorkspaceRunId, runWorkspaceOpenDescriptor, runWorkspaceOpenCapabilityMessage, strictGatewayContract]);
@@ -3758,7 +3758,7 @@ export function RunFlowModal({
     const hasInputDataDescriptor = descriptorEndpointAvailable(runInputDataDescriptor);
     const inputDataEndpoint = (() => {
       if (hasInputDataDescriptor) {
-        return endpointFromDescriptor(runInputDataDescriptor, '/api/gateway/runs/{run_id}/input_data', {
+        return endpointFromDescriptor(runInputDataDescriptor, 'api/gateway/runs/{run_id}/input_data', {
           run_id: runWorkspaceRunId,
         });
       }
@@ -3769,7 +3769,7 @@ export function RunFlowModal({
       console.warn(
         '#FALLBACK: runs.input_data descriptor missing in discovery; using legacy canonical route for run detail rehydration compatibility.'
       );
-      return gatewayPath('/api/gateway/runs/{run_id}/input_data', { run_id: runWorkspaceRunId });
+      return gatewayPath('api/gateway/runs/{run_id}/input_data', { run_id: runWorkspaceRunId });
     })();
     (async () => {
       if (!inputDataEndpoint) {
@@ -5803,7 +5803,7 @@ export function RunFlowModal({
           return gatewayJson<{ artifact_id: string; payload: unknown }>(
             endpointFromDescriptor(
               artifactMetadataDescriptor,
-              '/api/gateway/runs/{run_id}/artifacts/{artifact_id}',
+              'api/gateway/runs/{run_id}/artifacts/{artifact_id}',
               { run_id: rootRunId, artifact_id: aid }
             )
           );
@@ -6259,7 +6259,7 @@ export function RunFlowModal({
       form.append('file', blob, filename);
       form.append('filename', filename);
       if (blob.type) form.append('content_type', blob.type);
-      const url = endpointFromDescriptor(uploadDescriptor, '/api/gateway/attachments/upload');
+      const url = endpointFromDescriptor(uploadDescriptor, 'api/gateway/attachments/upload');
       const res = await gatewayFetch(url, { method: 'POST', body: form, timeoutMs: 0 });
       const payload = (await res.json()) as Record<string, unknown>;
       const ref = artifactRefFromUploadResponse(payload);

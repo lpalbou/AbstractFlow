@@ -7,6 +7,7 @@ import {
   GatewayConnectionModal,
   clearGatewayConnection,
   fetchGatewayConnection,
+  hasBrowserGatewaySession,
   type GatewayConnectionStatus,
 } from './components/GatewayConnectionModal';
 import { AuthoringAssistantDrawer } from './components/AuthoringAssistantDrawer';
@@ -54,18 +55,6 @@ function monitor_memory_enabled(): boolean {
   }
 }
 
-function has_browser_gateway_session(status: GatewayConnectionStatus | null): boolean {
-  const gateway = status?.gateway || status?.embeddings;
-  const principal = gateway?.principal;
-  if (!(status?.token_source === 'browser-session' && status.has_token && status.embeddings?.ok === true && principal?.user_id)) {
-    return false;
-  }
-  const auth = gateway?.auth;
-  if (auth?.mode === 'legacy-token' || auth?.user_auth_enabled === false) return false;
-  if (principal.source === 'legacy-token') return false;
-  return true;
-}
-
 type RightDrawerMode = 'assistant' | 'properties' | 'functions' | null;
 
 function App() {
@@ -96,7 +85,7 @@ function App() {
   // destroy the in-flight autonomous authoring loop plus all conversation,
   // plan, and activity state that lives in the drawer.
   const [assistant_mounted, set_assistant_mounted] = useState(false);
-  const gateway_connected = has_browser_gateway_session(connection_status);
+  const gateway_connected = hasBrowserGatewaySession(connection_status);
   // Once the editor has rendered it owns unsaved graph state, so losing the
   // session must never throw the user back to the full-screen sign-in gate.
   const entered_editor_ref = useRef(false);
@@ -165,7 +154,7 @@ function App() {
       .then((status) => {
         if (cancelled) return;
         set_connection_status(status);
-        const needs_connection = !has_browser_gateway_session(status);
+        const needs_connection = !hasBrowserGatewaySession(status);
         set_connection_required(needs_connection);
         if (needs_connection) set_show_connection(true);
         set_connection_checked(true);
@@ -195,7 +184,7 @@ function App() {
       fetchGatewayConnection()
         .then((status) => {
           if (cancelled) return;
-          const still_connected = has_browser_gateway_session(status);
+          const still_connected = hasBrowserGatewaySession(status);
           set_connection_status(status);
           if (!still_connected && entered_editor_ref.current && !session_lost_notified_ref.current) {
             session_lost_notified_ref.current = true;
@@ -224,7 +213,7 @@ function App() {
 
   const handle_connection_saved = (status: GatewayConnectionStatus) => {
     set_connection_status(status);
-    const needs_connection = !has_browser_gateway_session(status);
+    const needs_connection = !hasBrowserGatewaySession(status);
     set_connection_required(needs_connection);
     if (!needs_connection) set_show_connection(false);
     queryClient.invalidateQueries({ queryKey: ['gateway'] });

@@ -2389,7 +2389,7 @@ export function AuthoringAssistantDrawer({
       if (!wait || !runId) return;
       const waitKey = wait.waitKey || (typeof wait.raw.wait_key === 'string' ? wait.raw.wait_key : '');
       try {
-        const url = endpointFromDescriptor(gatewayContracts?.common?.runs?.commands, '/api/gateway/commands');
+        const url = endpointFromDescriptor(gatewayContracts?.common?.runs?.commands, 'api/gateway/commands');
         await gatewayFetch(
           url,
           jsonRequest(
@@ -2454,7 +2454,7 @@ export function AuthoringAssistantDrawer({
     try {
       const publishEndpoint = endpointFromDescriptor(
         gatewayContracts?.flow_editor?.visualflows?.publish,
-        '/api/gateway/visualflows/{flow_id}/publish',
+        'api/gateway/visualflows/{flow_id}/publish',
         { flow_id: flowId }
       );
       logActivity('info', 'Test run: publishing the saved flow as a draft test bundle.');

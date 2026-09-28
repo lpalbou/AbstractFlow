@@ -39,7 +39,7 @@ export function KgActiveMemoryPanel({ runId, title, output, queryEndpoint }: KgA
     async (params: KgQueryParams): Promise<KgQueryResult> => {
       if (!runId) throw new Error('run_id is missing');
       return gatewayJson<KgQueryResult>(
-        endpointFromDescriptor(queryEndpoint, '/api/gateway/kg/query'),
+        endpointFromDescriptor(queryEndpoint, 'api/gateway/kg/query'),
         jsonRequest({ ...params, run_id: runId }, { method: 'POST' })
       );
     },

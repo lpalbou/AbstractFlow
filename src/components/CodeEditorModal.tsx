@@ -356,7 +356,7 @@ export function CodeEditorModal({
     try {
       const code = generatePythonTransformCode(params, value);
       const result = await gatewayJson<CodeSimulationResponse>(
-        gatewayPath('/visualflows/code/simulate'),
+        gatewayPath('visualflows/code/simulate'),
         {
           ...jsonRequest({ code, input: inputPayload, function_name: 'transform', permissions }, { method: 'POST' }),
           timeoutMs: 30_000,

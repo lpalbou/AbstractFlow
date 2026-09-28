@@ -81,7 +81,7 @@ export function WorkspacePathInputField({
     let active = true;
     setLoading(true);
     setError(null);
-    const endpoint = endpointFromDescriptor(listDescriptor, '/api/gateway/files/list', {}, {
+    const endpoint = endpointFromDescriptor(listDescriptor, 'api/gateway/files/list', {}, {
       path: browsePath,
       include_directories: true,
       recursive: false,

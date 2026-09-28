@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { GatewaySessionSignInCard } from '@abstractframework/ui-kit';
+import { GATEWAY_CONNECTION_PATH, GatewaySessionSignInCard } from '@abstractframework/ui-kit';
 
-type EmbeddingsStatus = {
+/** What the gateway said about this browser's session (`GET /api/gateway/me`
+ * on a probe, the sign-in answer after a sign-in). */
+type GatewaySessionInfo = {
   ok?: boolean;
-  provider?: string;
-  model?: string;
-  dimension?: number;
   error?: string;
-  detail?: string;
+  detail?: unknown;
   principal?: {
     user_id?: string;
     runtime_id?: string;
@@ -24,17 +23,32 @@ type EmbeddingsStatus = {
   };
 };
 
+/** The app server's session endpoint (`@abstractframework/app-server`
+ * createGatewaySessionProxy): `ok` = the gateway accepted the session. */
 export type GatewayConnectionStatus = {
   ok: boolean;
   gateway_url: string;
-  has_token: boolean;
-  token_source: string;
-  embeddings: EmbeddingsStatus;
-  gateway?: EmbeddingsStatus;
+  has_session: boolean;
+  gateway?: GatewaySessionInfo;
 };
 
+/**
+ * True when this browser holds a gateway session the editor can use: the
+ * gateway accepted it (`ok`) for a named USER (a legacy shared token never
+ * signs a browser in).
+ */
+export function hasBrowserGatewaySession(status: GatewayConnectionStatus | null): boolean {
+  if (!(status?.ok === true && status.has_session === true)) return false;
+  const principal = status.gateway?.principal;
+  if (!principal?.user_id) return false;
+  const auth = status.gateway?.auth;
+  if (auth?.mode === 'legacy-token' || auth?.user_auth_enabled === false) return false;
+  if (principal.source === 'legacy-token') return false;
+  return true;
+}
+
 export async function fetchGatewayConnection(): Promise<GatewayConnectionStatus> {
-  const res = await fetch('/api/connection/gateway');
+  const res = await fetch(GATEWAY_CONNECTION_PATH);
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const msg = data && typeof data === 'object' && (data as any).detail ? String((data as any).detail) : `HTTP ${res.status}`;
@@ -48,9 +62,8 @@ export async function saveGatewayConnection(payload: {
   gateway_user_id?: string;
   gateway_token?: string;
   persist?: boolean;
-  validate_only?: boolean;
 }): Promise<GatewayConnectionStatus> {
-  const res = await fetch('/api/connection/gateway', {
+  const res = await fetch(GATEWAY_CONNECTION_PATH, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -64,7 +77,7 @@ export async function saveGatewayConnection(payload: {
 }
 
 export async function clearGatewayConnection(): Promise<void> {
-  const res = await fetch('/api/connection/gateway', { method: 'DELETE' });
+  const res = await fetch(GATEWAY_CONNECTION_PATH, { method: 'DELETE' });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     const msg = data && typeof data === 'object' && (data as any).detail ? String((data as any).detail) : `HTTP ${res.status}`;
@@ -97,15 +110,12 @@ function normalizeGatewayUrl(value: string): string {
 
 function statusBadge(status: GatewayConnectionStatus | null): { label: string; tone: 'ok' | 'warn' | 'err' } {
   if (!status) return { label: 'Signed out', tone: 'warn' };
-  if (!status.has_token) return { label: 'Signed out', tone: 'err' };
-  const emb = status.gateway || status.embeddings || {};
-  const ok = emb.ok === true;
-  const user = emb.principal?.user_id;
-  const runtime = emb.principal?.runtime_id;
-  if (ok && user) return { label: `Signed in as ${user}${runtime ? ` · runtime ${runtime}` : ''}`, tone: 'ok' };
-  if (ok) return { label: 'Signed in', tone: 'ok' };
-  const err = emb.error || emb.detail;
-  if (typeof err === 'string' && err.trim()) return { label: 'Could not sign in', tone: 'err' };
+  if (!status.has_session) return { label: 'Signed out', tone: 'err' };
+  const user = status.gateway?.principal?.user_id;
+  const runtime = status.gateway?.principal?.runtime_id;
+  if (status.ok && user) return { label: `Signed in as ${user}${runtime ? ` · runtime ${runtime}` : ''}`, tone: 'ok' };
+  if (status.ok) return { label: 'Signed in', tone: 'ok' };
+  if (status.gateway?.error || status.gateway?.detail) return { label: 'Could not sign in', tone: 'err' };
   return { label: 'Sign in required', tone: 'err' };
 }
 
@@ -141,7 +151,7 @@ export function GatewayConnectionModal({
       .then((s) => {
         setStatus(s);
         if (typeof s.gateway_url === 'string' && s.gateway_url.trim()) setGatewayUrl(normalizeGatewayUrl(s.gateway_url));
-        const principal = (s.gateway || s.embeddings)?.principal;
+        const principal = s.gateway?.principal;
         if (principal?.user_id) setGatewayUserId(principal.user_id);
       })
       .catch((e) => {
@@ -196,9 +206,7 @@ export function GatewayConnectionModal({
     }
   };
 
-  const tokenSource = status?.has_token
-    ? `token: ${status.token_source || 'browser session'}`
-    : 'token: missing';
+  const tokenSource = status?.has_session ? 'token: browser session' : 'token: missing';
 
   return (
     <div className="modal-overlay gateway-connection-overlay" onClick={blocking ? undefined : onClose}>
@@ -216,7 +224,7 @@ export function GatewayConnectionModal({
           userId={gatewayUserId}
           onUserIdChange={setGatewayUserId}
           token={gatewayToken}
-          tokenPlaceholder={status?.has_token ? '(browser session already signed in)' : 'Paste Gateway user token'}
+          tokenPlaceholder={status?.has_session ? '(browser session already signed in)' : 'Paste Gateway user token'}
           showToken={showToken}
           onTokenChange={setGatewayToken}
           onShowTokenChange={setShowToken}

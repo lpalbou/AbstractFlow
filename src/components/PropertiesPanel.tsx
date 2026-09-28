@@ -470,7 +470,7 @@ function ArtifactLiteralPanel({
     try {
       const uploadUrl = endpointFromDescriptor(
         gatewayContracts?.common?.attachments?.upload,
-        '/api/gateway/attachments/upload'
+        'api/gateway/attachments/upload'
       );
       const selectedContentType = stringFrom(file.type) || config.fallbackContentType;
       const form = new FormData();

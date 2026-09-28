@@ -3516,7 +3516,7 @@ export const BaseNode = memo(function BaseNode({
         form.append('file', file, file.name);
         form.append('filename', file.name);
         if (file.type) form.append('content_type', file.type);
-        const url = endpointFromDescriptor(uploadDescriptor, '/api/gateway/attachments/upload');
+        const url = endpointFromDescriptor(uploadDescriptor, 'api/gateway/attachments/upload');
         const res = await gatewayFetch(url, { method: 'POST', body: form, timeoutMs: 0 });
         const payload = (await res.json()) as Record<string, unknown>;
         const ref = artifactRefFromUploadResponse(payload);

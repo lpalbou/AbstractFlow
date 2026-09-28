@@ -1,4 +1,5 @@
 import type { GatewayAuthoringCapability } from './nodeCapabilities';
+import { GATEWAY_API_PATH, gatewayApiPath } from '@abstractframework/ui-kit';
 
 export type GatewayQueryValue = string | number | boolean | null | undefined;
 
@@ -598,15 +599,29 @@ function messageFromJsonError(detail: unknown): string {
   return '';
 }
 
+/**
+ * A gateway endpoint as the editor requests it: RELATIVE to the page's base
+ * (the kit's `GATEWAY_API_PATH`, "api/gateway/..."), so the same build works
+ * at / and under the gateway at /apps/flow/, where this app's server proxies
+ * it to the gateway. The gateway advertises its endpoints rooted at its own
+ * origin ("/" + "api/gateway/runs"); that becomes "api/gateway/runs". A
+ * route relative to the gateway API ("about") is `gatewayApiPath(route)`;
+ * any other rooted path throws (kit rule).
+ */
+export function gatewayRequestPath(endpoint: string): string {
+  const e = String(endpoint || '').trim();
+  const within = (p: string) => p === GATEWAY_API_PATH || p.startsWith(`${GATEWAY_API_PATH}/`) || p.startsWith(`${GATEWAY_API_PATH}?`);
+  if (within(e)) return e;
+  if (e.startsWith('/') && within(e.slice(1))) return e.slice(1);
+  return gatewayApiPath(e);
+}
+
 export function gatewayPath(
   template: string,
   params: Record<string, string | number | boolean | null | undefined> = {},
   query: Record<string, GatewayQueryValue> = {}
 ): string {
-  let path = String(template || '').trim();
-  if (!path) path = '/api/gateway';
-  if (!path.startsWith('/')) path = `/${path}`;
-  if (!path.startsWith('/api/gateway')) path = `/api/gateway${path}`;
+  let path = gatewayRequestPath(template);
 
   path = path.replace(/\{([^}]+)\}/g, (_m, key: string) => {
     const raw = params[key];
@@ -1087,8 +1102,9 @@ export async function gatewayFetch(path: string, init?: RequestInit & { timeoutM
   const { timeoutMs: _timeoutMs, signal, ...fetchInit } = init || {};
   const method = String(fetchInit.method || 'GET').toUpperCase();
   const headers = new Headers(fetchInit.headers || {});
+  const url = gatewayRequestPath(path);
   if (
-    path.startsWith('/api/gateway/') &&
+    url.startsWith('api/gateway/') &&
     ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
     !headers.has('X-AbstractFlow-CSRF')
   ) {
@@ -1102,7 +1118,7 @@ export async function gatewayFetch(path: string, init?: RequestInit & { timeoutM
   const mergedSignal = signal || controller?.signal;
   let res: Response;
   try {
-    res = await fetch(path, { ...fetchInit, headers, signal: mergedSignal });
+    res = await fetch(url, { ...fetchInit, headers, signal: mergedSignal });
   } finally {
     if (timeout !== null) window.clearTimeout(timeout);
   }
@@ -1218,7 +1234,7 @@ export async function gatewayStartRun(
   request: GatewayStartRunRequest,
   contracts?: GatewayContracts | null
 ): Promise<GatewayStartRunResponse> {
-  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.start, '/api/gateway/runs/start');
+  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.start, 'api/gateway/runs/start');
   return gatewayJson<GatewayStartRunResponse>(
     endpoint,
     jsonRequest(
@@ -1241,7 +1257,7 @@ export async function gatewayRunSummary(
   runId: string,
   contracts?: GatewayContracts | null
 ): Promise<GatewayRunSummaryResponse> {
-  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.summary, '/api/gateway/runs/{run_id}', { run_id: runId });
+  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.summary, 'api/gateway/runs/{run_id}', { run_id: runId });
   return gatewayJson<GatewayRunSummaryResponse>(endpoint);
 }
 
@@ -1249,7 +1265,7 @@ export async function gatewayCancelRun(
   runId: string,
   contracts?: GatewayContracts | null
 ): Promise<void> {
-  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.commands, '/api/gateway/commands');
+  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.commands, 'api/gateway/commands');
   await gatewayFetch(
     endpoint,
     jsonRequest(
@@ -1272,7 +1288,7 @@ export async function gatewayRunLedger(
 ): Promise<GatewayLedgerResponse> {
   const endpoint = endpointFromDescriptor(
     contracts?.common?.ledger?.replay,
-    '/api/gateway/runs/{run_id}/ledger',
+    'api/gateway/runs/{run_id}/ledger',
     { run_id: runId },
     { after, limit }
   );

@@ -18,7 +18,7 @@ export const APP_VERSION: string = __APP_VERSION__;
 /** Throws at module load if the kit's descriptor does not know "abstractflow". */
 export const ABSTRACTFLOW_IDENTITY: AppIdentity = appIdentity('abstractflow', APP_VERSION);
 
-export const GATEWAY_ABOUT_PATH = gatewayPath('/about');
+export const GATEWAY_ABOUT_PATH = gatewayPath('about');
 
 /**
  * Why `GET /api/gateway/about` failed, as shown in the "unavailable (...)"

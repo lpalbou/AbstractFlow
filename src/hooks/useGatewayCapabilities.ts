@@ -12,7 +12,7 @@ import {
 export function useGatewayCapabilities(enabled = true) {
   return useQuery({
     queryKey: ['gateway', 'capabilities'],
-    queryFn: () => gatewayJson<GatewayCapabilitiesResponse>(gatewayPath('/discovery/capabilities')),
+    queryFn: () => gatewayJson<GatewayCapabilitiesResponse>(gatewayPath('discovery/capabilities')),
     enabled,
     staleTime: 60_000,
     retry: 1,

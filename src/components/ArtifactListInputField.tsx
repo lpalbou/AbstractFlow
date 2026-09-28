@@ -259,7 +259,7 @@ export function ArtifactListInputField({
         if (modality !== 'artifact') query.modality = modality;
         if (searchText.trim()) query.query = searchText.trim();
         if (Object.keys(parsedTags).length > 0) query.tags = JSON.stringify(parsedTags);
-        const url = endpointFromDescriptor(searchDescriptor, '/api/gateway/artifacts/search', {}, query);
+        const url = endpointFromDescriptor(searchDescriptor, 'api/gateway/artifacts/search', {}, query);
         gatewayJson<{ items?: unknown[] }>(url)
           .then((payload) => {
             if (!active) return;
@@ -293,7 +293,7 @@ export function ArtifactListInputField({
     let active = true;
     setLoadingItems(true);
     setError(null);
-    const url = endpointFromDescriptor(sessionListDescriptor, `/api/gateway/sessions/${encodeURIComponent(sid)}/artifacts`, {
+    const url = endpointFromDescriptor(sessionListDescriptor, `api/gateway/sessions/${encodeURIComponent(sid)}/artifacts`, {
       session_id: sid,
     });
     gatewayJson<{ items?: unknown[] }>(url)
@@ -365,7 +365,7 @@ export function ArtifactListInputField({
       setError('Set a session id to create or reuse artifacts.');
       return;
     }
-    const url = endpointFromDescriptor(uploadDescriptor, '/api/gateway/attachments/upload');
+    const url = endpointFromDescriptor(uploadDescriptor, 'api/gateway/attachments/upload');
     setBusy(true);
     setError(null);
     const uploaded: CanonicalArtifactRef[] = [];

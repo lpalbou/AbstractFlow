@@ -23,12 +23,12 @@ const advertised: GatewayContracts = {
 
 describe('triggerSourcesEndpoint', () => {
   it('takes the path from the capabilities descriptor', () => {
-    expect(triggerSourcesEndpoint(advertised)).toBe('/api/gateway/v2-test/trigger-sources');
+    expect(triggerSourcesEndpoint(advertised)).toBe('api/gateway/v2-test/trigger-sources');
   });
 
   it('uses the contract path when the descriptor does not name one', () => {
     expect(triggerSourcesEndpoint({ version: 1, common: {} })).toBe(TRIGGER_SOURCES_DEFAULT_ENDPOINT);
-    expect(triggerSourcesEndpoint(null)).toBe('/api/gateway/trigger-sources');
+    expect(triggerSourcesEndpoint(null)).toBe('api/gateway/trigger-sources');
   });
 });
 
@@ -36,7 +36,7 @@ describe('fetchTriggerSources', () => {
   it('fetches the advertised path and parses every item', async () => {
     const fetchJson = vi.fn(async () => TRIGGER_SOURCES_RESPONSE);
     const result = await fetchTriggerSources(advertised, fetchJson);
-    expect(fetchJson).toHaveBeenCalledWith('/api/gateway/v2-test/trigger-sources');
+    expect(fetchJson).toHaveBeenCalledWith('api/gateway/v2-test/trigger-sources');
     expect(result.status).toBe('ok');
     if (result.status !== 'ok') throw new Error('unreachable');
     expect(result.items.map((s) => `${s.id}:${s.available}`)).toEqual([
@@ -67,7 +67,7 @@ describe('fetchTriggerSources', () => {
     });
     expect(result).toEqual({
       status: 'unavailable',
-      endpoint: '/api/gateway/trigger-sources',
+      endpoint: 'api/gateway/trigger-sources',
       reason: 'Trigger sources are unavailable on this gateway.',
     });
   });
