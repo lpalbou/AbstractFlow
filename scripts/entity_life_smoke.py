@@ -739,6 +739,100 @@ def main() -> int:
                   block_b.startswith("THIS SESSION SO FAR:\nTHEY: [#TRUNCATION:") and not leaked,
                   f"block_head={block_b[:120]!r} leaked={leaked}")
 
+            # SCENARIO 7 — NO CONTENT CUTS (ADR-0026): what the entity stores
+            # (episode records, the session-close summary and diary note, the
+            # turn log) and what it feeds its mind (recall cue, prompt shelf,
+            # tool results, the day cue) carry the WHOLE content. Each body is
+            # the SHIPPED one (examples/flows JSON), run through the runtime's
+            # own code-node lane.
+            from abstractruntime.visualflow_compiler.visual.code_executor import create_code_handler
+            from abstractruntime.visualflow_compiler.visual.executor import _generate_code_from_body
+
+            def shipped_body(marker):
+                found = []
+                for path in sorted(FLOWS.glob("entity-*.json")):
+                    for node in json.loads(path.read_text()).get("nodes") or []:
+                        if marker in str((node.get("data") or {}).get("codeBody") or ""):
+                            found.append(node)
+                if not found:
+                    raise AssertionError(f"no shipped entity code body contains {marker!r}")
+                return create_code_handler(_generate_code_from_body(found[0]["data"], "transform"), "transform")
+
+            long_words = " ".join(f"word{i:03d}alpha" for i in range(60))
+            LONG = ("The Petrel sails at dawn. " + long_words + ". The last fact is the lighthouse keeper named Ondine.")
+            setup = shipped_body('turn_id = phase + "-d" + str(days)')({"state": {}, "phase": "visit", "stimulus": LONG})
+            check("ADR-0026: the recall cue is the whole stimulus", setup.get("cue_text") == LONG,
+                  f"cue={str(setup.get('cue_text'))[-60:]!r}")
+
+            episode = shipped_body("def gist(text")({
+                "stimulus": LONG, "clean_reply": "I will remember Ondine. " + long_words,
+                "phase": "visit", "turn_id": "visit-d0-turn-9", "guard_died": 1,
+                "ended_silent": 0, "guard_error": "E" * 900 + " END-OF-ERROR", "participants": []})
+            rec = (episode.get("records") or [{}])[0]
+            blob = json.dumps(rec)
+            check("ADR-0026: the stored failed-moment record keeps the whole error",
+                  "END-OF-ERROR" in blob and "E" * 900 in blob, blob[:160])
+            healthy = shipped_body("def gist(text")({
+                "stimulus": LONG, "clean_reply": "I will remember Ondine. " + long_words,
+                "phase": "visit", "turn_id": "visit-d0-turn-10", "guard_died": 0,
+                "ended_silent": 0, "guard_error": "", "participants": []})
+            rec2 = (healthy.get("records") or [{}])[0]
+            check("ADR-0026: the stored episode title is the whole stimulus",
+                  str(rec2.get("title")) == LONG, f"title={str(rec2.get('title'))[-60:]!r}")
+            check("ADR-0026: the stored digest carries both sides whole",
+                  LONG in str(rec2.get("digest")) and ("I will remember Ondine. " + long_words) in str(rec2.get("digest"))
+                  and "#TRUNCATION" not in str(rec2.get("digest")), str(rec2.get("digest"))[-80:])
+            kws = rec2.get("keywords") or []
+            check("ADR-0026: every content word is a stored keyword", "ondine" in kws and "word059alpha" in kws and len(kws) > 60,
+                  f"n={len(kws)} tail={kws[-3:]}")
+
+            fold = shipped_body("# Fold the turn outcome into the rolling session state.")({
+                "state": {}, "clean_reply": "ok", "stimulus": "hi", "episode_record_ids": [],
+                "tools_ran": [f"tool_{i}" for i in range(20)],
+                "tend_result": {"applied": [], "refused": [f"refusal {i}" for i in range(9)]},
+                "guard_died": 0, "ended_silent": 0, "guard_error": ""})
+            st7 = fold.get("state") or {}
+            check("ADR-0026: the turn log keeps every tool the moment ran",
+                  (st7.get("turn_log") or [{}])[-1].get("tools") == [f"tool_{i}" for i in range(20)], str(st7.get("turn_log"))[:160])
+            check("ADR-0026: every tend refusal is carried to the next turn",
+                  len((st7.get("last_tend") or {}).get("refused") or []) == 9, str(st7.get("last_tend"))[:160])
+
+            shelf = shipped_body("# The prompt shelf: render the working set")({
+                "state": {"last_tend": {"applied": 0, "refused": [f"refusal line {i}" for i in range(9)]}},
+                "tool_names": [f"tool_{i}" for i in range(20)],
+                "participants": [f"person:guest{i}" for i in range(8)], "phase": "visit"})
+            prompt7 = str(shelf.get("prompt") or "")
+            check("ADR-0026: the shelf names every granted tool", "tool_19" in prompt7, prompt7[:120])
+            check("ADR-0026: the shelf shows every refusal", "refusal line 8" in prompt7, prompt7[:120])
+            check("ADR-0026: the shelf names everyone present", "person:guest7" in prompt7, prompt7[:120])
+
+            big = "R" * 30000 + " END-OF-RESULTS"
+            rounds = shipped_body("YOUR WORDS (round ")({
+                "state": {"prompt": "P", "rounds_used": 0, "ran": [], "words": [], "calls_used": 1},
+                "results_message": big, "markers": [], "ran": [], "content": "", "max_rounds": 3, "results": []})
+            check("ADR-0026: the whole tool results reach the next round",
+                  "END-OF-RESULTS" in str((rounds.get("state") or {}).get("prompt")), "results narrowed")
+
+            first = "At the very beginning the visitor told a long story about the harbour, the gulls, and a lantern called Vesper."
+            close = shipped_body('title = "session close ("')({
+                "state": {"turn_log": [{"stimulus": first, "reply": "r", "episode": f"ep-{i}"} for i in range(15)]
+                          + [{"stimulus": "s", "reply": "My last words were about Vesper the lantern and the gulls at the harbour mouth."}]},
+                "phase": "visit", "reason": "test"})
+            summ = (close.get("summary_records") or [{}])[0]
+            check("ADR-0026: the close summary links every episode",
+                  len(summ.get("edges") or []) == 15, f"edges={len(summ.get('edges') or [])}")
+            check("ADR-0026: the close summary and diary note keep whole sentences",
+                  first in str(summ.get("digest")) and first in str(close.get("diary_text"))
+                  and "Vesper the lantern and the gulls at the harbour mouth." in str(close.get("diary_text")),
+                  str(close.get("diary_text"))[:200])
+
+            cue7 = shipped_body("What is alive for you today:")({"items": [{"title": f"thread {i}"} for i in range(8)]
+                                                     + [{"kind": "dream", "record_id": "dr-1",
+                                                         "digest": "A long dream, with many clauses and no early full stop, " + "x" * 200 + " END-OF-DREAM"}]})
+            cue_text = str(cue7.get("cue") or "")
+            check("ADR-0026: the day cue offers everything alive, dreams whole",
+                  "thread 7" in cue_text and "END-OF-DREAM" in cue_text, cue_text[:160])
+
         finally:
             ert.close()
 

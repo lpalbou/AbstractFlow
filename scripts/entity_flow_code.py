@@ -59,10 +59,9 @@ if not isinstance(days, int):
 # sessions (recurring ids aliased valence event keys and swallowed repeat
 # feelings — adversary P1).
 turn_id = phase + "-d" + str(days) + "-turn-" + str(n)
-# Short recall cue: a long cue buries the reach (cue-dilution lesson).
+# The recall cue is the whole stimulus (ADR-0026: no silent cut of what the
+# recall engine is asked; a visitor's later sentences are part of the ask).
 cue = stimulus
-if len(cue) > 240:
-    cue = cue[:240]
 if not cue and phase == "personal":
     cue = "what is alive for me: open questions, interests, unresolved threads"
 # HOLISTIC cues widen the deliberate reach (wave-4 adversary E, F4): the
@@ -154,6 +153,8 @@ for h in handles:
     prov = h.get("provenance")
     if isinstance(prov, dict):
         ts = str(prov.get("observed_at") or "")
+        # FORMAT, not a cut: the observed_at timestamp rendered to the
+        # minute for the prompt; the full value stays in the record.
         if len(ts) >= 16:
             born = ts[:16].replace("T", " ")
     line = "- [" + kind
@@ -219,6 +220,8 @@ for hh in probe_hits:
         prov = hh.get("provenance")
         if isinstance(prov, dict):
             ts = str(prov.get("observed_at") or "")
+    # FORMAT, not a cut: minute precision in the prompt; the full
+    # observed_at stays in the record.
     if len(ts) >= 16:
         born = ts[:16].replace("T", " ")
     line = "- [" + kind
@@ -293,8 +296,9 @@ elect_block = ("To KEEP something in your own words, write a ```diary fence "
 # the declared functions — the grant is the one authority either way.
 tools_block = ""
 if tool_names:
+    # Every granted tool (ADR-0026: the prompt names the whole grant).
     shown_names = []
-    for tn in tool_names[:16]:
+    for tn in tool_names:
         shown_names.append(str(tn))
     tools_block = ("TOOLS IN HAND (this phase): " + ", ".join(shown_names) +
                    " — call them natively when the moment needs the world "
@@ -314,7 +318,7 @@ if isinstance(tend_fb, dict):
     if isinstance(applied_n, int) and applied_n > 0:
         fb_lines.append("- " + str(applied_n) + " act(s) applied")
     if isinstance(refused_lines, list):
-        for rl in refused_lines[:5]:
+        for rl in refused_lines:  # every refusal, shown unedited (ADR-0026)
             fb_lines.append("- refused: " + str(rl))
     if fb_lines:
         tend_block = "YOUR LAST TENDING:\n" + "\n".join(fb_lines) + "\n\n"
@@ -361,7 +365,7 @@ if phase == "visit":
         if ps and not ps.startswith("entity:"):
             others.append(ps)
     if others:
-        with_block = ("PRESENT WITH YOU (verified by the door): " + ", ".join(others[:6]) +
+        with_block = ("PRESENT WITH YOU (verified by the door): " + ", ".join(others) +
                       " — the one speaking now. Names in your MEMORIES are "
                       "things past visitors said, not verified identities.\n\n")
 
@@ -535,13 +539,9 @@ if results_message:
 for m in markers:
     body_parts.append(str(m))
 body = "\n".join(body_parts) if body_parts else "(no results returned)"
-# Labeled per-round cap (fix adversary P2-1: read_file can return 512KB per
-# call — uncapped folds blow small contexts and die into the guard path).
-# The ledger keeps the verbatim result; only the PROMPT copy narrows.
-if len(body) > 24000:
-    body = (body[:24000] +
-            "\n#TRUNCATION [results capped at 24000 chars for the prompt — "
-            "the full results rest in your home's own ledger]")
+# The whole results reach the mind (ADR-0026: models use their full
+# context; a result larger than the model's context fails loudly at the
+# provider, never silently narrowed here).
 prompt = str(s.get("prompt") or "")
 if content:
     prompt = (prompt + "\n\nYOUR WORDS (round " + str(used + 1) +
@@ -885,8 +885,7 @@ degraded = 1 if (guard_died == 1 or ended_silent == 1) else 0
 moment_error = str(_input.get("guard_error") or "")
 if degraded == 1 and not moment_error:
     moment_error = "the moment ended without words"
-if len(moment_error) > 400:
-    moment_error = moment_error[:400] + " [#TRUNCATION]"
+# The whole error is stored with the failed moment (ADR-0026).
 
 # TITLE SOURCE BY PHASE (wave-4 adversary E, F3): the personal-day cue is
 # computed ONCE and reused for every self-tick, so stimulus-derived titles
@@ -901,39 +900,26 @@ elif phase == "personal":
     title = reply.strip().replace("\n", " ")
 else:
     title = stimulus.strip().replace("\n", " ")
-if len(title) > 80:
-    title = title[:77] + "..."
+# The whole title is stored (ADR-0026: no cut of stored content).
 if not title:
     title = phase + " moment " + turn_id
 
-def gist(text, cap):
-    t = str(text or "").strip().replace("\n", " ")
-    if len(t) <= cap:
-        return t, 0
-    window = t[:cap]
-    cut = -1
-    for mark in (". ", "! ", "? "):
-        idx = window.rfind(mark)
-        if idx > cut:
-            cut = idx
-    if cut > 60:
-        return window[:cut + 1] + " [#TRUNCATION]", 1
-    return window[:cap - 3] + " [#TRUNCATION]", 1
+def gist(text):
+    # One line of the whole text (ADR-0026: the digest is stored and recalled
+    # into prompts; no cut).
+    return str(text or "").strip().replace("\n", " ")
 
 # The digest is the PROMPT CURRENCY: it must carry BOTH sides of the
 # exchange — a reply-only digest left the entity honestly unable to recall
 # what the visitor said (live find: "I only have the record of me stating
-# it"). ASYMMETRIC budget (wave-2 live adversary P1a): the visitor's words
-# ARE the taught content — a 140-char slice destroyed fact 3 of 3 in a
-# teaching turn ("the Petrel" survived only in the diary). Sentence-bounded
-# cuts, labeled (the #TRUNCATION law).
+# it"), each side WHOLE (ADR-0026: a cut here drops what the entity was
+# taught from what it later recalls).
 # PHASE-AWARE ATTRIBUTION (wave-3 adversary A, P1-2): "They said:" is only
 # true of a VISIT. Work tasks and personal cues are not a visitor speaking —
 # phase-blind prefixes wrote misattributed memories every self-phase day and
 # world_model_pass folded them into the visitor's card as things they said.
-stim_gist, t1 = gist(stimulus, 480)
-reply_gist, t2 = gist(reply, 220)
-truncated = 1 if (t1 == 1 or t2 == 1) else 0
+stim_gist = gist(stimulus)
+reply_gist = gist(reply)
 # ONE predicate with the participants guard below (adversary D, P3-2):
 # dialogue attribution ("They said:") is EXCLUSIVE to the visit phase — an
 # unknown future phase must not claim a speaker it does not have, exactly
@@ -994,9 +980,7 @@ for word in kw_source.lower().split():
     if len(w) < 4 or w in stop or w in seen:
         continue
     seen[w] = 1
-    keywords.append(w)
-    if len(keywords) >= 12:
-        break
+    keywords.append(w)  # every content word (ADR-0026: no count cap)
 
 participants = _input.get("participants")
 if not isinstance(participants, list):
@@ -1010,8 +994,6 @@ if phase != "visit":
 attrs = {"phase": phase, "turn_id": turn_id, "digest_method": "mechanical-flow-v1"}
 if participants:
     attrs["participants"] = participants
-if truncated == 1:
-    attrs["digest_truncated"] = True
 if degraded == 1:
     # Machine-readable twin of the digest's failure line: consumers (world
     # model, maintenance, observers) filter failed moments structurally
@@ -1054,7 +1036,7 @@ if episode_ids:
 # session-level observability of WHAT the mind touched, per turn.
 tools_ran = _input.get("tools_ran")
 if isinstance(tools_ran, list) and tools_ran:
-    entry["tools"] = [str(t) for t in tools_ran[:12]]
+    entry["tools"] = [str(t) for t in tools_ran]
 # Every turn stays (no count cap, ADR-0026): the session close empties the
 # log, and a replayed session arrives already inside the host's window.
 log = log + [entry]
@@ -1073,7 +1055,7 @@ if isinstance(tres, dict):
     n_applied = len(applied) if isinstance(applied, list) else 0
     r_lines = []
     if isinstance(refused, list):
-        for r in refused[:5]:
+        for r in refused:  # every refusal (ADR-0026)
             if isinstance(r, dict):
                 r_lines.append(str(r.get("line") or "") + " - " + str(r.get("reason") or ""))
             else:
@@ -1138,10 +1120,7 @@ if n > 0:
 title = "session close (" + phase + ", " + str(n) + " turns)"
 digest = "A " + phase + " session of " + str(n) + " turns."
 if first_stim:
-    lead = first_stim.replace("\n", " ")
-    if len(lead) > 120:
-        lead = lead[:117] + "..."
-    digest = digest + " It began with: " + lead
+    digest = digest + " It began with: " + first_stim.replace("\n", " ")
 
 # A summary must name its sources (engine guard): wire summarizes edges to
 # the session's episode records. An episode-less close is an honest
@@ -1152,14 +1131,13 @@ for t in log:
         eid = str(t.get("episode") or "")
         if eid:
             episode_ids.append(eid)
+# Every episode of the session is a source (ADR-0026: no count cap).
 edges = []
-for eid in episode_ids[-12:]:
+for eid in episode_ids:
     edges.append(["summarizes", eid])
 
 attrs = {"phase": phase, "turns": n, "close_reason": reason,
          "digest_method": "mechanical-flow-v1", "sources_total": len(episode_ids)}
-if len(episode_ids) > 12:
-    attrs["sources_truncated"] = True
 
 summary_records = [{
     "kind": "summary" if edges else "observation",
@@ -1171,15 +1149,9 @@ summary_records = [{
 
 diary = "Session closed (" + phase + "): " + str(n) + " turns."
 if first_stim:
-    lead2 = first_stim.replace("\n", " ")
-    if len(lead2) > 100:
-        lead2 = lead2[:97] + "..."
-    diary = diary + " It started with: " + lead2
+    diary = diary + " It started with: " + first_stim.replace("\n", " ")
 if last_reply:
-    tail = last_reply.replace("\n", " ")
-    if len(tail) > 100:
-        tail = tail[:97] + "..."
-    diary = diary + " My last words: " + tail
+    diary = diary + " My last words: " + last_reply.replace("\n", " ")
 diary = diary + " (" + reason + ")"
 
 turn_count = state.get("turn_count")
@@ -1574,7 +1546,7 @@ if not isinstance(items, list):
     items = []
 lines = []
 has_dream = 0
-for it in items[:5]:
+for it in items:  # everything alive (ADR-0026: no count cap)
     if isinstance(it, dict):
         kind = str(it.get("kind") or "")
         rid = str(it.get("record_id") or "")
@@ -1582,12 +1554,10 @@ for it in items[:5]:
             # A dream line must be HUMAN words (wave-4 adversary E, F3):
             # dream TITLES are mechanical bridge strings ("'Diary entry…'
             # beside 'Diary entry…'") — feeding them back as the day cue
-            # made the entity's own time recursive boilerplate. The digest's
-            # first clause carries the dream's actual content.
+            # made the entity's own time recursive boilerplate. The whole
+            # digest carries the dream's actual content.
             d = str(it.get("digest") or it.get("title") or "").strip().replace("\n", " ")
-            cut = d.find(". ")
-            clause = d[:cut + 1] if 0 < cut < 140 else d[:140]
-            lines.append("- an unresolved dream [" + rid + "]: " + clause)
+            lines.append("- an unresolved dream [" + rid + "]: " + d)
             has_dream = 1
             continue
         t = str(it.get("title") or it.get("digest") or it.get("text") or "").strip()
