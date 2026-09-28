@@ -235,7 +235,7 @@ export function ArtifactInputField({
         if (modality !== 'artifact') query.modality = modality;
         if (searchText.trim()) query.query = searchText.trim();
         if (Object.keys(parsedTags).length > 0) query.tags = JSON.stringify(parsedTags);
-        const url = endpointFromDescriptor(searchDescriptor, '/api/gateway/artifacts/search', {}, query);
+        const url = endpointFromDescriptor(searchDescriptor, 'api/gateway/artifacts/search', {}, query);
         gatewayJson<{ items?: unknown[] }>(url)
           .then((payload) => {
             if (!active) return;
@@ -268,7 +268,7 @@ export function ArtifactInputField({
     setError(null);
     const url = endpointFromDescriptor(
       sessionListDescriptor,
-      '/api/gateway/sessions/{session_id}/artifacts',
+      'api/gateway/sessions/{session_id}/artifacts',
       { session_id: sid },
       { limit: 500 }
     );
@@ -303,7 +303,7 @@ export function ArtifactInputField({
       form.append('file', file, file.name);
       form.append('filename', file.name);
       if (file.type) form.append('content_type', file.type);
-      const url = endpointFromDescriptor(uploadDescriptor, '/api/gateway/attachments/upload');
+      const url = endpointFromDescriptor(uploadDescriptor, 'api/gateway/attachments/upload');
       const res = await gatewayFetch(url, { method: 'POST', body: form, timeoutMs: 0 });
       const payload = (await res.json()) as Record<string, unknown>;
       const ref = artifactRefFromUploadResponse(payload);
@@ -332,7 +332,7 @@ export function ArtifactInputField({
       if (workspaceRoot.trim()) payload.workspace_root = workspaceRoot.trim();
       if (workspaceAccessMode.trim()) payload.workspace_access_mode = workspaceAccessMode.trim();
       if (workspaceIgnoredPaths.length > 0) payload.workspace_ignored_paths = workspaceIgnoredPaths.join('\n');
-      const url = endpointFromDescriptor(importDescriptor, '/api/gateway/artifacts/import');
+      const url = endpointFromDescriptor(importDescriptor, 'api/gateway/artifacts/import');
       const ref = artifactRefFromUploadResponse(
         await gatewayJson<Record<string, unknown>>(url, { ...jsonRequest(payload, { method: 'POST' }), timeoutMs: 0 })
       );

@@ -42,7 +42,7 @@ async function fetchRuns(
   const all: RunSummary[] = [];
   for (const wid of candidates) {
     const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
-      endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true, include_drafts: true, workflow_id: wid })
+      endpointFromDescriptor(runsListDescriptor, 'api/gateway/runs', {}, { limit: 500, root_only: true, include_drafts: true, workflow_id: wid })
     ).catch(() => null);
     if (!payload) continue;
     const items = Array.isArray(payload.items) ? payload.items : [];
@@ -53,7 +53,7 @@ async function fetchRuns(
   // Fallback: fetch recent root runs and filter by flow id suffix.
   try {
     const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
-      endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true, include_drafts: true })
+      endpointFromDescriptor(runsListDescriptor, 'api/gateway/runs', {}, { limit: 500, root_only: true, include_drafts: true })
     );
     const items = Array.isArray(payload.items) ? payload.items : [];
     const mapped = items.map(mapGatewayRunSummary);

@@ -12,7 +12,7 @@ and shipped JSONs are in sync again — keep them that way.
 Gateway's contract test (test_deep_research_bundle_contract.py) pins both the
 graph contract and the metadata block; the 2026-07-16 rename repack dropped
 metadata because the one-off pack call didn't pass it — this script exists so
-that cannot happen again. Bump BUNDLE_VERSION when publishing a new wave.
+that cannot happen again. Bump BUNDLE_VERSION (in build_deep_research_workflows.py) when publishing a new wave.
 """
 from __future__ import annotations
 
@@ -24,11 +24,12 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "abstractruntime" / "src"))
 
-BUNDLE_VERSION = "0.1.7"
-
 _spec = importlib.util.spec_from_file_location("deep_gen", HERE / "build_deep_research_workflows.py")
 _gen = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_gen)
+
+# One copy: the generator owns the version (bump it there for a new wave).
+BUNDLE_VERSION = _gen.BUNDLE_VERSION
 
 
 def bundle_metadata() -> dict:

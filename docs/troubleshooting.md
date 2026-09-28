@@ -9,7 +9,7 @@ Two quick checks help with most problems:
 
 ```bash
 # Is the Flow server up, and which Gateway does it proxy to?
-curl -s http://localhost:3003/api/health
+curl -s http://127.0.0.1:3003/api/health
 
 # Is the Gateway reachable?
 curl -s http://127.0.0.1:8080/api/health
@@ -62,7 +62,7 @@ See [Web editor > Browser Auth](web-editor.md#browser-auth).
   the request instead of forwarding it without that information.
 - **Fix:** connect to the Flow server directly or through a reverse proxy that
   opens a normal TCP connection to it. See
-  [Web editor > Browser Auth](web-editor.md#browser-auth) for the forwarding
+  [API and contracts > Proxy Contract](api.md#proxy-contract) for the forwarding
   headers the server sends.
 
 ### "Flow browser session CSRF token missing or invalid" (HTTP 403)
@@ -73,16 +73,22 @@ See [Web editor > Browser Auth](web-editor.md#browser-auth).
 - **Fix:** sign out and sign in again from the same origin you use to open the
   editor.
 
-### A remote browser is treated as if it ran on the Gateway's machine
+### The Gateway says the Flow Editor "cannot be served at /apps/flow/"
 
-- **Cause:** the Vite development server (`npm run dev`) drops browser-supplied
-  forwarding headers but does not add `X-Forwarded-For` or the
-  `X-AbstractFramework-App-Proxy` marker, so the Gateway sees the development
-  server's own local address.
-- **Fix:** when remote browsers use the editor, serve it with the built server
-  (`npm run build` then `npm start -- --gateway-url ...`, or
-  `npx @abstractframework/flow`), which sets both headers on every
-  Gateway-bound request.
+- **Cause:** the running Flow server does not announce
+  `X-AbstractFramework-App: flow; mount=1`, which an older
+  `@abstractframework/flow` version does not send. The Gateway serves only a
+  server that follows the base-path rules.
+- **Fix:** update the Flow Editor from the Gateway console (**Apps**), or run a
+  current `npx @abstractframework/flow`.
+
+### The editor loads under /apps/flow/ but asks to sign in again
+
+- **Cause:** the editor's session cookies are scoped to `/apps/flow/`; a
+  session created at the editor's own port (`http://127.0.0.1:3003/`) is a
+  separate session.
+- **Fix:** open the editor from the Gateway console (**Apps > Flow Editor >
+  Open**), which signs the browser in at `/apps/flow/`.
 
 ## Editor Behavior
 

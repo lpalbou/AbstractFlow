@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { VisualFlow } from '../types/flow';
+import { computeRunPreflightIssues } from './preflight';
 import { applyInterfacePins, buildFlowFamilyIndex, interfaceBoundaryPins, missingInterfacePins } from './flowFamilies';
 import {
   BUNDLED_COMPOSED_ONLY_IDS,
@@ -282,8 +284,34 @@ describe('bundled flows honour the interfaces they declare', () => {
 });
 
 describe('bundled agent.v1 flows use what agent hosts send and read', () => {
-  // Known gaps recorded as a backlog follow-up (unwired pins kept on purpose).
-  const KNOWN_GAPS = new Set(['entity-chat:success', 'entity-goodbye:prompt', 'entity-goodbye:success']);
+  // A flow that never calls an LLM has no use for the host's prompt/provider/
+  // model: it is exempt from the `prompt` check instead of being fake-wired
+  // (backlog 0890). Each entry says why, and the guard below fails the day
+  // such a flow gains an LLM call (in itself or any subflow it runs).
+  const NO_LLM_FLOWS = new Map<string, string>([
+    ['entity-goodbye', 'folds the session history and runs the session close (summary + diary note): no LLM call'],
+  ]);
+  const LLM_NODE_TYPES = new Set(['llm_call', 'agent']);
+
+  function callsAnLlm(flowId: string, byId: Map<string, VisualFlow>, seen = new Set<string>()): boolean {
+    if (seen.has(flowId)) return false;
+    seen.add(flowId);
+    const flow = byId.get(flowId);
+    if (!flow) throw new Error(`subflow ${flowId} is not in the bundled catalog`);
+    return flow.nodes.some((node) => {
+      const type = String(node.data?.nodeType || '');
+      if (LLM_NODE_TYPES.has(type)) return true;
+      const sub = (node.data as { subflowId?: string }).subflowId;
+      return type === 'subflow' && typeof sub === 'string' && callsAnLlm(sub, byId, seen);
+    });
+  }
+
+  it('the no-LLM exemption holds: those flows (and their subflows) call no LLM; the others do', () => {
+    const byId = new Map(listBundledFlows().map((flow) => [flow.id, flow] as const));
+    for (const id of NO_LLM_FLOWS.keys()) expect(callsAnLlm(id, byId), id).toBe(false);
+    // The guard can see an LLM call through a subflow.
+    expect(callsAnLlm('entity-chat', byId)).toBe(true);
+  });
 
   it('On Flow Start `prompt` feeds the graph and every On Flow End sets `success`', () => {
     const gaps: string[] = [];
@@ -292,7 +320,7 @@ describe('bundled agent.v1 flows use what agent hosts send and read', () => {
     for (const flow of agentFlows) {
       for (const node of flow.nodes) {
         const type = node.data?.nodeType;
-        if (type === 'on_flow_start') {
+        if (type === 'on_flow_start' && !NO_LLM_FLOWS.has(flow.id)) {
           const fed = flow.edges.some((e) => e.source === node.id && e.sourceHandle === 'prompt');
           if (!fed) gaps.push(`${flow.id}:prompt`);
         }
@@ -306,7 +334,50 @@ describe('bundled agent.v1 flows use what agent hosts send and read', () => {
         }
       }
     }
-    expect(gaps.filter((gap) => !KNOWN_GAPS.has(gap))).toEqual([]);
+    expect(gaps).toEqual([]);
+  });
+
+  it('entity-chat and entity-goodbye compute `success` and `meta` (wired, never a constant)', () => {
+    for (const id of ['entity-chat', 'entity-goodbye']) {
+      const flow = listBundledFlows().find((f) => f.id === id);
+      expect(flow, id).toBeTruthy();
+      const end = flow!.nodes.find((n) => n.data?.nodeType === 'on_flow_end');
+      for (const pin of ['success', 'meta']) {
+        const wire = flow!.edges.find((e) => e.target === end!.id && e.targetHandle === pin);
+        expect(wire, `${id}:${pin}`).toBeTruthy();
+        const source = flow!.nodes.find((n) => n.id === wire!.source);
+        expect(source?.data?.nodeType, `${id}:${pin} source`).toBe('code');
+      }
+    }
+  });
+
+  it('run preflight on the wired flows reports no "hosts will read null" end pin', () => {
+    const problems: string[] = [];
+    for (const id of ['entity-chat', 'entity-goodbye', 'multiagent-coding', 'deep-research']) {
+      const flow = listBundledFlows().find((f) => f.id === id);
+      expect(flow, id).toBeTruthy();
+      const issues = computeRunPreflightIssues(flow!.nodes, flow!.edges, { flowInterfaces: flow!.interfaces });
+      for (const issue of issues) if (issue.message.includes('hosts will read null')) problems.push(`${id}: ${issue.nodeId} ${issue.message}`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('every On Flow End of a coding.v1 flow sets `passed` (the verdict; False where no gate ran)', () => {
+    const coding = listBundledFlows().filter((flow) => (flow.interfaces || []).includes('abstractcode.coding.v1'));
+    expect(coding.map((flow) => flow.id)).toContain('multiagent-coding');
+    const gaps: string[] = [];
+    for (const flow of coding) {
+      for (const node of flow.nodes.filter((n) => n.data?.nodeType === 'on_flow_end')) {
+        const data = node.data as { pinDefaults?: Record<string, unknown> };
+        const wired = flow.edges.some((e) => e.target === node.id && e.targetHandle === 'passed');
+        if (!wired && data.pinDefaults?.passed !== false) gaps.push(`${flow.id}:${node.id}`);
+      }
+    }
+    expect(gaps).toEqual([]);
+    const multi = coding.find((flow) => flow.id === 'multiagent-coding')!;
+    const passed = multi.edges.find((e) => e.target === 'end' && e.targetHandle === 'passed');
+    const chip = multi.nodes.find((n) => n.id === passed?.source);
+    expect((chip?.data as { pinDefaults?: Record<string, unknown> })?.pinDefaults?.name).toBe('all_passed');
   });
 
   it('deep-research researches the host `prompt` when no `request` is given (request still wins)', () => {

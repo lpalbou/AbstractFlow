@@ -1,15 +1,15 @@
 # AbstractFlow
 
-> AbstractFlow is the web visual workflow editor for AbstractFramework, distributed as the npm package `@abstractframework/flow`. It serves a browser editor and a small Node server that proxies `/api/*` to AbstractGateway.
+> AbstractFlow is the web visual workflow editor for AbstractFramework, distributed as the npm package `@abstractframework/flow`. It serves a browser editor and a small Node server that forwards `/api/*` to AbstractGateway; the same server runs on its own at `/` (127.0.0.1:3003) or behind the Gateway at `/apps/flow/`.
 
 Do not assume a Python package, FastAPI backend, or local execution host exists in AbstractFlow. Execution, provider configuration, user auth, workflow persistence, runs, ledgers, artifacts, and runtime isolation are owned by AbstractGateway and AbstractRuntime.
 
-Repository map: `src/` (React/Vite editor), `bin/cli.js` (CLI, static server, Gateway proxy), `bin/gateway_forwarding.js` (forwarding headers), `examples/flows/` (sample and shipped VisualFlow JSON), `scripts/` (workflow generators and doc generators), `docs/`.
+Repository map: `src/` (React/Vite editor), `bin/cli.js` + `bin/flags.js` (CLI, launch flags, Gateway URL resolution), `bin/server.js` (static server, base path, Gateway session proxy on `@abstractframework/app-server`), `examples/flows/` (sample and shipped VisualFlow JSON), `scripts/` (workflow generators and doc generators), `docs/`.
 
 Key behavior:
 
 - Gateway is the only execution boundary. Flow may capture browser-local files or microphone audio, but uploads them to Gateway as artifacts before start/resume.
-- The Flow server sets `X-Forwarded-For` (the browser connection's address) and `X-AbstractFramework-App-Proxy: abstractflow` on every Gateway-bound request and drops browser-supplied forwarding headers. The Vite dev server does not add these headers.
+- The Flow server sets `X-Forwarded-For` (the browser's address) and `X-AbstractFramework-App-Proxy: abstractflow` on every Gateway-bound request and drops browser-supplied forwarding headers. Every response carries `X-AbstractFramework-App: flow; mount=1`; the editor uses relative URLs only, so it works at `/` and under `/apps/flow/`.
 - A workflow's `interfaces` list declares the contracts it implements. Declaring an interface adds its typed pins to `On Flow Start` / `On Flow End`; opening a workflow adds missing pins and shows unsaved changes; Run preflight warns about missing, unconnected, or mistyped interface pins. Eight interfaces carry pin contracts, including `abstractcode.agent.v1`, `abstractassistant.agent.v1`, and `abstractcode.goal.v1`.
 - Opening or importing a workflow keeps every stored connection. Connections the canvas cannot draw are kept, saved, and listed in an "N hidden" node badge; only connections to missing nodes are removed, with a notice.
 - A runnable workflow can store `automation_defaults` (trigger source and settings, context mode, title, default `input_data`) in Flow Library > Automation. Trigger sources are discovered from the Gateway (`GET /api/gateway/trigger-sources`, or the path in `contracts.common.automations.trigger_sources_endpoint`); settings are validated against the source's `config_schema` with a JSON Schema subset and schemas using other keywords are refused. Publish exports the field as `metadata.automation_defaults[<flow id>]`; Gateway fills a creation request's missing trigger, context, title and `input_data` from it. Automations are created in AbstractObserver or the Assistant.

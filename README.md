@@ -2,7 +2,7 @@
 
 AbstractFlow is the visual workflow editor for AbstractFramework.
 
-It is a web package (`@abstractframework/flow`). It runs a browser editor and a small Node server that serves the built UI and proxies `/api/*` to AbstractGateway. AbstractGateway owns users, sessions, runtime routing, provider configuration, workflow storage, run execution, ledgers, artifacts, and media catalogs.
+It is a web package (`@abstractframework/flow`). It runs a browser editor and a small Node server that serves the built UI and forwards `/api/*` to AbstractGateway. The server runs on its own (`http://127.0.0.1:3003/`) or behind the Gateway at `/apps/flow/`, where the Gateway console opens it signed in. AbstractGateway owns users, sessions, runtime routing, provider configuration, workflow storage, run execution, ledgers, artifacts, and media catalogs.
 
 ## Install
 
@@ -18,10 +18,10 @@ checkout.
 ```bash
 git clone https://github.com/lpalbou/AbstractUIC.git ../abstractuic
 npm install
-npm run dev -- --host 0.0.0.0 --port 3003
+npm run dev
 ```
 
-Open http://localhost:3003 and sign in with the Gateway user and token created by AbstractGateway.
+Open the address Vite prints and sign in with the Gateway user and token created by AbstractGateway.
 Leave provider/model selectors on `Auto (Gateway default)` for portable
 workflows. Gateway/Core capability defaults choose the actual provider/model at
 run time for the current user/runtime.

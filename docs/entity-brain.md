@@ -175,9 +175,26 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
 - Degradation surfaces honestly: a dead cognition turn answers
   `[the moment could not be lived: …]` and the visit/chat outputs carry
   `degraded` + `moment_error` pins so thin clients never confuse "the entity
-  said nothing" with "the turn died". READ `degraded`, never `success` alone:
-  the run-level `success` flag means "the flow executed", and a degraded
-  turn still completes its flow.
+  said nothing" with "the turn died". The agent.v1 end pins follow the same
+  signal: `entity-chat` sets `success` to true only when the moment was not
+  degraded and `meta` to `{provider, model, tools_ran, tool_rounds, degraded}`
+  (the provider/model the host asked for, empty for the Gateway default);
+  `entity-goodbye` sets `success` when the session close ran and `meta` to
+  `{turns, reason}`. The run-level status only says "the flow executed": a
+  degraded turn still completes its flow.
+- SESSION HISTORY: the turn prompt's `THIS SESSION SO FAR` block carries
+  every turn of the session, whole. A chat client's replayed history
+  (`use_session_history`) arrives already bounded by the Gateway's replay
+  window (the most recent 50,000 tokens of whole turns; older turns are
+  dropped with a labeled `#TRUNCATION` notice), and the flows add no second,
+  smaller bound.
+- WHOLE CONTENT: nothing the entity stores or reads is cut. Episode records
+  keep the whole stimulus and reply (title, digest, keywords; the verbatim
+  goes to the artifact store), a failed moment keeps its whole error, the
+  session close summarizes every episode of the session, and the turn prompt
+  carries every granted tool, every tend refusal and everyone present. Loop
+  bounds (`max_rounds`, `max_ticks`, `max_days`, the tool-call budget) are
+  explicit input pins, not content cuts.
 - VERSION CONTRACT: bundle versions are immutable and PINNABLE
   (`bundle_version` on the summon). The `degraded`/`moment_error` output
   pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the

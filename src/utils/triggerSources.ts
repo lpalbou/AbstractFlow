@@ -20,7 +20,7 @@ import {
   type GatewayContracts,
 } from './gatewayClient';
 
-export const TRIGGER_SOURCES_DEFAULT_ENDPOINT = '/api/gateway/trigger-sources';
+export const TRIGGER_SOURCES_DEFAULT_ENDPOINT = 'api/gateway/trigger-sources';
 
 export type TriggerSourceKind = 'time' | 'manual' | 'event';
 

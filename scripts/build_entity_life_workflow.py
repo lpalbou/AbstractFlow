@@ -114,9 +114,9 @@ def subflow_node(node_id, label, flow_id, x, y):
 
 
 from entity_flow_code import (  # noqa: E402
-    CHAT_DEGRADED_CODE, CHAT_STATE_CODE, CLOSE_PREP_CODE, DAY_END_CODE,
+    CHAT_DEGRADED_CODE, CHAT_REPORT_CODE, CHAT_STATE_CODE, CLOSE_PREP_CODE, DAY_END_CODE,
     DRIVE_CUE_CODE, ELECTIONS_CODE, EPISODE_CODE, GATE_CODE,
-    GOODBYE_WORD_CODE, GUARD_CODE,
+    GOODBYE_REPORT_CODE, GOODBYE_WORD_CODE, GUARD_CODE,
     LIFE_COND_CODE, PERSONAL_COND_CODE, PHASE_ROUTE_CODE,
     ROUNDS_COND_CODE, ROUNDS_FOLD_FINAL_CODE, ROUNDS_FOLD_TOOLS_CODE,
     ROUNDS_INIT_CODE, ROUNDS_RESULT_CODE, ROUNDS_ROUTE_CODE,
@@ -167,7 +167,12 @@ BUNDLE_ID = "entity-life"
 # identical (both entity smokes green). Version bump because 0.0.16 shipped the
 # pre-migration bytes. This bundle now REQUIRES a pin-expression runtime
 # (metadata.min_runtime below; enforcement gate is gateway's lane, backlog 0154).
-BUNDLE_VERSION = "0.0.18"
+# 0.0.19 (2026-09-28, backlog 0890): entity-chat and entity-goodbye set the
+# agent.v1 `success` and `meta` end pins (chat_report / close_report).
+# Session history is never capped in-flow (ADR-0026): chat folds every
+# replayed message, the shelf renders every turn whole, the turn log keeps
+# every turn; the host's 50k-token replay window is the only bound.
+BUNDLE_VERSION = "0.0.19"
 # Version history: CHANGELOG.md (entity-life entries) — the per-version
 # ledger moved there 2026-07-25 (cleanup adversary P1-2: the header-comment
 # practice bloated this file AND silently stopped at 0.0.11 while five
@@ -783,6 +788,13 @@ def build_goodbye() -> dict:
     # agent.v1 consumers read answer/response — the close reports itself.
     N.append(code_node("close_word", "The close reports", GOODBYE_WORD_CODE, 940, 460,
                        [pin("turns", "turns", "number"), pin("reason", "reason", "string")]))
+    # agent.v1 success/meta (backlog 0890): the close ran (its child output
+    # arrived) and what it closed. Named outputs: a code node's own `success`
+    # is the executor's "the code ran", never the flow's verdict.
+    N.append(code_node("close_report", "Did the close run?", GOODBYE_REPORT_CODE, 940, 600,
+                       [pin("close_out", "close_out", "object"), pin("turns", "turns", "number"),
+                        pin("reason", "reason", "string")],
+                       outputs=[pin("completed", "completed", "boolean"), pin("meta", "meta", "object")]))
     # diary_entry_id extraction rides the end pin (was the single-consumer
     # get node entry_out): close.output wires straight in; a dead close
     # child delivers None and `(value or {})` keeps the get-node default.
@@ -815,6 +827,11 @@ def build_goodbye() -> dict:
     E.append(edge("turns_out", "value", "end", "turns"))
     # the whole close output feeds the extracting end pin directly
     E.append(edge("close", "output", "end", "diary_entry_id"))
+    E.append(edge("close", "output", "close_report", "close_out"))
+    E.append(edge("turns_out", "value", "close_report", "turns"))
+    E.append(edge("start", "reason", "close_report", "reason"))
+    E.append(edge("close_report", "completed", "end", "success"))
+    E.append(edge("close_report", "meta", "end", "meta"))
 
     return f
 
@@ -1598,6 +1615,16 @@ def build_chat() -> dict:
                        [pin("visit_out", "visit_out", "object"),
                         pin("guard_died", "guard_died", "number"),
                         pin("guard_error", "guard_error", "string")]))
+    # agent.v1 success/meta (backlog 0890): success = the moment was not
+    # degraded; meta = the host's provider/model and what the moment did.
+    # Named outputs: a code node's own `success` is the executor's "the code
+    # ran", never the flow's verdict.
+    N.append(code_node("chat_report", "Did the moment live?", CHAT_REPORT_CODE, 1160, 380,
+                       [pin("degraded", "degraded", "number"),
+                        pin("visit_out", "visit_out", "object"),
+                        pin("provider", "provider", "provider_text"),
+                        pin("model", "model", "model")],
+                       outputs=[pin("completed", "completed", "boolean"), pin("meta", "meta", "object")]))
     # `response` mirrors `answer` (adversary F, P2): the documented agent.v1
     # contract reads output.response; both apps fall back to `answer` today,
     # but a strict consumer reading only `response` would get "" — carry both.
@@ -1642,6 +1669,12 @@ def build_chat() -> dict:
     E.append(edge("degraded_fold", "moment_error", "end", "moment_error"))
     E.append(edge("visit", "output", "end", "tools_ran"))
     E.append(edge("visit", "output", "end", "tool_rounds"))
+    E.append(edge("degraded_fold", "degraded", "chat_report", "degraded"))
+    E.append(edge("visit", "output", "chat_report", "visit_out"))
+    E.append(edge("start", "provider", "chat_report", "provider"))
+    E.append(edge("start", "model", "chat_report", "model"))
+    E.append(edge("chat_report", "completed", "end", "success"))
+    E.append(edge("chat_report", "meta", "end", "meta"))
 
     return f
 

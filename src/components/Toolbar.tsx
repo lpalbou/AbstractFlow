@@ -66,33 +66,33 @@ import {
 
 // Fetch list of saved flows
 async function listFlows(contracts: GatewayContracts | null): Promise<VisualFlow[]> {
-  const endpoint = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows';
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || 'api/gateway/visualflows';
   return gatewayJson<VisualFlow[]>(gatewayPath(endpoint));
 }
 
 // Load a specific flow
 async function fetchFlow(flowId: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
-  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
   return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }));
 }
 
 async function deleteFlow(flowId: string, contracts: GatewayContracts | null): Promise<void> {
-  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
   await gatewayFetch(gatewayPath(endpoint, { flow_id: flowId }), { method: 'DELETE' });
 }
 
 async function renameFlow(flowId: string, name: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
-  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
   return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ name }, { method: 'PUT' }));
 }
 
 async function updateFlowDescription(flowId: string, description: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
-  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
   return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ description }, { method: 'PUT' }));
 }
 
 async function updateFlowInterfaces(flowId: string, interfaces: string[], contracts: GatewayContracts | null): Promise<VisualFlow> {
-  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
   return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ interfaces }, { method: 'PUT' }));
 }
 
@@ -102,7 +102,7 @@ async function updateFlowAutomationDefaults(
   automationDefaults: AutomationDefaults | null,
   contracts: GatewayContracts | null
 ): Promise<VisualFlow> {
-  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
   return gatewayJson<VisualFlow>(
     gatewayPath(endpoint, { flow_id: flowId }),
     jsonRequest({ automation_defaults: automationDefaults }, { method: 'PUT' })
@@ -161,7 +161,7 @@ function duplicateFlowPrompt(baseName: string, isBundledFamily: boolean): Omit<C
 }
 
 async function duplicateFlow(source: VisualFlow, newName: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
-  const endpoint = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows';
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || 'api/gateway/visualflows';
   return gatewayJson<VisualFlow>(gatewayPath(endpoint), jsonRequest({
       name: newName,
       description: source.description || '',
@@ -178,8 +178,8 @@ async function duplicateFlow(source: VisualFlow, newName: string, contracts: Gat
 
 /** Gateway-backed IO for family-aware duplication of bundled flows. */
 function familyDuplicateIO(contracts: GatewayContracts | null): DuplicateFamilyIO {
-  const collection = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows';
-  const item = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  const collection = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || 'api/gateway/visualflows';
+  const item = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
   return {
     createFlow: (flow) => gatewayJson<VisualFlow>(gatewayPath(collection), jsonRequest(flow, { method: 'POST' })),
     updateFlowNodes: (flowId, flow, nodes) =>
@@ -259,7 +259,7 @@ async function saveFlow(
   // Use existingFlowId to determine if this is an update or create
   // flow.id may have a generated value even for new flows
   const crud = contracts?.flow_editor?.visualflows?.crud;
-  const collectionUrl = gatewayPath(crud?.collection_endpoint || '/api/gateway/visualflows');
+  const collectionUrl = gatewayPath(crud?.collection_endpoint || 'api/gateway/visualflows');
   const body = jsonRequest({
     name: flow.name,
     description: flow.description,
@@ -277,7 +277,7 @@ async function saveFlow(
     return gatewayJson<VisualFlow>(collectionUrl, { ...body, method: 'POST' });
   }
 
-  const itemUrl = gatewayPath(crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}', {
+  const itemUrl = gatewayPath(crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}', {
     flow_id: existingFlowId,
   });
   try {
@@ -587,7 +587,7 @@ export function Toolbar() {
       if (hasHistoryBundleDescriptor) {
         return endpointFromDescriptor(
           historyBundleDescriptor,
-          '/api/gateway/runs/{run_id}/history_bundle',
+          'api/gateway/runs/{run_id}/history_bundle',
           { run_id: runId },
           {
             include_subruns: true,
@@ -602,7 +602,7 @@ export function Toolbar() {
         '#FALLBACK: runs.history_bundle descriptor missing in discovery; using legacy canonical route for history replay compatibility.'
       );
       return gatewayPath(
-        '/api/gateway/runs/{run_id}/history_bundle',
+        'api/gateway/runs/{run_id}/history_bundle',
         { run_id: runId },
         {
           include_subruns: true,
@@ -728,7 +728,7 @@ export function Toolbar() {
 
   // Query for listing saved flows
   const flowsQuery = useQuery({
-    queryKey: ['flows', flowEditorContract?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows'],
+    queryKey: ['flows', flowEditorContract?.visualflows?.crud?.collection_endpoint || 'api/gateway/visualflows'],
     queryFn: () => listFlows(gatewayContracts),
     enabled: showFlowLibrary && !visualflowCrudUnavailable && !gatewayCapabilitiesQuery.isLoading,
   });
@@ -1482,7 +1482,7 @@ export function Toolbar() {
           form.append('file', file, file.name);
           const uploadUrl = endpointFromDescriptor(
             gatewayContracts?.common?.attachments?.upload,
-            '/api/gateway/attachments/upload'
+            'api/gateway/attachments/upload'
           );
           const res = await gatewayFetch(uploadUrl, { method: 'POST', body: form });
           const data = (await res.json()) as Record<string, unknown>;

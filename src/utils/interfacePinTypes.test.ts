@@ -58,6 +58,6 @@ describe('entity-chat provider/model typed for agent.v1', () => {
       .filter((e) => e.source === 'start' && (e.sourceHandle === 'provider' || e.sourceHandle === 'model'))
       .map((e) => `${e.sourceHandle}->${e.target}.${e.targetHandle}`)
       .sort();
-    expect(kept).toEqual(['model->visit_in.model', 'provider->visit_in.provider']);
+    expect(kept).toEqual(['model->chat_report.model', 'model->visit_in.model', 'provider->chat_report.provider', 'provider->visit_in.provider']);
   });
 });

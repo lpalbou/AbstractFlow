@@ -40,7 +40,7 @@ async function publishFlow(
     const hint = typeof publish?.install_hint === 'string' ? publish.install_hint : '';
     throw new Error(hint || 'Gateway cannot publish VisualFlows');
   }
-  const url = endpointFromDescriptor(publish, '/api/gateway/visualflows/{flow_id}/publish', { flow_id: flowId });
+  const url = endpointFromDescriptor(publish, 'api/gateway/visualflows/{flow_id}/publish', { flow_id: flowId });
   return gatewayJson<PublishFlowResponse>(url, jsonRequest(payload, { method: 'POST' }));
 }
 

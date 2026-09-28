@@ -28,10 +28,25 @@ npm test
 `npm run build` first checks the bundled multi-agent coding workflow
 (`npm run verify:multiagent`, Python 3).
 
+The bundled-flow smokes run the shipped workflows through the real
+AbstractRuntime with scripted models (no network, no provider keys). With
+`pip install "abstractruntime>=0.7.0"`:
+
+```bash
+for smoke in entity_life_smoke entity_life_loop_smoke multiagent_coding_smoke \
+             coding_agent_v2_gates_smoke goal_agent_smoke react_coder_smoke \
+             ralph_coder_smoke coscientist_smoke; do
+  python "scripts/$smoke.py" || break
+done
+```
+
+CI runs the build, lint, `npm test` and these smokes on every push and pull
+request.
+
 ## Repository Shape
 
 - `src/`: React/Vite editor.
-- `bin/cli.js`: static server and Gateway proxy; `bin/gateway_forwarding.js` holds the forwarding headers it sets on Gateway-bound requests.
+- `bin/cli.js`, `bin/flags.js`, `bin/server.js`: the CLI, its launch flags and the server (static files, base path, Gateway session proxy) on `@abstractframework/app-server`. `npm run build` also runs `scripts/check_relative_urls.mjs`, which fails on any app-absolute `/api/` or `/assets/` URL.
 - `examples/flows/`: sample and shipped VisualFlow JSON files.
 - `scripts/`: workflow generators, bundle packers, and documentation generators.
 - `docs/`: user and contributor docs (see [docs/README.md](docs/README.md)).
@@ -62,7 +77,7 @@ For a release:
 
 1. Update `package.json`.
 2. Add the matching `CHANGELOG.md` entry.
-3. Run `npm run build`, `npm run lint` and `npm test`.
+3. Run `npm run build`, `npm run lint`, `npm test` and the bundled-flow smokes.
 4. Publish through the GitHub release workflow to npm.
 
 ## Pull Request Checklist
@@ -70,6 +85,7 @@ For a release:
 - `npm run build` passes.
 - `npm run lint` passes or any failures are explicitly documented.
 - `npm test` passes.
+- The bundled-flow smokes pass when you change a shipped workflow or its generator.
 - User-facing behavior changes are reflected in docs and changelog.
 - Security-relevant changes follow [SECURITY.md](SECURITY.md).
 

@@ -8,7 +8,7 @@ This file is generated from the root documentation set with `npm run docs:llms`.
 
 AbstractFlow is the visual workflow editor for AbstractFramework.
 
-It is a web package (`@abstractframework/flow`). It runs a browser editor and a small Node server that serves the built UI and proxies `/api/*` to AbstractGateway. AbstractGateway owns users, sessions, runtime routing, provider configuration, workflow storage, run execution, ledgers, artifacts, and media catalogs.
+It is a web package (`@abstractframework/flow`). It runs a browser editor and a small Node server that serves the built UI and forwards `/api/*` to AbstractGateway. The server runs on its own (`http://127.0.0.1:3003/`) or behind the Gateway at `/apps/flow/`, where the Gateway console opens it signed in. AbstractGateway owns users, sessions, runtime routing, provider configuration, workflow storage, run execution, ledgers, artifacts, and media catalogs.
 
 ## Install
 
@@ -24,10 +24,10 @@ checkout.
 ```bash
 git clone https://github.com/lpalbou/AbstractUIC.git ../abstractuic
 npm install
-npm run dev -- --host 0.0.0.0 --port 3003
+npm run dev
 ```
 
-Open http://localhost:3003 and sign in with the Gateway user and token created by AbstractGateway.
+Open the address Vite prints and sign in with the Gateway user and token created by AbstractGateway.
 Leave provider/model selectors on `Auto (Gateway default)` for portable
 workflows. Gateway/Core capability defaults choose the actual provider/model at
 run time for the current user/runtime.
@@ -272,7 +272,7 @@ cat "$ABSTRACTGATEWAY_DATA_DIR/auth/bootstrap-admin-token"
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Open http://localhost:3003.
+Open http://127.0.0.1:3003/.
 
 Sign in with:
 
@@ -310,7 +310,7 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/api/*` to the Gateway URL selected in the connection UI or configured with `ABSTRACTGATEWAY_URL` / `ABSTRACTFLOW_GATEWAY_URL`. It does not set the forwarding headers the built server sends to the Gateway, so serve the built editor (below) when browsers on other machines use it.
+The Vite dev server uses the same server-side Gateway session as the built server (`@abstractframework/app-server`). Its Gateway is `ABSTRACTFLOW_GATEWAY_URL` / `ABSTRACTGATEWAY_URL` when set, else the Gateway installed on this computer, else `http://127.0.0.1:8080`.
 
 ## Build
 
@@ -319,7 +319,7 @@ npm run build
 npm start -- --gateway-url http://127.0.0.1:8080
 ```
 
-The static server in `bin/cli.js` serves `dist/` and proxies API/SSE calls to Gateway with browser-session auth injection.
+The server in `bin/cli.js` serves `dist/` on `127.0.0.1:3003` and forwards API and SSE calls to the Gateway with the browser's session. When AbstractGateway manages the editor, open it from the Gateway console at `/apps/flow/` instead. See [CLI](cli.md).
 
 ## Next Steps
 
@@ -355,7 +355,7 @@ abstractgateway serve --host 127.0.0.1 --port 8080
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Open http://localhost:3003.
+Open http://127.0.0.1:3003/.
 
 ## Browser Auth
 
@@ -365,7 +365,9 @@ Server/operator bearer tokens such as `ABSTRACTGATEWAY_AUTH_TOKEN` are not brows
 
 Remote browser-supplied Gateway URL changes are blocked by default. A hosted Flow instance should proxy only to its configured Gateway unless the operator explicitly enables `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` behind their own access control.
 
-Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the address the browser connected from, and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own machine. Forwarding headers sent by the browser itself (`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`) and any browser-supplied `X-AbstractFramework-App-Proxy` are dropped. Behind a reverse proxy the Gateway therefore sees the reverse proxy's address, not the end user's. The Vite development server (`npm run dev`) drops browser-supplied forwarding headers but does not add these two headers; serve the built editor (`npm start` or `npx @abstractframework/flow`) when browsers on other machines use it. See [Troubleshooting](troubleshooting.md#sign-in-and-connection) for sign-in and proxy errors.
+Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the browser's address and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own computer. Behind the Gateway at `/apps/flow/`, the browser's address is the one the Gateway forwarded; forwarding headers are believed only from a connection on the Flow server's own computer, and browser-supplied ones never reach the Gateway. The Vite development server (`npm run dev`) uses the same session proxy. See [Troubleshooting](troubleshooting.md#sign-in-and-connection) for sign-in and proxy errors.
+
+Opened through the Gateway (**Apps > Flow Editor > Open** in the Gateway console), the editor lives at `/apps/flow/` and the browser arrives signed in. The session cookies there belong to `/apps/flow/` only. See [API and contracts > Serving Under A Base Path](api.md#serving-under-a-base-path).
 
 ## About
 
@@ -746,7 +748,7 @@ npm run dev
 
 Useful environment variables:
 
-- `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL`: default Gateway target for the proxy.
+- `ABSTRACTFLOW_GATEWAY_URL` or `ABSTRACTGATEWAY_URL`: Gateway target (legacy aliases of `--gateway-url`).
 - `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: allow non-local browsers to change the Gateway URL.
 
 See [API and contracts](api.md#cli) for the complete list of options and environment variables.
@@ -755,7 +757,7 @@ See [API and contracts](api.md#cli) for the complete list of options and environ
 
 ```bash
 npm run build
-npm start -- --host 0.0.0.0 --port 3003 --gateway-url http://127.0.0.1:8080
+npm start -- --port 3003 --gateway-url http://127.0.0.1:8080
 ```
 
 ## docs/workflow-authoring-skill.md
@@ -3730,14 +3732,16 @@ Save/Publish/Run remain user-controlled Gateway operations.
 
 ```mermaid
 flowchart LR
-  Browser[Browser editor] -->|HTTP, SSE, WebSocket under /api/*| Flow[AbstractFlow Node server<br/>bin/cli.js]
-  Flow -->|session headers + X-Forwarded-For + app-proxy marker| Gateway[AbstractGateway]
+  Browser[Browser editor] -->|"standalone: http://127.0.0.1:3003/"| Flow[AbstractFlow Node server<br/>bin/server.js]
+  Browser -->|"through the Gateway at /apps/flow/"| GwProxy[AbstractGateway app proxy]
+  GwProxy -->|"X-Forwarded-Prefix /apps/flow + browser address"| Flow
+  Flow -->|"HTTP + SSE under /api/*: session headers, X-Forwarded-For, app-proxy marker"| Gateway[AbstractGateway API]
   Gateway --> Runtime[AbstractRuntime]
   Runtime --> Core[AbstractCore]
   Gateway --> Stores[(Users / Workflows / Runs / Ledgers / Artifacts)]
 ```
 
-Flow serves static assets and proxies HTTP, SSE, and WebSocket calls. The browser does not talk directly to provider APIs or runtime stores.
+Flow serves the built editor and forwards HTTP and SSE calls under `/api/*`. The same server runs on its own at `/` or behind the Gateway at `/apps/flow/`; the editor uses relative URLs, so it works at either address. The browser does not talk directly to provider APIs or runtime stores. See [API and contracts > Serving Under A Base Path](api.md#serving-under-a-base-path).
 
 ## Components
 
@@ -3755,8 +3759,8 @@ flowchart TB
     Client["Gateway client (utils/gatewayClient.ts)"]
   end
   subgraph Server["Flow server (bin/)"]
-    Cli["cli.js<br/>static files, /api/health, sign-in, /api/* proxy"]
-    Fwd["gateway_forwarding.js<br/>X-Forwarded-For, X-AbstractFramework-App-Proxy"]
+    Cli["cli.js + flags.js<br/>launch flags, Gateway URL (flag, env, saved, pointer)"]
+    Fwd["server.js on @abstractframework/app-server<br/>base path, identity header, static files, /api/* session proxy"]
   end
   Gateway[AbstractGateway]
 
@@ -3885,9 +3889,9 @@ The Flow connection form collects a Gateway URL, Gateway user id, and Gateway us
 Hosted Flow deployments block arbitrary browser-supplied Gateway URLs by default so the Flow server cannot become a user-directed same-origin proxy. That decision uses the address of the browser's connection, never the `Host` header.
 
 Every request the Flow server sends to the Gateway carries `X-Forwarded-For`
-set to the browser connection's address and
+set to the browser's address and
 `X-AbstractFramework-App-Proxy: abstractflow`
-(`bin/gateway_forwarding.js`). Browser-supplied forwarding headers are dropped,
+(the `@abstractframework/app-server` session proxy). Browser-supplied forwarding headers never reach the Gateway,
 so the Gateway can decide reliably whether a browser runs on its own machine.
 See [API and contracts > Proxy Contract](api.md#proxy-contract).
 
@@ -3983,36 +3987,57 @@ The installed command is `abstractflow-editor`. See [CLI](cli.md).
 
 Options:
 
-- `--host <host>`: host for the Flow static/proxy server (default `0.0.0.0`).
-- `--port <port>`: port for the Flow static/proxy server (default `3003`).
-- `--gateway-url <url>`: Gateway target used by the proxy (default `http://127.0.0.1:8080`).
+- `--gateway-url <url>` (aliases `--gateway`, `--url`): the Gateway the server talks to.
+- `--port <n>`: the port to listen on (default `3003`).
+- `--host <addr>`: the address to listen on (default `127.0.0.1`).
 - `--help`, `-h`: print usage.
 
-Environment:
+An unknown flag or a missing value exits with code 2.
+
+Gateway URL, first match wins:
+
+1. `--gateway-url` (or an alias);
+2. `ABSTRACTFLOW_GATEWAY_URL`, then `ABSTRACTGATEWAY_URL` (legacy aliases);
+3. `gateway_url` in `~/.abstractflow/gateway_connection.json`, except `http://127.0.0.1:8080`;
+4. the local Gateway pointer `~/.abstractframework/gateway.json`;
+5. `http://127.0.0.1:8080`.
+
+A URL from 3, 4 or 5 is re-resolved when the Gateway refuses a connection; a flag or environment choice never changes.
+
+Environment (legacy aliases, below the flags):
 
 - `HOST`, `PORT`: defaults for `--host` and `--port`.
-- `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL`: default Gateway target. When neither is set, the server reads `gateway_url` from `~/.abstractflow/gateway_connection.json` if that file exists, then falls back to `http://127.0.0.1:8080`. `--gateway-url` overrides all of these.
-- `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: let browsers that do not run on the Flow server's machine sign in to another Gateway URL than the configured one. Only enable it behind your own access control.
+- `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: let browsers that are not on the Flow server's computer sign in to another Gateway URL than the configured one. Only enable it behind your own access control.
 - `ABSTRACTFLOW_ALLOW_BROWSER_GATEWAY_URL_COOKIE=1`: honor the Gateway URL stored in a browser's session cookie for every browser, not only local ones.
-- `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` (or `ABSTRACTGATEWAY_TRUST_PROXY_HEADERS=1`): name the host from `X-Forwarded-Host` in the message shown when a Gateway URL change is refused. Access decisions never use forwarded headers; they use the connection's own address.
+- `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` (or `ABSTRACTGATEWAY_TRUST_PROXY_HEADERS=1`): declare that the server runs behind a reverse proxy you control; a browser-chosen Gateway URL then requires the remote-config switch above.
 
-Session cookies are marked `Secure` when the request carries `X-Forwarded-Proto: https`.
+Session cookies are marked `Secure` when the request came over HTTPS (`X-Forwarded-Proto: https` from a local proxy).
+
+## Serving Under A Base Path
+
+The server is built on `@abstractframework/app-server` and serves the same editor at `/` and under the Gateway at `/apps/flow/`:
+
+- Every response carries `X-AbstractFramework-App: flow; mount=1`. The Gateway serves only an app that announces it.
+- From a connection on this computer (the Gateway's proxy), `X-Forwarded-Prefix` sets the base path and `X-Forwarded-For` the browser's address. From any other connection those headers are ignored. A malformed forwarded header from a local connection is refused with HTTP 400.
+- The page gets `<base href="<base path>/">` and `base_path` in `window.__ABSTRACT_UI_CONFIG__`. The editor names every same-origin URL relatively (`api/gateway/...`, `./assets/...`), so the same build works at both addresses.
+- Session cookies use `Path=<base path>/`. When a browser holds two cookies of the same name, the one with the longest path (sent first) wins. Signing out under `/apps/flow/` also clears the `Path=/` cookies.
+- Browser storage keys all start with `abstractflow_`: under the Gateway, every app shares one origin.
 
 ## Proxy Contract
 
 The Flow server answers these routes itself:
 
-- `GET /api/health` and `GET /health`: Flow server readiness (`status`, `service`, `mode`, `gateway_url`). No sign-in required.
-- `/api/connection/gateway`: browser sign-in (`POST` with `gateway_url`, `gateway_user_id`, `gateway_token`), connection status (`GET`), and sign-out (`DELETE`).
+- `GET /api/health` and `GET /health`: Flow server readiness (`status`, `service`, `mode`, `gateway_url`, `base_path`). No sign-in required.
+- `/api/connection/gateway`: browser sign-in (`POST` with `gateway_url`, `gateway_user_id`, `gateway_token`, `persist`), connection status (`GET`: `ok`, `gateway_url`, `has_session`, `gateway`), and sign-out (`DELETE`).
 
-Every other `/api/*` request, including WebSocket upgrades, is proxied to the Gateway of the browser's session. It requires a signed-in browser session (HTTP 401 otherwise) and, for mutating methods, the session's CSRF token (HTTP 403 otherwise). The server replaces browser cookies and `Authorization` with the Gateway session headers.
+Every other `/api/*` request is forwarded to the Gateway of the browser's session. It requires a signed-in browser session (HTTP 401 otherwise) and, for mutating methods, the session's CSRF token in `X-AbstractFlow-CSRF` or `X-Abstract-CSRF` (HTTP 403 otherwise). The server replaces browser cookies and `Authorization` with the Gateway session headers. WebSocket upgrades are refused.
 
-Forwarding headers on every Gateway-bound request (proxied calls, sign-in, sign-out, the signed-in check, streams, and WebSocket connections):
+Forwarding headers on every Gateway-bound request (forwarded calls, sign-in, sign-out, the signed-in check and streams):
 
-- `X-Forwarded-For`: the address of the browser's connection to the Flow server.
+- `X-Forwarded-For`: the browser's address (the connection's address, or the address the Gateway's `/apps/flow/` proxy forwarded).
 - `X-AbstractFramework-App-Proxy: abstractflow`.
 
-Browser-supplied `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`, and `X-AbstractFramework-App-Proxy` headers are dropped, in any letter case. A connection whose address cannot be determined is refused with HTTP 400. The Gateway uses these headers to decide whether a browser runs on its own machine.
+Browser-supplied `X-Forwarded-*`, `X-Real-IP`, `Forwarded` and `X-AbstractFramework-App-Proxy` headers never reach the Gateway. A connection whose address cannot be determined is refused with HTTP 400. The Gateway uses these headers to decide whether a browser runs on its own computer.
 
 The important Gateway surfaces are:
 
@@ -4051,7 +4076,7 @@ The optional `automation_defaults` field is described in [VisualFlow JSON > Auto
 
 High-value source modules:
 
-- `src/utils/gatewayClient.ts`: Gateway HTTP/SSE client helpers.
+- `src/utils/gatewayClient.ts`: Gateway HTTP/SSE client helpers; `gatewayRequestPath` turns an advertised `/api/gateway/...` endpoint into the relative `api/gateway/...` request path.
 - `src/utils/flowAuthoringCommands.ts`: typed Workflow Authoring Assistant command validation and graph mutation helpers.
 - `src/utils/gatewayCatalog.ts`: provider/model/media catalog normalization.
 - `src/utils/ledgerEvents.ts`: Gateway ledger to UI execution-event mapping.
@@ -4071,7 +4096,9 @@ High-value source modules:
 - `src/utils/triggerBindings.ts`: the `automation_defaults` shape (`parseAutomationDefaults`), the JSON Schema subset validator (`validateTriggerConfig`, `unsupportedSchemaKeywords`), and the schema-driven form conversion.
 - `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog.
 - `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time, Gateway rows from `GET /api/gateway/about` through the ui-kit `gatewayVersionRows` helper).
-- `bin/gateway_forwarding.js`: the forwarding headers the Flow server sets on Gateway-bound requests.
+- `bin/server.js`: the Flow server (`createFlowServer`) on `@abstractframework/app-server`: base path, identity header, session proxy, static files.
+- `bin/flags.js`: the launch flags and the Gateway URL resolution (`parseFlowFlags`).
+- `scripts/check_relative_urls.mjs`: run by `npm run build`; fails on any app-absolute `/api/` or `/assets/` URL in `src/` or `dist/`.
 
 Schema pin defaults are stored under `node.data.pinDefaults`, for example
 `pinDefaults.resp_schema` on LLM Call and Agent nodes. Gateway persists and
@@ -4436,15 +4463,13 @@ AbstractFlow ships one CLI through npm:
 npx @abstractframework/flow
 ```
 
-It serves the built editor and proxies `/api/*` to AbstractGateway.
+It serves the built editor and forwards `/api/*` to AbstractGateway through a
+server-side browser session.
 
 ## Usage
 
 ```bash
-npx @abstractframework/flow \
-  --host 0.0.0.0 \
-  --port 3003 \
-  --gateway-url http://127.0.0.1:8080
+npx @abstractframework/flow --gateway-url http://127.0.0.1:8080 --port 3003
 ```
 
 Equivalent installed command:
@@ -4454,19 +4479,46 @@ npm install -g @abstractframework/flow
 abstractflow-editor --gateway-url http://127.0.0.1:8080
 ```
 
-`npx @abstractframework/flow --help` prints the options. Defaults: host
-`0.0.0.0`, port `3003`, Gateway `http://127.0.0.1:8080`. See
-[API and contracts](api.md#cli) for the environment variables and the order in
-which the Gateway URL is resolved.
+Options (the launch flags every AbstractFramework browser app takes):
+
+| Flag | Meaning |
+|---|---|
+| `--gateway-url <url>` | The Gateway to talk to. Aliases: `--gateway`, `--url`. |
+| `--port <n>` | The port to listen on (default `3003`). |
+| `--host <addr>` | The address to listen on (default `127.0.0.1`). Use `--host 0.0.0.0` only when other computers must reach this server directly. |
+| `--help`, `-h` | Print the usage. |
+
+`--name value` and `--name=value` both work. An unknown flag or a missing value
+stops the command with exit code 2.
+
+Without `--gateway-url`, the Gateway is, in order: the legacy environment
+variables (`ABSTRACTFLOW_GATEWAY_URL`, then `ABSTRACTGATEWAY_URL`), the Gateway
+URL saved in `~/.abstractflow/gateway_connection.json`, the Gateway installed
+on this computer (`~/.abstractframework/gateway.json`, written by the
+installer and by `abstractgateway serve`), and finally `http://127.0.0.1:8080`.
+When the Gateway came from that file or the default, a running editor re-reads
+the file whenever the Gateway refuses a connection, so it follows a Gateway
+that moved to another port. See [API and contracts](api.md#cli).
+
+## Served Through The Gateway
+
+When AbstractGateway manages the Flow editor as an app, the Gateway serves it at
+`/apps/flow/` on the Gateway's own address: one port and one tunnel for the
+console, the API and every app. Open it from the Gateway console (**Apps >
+Flow Editor > Open**); you arrive signed in. The same `abstractflow-editor`
+server runs in both cases:
+
+- run on its own, the editor is at `http://127.0.0.1:3003/`;
+- through the Gateway, the editor is at `<gateway address>/apps/flow/`.
 
 ## What The CLI Does
 
-- Serves `dist/` static assets.
-- Answers `GET /api/health` (and `/health`) with its own readiness and the Gateway URL it targets.
-- Proxies Gateway HTTP, SSE, and WebSocket routes under `/api/*`.
-- Handles browser-session cookie forwarding and CSRF headers.
-- Sets `X-Forwarded-For` (the browser connection's address) and `X-AbstractFramework-App-Proxy: abstractflow` on every Gateway-bound request, dropping any forwarding headers the browser sends.
-- Rejects unsafe hosted Gateway URL changes by default.
+- Serves the built editor (`dist/`) at `/` or under `/apps/flow/`.
+- Answers `GET /api/health` (and `/health`) with its own readiness, the Gateway URL it targets and the base path it is served under.
+- Forwards Gateway HTTP and SSE routes under `/api/*` with the browser's session, and refuses WebSocket upgrades (the editor opens none).
+- Handles browser-session cookies and CSRF headers.
+- Tells the Gateway the browser's real address (`X-Forwarded-For`) and `X-AbstractFramework-App-Proxy: abstractflow` on every Gateway-bound request.
+- Refuses a browser-chosen Gateway URL from any browser that is not on this computer.
 
 It does not execute workflows locally. Workflow execution is a Gateway/Runtime responsibility.
 
@@ -4823,9 +4875,26 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
 - Degradation surfaces honestly: a dead cognition turn answers
   `[the moment could not be lived: …]` and the visit/chat outputs carry
   `degraded` + `moment_error` pins so thin clients never confuse "the entity
-  said nothing" with "the turn died". READ `degraded`, never `success` alone:
-  the run-level `success` flag means "the flow executed", and a degraded
-  turn still completes its flow.
+  said nothing" with "the turn died". The agent.v1 end pins follow the same
+  signal: `entity-chat` sets `success` to true only when the moment was not
+  degraded and `meta` to `{provider, model, tools_ran, tool_rounds, degraded}`
+  (the provider/model the host asked for, empty for the Gateway default);
+  `entity-goodbye` sets `success` when the session close ran and `meta` to
+  `{turns, reason}`. The run-level status only says "the flow executed": a
+  degraded turn still completes its flow.
+- SESSION HISTORY: the turn prompt's `THIS SESSION SO FAR` block carries
+  every turn of the session, whole. A chat client's replayed history
+  (`use_session_history`) arrives already bounded by the Gateway's replay
+  window (the most recent 50,000 tokens of whole turns; older turns are
+  dropped with a labeled `#TRUNCATION` notice), and the flows add no second,
+  smaller bound.
+- WHOLE CONTENT: nothing the entity stores or reads is cut. Episode records
+  keep the whole stimulus and reply (title, digest, keywords; the verbatim
+  goes to the artifact store), a failed moment keeps its whole error, the
+  session close summarizes every episode of the session, and the turn prompt
+  carries every granted tool, every tend refusal and everyone present. Loop
+  bounds (`max_rounds`, `max_ticks`, `max_days`, the tool-call budget) are
+  explicit input pins, not content cuts.
 - VERSION CONTRACT: bundle versions are immutable and PINNABLE
   (`bundle_version` on the summon). The `degraded`/`moment_error` output
   pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the
@@ -4932,7 +5001,7 @@ Two quick checks help with most problems:
 
 ```bash
 # Is the Flow server up, and which Gateway does it proxy to?
-curl -s http://localhost:3003/api/health
+curl -s http://127.0.0.1:3003/api/health
 
 # Is the Gateway reachable?
 curl -s http://127.0.0.1:8080/api/health
@@ -4985,7 +5054,7 @@ See [Web editor > Browser Auth](web-editor.md#browser-auth).
   the request instead of forwarding it without that information.
 - **Fix:** connect to the Flow server directly or through a reverse proxy that
   opens a normal TCP connection to it. See
-  [Web editor > Browser Auth](web-editor.md#browser-auth) for the forwarding
+  [API and contracts > Proxy Contract](api.md#proxy-contract) for the forwarding
   headers the server sends.
 
 ### "Flow browser session CSRF token missing or invalid" (HTTP 403)
@@ -4996,16 +5065,22 @@ See [Web editor > Browser Auth](web-editor.md#browser-auth).
 - **Fix:** sign out and sign in again from the same origin you use to open the
   editor.
 
-### A remote browser is treated as if it ran on the Gateway's machine
+### The Gateway says the Flow Editor "cannot be served at /apps/flow/"
 
-- **Cause:** the Vite development server (`npm run dev`) drops browser-supplied
-  forwarding headers but does not add `X-Forwarded-For` or the
-  `X-AbstractFramework-App-Proxy` marker, so the Gateway sees the development
-  server's own local address.
-- **Fix:** when remote browsers use the editor, serve it with the built server
-  (`npm run build` then `npm start -- --gateway-url ...`, or
-  `npx @abstractframework/flow`), which sets both headers on every
-  Gateway-bound request.
+- **Cause:** the running Flow server does not announce
+  `X-AbstractFramework-App: flow; mount=1`, which an older
+  `@abstractframework/flow` version does not send. The Gateway serves only a
+  server that follows the base-path rules.
+- **Fix:** update the Flow Editor from the Gateway console (**Apps**), or run a
+  current `npx @abstractframework/flow`.
+
+### The editor loads under /apps/flow/ but asks to sign in again
+
+- **Cause:** the editor's session cookies are scoped to `/apps/flow/`; a
+  session created at the editor's own port (`http://127.0.0.1:3003/`) is a
+  separate session.
+- **Fix:** open the editor from the Gateway console (**Apps > Flow Editor >
+  Open**), which signs the browser in at `/apps/flow/`.
 
 ## Editor Behavior
 
@@ -5110,6 +5185,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+- **Served through the Gateway at `/apps/flow/`.** The Flow server runs on
+  `@abstractframework/app-server`: it announces
+  `X-AbstractFramework-App: flow; mount=1`, reads the base path and the
+  browser's address from the Gateway's proxy (from a connection on the same
+  computer only), injects `<base href>` and `base_path` into the page, and
+  scopes session cookies to `Path=<base path>/`. Open it from the Gateway
+  console (**Apps > Flow Editor > Open**); `npx @abstractframework/flow` keeps
+  serving it at `/`. See [API and contracts > Serving Under A Base Path](docs/api.md#serving-under-a-base-path).
+- **Shared launch flags.** `--gateway-url` accepts the aliases `--gateway` and
+  `--url`; `--name=value` works; an unknown flag or missing value exits with
+  code 2.
+- **Finds the Gateway installed on this computer.** Without a flag or
+  environment variable, the server uses the saved login, then
+  `~/.abstractframework/gateway.json`, then `http://127.0.0.1:8080`, and follows
+  the Gateway to a new port when a connection is refused.
+- entity-chat and entity-goodbye set the agent.v1 `success` and `meta` end
+  pins; multiagent-coding sets the coding.v1 `passed` end pin (the verification
+  verdict, `false` on a preflight refusal).
+- CI runs `npm test` and the bundled-flow smokes (the shipped workflows
+  through the real AbstractRuntime with scripted models, no network).
+
+### Changed
+- The server listens on `127.0.0.1` by default (it was `0.0.0.0`). Pass
+  `--host 0.0.0.0` to accept other computers directly; through the Gateway no
+  change is needed.
+- The editor names every same-origin URL relatively (the build uses
+  `base: './'`); `npm run build` fails on an app-absolute `/api/` or `/assets/`
+  URL.
+- `GET /api/connection/gateway` answers `{ok, gateway_url, has_session,
+  gateway}` (the shared app-server shape); `/api/health` adds `base_path`.
+- `npm run dev` uses the same server-side Gateway session as the built server.
+- The entity flows keep the whole session history: entity-chat and
+  entity-goodbye fold every replayed message, the turn prompt shows every turn
+  of the session in full, and the session log keeps every turn. The only
+  bound is the Gateway's replay window (the most recent 50,000 tokens of whole
+  turns, with a labeled notice when older turns are dropped). Needs
+  AbstractRuntime 0.7.0 or later.
+- The multi-agent coding workflow's embedded verify gates match
+  `coding-verify-gates` exactly again.
+- The entity flows store and show whole content: episode titles, digests,
+  keywords and failure messages, the session-close summary (linked to every
+  episode of the session) and diary note, every tool and tend refusal in the
+  turn log, the whole recall cue, every granted tool, refusal and participant
+  in the turn prompt, whole tool results between rounds, and every item of the
+  day cue. The `digest_truncated` and `sources_truncated` record attributes
+  are gone (nothing is cut any more).
+
+### Removed
+- WebSocket forwarding under `/api/*` (the editor opens none); upgrades are
+  refused.
+- The ignored `--gateway-token` flag: it is now an unknown flag.
 
 ## [0.3.22] - 2026-09-27
 
@@ -5799,10 +5927,25 @@ npm test
 `npm run build` first checks the bundled multi-agent coding workflow
 (`npm run verify:multiagent`, Python 3).
 
+The bundled-flow smokes run the shipped workflows through the real
+AbstractRuntime with scripted models (no network, no provider keys). With
+`pip install "abstractruntime>=0.7.0"`:
+
+```bash
+for smoke in entity_life_smoke entity_life_loop_smoke multiagent_coding_smoke \
+             coding_agent_v2_gates_smoke goal_agent_smoke react_coder_smoke \
+             ralph_coder_smoke coscientist_smoke; do
+  python "scripts/$smoke.py" || break
+done
+```
+
+CI runs the build, lint, `npm test` and these smokes on every push and pull
+request.
+
 ## Repository Shape
 
 - `src/`: React/Vite editor.
-- `bin/cli.js`: static server and Gateway proxy; `bin/gateway_forwarding.js` holds the forwarding headers it sets on Gateway-bound requests.
+- `bin/cli.js`, `bin/flags.js`, `bin/server.js`: the CLI, its launch flags and the server (static files, base path, Gateway session proxy) on `@abstractframework/app-server`. `npm run build` also runs `scripts/check_relative_urls.mjs`, which fails on any app-absolute `/api/` or `/assets/` URL.
 - `examples/flows/`: sample and shipped VisualFlow JSON files.
 - `scripts/`: workflow generators, bundle packers, and documentation generators.
 - `docs/`: user and contributor docs (see [docs/README.md](docs/README.md)).
@@ -5833,7 +5976,7 @@ For a release:
 
 1. Update `package.json`.
 2. Add the matching `CHANGELOG.md` entry.
-3. Run `npm run build`, `npm run lint` and `npm test`.
+3. Run `npm run build`, `npm run lint`, `npm test` and the bundled-flow smokes.
 4. Publish through the GitHub release workflow to npm.
 
 ## Pull Request Checklist
@@ -5841,6 +5984,7 @@ For a release:
 - `npm run build` passes.
 - `npm run lint` passes or any failures are explicitly documented.
 - `npm test` passes.
+- The bundled-flow smokes pass when you change a shipped workflow or its generator.
 - User-facing behavior changes are reflected in docs and changelog.
 - Security-relevant changes follow [SECURITY.md](SECURITY.md).
 

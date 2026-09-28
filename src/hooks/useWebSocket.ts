@@ -297,7 +297,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       throw new Error(gatewayReadiness.operations.commands.reason || 'Gateway run command contract is incomplete');
     }
     const commandId = makeGatewayRequestId('cmd');
-    const url = endpointFromDescriptor(commonContract?.runs?.commands, '/api/gateway/commands');
+    const url = endpointFromDescriptor(commonContract?.runs?.commands, 'api/gateway/commands');
     await gatewayFetch(url, jsonRequest({
       command_id: commandId,
       run_id: payload.runId,
@@ -619,7 +619,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       const after = Math.max(0, Number(subrunCursorRef.current.get(rid) || 0));
       const url = endpointFromDescriptor(
         commonContract?.ledger?.stream,
-        '/api/gateway/runs/{run_id}/ledger/stream',
+        'api/gateway/runs/{run_id}/ledger/stream',
         { run_id: rid },
         { after }
       );
@@ -661,7 +661,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   }, [ensureSubrunStream]);
 
   const fetchRunSummary = useCallback(async (rid: string) => {
-    const url = endpointFromDescriptor(commonContract?.runs?.summary, '/api/gateway/runs/{run_id}', { run_id: rid });
+    const url = endpointFromDescriptor(commonContract?.runs?.summary, 'api/gateway/runs/{run_id}', { run_id: rid });
     return gatewayJson<Record<string, unknown>>(url);
   }, [commonContract?.runs?.summary]);
 
@@ -746,7 +746,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       const after = Math.max(0, Number(streamCursorRef.current || 0));
       const url = endpointFromDescriptor(
         commonContract?.ledger?.stream,
-        '/api/gateway/runs/{run_id}/ledger/stream',
+        'api/gateway/runs/{run_id}/ledger/stream',
         { run_id: rid },
         { after }
       );
@@ -815,7 +815,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         try {
           const schemaUrl = endpointFromDescriptor(
             schemaDescriptor,
-            '/api/gateway/bundles/{bundle_id}/flows/{flow_id}/input_schema',
+            'api/gateway/bundles/{bundle_id}/flows/{flow_id}/input_schema',
             { bundle_id: bundleId, flow_id: targetFlowId },
             { bundle_version: bundleVersion }
           );
@@ -838,7 +838,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         String(args.sessionId || '').trim() ||
         (typeof normalized.inputData.sessionId === 'string' ? normalized.inputData.sessionId.trim() : '') ||
         (typeof normalized.inputData.session_id === 'string' ? normalized.inputData.session_id.trim() : '');
-      const startUrl = endpointFromDescriptor(commonContract?.runs?.start, '/api/gateway/runs/start');
+      const startUrl = endpointFromDescriptor(commonContract?.runs?.start, 'api/gateway/runs/start');
       const startPayload = await gatewayJson<{ run_id?: string }>(startUrl, jsonRequest({
         bundle_id: bundleId,
         bundle_version: bundleVersion,
@@ -920,7 +920,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         }
         const publishUrl = endpointFromDescriptor(
           publishDescriptor,
-          '/api/gateway/visualflows/{flow_id}/publish',
+          'api/gateway/visualflows/{flow_id}/publish',
           { flow_id: flowId }
         );
         const requestedBundleVersion = draftBundleVersion(effectiveSessionId || flowId);

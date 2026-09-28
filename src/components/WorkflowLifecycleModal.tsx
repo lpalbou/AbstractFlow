@@ -23,7 +23,7 @@ async function deprecateBundle(
   payload: DeprecateBundleRequest,
   contracts: GatewayContracts | null | undefined
 ): Promise<DeprecateBundleResponse> {
-  const url = endpointFromDescriptor(contracts?.flow_editor?.bundles?.deprecate, '/api/gateway/bundles/{bundle_id}/deprecate', {
+  const url = endpointFromDescriptor(contracts?.flow_editor?.bundles?.deprecate, 'api/gateway/bundles/{bundle_id}/deprecate', {
     bundle_id: bundleId,
   });
   return gatewayJson<DeprecateBundleResponse>(url, jsonRequest(payload, { method: 'POST' }));
@@ -34,7 +34,7 @@ async function undeprecateBundle(
   payload: DeprecateBundleRequest,
   contracts: GatewayContracts | null | undefined
 ): Promise<DeprecateBundleResponse> {
-  const url = endpointFromDescriptor(contracts?.flow_editor?.bundles?.undeprecate, '/api/gateway/bundles/{bundle_id}/undeprecate', {
+  const url = endpointFromDescriptor(contracts?.flow_editor?.bundles?.undeprecate, 'api/gateway/bundles/{bundle_id}/undeprecate', {
     bundle_id: bundleId,
   });
   return gatewayJson<DeprecateBundleResponse>(url, jsonRequest(payload, { method: 'POST' }));

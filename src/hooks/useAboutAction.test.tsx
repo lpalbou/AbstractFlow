@@ -116,8 +116,8 @@ describe('gateway versions for the About dialog', () => {
       seen.push(path);
       return payload;
     });
-    expect(seen).toEqual(['/api/gateway/about']);
-    expect(GATEWAY_ABOUT_PATH).toBe('/api/gateway/about');
+    expect(seen).toEqual(['api/gateway/about']);
+    expect(GATEWAY_ABOUT_PATH).toBe('api/gateway/about');
     expect(vi.mocked(gatewayVersionRows)).toHaveBeenCalledWith(payload);
     expect(rows).toEqual([
       ['Gateway', 'AbstractGateway 0.4.3'],

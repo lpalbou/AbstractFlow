@@ -14,13 +14,13 @@ export function executionRoute(provider: string, model: string, defaults: unknow
 export function useExecutionCapabilities(provider: string, model: string, enabled = true) {
   const defaults = useQuery({
     queryKey: ['gateway', 'execution-default-route'],
-    queryFn: () => gatewayJson(gatewayPath('/api/gateway/config/capability-defaults')),
+    queryFn: () => gatewayJson(gatewayPath('api/gateway/config/capability-defaults')),
     enabled: enabled && (!provider || !model), staleTime: 30_000,
   });
   const route = executionRoute(provider, model, defaults.data);
   const result = useQuery({
     queryKey: ['model-execution-capabilities', route.provider, route.model],
-    queryFn: () => gatewayJson(gatewayPath('/api/gateway/discovery/models/capabilities', {}, {provider:route.provider, model_name:route.model})),
+    queryFn: () => gatewayJson(gatewayPath('api/gateway/discovery/models/capabilities', {}, {provider:route.provider, model_name:route.model})),
     enabled: enabled && Boolean(route.provider && route.model), staleTime: 30_000,
   });
   return { ...result, isFetching: result.isFetching || defaults.isFetching, isError: result.isError || defaults.isError };

@@ -21,7 +21,7 @@ export function artifactContentUrl(
 ): string {
   return endpointFromDescriptor(
     artifactContentDescriptor,
-    '/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
+    'api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
     {
       run_id: runId,
       artifact_id: artifactId,

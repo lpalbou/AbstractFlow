@@ -22,7 +22,7 @@ abstractgateway serve --host 127.0.0.1 --port 8080
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Open http://localhost:3003.
+Open http://127.0.0.1:3003/.
 
 ## Browser Auth
 
@@ -32,7 +32,9 @@ Server/operator bearer tokens such as `ABSTRACTGATEWAY_AUTH_TOKEN` are not brows
 
 Remote browser-supplied Gateway URL changes are blocked by default. A hosted Flow instance should proxy only to its configured Gateway unless the operator explicitly enables `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` behind their own access control.
 
-Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the address the browser connected from, and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own machine. Forwarding headers sent by the browser itself (`X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`) and any browser-supplied `X-AbstractFramework-App-Proxy` are dropped. Behind a reverse proxy the Gateway therefore sees the reverse proxy's address, not the end user's. The Vite development server (`npm run dev`) drops browser-supplied forwarding headers but does not add these two headers; serve the built editor (`npm start` or `npx @abstractframework/flow`) when browsers on other machines use it. See [Troubleshooting](troubleshooting.md#sign-in-and-connection) for sign-in and proxy errors.
+Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set to the browser's address and `X-AbstractFramework-App-Proxy: abstractflow`. The Gateway uses them to tell whether the browser runs on its own computer. Behind the Gateway at `/apps/flow/`, the browser's address is the one the Gateway forwarded; forwarding headers are believed only from a connection on the Flow server's own computer, and browser-supplied ones never reach the Gateway. The Vite development server (`npm run dev`) uses the same session proxy. See [Troubleshooting](troubleshooting.md#sign-in-and-connection) for sign-in and proxy errors.
+
+Opened through the Gateway (**Apps > Flow Editor > Open** in the Gateway console), the editor lives at `/apps/flow/` and the browser arrives signed in. The session cookies there belong to `/apps/flow/` only. See [API and contracts > Serving Under A Base Path](api.md#serving-under-a-base-path).
 
 ## About
 
@@ -413,7 +415,7 @@ npm run dev
 
 Useful environment variables:
 
-- `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL`: default Gateway target for the proxy.
+- `ABSTRACTFLOW_GATEWAY_URL` or `ABSTRACTGATEWAY_URL`: Gateway target (legacy aliases of `--gateway-url`).
 - `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: allow non-local browsers to change the Gateway URL.
 
 See [API and contracts](api.md#cli) for the complete list of options and environment variables.
@@ -422,5 +424,5 @@ See [API and contracts](api.md#cli) for the complete list of options and environ
 
 ```bash
 npm run build
-npm start -- --host 0.0.0.0 --port 3003 --gateway-url http://127.0.0.1:8080
+npm start -- --port 3003 --gateway-url http://127.0.0.1:8080
 ```

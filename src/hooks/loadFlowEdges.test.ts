@@ -82,7 +82,7 @@ describe('loadFlow edge round trip', () => {
       (e) => e.source === 'visit_guard' && e.sourceHandle === 'value' && e.target === 'end' && e.targetHandle === 'answer'
     );
     expect(saved).toHaveLength(1);
-    expect(useFlowStore.getState().getFlow().edges).toHaveLength(22);
+    expect(useFlowStore.getState().getFlow().edges).toHaveLength(28);
   });
 
   it('the round trip is stable: re-loading the saved document keeps the same edges', () => {
@@ -96,14 +96,15 @@ describe('loadFlow edge round trip', () => {
     }
   });
 
-  it('entity-chat keeps all 22 connections; the 8 on undeclared pins are preserved and reported', () => {
+  it('entity-chat keeps all 28 connections; the 9 on undeclared pins are preserved and reported', () => {
     const flow = listBundledFlows().find((f) => f.id === 'entity-chat')!;
-    expect(flow.edges).toHaveLength(22);
+    expect(flow.edges).toHaveLength(28);
     const loaded = useFlowStore.getState().loadFlow(flow);
     const state = useFlowStore.getState();
     expect(state.loadEdgeReport.dropped).toEqual([]);
     expect(state.loadEdgeReport.preserved.map((n) => n.edge).sort()).toEqual([
       'chat_state.state -> visit_in.state',
+      'degraded_fold.degraded -> chat_report.degraded',
       'degraded_fold.degraded -> end.degraded',
       'degraded_fold.moment_error -> end.moment_error',
       'visit.child_output -> visit_guard.child',
@@ -113,11 +114,11 @@ describe('loadFlow edge round trip', () => {
       'visit_guard.value -> end.response',
     ]);
     expect(state.loadEdgeReport.preserved[0].reason).toMatch(/is not a declared output of/);
-    // Saved = stored: same 22 edges, and the loaded baseline matches (no false dirty).
+    // Saved = stored: same 28 edges, and the loaded baseline matches (no false dirty).
     const saved = state.getFlow();
     expect(saved.edges.map((e) => e.id).sort()).toEqual(flow.edges.map((e) => e.id).sort());
     expect(loaded.edges.map((e) => e.id).sort()).toEqual(saved.edges.map((e) => e.id).sort());
-    expect(loadEdgeNotice(state.loadEdgeReport)).toMatch(/^8 connections are kept and saved but not drawn \(marked on their nodes\): /);
+    expect(loadEdgeNotice(state.loadEdgeReport)).toMatch(/^9 connections are kept and saved but not drawn \(marked on their nodes\): /);
   });
 
   it('preserved edges follow their nodes: deleting an endpoint removes them from the save', () => {

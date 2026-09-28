@@ -57,8 +57,8 @@ from abstractruntime.storage.in_memory import InMemoryLedgerStore, InMemoryRunSt
 from abstractruntime.visualflow_compiler import compile_visualflow  # noqa: E402
 from abstractruntime.visualflow_compiler.visual.code_executor import create_code_handler  # noqa: E402
 
-FLOW_PATH = ROOT / "abstractflow" / "examples" / "flows" / "coding-verify-gates.json"
-GEN = ROOT / "abstractflow" / "scripts" / "build_coding_agent_workflow.py"
+FLOW_PATH = Path(__file__).resolve().parents[1] / "examples" / "flows" / "coding-verify-gates.json"
+GEN = Path(__file__).resolve().parent / "build_coding_agent_workflow.py"
 
 CHECKS: List[str] = []
 

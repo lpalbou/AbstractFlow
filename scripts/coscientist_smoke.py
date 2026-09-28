@@ -44,7 +44,7 @@ from abstractruntime.visualflow_compiler.visual.pin_expressions import (  # noqa
 
 from coscientist_fixtures import CASES  # noqa: E402
 
-FLOW_PATH = ROOT / "abstractflow" / "examples" / "flows" / "co-scientist.json"
+FLOW_PATH = Path(__file__).resolve().parents[1] / "examples" / "flows" / "co-scientist.json"
 GOLDEN_PATH = Path(__file__).resolve().parent / "coscientist_golden.json"
 
 FAILURES: list[str] = []
