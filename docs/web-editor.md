@@ -151,11 +151,15 @@ the remaining findings are reported with the result instead of being hidden.
 
 The planner run receives a single prompt plus a system prompt with strict JSON
 instructions. Its runtime tool list is explicitly empty: authoring edits must
-come back as the workflow document JSON, not as Gateway tool calls. Prior user turns
-are included inside the current prompt, assistant turns are replayed as trimmed
-plan/result summaries (so pending plan items survive across turns), and applied
-cycles within a turn carry one-line notes of the model's own next steps. The
-visible graph remains the source of applied draft state.
+come back as the workflow document JSON, not as Gateway tool calls. Prior turns
+are included inside the current prompt through the history window: the newest
+whole turns up to 50,000 estimated tokens (AbstractRuntime's rule, ADR-0026). No
+turn is cut, so the pending items of a long plan survive across turns. The block
+states how many turns it holds, and a labeled `#TRUNCATION` line gives the count
+when older turns are dropped. Applied cycles within a turn carry one-line notes
+of the model's own next steps. After a test run, the next cycle reads every
+failed step with its whole inputs, the run's inputs and, on a pass, its whole
+outputs. The visible graph remains the source of applied draft state.
 
 Session policy (revised 2026-07-11, backlog 0112): the per-workflow session id
 remains the conversation identity — scoped to the workflow storage key (never

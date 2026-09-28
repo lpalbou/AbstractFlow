@@ -1747,8 +1747,10 @@ def _loop2_nodes(N: list, E: list) -> None:
                         extra_inputs=[pin("max_output_tokens", "max_output_tokens", "number")],
                         pin_defaults={"system": JUDGE_SYSTEM, "tools": JUDGE_TOOLS,
                                       "max_iterations": 12, "temperature": 0.0,
-                                      "resp_schema": JUDGE_SCHEMA,
-                                      "max_output_tokens": 4000}))
+                                      # No output-token cap (ADR-0026 §2: a structured
+                                      # verdict is a critical path); the model default
+                                      # applies, the pin stays for an explicit budget.
+                                      "resp_schema": JUDGE_SCHEMA}))
     E.append(edge("judge_prompt", "prompt", "spec_judge", "prompt"))
     E.append(edge("start", "provider", "spec_judge", "provider"))
     E.append(edge("start", "model", "spec_judge", "model"))

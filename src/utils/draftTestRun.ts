@@ -12,8 +12,10 @@
  *   versions) and a client wall-clock watchdog cancels overruns — workflows'
  *   own declared budgets are never overridden (the workflow decides).
  * - Failure feedback is STRUCTURED (failed node, effect type, verbatim error,
- *   truncated inputs labeled #TRUNCATION) so the next planning cycle can fix
- *   the graph instead of re-guessing.
+ *   the step's whole inputs) so the next planning cycle can fix the graph
+ *   instead of re-guessing. Every failed step, the inputs and the outputs
+ *   reach the model whole (ADR-0026, operator ruling 2026-09-28: no char cap,
+ *   no step-count cap on what the model reads).
  */
 
 import type { VisualFlow } from '../types/flow';
@@ -54,8 +56,8 @@ export interface DraftTestFailedStep {
   nodeLabel: string;
   effectType: string;
   error: string;
-  /** First 500 chars of the step's effect payload, labeled when truncated. */
-  inputsPreview: string;
+  /** The step's whole effect payload, as JSON. */
+  inputsJson: string;
 }
 
 export interface DraftTestReport {
@@ -248,14 +250,12 @@ export async function pollDraftTestRun(
   }
 }
 
-function truncateInputs(payload: unknown): string {
-  let text = '';
+function jsonText(payload: unknown): string {
   try {
-    text = JSON.stringify(payload) ?? '';
+    return JSON.stringify(payload) ?? '';
   } catch {
-    text = String(payload);
+    return String(payload);
   }
-  return text.length > 500 ? `${text.slice(0, 500)}… #TRUNCATION` : text;
 }
 
 /** Node label lookup from the authored graph so failures name what users see. */
@@ -305,7 +305,7 @@ export function buildDraftTestReport(args: {
         nodeLabel: nodeId ? labels.get(nodeId) || nodeId : '(run)',
         effectType,
         error: error || 'step failed without an error message',
-        inputsPreview: truncateInputs(effect.payload ?? {}),
+        inputsJson: jsonText(effect.payload ?? {}),
       });
     }
     // The flow-end record's result carries the exposed On Flow End outputs.
@@ -364,16 +364,16 @@ export async function collectDraftTestReport(args: {
 export function testReportPromptSection(report: DraftTestReport): string {
   const lines: string[] = [
     `LAST TEST RUN (${report.bundleRef}, run ${report.runId}, ${Math.round(report.durationMs / 1000)}s): verdict=${report.verdict}`,
-    `inputs used: ${truncateInputs(report.inputsUsed)}`,
+    `inputs used: ${jsonText(report.inputsUsed)}`,
   ];
   if (report.flowError) lines.push(`flow error: ${report.flowError}`);
-  for (const step of report.failedSteps.slice(0, 8)) {
+  for (const step of report.failedSteps) {
     lines.push(
-      `FAILED step node=${step.nodeId} (“${step.nodeLabel}”, effect=${step.effectType}): ${step.error} — inputs: ${step.inputsPreview}`
+      `FAILED step node=${step.nodeId} (“${step.nodeLabel}”, effect=${step.effectType}): ${step.error} — inputs: ${step.inputsJson}`
     );
   }
   if (report.verdict === 'passed' && report.outputs) {
-    lines.push(`outputs: ${truncateInputs(report.outputs)}`);
+    lines.push(`outputs: ${jsonText(report.outputs)}`);
   }
   lines.push(
     report.verdict === 'passed'

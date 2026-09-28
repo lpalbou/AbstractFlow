@@ -371,10 +371,10 @@ if web_class:
 
 failures = []
 if not ok:
-    failures.append("delivery: could not list the workspace: " + text[:200])
+    failures.append("delivery: could not list the workspace: " + text)
 elif not files:
     if text.startswith("Error"):
-        failures.append("delivery: workspace listing failed: " + text[:200])
+        failures.append("delivery: workspace listing failed: " + text)
     else:
         failures.append("delivery: the workspace contains no files — nothing was delivered where the task expects it")
 
@@ -428,7 +428,7 @@ failures = []
 local = []
 if web and entry:
     if not bool(entry_ok):
-        failures.append("integration: could not read entrypoint " + entry + " for the reference check: " + str(entry_content or "")[:160])
+        failures.append("integration: could not read entrypoint " + entry + " for the reference check: " + str(entry_content or ""))
     else:
         text = str(entry_content or "")
         low_text = text.lower()
@@ -776,7 +776,7 @@ else:
         rest = s[len("ARTIFACT-SHA256:"):].strip()
         bits = [b for b in rest.split(" ") if b]
         if len(bits) < 2:
-            failures.append("self-report unbound: malformed ARTIFACT-SHA256 line in SELFCHECK.md ('" + s[:120] + "') - required format: 'ARTIFACT-SHA256: <workspace-relative-path> <sha256>'")
+            failures.append("self-report unbound: malformed ARTIFACT-SHA256 line in SELFCHECK.md ('" + s + "') - required format: 'ARTIFACT-SHA256: <workspace-relative-path> <sha256>'")
             continue
         p = " ".join(bits[:-1]).strip()
         if p.startswith("./"):
@@ -789,7 +789,7 @@ else:
                     ok_hex = False
                     break
         if not ok_hex:
-            failures.append("self-report unbound: ARTIFACT-SHA256 line for '" + p[:120] + "' does not carry a valid sha256 (64 hex chars) - recompute it with: shasum -a 256 " + p[:120])
+            failures.append("self-report unbound: ARTIFACT-SHA256 line for '" + p + "' does not carry a valid sha256 (64 hex chars) - recompute it with: shasum -a 256 " + p)
             continue
         if p.rsplit("/", 1)[-1].lower() == "selfcheck.md":
             continue
@@ -872,7 +872,7 @@ if claims:
     low = hash_text.lower()
     host_cant_hash = (not hash_text.strip()) or ("command not found" in low) or ("not recognized" in low)
     if host_cant_hash:
-        warnings.append("selfcheck: could not recompute artifact hashes on this host (" + hash_text.strip()[:160] + ") - hash binding unchecked (#FALLBACK)" if hash_text.strip() else "selfcheck: could not recompute artifact hashes on this host (no output) - hash binding unchecked (#FALLBACK)")
+        warnings.append("selfcheck: could not recompute artifact hashes on this host (" + hash_text.strip() + ") - hash binding unchecked (#FALLBACK)" if hash_text.strip() else "selfcheck: could not recompute artifact hashes on this host (no output) - hash binding unchecked (#FALLBACK)")
     else:
         for pair in claims:
             p = pair[0]
@@ -1183,13 +1183,13 @@ if web:
         elif not isinstance(results, list) or not results:
             env_failures.append("web execution gate UNAVAILABLE: the probe node returned no tool result at all (mode=executed, results=[]) - either the tool_call object was never composed (flow wiring) or the executor dropped the call. Check GET /api/gateway/discovery/tools for browser_probe")
         elif "not found" in low or "unknown tool" in low or "not registered" in low:
-            env_failures.append("web execution gate UNAVAILABLE: browser_probe is NOT MOUNTED in this host's tool registry (\\"" + err[:140] + "\\"). Enable abstractcore's `web` toolset; verify with GET /api/gateway/discovery/tools")
+            env_failures.append("web execution gate UNAVAILABLE: browser_probe is NOT MOUNTED in this host's tool registry (\\"" + err + "\\"). Enable abstractcore's `web` toolset; verify with GET /api/gateway/discovery/tools")
         elif "not allowed" in low or "denied" in low or "blocked" in low or "approval" in low:
-            env_failures.append("web execution gate REFUSED: the browser_probe call was blocked by tool policy (\\"" + err[:140] + "\\"). Grant it via input_data._runtime.tool_policy.auto_approve_tools, or answer the approval wait")
+            env_failures.append("web execution gate REFUSED: the browser_probe call was blocked by tool policy (\\"" + err + "\\"). Grant it via input_data._runtime.tool_policy.auto_approve_tools, or answer the approval wait")
         elif err:
-            env_failures.append("web execution gate FAILED: browser_probe returned an error instead of a result: " + err[:200])
+            env_failures.append("web execution gate FAILED: browser_probe returned an error instead of a result: " + err)
         else:
-            env_failures.append("web execution gate UNREADABLE: browser_probe RAN but returned a result this gate cannot parse - neither a structured payload nor a 'Browser probe: PASS/FAIL' report. First 200 chars: " + report[:200].replace("\\n", " "))
+            env_failures.append("web execution gate UNREADABLE: browser_probe RAN but returned a result this gate cannot parse - neither a structured payload nor a 'Browser probe: PASS/FAIL' report. The result, whole: " + report)
     elif stage == "no-executor":
         env_failures.append("no browser executor available on this host to run " + entry + ": " + str(r.get("error") or "no engine"))
     else:
@@ -1395,7 +1395,7 @@ if verdict_missing:
         passed_gates = passed_gates + ", browser probe"
     env_failures.append(
         "verification unavailable: " + cause
-        + ((": " + note[:240]) if note else "")
+        + ((": " + note) if note else "")
         + " — deterministic gates (" + passed_gates + ") passed; the artifact is delivered but could not be independently verified here"
     )
     entry = str(g0.get("entrypoint") or "")
@@ -1467,13 +1467,13 @@ for fc in fchecks:
     if dep_false:
         feat = str(fc.get("feature") or "unnamed feature").strip()
         ev = str(fc.get("evidence") or fc.get("expected_change") or "").strip()
-        line = "matches: task-named feature '" + feat[:120] + "' does not depend on its input" + ((" - " + ev[:200]) if ev else "") + " - a feature that is present but vacuous is a FAILURE, not a pass"
+        line = "matches: task-named feature '" + feat + "' does not depend on its input" + ((" - " + ev) if ev else "") + " - a feature that is present but vacuous is a FAILURE, not a pass"
         if line not in failures:
             failures.append(line)
         matches = False
     elif not dep_known:
         feat = str(fc.get("feature") or "unnamed feature").strip()
-        w = "feature-checks: '" + feat[:120] + "' reported depends_on_input=" + (str(dep)[:40] if dep is not None else "(missing)") + " - not a clear true/false; input-dependence for this feature is UNVERIFIED (#FALLBACK)"
+        w = "feature-checks: '" + feat + "' reported depends_on_input=" + (str(dep) if dep is not None else "(missing)") + " - not a clear true/false; input-dependence for this feature is UNVERIFIED (#FALLBACK)"
         if w not in warnings:
             warnings.append(w)
 if web:
@@ -1915,7 +1915,7 @@ verdict_missing = ("builds" not in verdict) and ("all_passed" not in verdict)
 if verdict_missing:
     meta = verify_meta if isinstance(verify_meta, dict) else {}
     err = str(meta.get("error") or "the verification subflow returned no verdict")
-    env_line = "verification unavailable: the verification subflow failed before returning a verdict: " + err[:300]
+    env_line = "verification unavailable: the verification subflow failed before returning a verdict: " + err
     verdict = {
         "builds": False,
         "executes": False,
@@ -2449,13 +2449,13 @@ def build_verifier_subflow() -> dict[str, Any]:
                     _pin("gate3_out", "gate3_out", "object")],
                    output_type="string"),
         _agent_node("verifier", "Independent verifier", 1800, 0,
-                    # max_output_tokens bounds the verdict call (agent precision 4,
-                    # c2847: review was the one unbounded call type in their lane) —
-                    # the verdict is compact JSON; tool-loop turns are unaffected.
-                    # R4 raise (2000->4000 tokens, 12->16 iterations): forced
-                    # per-feature enumeration costs tokens; the old caps would
-                    # silently truncate exactly the multi-feature tasks that
-                    # need it.
+                    # No output-token cap (ADR-0026 §2: the verdict is a
+                    # structured-output call, a critical path). A 2000-token
+                    # cap was added to bound the one unbounded call type (agent
+                    # precision 4, c2847) and had to be raised to 4000 in R4
+                    # because it silently truncated the multi-feature verdicts;
+                    # the model default now applies. The pin stays so an author
+                    # can still wire an explicit budget.
                     extra_inputs=[_pin("max_output_tokens", "max_output_tokens", "number")],
                     pin_defaults={
                         "system": "You are a rigorous, independent code verifier. You never edit code. You run commands and inspect structure, then report a strict structured verdict. A gate is only PASS if you actually observed success; when a command fails, capture the real error text. A gate you could not execute is a FAIL with the reason recorded — never a pass.",
@@ -2463,7 +2463,6 @@ def build_verifier_subflow() -> dict[str, Any]:
                         "max_iterations": 16,
                         "temperature": 0.0,
                         "resp_schema": VERIFIER_SCHEMA,
-                        "max_output_tokens": 4000,
                     }),
         _code_node("merge", "Merge verdict", MERGE_VERDICT_CODE, 2180, 400,
                    [_pin("verifier_data", "verifier_data", "object"),

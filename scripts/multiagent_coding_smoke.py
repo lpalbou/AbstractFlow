@@ -1219,6 +1219,14 @@ def main() -> int:
     check("fold-verifier-death-names-the-cause",
           any("child run failed" in f for f in d1["updates"]["last_verdict"]["failures"]),
           str(d1["updates"]["last_verdict"]["failures"])[:200])
+    # ADR-0026 (operator ruling 2026-09-28): the cause reaches the fixer
+    # WHOLE — a 160-char cut used to hide the decisive tail of the error.
+    long_cause = "child run failed: " + "x" * 300 + " DECISIVE-TAIL"
+    d_long = node_from_vars("next_state", st, verify_verdict={},
+                            verify_meta={"success": False, "error": long_cause}, lint_out=[])
+    check("fold-verifier-death-cause-whole",
+          any(long_cause in f for f in d_long["updates"]["last_verdict"]["failures"]),
+          str(d_long["updates"]["last_verdict"]["failures"])[:200])
     death = {"success": False, "error": "child run failed"}
     v1 = applied(st, d1)
     d2 = node_from_vars("next_state", v1, verify_verdict={}, verify_meta=death, lint_out=[])

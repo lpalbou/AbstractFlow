@@ -1309,7 +1309,7 @@ meta = verify_meta if isinstance(verify_meta, dict) else {}
 if "all_passed" not in v:
     all_passed = False
     err = str(meta.get("error") or "verify child run died or returned no verdict")
-    fails.append("verify: verdict missing - " + err[:160] + " (#FALLBACK)")
+    fails.append("verify: verdict missing - " + err + " (#FALLBACK)")
 # ENVIRONMENT failures are not fixable by the builder: fail-soft to
 # "delivered, not verifiable" (coding-agent 0.2.2 precedent).
 env_fails = v.get("environment_failures") if isinstance(v.get("environment_failures"), list) else []

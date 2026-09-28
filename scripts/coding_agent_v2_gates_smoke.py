@@ -994,6 +994,60 @@ def main() -> int:
                                 "restore_out": {}, "restore_ok": None})
     check("report: state-level snapshot warnings surface as advisory", "snapshot: round 0 snapshot failed" in r["report_markdown"], r["report_markdown"])
 
+    # ------------------------------------------------------------------
+    # ADR-0026 (operator ruling 2026-09-28): failure text the fixer model reads
+    # is carried WHOLE (the old 120-300 char cuts hid the decisive tail), and
+    # the verifier verdict call carries no output-token cap.
+    # ------------------------------------------------------------------
+    print("unit: ADR-0026 whole failure text + no verifier output cap")
+    tail = "DECISIVE-TAIL-" + "e" * 400
+    long_err = "Error: " + "x" * 400 + " " + tail
+    r = run_code(code_body("GATE0_CODE"), {"listing": long_err, "listing_ok": False})
+    check("G0 listing failure carries the whole listing error", any(tail in str(f) for f in r["failures"]), str(r["failures"])[:300])
+    r = run_code(code_body("GATE0_CODE"), {"listing": long_err, "listing_ok": True})
+    check("G0 'listing failed' carries the whole error", any(tail in str(f) for f in r["failures"]), str(r["failures"])[:300])
+    r = run_code(gate1, {"gate0_out": g0_web, "entry_content": long_err, "entry_ok": False})
+    check("G1 unreadable entrypoint carries the whole read error", any(tail in str(f) for f in r["failures"]), str(r["failures"])[:300])
+    for probe_err, label in (("Tool 'browser_probe' not found " + tail, "not mounted"),
+                             ("browser_probe is not allowed for this node " + tail, "refused"),
+                             ("probe crashed " + tail, "failed")):
+        r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of(None, success=False, error=probe_err), "round_index": 0})
+        check(f"G3 {label} carries the whole probe error", any(tail in str(f) for f in r["environment_failures"]), str(r["environment_failures"])[:300])
+    r = run_code(gate3, {"gate0_out": g0_web, "probe_raw": raw_of("unparseable report " + tail), "round_index": 0})
+    check("G3 unreadable probe result is carried whole", any(tail in str(f) for f in r["environment_failures"]), str(r["environment_failures"])[:300])
+    long_path = "src/" + "deep/" * 40 + "index.html"
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: " + long_path + " deadbeef", "selfcheck_ok": True, "hash_output": ""})
+    check("G5 malformed hash line names the whole path", any(str(f).count(long_path) == 2 for f in r["failures"]), str(r["failures"])[:300])
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: " + tail, "selfcheck_ok": True, "hash_output": ""})
+    check("G5 malformed claim line is quoted whole", any(tail in str(f) for f in r["failures"]), str(r["failures"])[:300])
+    r = run_code(gate5, {"selfcheck_content": "ok\nARTIFACT-SHA256: index.html " + aa, "selfcheck_ok": True, "hash_output": "sh: shasum: command not found " + tail})
+    check("G5 host-cannot-hash warning carries the whole output", any(tail in str(w) for w in r["warnings"]), str(r["warnings"])[:300])
+    r = run_code(merge, {"verifier_data": None, "verifier_ok": False, "verifier_response": "provider failed: " + tail,
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
+    check("MERGE dead-verifier note is carried whole", any(tail in str(f) for f in r["environment_failures"]), str(r["environment_failures"])[:300])
+    long_feat = "the score counter increments on every eaten apple " + tail
+    long_ev = "counter stayed at 0 after 5 apples " + tail
+    v_vacuous = {"builds": True, "executes": True, "matches": True, "failures": [], "artifacts": ["index.html"], "summary": "",
+                 "feature_checks": [{"feature": long_feat, "depends_on_input": False, "evidence": long_ev},
+                                    {"feature": long_feat + "-2", "depends_on_input": "maybe " + tail}]}
+    r = run_code(merge, {"verifier_data": v_vacuous, "verifier_ok": True, "verifier_response": "",
+                         "gate0_out": g0_web, "gate1_out": {"integration_ok": True}, "gate3_out": g3_ok, "gate5_out": {}})
+    check("MERGE vacuous-feature failure names the whole feature and evidence",
+          any(long_feat in str(f) and long_ev in str(f) for f in r["failures"]), str(r["failures"])[:300])
+    check("MERGE unclear depends_on_input warning carries the whole value",
+          any(("maybe " + tail) in str(w) and (long_feat + "-2") in str(w) for w in r["warnings"]), str(r["warnings"])[:300])
+    r = run_code(next_state, {"verifier": {}, "verify_meta": {"success": False, "error": "subflow died: " + tail}, "round_index": 0,
+                              "builder_report": "", "prev_state": {}, "snapshot_ok": True})
+    check("NEXT_STATE verify-death line carries the whole error", any(tail in str(f) for f in r["environment_failures"]), str(r["environment_failures"])[:300])
+    flows_dir = FLOW_PATH.parent
+    for fname in ("coding-verify-gates.json", "multiagent-verify-gates.json"):
+        flow = json.loads((flows_dir / fname).read_text())
+        verifiers = [n for n in flow["nodes"] if n["id"] == "verifier"]
+        check(f"{fname}: the verifier agent node exists", len(verifiers) == 1, str([n["id"] for n in flow["nodes"]]))
+        defaults = verifiers[0]["data"].get("pinDefaults") or {}
+        check(f"{fname}: no max_output_tokens default on the verifier (model default applies)",
+              "max_output_tokens" not in defaults, str(defaults.get("max_output_tokens")))
+
     print(f"\nALL {len(CHECKS)} CHECKS PASSED")
     return 0
 

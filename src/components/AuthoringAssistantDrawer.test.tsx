@@ -813,8 +813,9 @@ describe('AuthoringAssistantDrawer plan response tolerance', () => {
 });
 
 describe('AuthoringAssistantDrawer conversation replay', () => {
-  it('replays assistant turns trimmed so pending plan items survive across turns', () => {
-    const longAssistant = `**Workflow Plan**\n- 1. Add nodes\n- 6. Ajouter la logique de sélection de modèles\n${'x'.repeat(2000)}`;
+  it('replays assistant turns WHOLE so every pending plan item survives across turns (ADR-0026)', () => {
+    // The tail item sits past the old 1,200-char clamp.
+    const longAssistant = `**Workflow Plan**\n- 1. Add nodes\n${'x'.repeat(2000)}\n- 6. Ajouter la logique de sélection de modèles`;
     const context = conversationContextFor([
       { id: 'u1', role: 'user', content: 'Create a multi-AI discussion workflow.' },
       { id: 'a1', role: 'assistant', content: longAssistant },
@@ -822,9 +823,31 @@ describe('AuthoringAssistantDrawer conversation replay', () => {
     ]);
     expect(context).toContain('USER TURN 1:');
     expect(context).toContain('ASSISTANT TURN 2');
+    expect(context).toContain(longAssistant);
     expect(context).toContain('Ajouter la logique de sélection de modèles');
-    expect(context).toContain('#TRUNCATION');
+    expect(context).not.toContain('#TRUNCATION');
+    expect(context).toContain('History window: 3 of 3 prior turn(s)');
     expect(context).toContain('Each AI must use a different model.');
+  });
+
+  it('drops only the OLDEST whole turns past 50k tokens, with a labeled #TRUNCATION line', () => {
+    // 40 turns x ~8,000 chars (~2,000 tokens) = ~80,000 tokens.
+    const turns = Array.from({ length: 40 }, (_, i) => ({
+      id: `m${i}`,
+      role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: `turn-${i + 1}-start ${'y'.repeat(8000)} turn-${i + 1}-end`,
+    }));
+    const context = conversationContextFor(turns);
+    const replayed = Number(/History window: (\d+) of 40 prior turn\(s\)/.exec(context)?.[1]);
+    expect(replayed).toBeGreaterThan(0);
+    expect(replayed).toBeLessThan(40);
+    expect(context).toContain(`#TRUNCATION: the ${40 - replayed} oldest turn(s)`);
+    expect(context).not.toContain('turn-1-start');
+    expect(context).toContain('turn-40-start');
+    // Every replayed turn is whole.
+    for (let i = 40 - replayed + 1; i <= 40; i += 1) {
+      expect(context).toContain(`turn-${i}-start ${'y'.repeat(8000)} turn-${i}-end`);
+    }
   });
 
   it('gives follow-up turns the prior conversation AND the current workflow graph', () => {

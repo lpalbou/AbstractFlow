@@ -51,6 +51,7 @@ import {
   type DraftTestWait,
 } from '../utils/draftTestRun';
 import { buildDraftRunMetadata } from '../utils/runLifecycle';
+import { estimateTokens, foldHistoryWindow } from '../utils/historyWindow';
 import { replyLanguageMismatch } from '../utils/languageGuard';
 import {
   authoringDocumentText,
@@ -1370,8 +1371,15 @@ export function assistantSystemPrompt(): string {
   ].join('\n');
 }
 
-const ASSISTANT_TURN_REPLAY_MAX_CHARS = 1200;
-
+/**
+ * Prior turns of this assistant session, replayed through the history window
+ * (operator ruling 2026-09-28, ADR-0026): the newest WHOLE turns up to 50,000
+ * estimated tokens (`utils/historyWindow.ts`, AbstractRuntime's rule). No turn
+ * is cut — assistant turns carry the assistant's own pending plan items across
+ * user messages, and a 1,200-char clamp used to drop the tail of exactly those
+ * plans. The first line records how many turns were replayed; when older turns
+ * were dropped a labeled #TRUNCATION line says how many.
+ */
 export function conversationContextFor(messages: AssistantMessage[]): string {
   const entries = messages
     .map((message) => ({ role: message.role, content: String(message.content || '').trim() }))
@@ -1380,19 +1388,20 @@ export function conversationContextFor(messages: AssistantMessage[]): string {
   if (entries.length === 0) return 'No prior turns in this assistant session.';
   const rendered = entries.map((message, index) => {
     if (message.role === 'user') return `USER TURN ${index + 1}:\n${message.content}`;
-    // Replay assistant turns trimmed: the plan/summary part carries the
-    // assistant's own pending intentions across turns (losing them caused the
-    // model to forget unfinished plan items between user messages).
-    const content = message.content.length > ASSISTANT_TURN_REPLAY_MAX_CHARS
-      ? `${message.content.slice(0, ASSISTANT_TURN_REPLAY_MAX_CHARS)}\n… [#TRUNCATION assistant turn trimmed for prompt budget]`
-      : message.content;
-    return `ASSISTANT TURN ${index + 1} (summary; the current graph summary is the source of applied draft state):\n${content}`;
+    return `ASSISTANT TURN ${index + 1} (summary; the current graph summary is the source of applied draft state):\n${message.content}`;
   });
-  return [
+  const { kept, report } = foldHistoryWindow(rendered, estimateTokens);
+  const lines = [
     'Prior turns in this assistant session are included below. Assistant turns are summaries of past plans/results; CURRENT WORKFLOW DOCUMENT is authoritative for draft state.',
-    '',
-    rendered.join('\n\n'),
-  ].join('\n');
+    `History window: ${report.replayedMessages} of ${report.totalMessages} prior turn(s), ~${report.replayedTokens} tokens (the newest whole turns up to ${report.maxTokens} tokens).`,
+  ];
+  if (report.droppedMessages > 0) {
+    // #[WARNING:TRUNCATION] oldest whole turns dropped by the history window — stated, never silent
+    lines.push(
+      `#TRUNCATION: the ${report.droppedMessages} oldest turn(s) (~${report.droppedTokens} tokens) were dropped by the history window (abstractflow authoring assistant); this history starts mid-conversation.`
+    );
+  }
+  return [...lines, '', kept.join('\n\n')].join('\n');
 }
 
 function contractPinText(pin: { id: string; type: string; description?: string; required?: boolean; defaultValue?: unknown }, isInput: boolean): string {

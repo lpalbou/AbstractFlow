@@ -107,7 +107,7 @@ describe('assistant test-run primitives', () => {
 });
 
 describe('test report distillation', () => {
-  it('extracts failed steps with node labels, effect types, and truncated inputs', () => {
+  it('extracts failed steps with node labels, effect types, and the WHOLE inputs (ADR-0026)', () => {
     const report = buildDraftTestReport({
       runId: 'r1',
       bundleRef: 'my-flow@draft.x',
@@ -123,7 +123,31 @@ describe('test report distillation', () => {
     });
     expect(report.failedSteps).toHaveLength(1);
     expect(report.failedSteps[0]).toMatchObject({ nodeId: 'llm-2', nodeLabel: 'Summarize', effectType: 'llm_call', error: 'Provider timeout' });
-    expect(report.failedSteps[0].inputsPreview.endsWith('#TRUNCATION')).toBe(true);
+    expect(report.failedSteps[0].inputsJson).toBe(JSON.stringify({ prompt: 'x'.repeat(600) }));
+    expect(report.failedSteps[0].inputsJson).not.toContain('#TRUNCATION');
+  });
+
+  it('the prompt section carries EVERY failed step and the whole inputs/outputs (no 8-step, no 500-char cap)', () => {
+    const big = 'p'.repeat(3000) + '-TAIL';
+    const records = Array.from({ length: 12 }, (_, i) => ({
+      node_id: `n${i + 1}`,
+      status: 'failed',
+      error: `boom ${i + 1}`,
+      effect: { type: 'llm_call', payload: { prompt: big } },
+    }));
+    const failed = testReportPromptSection(buildDraftTestReport({
+      runId: 'r3', bundleRef: 'my-flow@draft.x', verdict: 'failed', durationMs: 1000,
+      inputsUsed: { topic: big }, flow, records,
+    }));
+    for (let i = 1; i <= 12; i += 1) expect(failed).toContain(`FAILED step node=n${i} `);
+    expect(failed).toContain(`inputs used: ${JSON.stringify({ topic: big })}`);
+    expect(failed).toContain(`inputs: ${JSON.stringify({ prompt: big })}`);
+    expect(failed).not.toContain('#TRUNCATION');
+    const passed = testReportPromptSection(buildDraftTestReport({
+      runId: 'r4', bundleRef: 'my-flow@draft.x', verdict: 'passed', durationMs: 1000, inputsUsed: {}, flow,
+      records: [{ node_id: 'end-1', status: 'completed', result: { outputs: { report: big } } }],
+    }));
+    expect(passed).toContain(`outputs: ${JSON.stringify({ report: big })}`);
   });
 
   it('renders the prompt section with verdict, failures, and the fix instruction', () => {

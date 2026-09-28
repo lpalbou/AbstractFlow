@@ -60,6 +60,31 @@ Standalone use at `/` works with any supported Gateway.
   in the turn prompt, whole tool results between rounds, and every item of the
   day cue. The `digest_truncated` and `sources_truncated` record attributes
   are gone (nothing is cut any more).
+- **The coding workflows hand the fixer the whole failure text (ADR-0026).**
+  In `coding-verify-gates`, `coding-agent`, `multiagent-coding` and the
+  `spec-*` families, the failure lines the builder reads next round cut
+  listing, read and probe errors, SELFCHECK lines, verifier notes, feature
+  names and evidence to 40–300 characters. They now carry the whole text, so
+  the decisive end of an error message is no longer lost.
+- **The verify and judge agents have no output-token cap.** The verifier in
+  `coding-verify-gates` (and its copies `multiagent-verify-gates`,
+  `spec-verify-gates`, `spec-std-verify-gates`) and the `spec_judge` coverage
+  judge set `max_output_tokens: 4000` on their structured verdict call. The
+  cap had already been raised once, from 2000, because it cut multi-feature
+  verdicts. The model default now applies; the `max_output_tokens` pin remains
+  for an explicit budget. A test fails if any shipped workflow sets this
+  default on an agent or LLM call node again.
+- **The authoring assistant replays its conversation through the 50,000-token
+  history window.** Earlier assistant turns were cut to 1,200 characters,
+  which dropped the unfinished items of long plans. The prompt now carries the
+  newest whole turns up to 50,000 estimated tokens (AbstractRuntime's rule),
+  states how many turns it holds, and adds a labeled `#TRUNCATION` line with
+  the count when older turns are dropped.
+- **Draft test reports reach the assistant whole.** The report the assistant
+  reads after a test run cut each step's inputs, the run's inputs and its
+  outputs to 500 characters and listed at most 8 failed steps. It now carries
+  every failed step and the whole inputs and outputs. The test card in the
+  drawer still shows a short preview.
 
 ### Removed
 - WebSocket forwarding under `/api/*` (the editor opens none); upgrades are
