@@ -43,9 +43,9 @@ Save/Publish/Run remain user-controlled Gateway operations.
 ```mermaid
 flowchart LR
   Browser[Browser editor] -->|"standalone: http://127.0.0.1:3003/"| Flow[AbstractFlow Node server<br/>bin/server.js]
-  Browser -->|"through the Gateway: /apps/flow/"| GwProxy[AbstractGateway app proxy]
+  Browser -->|"through the Gateway at /apps/flow/"| GwProxy[AbstractGateway app proxy]
   GwProxy -->|"X-Forwarded-Prefix /apps/flow + browser address"| Flow
-  Flow -->|"/api/* HTTP + SSE: session headers, X-Forwarded-For, app-proxy marker"| Gateway[AbstractGateway API]
+  Flow -->|"HTTP + SSE under /api/*: session headers, X-Forwarded-For, app-proxy marker"| Gateway[AbstractGateway API]
   Gateway --> Runtime[AbstractRuntime]
   Runtime --> Core[AbstractCore]
   Gateway --> Stores[(Users / Workflows / Runs / Ledgers / Artifacts)]
