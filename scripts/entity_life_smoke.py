@@ -645,6 +645,100 @@ def main() -> int:
                       and meta5.get("degraded") == 0 and isinstance(meta5.get("tools_ran"), int),
                       f"meta={meta5!r}")
 
+            # SCENARIO 6 — THE HISTORY WINDOW (ADR-0026, operator ruling
+            # 2026-09-28): a replayed conversation reaches the model WHOLE up
+            # to the host's window (the most recent 50,000 tokens of whole
+            # turns, abstractruntime.session_history), never a smaller
+            # flow-side cut. The replay comes from the REAL host function over
+            # the chat runs this smoke just completed.
+            from abstractruntime.session_history import HISTORY_REPLAY_MAX_TOKENS, session_chat_messages
+
+            def llm_text(calls):
+                out = []
+                for c in calls:
+                    out.append(str(c.get("prompt") or ""))
+                    for m in c.get("messages") or []:
+                        if isinstance(m, dict):
+                            out.append(str(m.get("content") or ""))
+                return "\n".join(out)
+
+            # A recording mind (the production act-only composition around
+            # it, as in scenario 3c): answers in plain words, keeps every
+            # request it receives.
+            history_calls: list[dict] = []
+
+            def recording_llm(run, effect, default_next_node):
+                del run, default_next_node
+                history_calls.append(dict(effect.payload or {}))
+                return EffectOutcome.completed({"content": "I remember what we said."})
+
+            ert.runtime._handlers[EffectType.LLM_CALL] = wrap_llm_handler_with_act_only(
+                recording_llm,
+                diary_write_handler=ert.runtime._handlers.get(EffectType.DIARY_WRITE),
+            )
+
+            def chat_turn(session, prompt, context=None):
+                v = {"prompt": prompt, "system": "", "provider": "", "model": "",
+                     "state": {}, "participants": ["person:laurent"]}
+                if context is not None:
+                    v["context"] = context
+                rid = ert.runtime.start(workflow=specs["entity-chat"], vars=v, session_id=session)
+                drive(rid)
+                return ert.runtime.get_state(rid)
+
+            def session_block(text):
+                """The prompt's THIS SESSION block (graph recall elsewhere in
+                the prompt may surface an old episode: memory, not replay)."""
+                at = text.find("THIS SESSION SO FAR:")
+                return text[at:text.find("\n\n", at)] if at >= 0 else ""
+
+            def history_case(session, n_turns, filler_chars):
+                stimuli = []
+                for i in range(n_turns):
+                    # Stored turns are whitespace-trimmed; the probe text has none to trim.
+                    text = (f"marker-{session}-{i:03d} " + ("the sky was wide and blue today " * (filler_chars // 32 + 1))[:filler_chars]).strip()
+                    stimuli.append(text)
+                    st = chat_turn(session, text)
+                    if st.status != RunStatus.COMPLETED:
+                        return stimuli, None, "", st
+                replay = session_chat_messages(run_store=ert.run_store, ledger_store=ert.ledger_store,
+                                               artifact_store=getattr(ert, "artifact_store", None), session_id=session)
+                before = len(history_calls)
+                final = chat_turn(session, f"final question for {session}", {"messages": [dict(m) for m in replay]})
+                return stimuli, replay, llm_text(history_calls[before:]), final
+
+            # (a) inside the window: 20 short turns (more than any old cut:
+            # 24 messages / 12 folded turns / 6 rendered turns) all reach the
+            # model whole.
+            stim_a, replay_a, seen_a, final_a = history_case("hist-a", 20, 400)
+            check("history (a): the host replays all 20 turns (nothing dropped)",
+                  replay_a is not None and replay_a.report["dropped_messages"] == 0
+                  and replay_a.report["replayed_messages"] == 40, f"report={getattr(replay_a, 'report', None)}")
+            check("history (a): the final turn completes", final_a.status == RunStatus.COMPLETED, f"status={final_a.status}")
+            missing_a = [s[:24] for s in stim_a if s not in session_block(seen_a)]
+            check("history (a): every replayed turn reaches the model whole", not missing_a, f"missing={missing_a}")
+
+            # (b) beyond the window: ~2,000-token turns, more than 50,000
+            # tokens in all. The newest whole turns that fit are replayed and
+            # reach the model whole; older turns are dropped WITH the labeled
+            # #TRUNCATION notice; nothing is cut inside a turn.
+            stim_b, replay_b, seen_b, final_b = history_case("hist-b", 30, 8000)
+            rep = replay_b.report if replay_b is not None else {}
+            check("history (b): the window dropped older whole turns within 50k tokens",
+                  rep.get("dropped_messages", 0) > 0 and rep.get("replayed_tokens", 0) <= HISTORY_REPLAY_MAX_TOKENS
+                  and rep.get("max_tokens") == HISTORY_REPLAY_MAX_TOKENS, f"report={rep}")
+            kept_n = rep.get("replayed_messages", 0) // 2
+            kept, dropped = stim_b[len(stim_b) - kept_n:], stim_b[:len(stim_b) - kept_n]
+            check("history (b): the final turn completes", final_b.status == RunStatus.COMPLETED, f"status={final_b.status}")
+            block_b = session_block(seen_b)
+            missing_b = [s[:24] for s in kept if s not in block_b]
+            check(f"history (b): all {kept_n} windowed turns reach the model whole", kept_n > 12 and not missing_b,
+                  f"kept={kept_n} missing={missing_b}")
+            leaked = [s[:24] for s in dropped if s[:24] in block_b]
+            check("history (b): the dropped turns are announced, not silent",
+                  block_b.startswith("THIS SESSION SO FAR:\nTHEY: [#TRUNCATION:") and not leaked,
+                  f"block_head={block_b[:120]!r} leaked={leaked}")
+
         finally:
             ert.close()
 

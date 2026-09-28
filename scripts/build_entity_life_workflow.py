@@ -169,6 +169,9 @@ BUNDLE_ID = "entity-life"
 # (metadata.min_runtime below; enforcement gate is gateway's lane, backlog 0154).
 # 0.0.19 (2026-09-28, backlog 0890): entity-chat and entity-goodbye set the
 # agent.v1 `success` and `meta` end pins (chat_report / close_report).
+# Session history is never capped in-flow (ADR-0026): chat folds every
+# replayed message, the shelf renders every turn whole, the turn log keeps
+# every turn; the host's 50k-token replay window is the only bound.
 BUNDLE_VERSION = "0.0.19"
 # Version history: CHANGELOG.md (entity-life entries) — the per-version
 # ledger moved there 2026-07-25 (cleanup adversary P1-2: the header-comment

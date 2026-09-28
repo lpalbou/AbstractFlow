@@ -319,21 +319,20 @@ if isinstance(tend_fb, dict):
     if fb_lines:
         tend_block = "YOUR LAST TENDING:\n" + "\n".join(fb_lines) + "\n\n"
 
-# The living conversation (this session's recent turns).
+# The living conversation: EVERY turn of this session, whole (ADR-0026 and
+# the operator ruling of 2026-09-28: the model may use its full context; the
+# only history bound is the host's replay window — the most recent 50,000
+# tokens of whole turns, abstractruntime.session_history — applied before
+# the history reaches this flow). No turn count, no character cut here.
 log = state.get("turn_log")
 if not isinstance(log, list):
     log = []
 convo_lines = []
-recent = log[-6:]
-for t in recent:
+for t in log:
     if not isinstance(t, dict):
         continue
-    s = str(t.get("stimulus") or "").replace("\n", " ")
-    r = str(t.get("reply") or "").replace("\n", " ")
-    if len(s) > 160:
-        s = s[:157] + "..."
-    if len(r) > 160:
-        r = r[:157] + "..."
+    s = str(t.get("stimulus") or "")
+    r = str(t.get("reply") or "")
     if s:
         convo_lines.append("THEY: " + s)
     if r:
@@ -1056,9 +1055,9 @@ if episode_ids:
 tools_ran = _input.get("tools_ran")
 if isinstance(tools_ran, list) and tools_ran:
     entry["tools"] = [str(t) for t in tools_ran[:12]]
+# Every turn stays (no count cap, ADR-0026): the session close empties the
+# log, and a replayed session arrives already inside the host's window.
 log = log + [entry]
-if len(log) > 40:
-    log = log[-40:]
 state["turn_log"] = log
 state["last_reply"] = reply
 
@@ -1660,7 +1659,7 @@ return {
 
 CHAT_STATE_CODE = r'''
 # Session continuity for chat clients: when the host seeds durable session
-# history (use_session_history -> context.messages), fold the recent turns
+# history (use_session_history -> context.messages), fold the replayed turns
 # into the session log so the shelf's THIS-SESSION block carries the live
 # conversation — without this every chat prompt was an amnesiac turn and
 # only graph recall bridged prompts (adversary F6).
@@ -1680,7 +1679,10 @@ if not log:
         msgs = []
     pending_user = ""
     folded = []
-    for m in msgs[-24:]:
+    # Every replayed message: the host already applied THE history window
+    # (the most recent 50,000 tokens of whole turns, recorded in the run;
+    # abstractruntime.session_history). No second, smaller bound here.
+    for m in msgs:
         if not isinstance(m, dict):
             continue
         role = str(m.get("role") or "")
@@ -1691,7 +1693,7 @@ if not log:
             folded.append({"stimulus": pending_user, "reply": content})
             pending_user = ""
     if folded:
-        log = folded[-12:]
+        log = folded
         state["turn_log"] = log
 return {"state": state}
 '''

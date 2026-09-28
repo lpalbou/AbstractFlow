@@ -114,7 +114,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "\n# Session continuity for chat clients: when the host seeds durable session\n# history (use_session_history -> context.messages), fold the recent turns\n# into the session log so the shelf's THIS-SESSION block carries the live\n# conversation — without this every chat prompt was an amnesiac turn and\n# only graph recall bridged prompts (adversary F6).\nstate = _input.get(\"state\")\nif not isinstance(state, dict):\n    state = {}\nstate = dict(state)\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nif not log:\n    ctx = _input.get(\"context\")\n    if not isinstance(ctx, dict):\n        ctx = {}\n    msgs = ctx.get(\"messages\")\n    if not isinstance(msgs, list):\n        msgs = []\n    pending_user = \"\"\n    folded = []\n    for m in msgs[-24:]:\n        if not isinstance(m, dict):\n            continue\n        role = str(m.get(\"role\") or \"\")\n        content = str(m.get(\"content\") or \"\")\n        if role == \"user\":\n            pending_user = content\n        elif role == \"assistant\" and pending_user:\n            folded.append({\"stimulus\": pending_user, \"reply\": content})\n            pending_user = \"\"\n    if folded:\n        log = folded[-12:]\n        state[\"turn_log\"] = log\nreturn {\"state\": state}\n",
+        "codeBody": "\n# Session continuity for chat clients: when the host seeds durable session\n# history (use_session_history -> context.messages), fold the replayed turns\n# into the session log so the shelf's THIS-SESSION block carries the live\n# conversation — without this every chat prompt was an amnesiac turn and\n# only graph recall bridged prompts (adversary F6).\nstate = _input.get(\"state\")\nif not isinstance(state, dict):\n    state = {}\nstate = dict(state)\nlog = state.get(\"turn_log\")\nif not isinstance(log, list):\n    log = []\nif not log:\n    ctx = _input.get(\"context\")\n    if not isinstance(ctx, dict):\n        ctx = {}\n    msgs = ctx.get(\"messages\")\n    if not isinstance(msgs, list):\n        msgs = []\n    pending_user = \"\"\n    folded = []\n    # Every replayed message: the host already applied THE history window\n    # (the most recent 50,000 tokens of whole turns, recorded in the run;\n    # abstractruntime.session_history). No second, smaller bound here.\n    for m in msgs:\n        if not isinstance(m, dict):\n            continue\n        role = str(m.get(\"role\") or \"\")\n        content = str(m.get(\"content\") or \"\")\n        if role == \"user\":\n            pending_user = content\n        elif role == \"assistant\" and pending_user:\n            folded.append({\"stimulus\": pending_user, \"reply\": content})\n            pending_user = \"\"\n    if folded:\n        log = folded\n        state[\"turn_log\"] = log\nreturn {\"state\": state}\n",
         "pinExpressions": {
           "context": "vars.get(\"context\", {})"
         }
@@ -591,6 +591,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-09-28T01:21:21.855217+00:00",
-  "updated_at": "2026-09-28T01:21:21.855217+00:00"
+  "created_at": "2026-09-28T01:34:59.691175+00:00",
+  "updated_at": "2026-09-28T01:34:59.691175+00:00"
 }
