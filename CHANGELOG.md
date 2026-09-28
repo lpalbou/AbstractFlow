@@ -85,6 +85,43 @@ Standalone use at `/` works with any supported Gateway.
   outputs to 500 characters and listed at most 8 failed steps. It now carries
   every failed step and the whole inputs and outputs. The test card in the
   drawer still shows a short preview.
+- **No shipped workflow cuts what a model reads (ADR-0026).**
+  - `co-scientist` 0.2.1: the next cycle's feedback carries every reviewer
+    critique and debate reason whole (it kept 6 of each, cut to 400 and 300
+    characters). The expansion prompt lists every open question (it listed 6).
+    The meta-review and the figure-spec prompt read every ranked hypothesis
+    (they read the top 5), with the whole literature base (cut at 2,500
+    characters), whole reviewer notes (300) and whole statements (200).
+    Citation-check reasons and the dropped-source warning quote whole titles.
+  - `goal-agent` 0.0.2: the verifier reads the worker's whole report (it was
+    cut at 6,000 characters). The worker reads the whole verified progress log
+    (it read the last 6 entries) and the verifier's whole summary and
+    remaining work. The run keeps every log entry.
+  - `ralph-coding` / `ralph-coder` 0.2.1: the warm-start progress tail is the
+    newest whole entries up to the 50,000-token history window, and older
+    entries are dropped with a stated notice. Before, it held the last 3
+    entries within 6,000 characters, or a 2,500-character tail when the file
+    had no `## ` entries. `warm_entries` defaults to `0` (no count bound); a
+    positive value is still honored. The per-cycle step trace has no default
+    bound (`max_chars` was `20000`).
+  - `map-reduce` 0.1.2: the reducer reads every per-item result whole (cut at
+    1,200 characters).
+  - `diagram-render` 0.2.1: the `#FALLBACK` warnings carry the whole spec or
+    render error.
+  - `react-coding` / `react-coder` 0.1.2 and `ralph-coding`: the one-line
+    progress message ends with `… (truncated)` when it shortens the last
+    action; the model still reads it whole.
+  - `coding-agent` 0.2.8 packs the whole-failure-text and no-output-cap
+    changes above (0.2.7 is not used).
+  - The Flow Library runs these versions: `coding-agent@0.2.8` (it pointed at
+    0.2.5), `co-scientist@0.2.1`, `diagram-render@0.2.1`, `map-reduce@0.1.2`,
+    `react-coding@0.1.2` and `ralph-coding@0.2.1` (it pointed at 0.1.1).
+    Gateway builds that ship `coding-agent@0.2.8` and `co-scientist@0.2.1`
+    serve these library runs out of the box. The others run once their
+    bundles are published to your Gateway.
+- The workflow generators accept `--bundles-dir <dir>` to write their `.flow`
+  bundle outside the sibling Gateway checkout. A regenerated flow keeps its
+  `created_at`, and its `updated_at` changes only when its content changes.
 
 ### Removed
 - WebSocket forwarding under `/api/*` (the editor opens none); upgrades are

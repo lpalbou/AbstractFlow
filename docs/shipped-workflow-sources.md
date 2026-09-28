@@ -12,15 +12,28 @@ For what those workflows do and how to run them, see
 
 | Bundle | Editable flows (`examples/flows/`) | Generator (`scripts/`) |
 | --- | --- | --- |
-| `coding-agent@0.2.6` | `coder.json`, `coding-agent.json`, `coding-verify-gates.json` | `build_coding_agent_workflow.py` |
-| `deep-research@0.1.7` | `deep-research.json`, `deep-plan.json`, `deep-investigate.json`, `deep-review.json`, `deep-render.json` | `build_deep_research_workflows.py`, packed by `pack_deep_research_bundle.py` |
-| `co-scientist@0.2.0` | `co-scientist.json`, `deep-plan.json`, `deep-investigate.json`, `diagram-render.json` | `build_co_scientist_workflow.py` |
+| `coding-agent@0.2.8` | `coder.json`, `coding-agent.json`, `coding-verify-gates.json` | `build_coding_agent_workflow.py` |
+| `deep-research@0.1.8` | `deep-research.json`, `deep-plan.json`, `deep-investigate.json`, `deep-review.json`, `deep-render.json` | `build_deep_research_workflows.py`, packed by `pack_deep_research_bundle.py` |
+| `co-scientist@0.2.1` | `co-scientist.json`, `deep-plan.json`, `deep-investigate.json`, `diagram-render.json` | `build_co_scientist_workflow.py` |
 
 The generators are the source of truth for bundle id and version; each writes
-its `.flow` into `abstractgateway/flows/bundles/`. Bundle versions are
-immutable by sha, so publishing a changed graph means bumping the version in
-the generator and updating the packaging pin in
+its `.flow` into the sibling `abstractgateway/flows/bundles/` checkout by
+default. Pass `--bundles-dir <dir>` to write the bundle somewhere else, for
+example a release staging folder, without touching the gateway checkout:
+
+```bash
+python3 scripts/build_coding_agent_workflow.py --bundles-dir /path/to/staging
+```
+
+Bundle versions are immutable by sha, so publishing a changed graph means
+bumping the version in the generator and updating the packaging pin in
 `abstractgateway/pyproject.toml`.
+
+None of these shipped flows cuts what a model reads (ADR-0026): no message or
+character caps on prompts, tool output or documents, and no default output-token
+caps. The only bounds left are labeled display previews (for example, a
+progress line) and co-scientist's figure-layout limits on the diagram spec the
+model writes.
 
 `co-scientist` reuses the `deep-plan` and `deep-investigate` flows to ground
 its hypotheses in real literature, which is why those files appear under two
