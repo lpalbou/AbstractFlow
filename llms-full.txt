@@ -4888,6 +4888,13 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
   window (the most recent 50,000 tokens of whole turns; older turns are
   dropped with a labeled `#TRUNCATION` notice), and the flows add no second,
   smaller bound.
+- WHOLE CONTENT: nothing the entity stores or reads is cut. Episode records
+  keep the whole stimulus and reply (title, digest, keywords; the verbatim
+  goes to the artifact store), a failed moment keeps its whole error, the
+  session close summarizes every episode of the session, and the turn prompt
+  carries every granted tool, every tend refusal and everyone present. Loop
+  bounds (`max_rounds`, `max_ticks`, `max_days`, the tool-call budget) are
+  explicit input pins, not content cuts.
 - VERSION CONTRACT: bundle versions are immutable and PINNABLE
   (`bundle_version` on the summon). The `degraded`/`moment_error` output
   pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the
@@ -5219,6 +5226,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   AbstractRuntime 0.7.0 or later.
 - The multi-agent coding workflow's embedded verify gates match
   `coding-verify-gates` exactly again.
+- The entity flows store and show whole content: episode titles, digests,
+  keywords and failure messages, the session-close summary (linked to every
+  episode of the session) and diary note, every tool and tend refusal in the
+  turn log, the whole recall cue, every granted tool, refusal and participant
+  in the turn prompt, whole tool results between rounds, and every item of the
+  day cue. The `digest_truncated` and `sources_truncated` record attributes
+  are gone (nothing is cut any more).
 
 ### Removed
 - WebSocket forwarding under `/api/*` (the editor opens none); upgrades are

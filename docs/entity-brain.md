@@ -188,6 +188,13 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
   window (the most recent 50,000 tokens of whole turns; older turns are
   dropped with a labeled `#TRUNCATION` notice), and the flows add no second,
   smaller bound.
+- WHOLE CONTENT: nothing the entity stores or reads is cut. Episode records
+  keep the whole stimulus and reply (title, digest, keywords; the verbatim
+  goes to the artifact store), a failed moment keeps its whole error, the
+  session close summarizes every episode of the session, and the turn prompt
+  carries every granted tool, every tend refusal and everyone present. Loop
+  bounds (`max_rounds`, `max_ticks`, `max_days`, the tool-call budget) are
+  explicit input pins, not content cuts.
 - VERSION CONTRACT: bundle versions are immutable and PINNABLE
   (`bundle_version` on the summon). The `degraded`/`moment_error` output
   pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the

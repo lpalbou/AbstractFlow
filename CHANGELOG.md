@@ -47,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   AbstractRuntime 0.7.0 or later.
 - The multi-agent coding workflow's embedded verify gates match
   `coding-verify-gates` exactly again.
+- The entity flows store and show whole content: episode titles, digests,
+  keywords and failure messages, the session-close summary (linked to every
+  episode of the session) and diary note, every tool and tend refusal in the
+  turn log, the whole recall cue, every granted tool, refusal and participant
+  in the turn prompt, whole tool results between rounds, and every item of the
+  day cue. The `digest_truncated` and `sources_truncated` record attributes
+  are gone (nothing is cut any more).
 
 ### Removed
 - WebSocket forwarding under `/api/*` (the editor opens none); upgrades are
