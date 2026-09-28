@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-28
+
+Serving the editor through the Gateway at `/apps/flow/` needs AbstractGateway
+0.7.0 or later. The bundled entity flows need AbstractRuntime 0.7.0 or later.
+Standalone use at `/` works with any supported Gateway.
+
 ### Added
 - **Served through the Gateway at `/apps/flow/`.** The Flow server runs on
   `@abstractframework/app-server`: it announces
@@ -59,6 +65,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WebSocket forwarding under `/api/*` (the editor opens none); upgrades are
   refused.
 - The ignored `--gateway-token` flag: it is now an unknown flag.
+
+### Security
+- Requires `@abstractframework/app-server` 0.1.11 or newer. A request counts
+  as coming from this computer only when both its connection address and the
+  host name the browser addressed are loopback, so a page served from another
+  site under a name that resolves to `127.0.0.1` is treated as remote.
 
 ## [0.3.22] - 2026-09-27
 

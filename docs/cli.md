@@ -54,6 +54,10 @@ server runs in both cases:
 - run on its own, the editor is at `http://127.0.0.1:3003/`;
 - through the Gateway, the editor is at `<gateway address>/apps/flow/`.
 
+Serving under `/apps/flow/` needs AbstractGateway 0.7.0 or later. On its own,
+the server listens on `127.0.0.1`; pass `--host 0.0.0.0` only when other
+computers must reach it directly.
+
 ## What The CLI Does
 
 - Serves the built editor (`dist/`) at `/` or under `/apps/flow/`.
