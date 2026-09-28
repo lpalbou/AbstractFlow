@@ -31,7 +31,7 @@ npm test
 ## Repository Shape
 
 - `src/`: React/Vite editor.
-- `bin/cli.js`: static server and Gateway proxy; `bin/gateway_forwarding.js` holds the forwarding headers it sets on Gateway-bound requests.
+- `bin/cli.js`, `bin/flags.js`, `bin/server.js`: the CLI, its launch flags and the server (static files, base path, Gateway session proxy) on `@abstractframework/app-server`. `npm run build` also runs `scripts/check_relative_urls.mjs`, which fails on any app-absolute `/api/` or `/assets/` URL.
 - `examples/flows/`: sample and shipped VisualFlow JSON files.
 - `scripts/`: workflow generators, bundle packers, and documentation generators.
 - `docs/`: user and contributor docs (see [docs/README.md](docs/README.md)).

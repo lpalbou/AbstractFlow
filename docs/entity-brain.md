@@ -175,9 +175,13 @@ curl -X POST $GW/api/gateway/entities/<name>/summon \
 - Degradation surfaces honestly: a dead cognition turn answers
   `[the moment could not be lived: …]` and the visit/chat outputs carry
   `degraded` + `moment_error` pins so thin clients never confuse "the entity
-  said nothing" with "the turn died". READ `degraded`, never `success` alone:
-  the run-level `success` flag means "the flow executed", and a degraded
-  turn still completes its flow.
+  said nothing" with "the turn died". The agent.v1 end pins follow the same
+  signal: `entity-chat` sets `success` to true only when the moment was not
+  degraded and `meta` to `{provider, model, tools_ran, tool_rounds, degraded}`
+  (the provider/model the host asked for, empty for the Gateway default);
+  `entity-goodbye` sets `success` when the session close ran and `meta` to
+  `{turns, reason}`. The run-level status only says "the flow executed": a
+  degraded turn still completes its flow.
 - VERSION CONTRACT: bundle versions are immutable and PINNABLE
   (`bundle_version` on the summon). The `degraded`/`moment_error` output
   pins exist from 0.0.2; `response` (agent.v1 mirror) from 0.0.4; the

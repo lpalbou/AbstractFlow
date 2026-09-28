@@ -42,14 +42,16 @@ Save/Publish/Run remain user-controlled Gateway operations.
 
 ```mermaid
 flowchart LR
-  Browser[Browser editor] -->|HTTP, SSE, WebSocket under /api/*| Flow[AbstractFlow Node server<br/>bin/cli.js]
-  Flow -->|session headers + X-Forwarded-For + app-proxy marker| Gateway[AbstractGateway]
+  Browser[Browser editor] -->|"standalone: http://127.0.0.1:3003/"| Flow[AbstractFlow Node server<br/>bin/server.js]
+  Browser -->|"through the Gateway: /apps/flow/"| GwProxy[AbstractGateway app proxy]
+  GwProxy -->|"X-Forwarded-Prefix /apps/flow + browser address"| Flow
+  Flow -->|"/api/* HTTP + SSE: session headers, X-Forwarded-For, app-proxy marker"| Gateway[AbstractGateway API]
   Gateway --> Runtime[AbstractRuntime]
   Runtime --> Core[AbstractCore]
   Gateway --> Stores[(Users / Workflows / Runs / Ledgers / Artifacts)]
 ```
 
-Flow serves static assets and proxies HTTP, SSE, and WebSocket calls. The browser does not talk directly to provider APIs or runtime stores.
+Flow serves the built editor and forwards HTTP and SSE calls under `/api/*`. The same server runs on its own at `/` or behind the Gateway at `/apps/flow/`; the editor uses relative URLs, so it works at either address. The browser does not talk directly to provider APIs or runtime stores. See [API and contracts > Serving Under A Base Path](api.md#serving-under-a-base-path).
 
 ## Components
 
@@ -67,8 +69,8 @@ flowchart TB
     Client["Gateway client (utils/gatewayClient.ts)"]
   end
   subgraph Server["Flow server (bin/)"]
-    Cli["cli.js<br/>static files, /api/health, sign-in, /api/* proxy"]
-    Fwd["gateway_forwarding.js<br/>X-Forwarded-For, X-AbstractFramework-App-Proxy"]
+    Cli["cli.js + flags.js<br/>launch flags, Gateway URL (flag, env, saved, pointer)"]
+    Fwd["server.js on @abstractframework/app-server<br/>base path, identity header, static files, /api/* session proxy"]
   end
   Gateway[AbstractGateway]
 
@@ -197,9 +199,9 @@ The Flow connection form collects a Gateway URL, Gateway user id, and Gateway us
 Hosted Flow deployments block arbitrary browser-supplied Gateway URLs by default so the Flow server cannot become a user-directed same-origin proxy. That decision uses the address of the browser's connection, never the `Host` header.
 
 Every request the Flow server sends to the Gateway carries `X-Forwarded-For`
-set to the browser connection's address and
+set to the browser's address and
 `X-AbstractFramework-App-Proxy: abstractflow`
-(`bin/gateway_forwarding.js`). Browser-supplied forwarding headers are dropped,
+(the `@abstractframework/app-server` session proxy). Browser-supplied forwarding headers never reach the Gateway,
 so the Gateway can decide reliably whether a browser runs on its own machine.
 See [API and contracts > Proxy Contract](api.md#proxy-contract).
 

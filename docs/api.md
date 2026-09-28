@@ -12,36 +12,57 @@ The installed command is `abstractflow-editor`. See [CLI](cli.md).
 
 Options:
 
-- `--host <host>`: host for the Flow static/proxy server (default `0.0.0.0`).
-- `--port <port>`: port for the Flow static/proxy server (default `3003`).
-- `--gateway-url <url>`: Gateway target used by the proxy (default `http://127.0.0.1:8080`).
+- `--gateway-url <url>` (aliases `--gateway`, `--url`): the Gateway the server talks to.
+- `--port <n>`: the port to listen on (default `3003`).
+- `--host <addr>`: the address to listen on (default `127.0.0.1`).
 - `--help`, `-h`: print usage.
 
-Environment:
+An unknown flag or a missing value exits with code 2.
+
+Gateway URL, first match wins:
+
+1. `--gateway-url` (or an alias);
+2. `ABSTRACTFLOW_GATEWAY_URL`, then `ABSTRACTGATEWAY_URL` (legacy aliases);
+3. `gateway_url` in `~/.abstractflow/gateway_connection.json`, except `http://127.0.0.1:8080`;
+4. the local Gateway pointer `~/.abstractframework/gateway.json`;
+5. `http://127.0.0.1:8080`.
+
+A URL from 3, 4 or 5 is re-resolved when the Gateway refuses a connection; a flag or environment choice never changes.
+
+Environment (legacy aliases, below the flags):
 
 - `HOST`, `PORT`: defaults for `--host` and `--port`.
-- `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL`: default Gateway target. When neither is set, the server reads `gateway_url` from `~/.abstractflow/gateway_connection.json` if that file exists, then falls back to `http://127.0.0.1:8080`. `--gateway-url` overrides all of these.
-- `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: let browsers that do not run on the Flow server's machine sign in to another Gateway URL than the configured one. Only enable it behind your own access control.
+- `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1`: let browsers that are not on the Flow server's computer sign in to another Gateway URL than the configured one. Only enable it behind your own access control.
 - `ABSTRACTFLOW_ALLOW_BROWSER_GATEWAY_URL_COOKIE=1`: honor the Gateway URL stored in a browser's session cookie for every browser, not only local ones.
-- `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` (or `ABSTRACTGATEWAY_TRUST_PROXY_HEADERS=1`): name the host from `X-Forwarded-Host` in the message shown when a Gateway URL change is refused. Access decisions never use forwarded headers; they use the connection's own address.
+- `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` (or `ABSTRACTGATEWAY_TRUST_PROXY_HEADERS=1`): declare that the server runs behind a reverse proxy you control; a browser-chosen Gateway URL then requires the remote-config switch above.
 
-Session cookies are marked `Secure` when the request carries `X-Forwarded-Proto: https`.
+Session cookies are marked `Secure` when the request came over HTTPS (`X-Forwarded-Proto: https` from a local proxy).
+
+## Serving Under A Base Path
+
+The server is built on `@abstractframework/app-server` and serves the same editor at `/` and under the Gateway at `/apps/flow/`:
+
+- Every response carries `X-AbstractFramework-App: flow; mount=1`. The Gateway serves only an app that announces it.
+- From a connection on this computer (the Gateway's proxy), `X-Forwarded-Prefix` sets the base path and `X-Forwarded-For` the browser's address. From any other connection those headers are ignored. A malformed forwarded header from a local connection is refused with HTTP 400.
+- The page gets `<base href="<base path>/">` and `base_path` in `window.__ABSTRACT_UI_CONFIG__`. The editor names every same-origin URL relatively (`api/gateway/...`, `./assets/...`), so the same build works at both addresses.
+- Session cookies use `Path=<base path>/`. When a browser holds two cookies of the same name, the one with the longest path (sent first) wins. Signing out under `/apps/flow/` also clears the `Path=/` cookies.
+- Browser storage keys all start with `abstractflow_`: under the Gateway, every app shares one origin.
 
 ## Proxy Contract
 
 The Flow server answers these routes itself:
 
-- `GET /api/health` and `GET /health`: Flow server readiness (`status`, `service`, `mode`, `gateway_url`). No sign-in required.
-- `/api/connection/gateway`: browser sign-in (`POST` with `gateway_url`, `gateway_user_id`, `gateway_token`), connection status (`GET`), and sign-out (`DELETE`).
+- `GET /api/health` and `GET /health`: Flow server readiness (`status`, `service`, `mode`, `gateway_url`, `base_path`). No sign-in required.
+- `/api/connection/gateway`: browser sign-in (`POST` with `gateway_url`, `gateway_user_id`, `gateway_token`, `persist`), connection status (`GET`: `ok`, `gateway_url`, `has_session`, `gateway`), and sign-out (`DELETE`).
 
-Every other `/api/*` request, including WebSocket upgrades, is proxied to the Gateway of the browser's session. It requires a signed-in browser session (HTTP 401 otherwise) and, for mutating methods, the session's CSRF token (HTTP 403 otherwise). The server replaces browser cookies and `Authorization` with the Gateway session headers.
+Every other `/api/*` request is forwarded to the Gateway of the browser's session. It requires a signed-in browser session (HTTP 401 otherwise) and, for mutating methods, the session's CSRF token in `X-AbstractFlow-CSRF` or `X-Abstract-CSRF` (HTTP 403 otherwise). The server replaces browser cookies and `Authorization` with the Gateway session headers. WebSocket upgrades are refused.
 
-Forwarding headers on every Gateway-bound request (proxied calls, sign-in, sign-out, the signed-in check, streams, and WebSocket connections):
+Forwarding headers on every Gateway-bound request (forwarded calls, sign-in, sign-out, the signed-in check and streams):
 
-- `X-Forwarded-For`: the address of the browser's connection to the Flow server.
+- `X-Forwarded-For`: the browser's address (the connection's address, or the address the Gateway's `/apps/flow/` proxy forwarded).
 - `X-AbstractFramework-App-Proxy: abstractflow`.
 
-Browser-supplied `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Real-IP`, `Forwarded`, and `X-AbstractFramework-App-Proxy` headers are dropped, in any letter case. A connection whose address cannot be determined is refused with HTTP 400. The Gateway uses these headers to decide whether a browser runs on its own machine.
+Browser-supplied `X-Forwarded-*`, `X-Real-IP`, `Forwarded` and `X-AbstractFramework-App-Proxy` headers never reach the Gateway. A connection whose address cannot be determined is refused with HTTP 400. The Gateway uses these headers to decide whether a browser runs on its own computer.
 
 The important Gateway surfaces are:
 
@@ -80,7 +101,7 @@ The optional `automation_defaults` field is described in [VisualFlow JSON > Auto
 
 High-value source modules:
 
-- `src/utils/gatewayClient.ts`: Gateway HTTP/SSE client helpers.
+- `src/utils/gatewayClient.ts`: Gateway HTTP/SSE client helpers; `gatewayRequestPath` turns an advertised `/api/gateway/...` endpoint into the relative `api/gateway/...` request path.
 - `src/utils/flowAuthoringCommands.ts`: typed Workflow Authoring Assistant command validation and graph mutation helpers.
 - `src/utils/gatewayCatalog.ts`: provider/model/media catalog normalization.
 - `src/utils/ledgerEvents.ts`: Gateway ledger to UI execution-event mapping.
@@ -100,7 +121,9 @@ High-value source modules:
 - `src/utils/triggerBindings.ts`: the `automation_defaults` shape (`parseAutomationDefaults`), the JSON Schema subset validator (`validateTriggerConfig`, `unsupportedSchemaKeywords`), and the schema-driven form conversion.
 - `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog.
 - `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time, Gateway rows from `GET /api/gateway/about` through the ui-kit `gatewayVersionRows` helper).
-- `bin/gateway_forwarding.js`: the forwarding headers the Flow server sets on Gateway-bound requests.
+- `bin/server.js`: the Flow server (`createFlowServer`) on `@abstractframework/app-server`: base path, identity header, session proxy, static files.
+- `bin/flags.js`: the launch flags and the Gateway URL resolution (`parseFlowFlags`).
+- `scripts/check_relative_urls.mjs`: run by `npm run build`; fails on any app-absolute `/api/` or `/assets/` URL in `src/` or `dist/`.
 
 Schema pin defaults are stored under `node.data.pinDefaults`, for example
 `pinDefaults.resp_schema` on LLM Call and Agent nodes. Gateway persists and

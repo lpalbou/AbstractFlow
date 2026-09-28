@@ -22,7 +22,7 @@ cat "$ABSTRACTGATEWAY_DATA_DIR/auth/bootstrap-admin-token"
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Open http://localhost:3003.
+Open http://127.0.0.1:3003/.
 
 Sign in with:
 
@@ -60,7 +60,7 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/api/*` to the Gateway URL selected in the connection UI or configured with `ABSTRACTGATEWAY_URL` / `ABSTRACTFLOW_GATEWAY_URL`. It does not set the forwarding headers the built server sends to the Gateway, so serve the built editor (below) when browsers on other machines use it.
+The Vite dev server uses the same server-side Gateway session as the built server (`@abstractframework/app-server`). Its Gateway is `ABSTRACTFLOW_GATEWAY_URL` / `ABSTRACTGATEWAY_URL` when set, else the Gateway installed on this computer, else `http://127.0.0.1:8080`.
 
 ## Build
 
@@ -69,7 +69,7 @@ npm run build
 npm start -- --gateway-url http://127.0.0.1:8080
 ```
 
-The static server in `bin/cli.js` serves `dist/` and proxies API/SSE calls to Gateway with browser-session auth injection.
+The server in `bin/cli.js` serves `dist/` on `127.0.0.1:3003` and forwards API and SSE calls to the Gateway with the browser's session. When AbstractGateway manages the editor, open it from the Gateway console at `/apps/flow/` instead. See [CLI](cli.md).
 
 ## Next Steps
 

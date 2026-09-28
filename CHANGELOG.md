@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Served through the Gateway at `/apps/flow/`.** The Flow server runs on
+  `@abstractframework/app-server`: it announces
+  `X-AbstractFramework-App: flow; mount=1`, reads the base path and the
+  browser's address from the Gateway's proxy (from a connection on the same
+  computer only), injects `<base href>` and `base_path` into the page, and
+  scopes session cookies to `Path=<base path>/`. Open it from the Gateway
+  console (**Apps > Flow Editor > Open**); `npx @abstractframework/flow` keeps
+  serving it at `/`. See [API and contracts > Serving Under A Base Path](docs/api.md#serving-under-a-base-path).
+- **Shared launch flags.** `--gateway-url` accepts the aliases `--gateway` and
+  `--url`; `--name=value` works; an unknown flag or missing value exits with
+  code 2.
+- **Finds the Gateway installed on this computer.** Without a flag or
+  environment variable, the server uses the saved login, then
+  `~/.abstractframework/gateway.json`, then `http://127.0.0.1:8080`, and follows
+  the Gateway to a new port when a connection is refused.
+- entity-chat and entity-goodbye set the agent.v1 `success` and `meta` end
+  pins; multiagent-coding sets the coding.v1 `passed` end pin (the verification
+  verdict, `false` on a preflight refusal).
+
+### Changed
+- The server listens on `127.0.0.1` by default (it was `0.0.0.0`). Pass
+  `--host 0.0.0.0` to accept other computers directly; through the Gateway no
+  change is needed.
+- The editor names every same-origin URL relatively (the build uses
+  `base: './'`); `npm run build` fails on an app-absolute `/api/` or `/assets/`
+  URL.
+- `GET /api/connection/gateway` answers `{ok, gateway_url, has_session,
+  gateway}` (the shared app-server shape); `/api/health` adds `base_path`.
+- `npm run dev` uses the same server-side Gateway session as the built server.
+
+### Removed
+- WebSocket forwarding under `/api/*` (the editor opens none); upgrades are
+  refused.
+- The ignored `--gateway-token` flag: it is now an unknown flag.
+
 ## [0.3.22] - 2026-09-27
 
 ### Added
