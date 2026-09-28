@@ -16,7 +16,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "deep-research@0.1.7.flow"
+# The shipped bundle version (abstractgateway flows/bundles/deep-research@0.1.8.flow,
+# gateway 0.5.0+). One copy: pack_deep_research_bundle.py reads it from here.
+BUNDLE_VERSION = "0.1.8"
+BUNDLE_PATH = BUNDLES_DIR / f"deep-research@{BUNDLE_VERSION}.flow"
 
 
 def _pin(pin_id: str, label: str, pin_type: str, description: str | None = None) -> dict[str, Any]:
@@ -1956,7 +1959,7 @@ def main() -> int:
         root_flow_json=FLOWS_DIR / "deep-research.json",
         out_path=BUNDLE_PATH,
         bundle_id="deep-research",
-        bundle_version="0.1.7",
+        bundle_version=BUNDLE_VERSION,
         flows_dir=FLOWS_DIR,
         entrypoints=["deep-research"],
         default_entrypoint="deep-research",

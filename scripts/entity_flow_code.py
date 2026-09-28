@@ -1642,6 +1642,22 @@ else:
 return {"answer": word}
 '''
 
+GOODBYE_REPORT_CODE = r'''
+# agent.v1 `success` / `meta` for the goodbye (backlog 0890): the close ran
+# when the session-close child delivered its output (a dead child delivers
+# None). meta says what closed: the turns folded and why the visitor left.
+out = _input.get("close_out")
+turns = _input.get("turns")
+try:
+    n = int(turns)
+except Exception:
+    n = 0
+return {
+    "completed": isinstance(out, dict),
+    "meta": {"turns": n, "reason": str(_input.get("reason") or "the visitor left")},
+}
+'''
+
 CHAT_STATE_CODE = r'''
 # Session continuity for chat clients: when the host seeds durable session
 # history (use_session_history -> context.messages), fold the recent turns
@@ -1678,6 +1694,33 @@ if not log:
         log = folded[-12:]
         state["turn_log"] = log
 return {"state": state}
+'''
+
+CHAT_REPORT_CODE = r'''
+# agent.v1 `success` / `meta` for one chat moment (backlog 0890): the moment
+# succeeded when it was not degraded (the turn did not die, the visit child
+# did not die: CHAT_DEGRADED_CODE's fold). meta carries what the host asked
+# for (provider/model, empty = the gateway default) and what the moment did.
+degraded = 1 if _input.get("degraded") == 1 else 0
+vout = _input.get("visit_out")
+if not isinstance(vout, dict):
+    vout = {}
+tools = vout.get("tools_ran")
+if not isinstance(tools, list):
+    tools = []
+rounds = vout.get("tool_rounds")
+if not isinstance(rounds, int):
+    rounds = 0
+return {
+    "completed": degraded == 0,
+    "meta": {
+        "provider": str(_input.get("provider") or ""),
+        "model": str(_input.get("model") or ""),
+        "tools_ran": len(tools),
+        "tool_rounds": rounds,
+        "degraded": degraded,
+    },
+}
 '''
 
 CHAT_DEGRADED_CODE = r'''

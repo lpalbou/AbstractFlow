@@ -116,7 +116,8 @@ def main() -> int:
         reg = WorkflowRegistry()
         specs = {}
         for fid in ("entity-cognition-turn", "entity-tool-rounds",
-                    "entity-session-close", "entity-goodbye"):
+                    "entity-session-close", "entity-goodbye",
+                    "entity-visit", "entity-chat"):
             fspec = compile_visualflow(json.loads((FLOWS / f"{fid}.json").read_text()))
             specs[fspec.workflow_id] = fspec
             reg.register(fspec)
@@ -603,12 +604,46 @@ def main() -> int:
                 check("goodbye reports itself in words",
                       "session closed" in str(out4.get("answer") or ""),
                       f"answer={str(out4.get('answer'))[:120]!r}")
+                # agent.v1 success/meta (backlog 0890): computed, never null.
+                check("goodbye sets success=True (the close ran)", out4.get("success") is True,
+                      f"success={out4.get('success')!r}")
+                check("goodbye meta says what closed",
+                      out4.get("meta") == {"turns": 2, "reason": "goodbye test"},
+                      f"meta={out4.get('meta')!r}")
                 closes = [e for e in ert.home.diary.list_entries()
                           if "session close" in str(e.get("text") or "")
                           or "visit session" in str(e.get("text") or "")
                           or str(e.get("kind") or "") == "note"]
                 check("the deterministic close note landed in the book",
                       len(closes) >= 1, f"entries={len(ert.home.diary.list_entries())}")
+
+
+            # SCENARIO 5 — the chat door (agent.v1, backlog 0890): one visit
+            # moment answered, with `success` and `meta` computed.
+            cspec = specs.get("entity-chat")
+            check("entity-chat compiled", cspec is not None, "flow missing")
+            if cspec is not None:
+                run5 = ert.runtime.start(
+                    workflow=cspec,
+                    vars={"prompt": "Hello again, how is the sky?", "system": "", "provider": "",
+                          "model": "", "state": {}, "participants": ["person:laurent"]},
+                    session_id="smoke-chat-1",
+                )
+                drive(run5)
+                s5 = ert.runtime.get_state(run5)
+                out5 = s5.output if isinstance(s5.output, dict) else {}
+                check("chat completes", s5.status == RunStatus.COMPLETED,
+                      f"status={s5.status} err={getattr(s5, 'error', None)}")
+                check("chat answers", bool(str(out5.get("answer") or "").strip()),
+                      f"answer={str(out5.get('answer'))[:120]!r}")
+                check("chat sets success=True on a lived moment",
+                      out5.get("success") is True and out5.get("degraded") == 0,
+                      f"success={out5.get('success')!r} degraded={out5.get('degraded')!r}")
+                meta5 = out5.get("meta") if isinstance(out5.get("meta"), dict) else {}
+                check("chat meta carries provider/model and what the moment did",
+                      set(meta5) == {"provider", "model", "tools_ran", "tool_rounds", "degraded"}
+                      and meta5.get("degraded") == 0 and isinstance(meta5.get("tools_ran"), int),
+                      f"meta={meta5!r}")
 
         finally:
             ert.close()

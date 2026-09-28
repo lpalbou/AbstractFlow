@@ -67,7 +67,8 @@ from wf_common import (
 
 # abstractcode.coding.v1 requires a `passed` On Flow End input (the AbstractFlow
 # editor adds it to any flow declaring the interface; keep it here so a
-# regenerated flow matches). Not wired: this pipeline reports `success`.
+# regenerated flow matches). `end` reads the run var `all_passed` (the last
+# verification verdict); the preflight refusal `end_pre` ran no gate: False.
 CODING_V1_PASSED_PIN = {**pin("passed", "passed", "boolean"),
                         "description": "True when the verification gates passed."}
 
@@ -152,7 +153,9 @@ BUNDLE_ID = "multiagent-coding"
 #   probe fails SAFE to brownfield. The requirements-coverage stage considered
 #   for 0.0.18 was NOT shipped (window too small to graft spec-coding's Loop 2
 #   machinery responsibly); gates + review remain the quality oracle.
-BUNDLE_VERSION = "0.0.18"
+# 0.0.19 (2026-09-28, backlog 0890): the coding.v1 `passed` end pin reads
+# all_passed (`end`) and is False on the preflight refusal (`end_pre`).
+BUNDLE_VERSION = "0.0.19"
 ROOT_FLOW_ID = "multiagent-coding"
 VERIFY_FLOW_ID = "multiagent-verify-gates"
 WRAPPER_FLOW_ID = "multiagent-coder"  # agent.v1 wrapper entrypoint (picker-visible)
@@ -1808,7 +1811,7 @@ def build_root() -> dict:
                           pin("success", "success", "boolean"),
                           pin("stopped_reason", "stopped_reason", "string"),
                           CODING_V1_PASSED_PIN],
-                  pin_defaults={"success": False,
+                  pin_defaults={"success": False, "passed": False,
                                 "stopped_reason": "preflight-failed"}))
 
     # Run-start gating line (code-tui c5871): the FIRST user-visible line of
@@ -2719,6 +2722,8 @@ def build_root() -> dict:
     data("final_report", "merged_ok", "end", "success")
     data("final_report", "branch", "end", "branch")
     data("final_report", "stopped_reason", "end", "stopped_reason")
+    # coding.v1 `passed`: the same all_passed chip the final report reads.
+    data("final_report_all_passed", "value", "end", "passed")
 
     W.apply_flow_layout(f)
     write_json(FLOWS_DIR / f"{ROOT_FLOW_ID}.json", f)

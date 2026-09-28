@@ -343,7 +343,10 @@ def main() -> int:
                         # `success` here reported every refusal as a success.
                         "success": ("final_report", "merged_ok"),
                         "branch": ("final_report", "branch"),
-                        "stopped_reason": ("final_report", "stopped_reason")},
+                        "stopped_reason": ("final_report", "stopped_reason"),
+                        # coding.v1 `passed` (backlog 0890): the run var
+                        # all_passed, through the chip the final report reads.
+                        "passed": ("final_report_all_passed", "value")},
           str(end_wires))
     # Doctrine gate: no exec-lane code node may declare an output pin whose
     # name the executor's own output record owns. wf_common refuses this at
@@ -1531,7 +1534,7 @@ def main() -> int:
     check("e2e-refusal-completes", state_run.status == RunStatus.COMPLETED,
           f"status={state_run.status}")
     out = state_run.output or {}
-    check("e2e-refusal-honest", out.get("success") is False
+    check("e2e-refusal-honest", out.get("success") is False and out.get("passed") is False
           and out.get("stopped_reason") == "preflight-failed"
           and "empty request" in str(out.get("report") or ""),
           str(out)[:200])
@@ -1621,7 +1624,7 @@ def main() -> int:
     check("e2e-full-completes", final is not None and final.status == RunStatus.COMPLETED,
           f"status={final and final.status} error={final and getattr(final, 'error', None)}")
     out = (final.output or {}) if final else {}
-    check("e2e-full-merged", out.get("success") is True
+    check("e2e-full-merged", out.get("success") is True and out.get("passed") is True
           and out.get("stopped_reason") == "approved-and-merged"
           and out.get("branch") == "snake-game", str(out)[:200])
     check("e2e-full-gating-line-first", progress_lines[:1] == ["gating: wait"],
@@ -1689,7 +1692,7 @@ def main() -> int:
     st4 = runtime3.tick(workflow=spec, run_id=run_id4, max_steps=400)
     out4 = st4.output or {}
     check("e2e-auto-stall-exits", st4.status == RunStatus.COMPLETED
-          and out4.get("success") is False
+          and out4.get("success") is False and out4.get("passed") is False
           and str(out4.get("stopped_reason") or "").startswith("stalled"),
           f"status={st4.status} out={str(out4)[:160]}")
 

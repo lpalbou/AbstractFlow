@@ -484,6 +484,7 @@
         "outputs": [],
         "pinDefaults": {
           "success": false,
+          "passed": false,
           "stopped_reason": "preflight-failed"
         }
       },
@@ -4201,7 +4202,7 @@
       "type": "call_tool",
       "position": {
         "x": 12000.0,
-        "y": 120.0
+        "y": 440.0
       },
       "data": {
         "nodeType": "call_tool",
@@ -7969,7 +7970,7 @@
       "type": "code",
       "position": {
         "x": 12000.0,
-        "y": 440.0
+        "y": 760.0
       },
       "data": {
         "nodeType": "code",
@@ -8132,7 +8133,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 484.0
+        "y": 804.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8174,7 +8175,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 510.0
+        "y": 830.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8216,7 +8217,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 536.0
+        "y": 856.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8257,8 +8258,8 @@
       "id": "final_report_all_passed",
       "type": "get_var",
       "position": {
-        "x": 11845.0,
-        "y": 562.0
+        "x": 12000.0,
+        "y": 120.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8300,7 +8301,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 588.0
+        "y": 908.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8342,7 +8343,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 614.0
+        "y": 934.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8384,7 +8385,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 640.0
+        "y": 960.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8426,7 +8427,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 666.0
+        "y": 986.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8468,7 +8469,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 692.0
+        "y": 1012.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8510,7 +8511,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 718.0
+        "y": 1038.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8552,7 +8553,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 744.0
+        "y": 1064.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8594,7 +8595,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 770.0
+        "y": 1090.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8636,7 +8637,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 796.0
+        "y": 1116.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8678,7 +8679,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 822.0
+        "y": 1142.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8720,7 +8721,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 848.0
+        "y": 1168.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8762,7 +8763,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 874.0
+        "y": 1194.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8804,7 +8805,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 900.0
+        "y": 1220.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8846,7 +8847,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 926.0
+        "y": 1246.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8888,7 +8889,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 952.0
+        "y": 1272.0
       },
       "data": {
         "nodeType": "get_var",
@@ -8930,7 +8931,7 @@
       "type": "get_var",
       "position": {
         "x": 11845.0,
-        "y": 978.0
+        "y": 1298.0
       },
       "data": {
         "nodeType": "get_var",
@@ -10941,11 +10942,19 @@
       "target": "end",
       "targetHandle": "stopped_reason",
       "animated": false
+    },
+    {
+      "id": "e-final_report_all_passed-value-end-passed",
+      "source": "final_report_all_passed",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "passed",
+      "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-08-02T13:03:03.950453+00:00",
-  "updated_at": "2026-08-02T13:03:03.950453+00:00",
+  "created_at": "2026-09-28T01:21:22.835069+00:00",
+  "updated_at": "2026-09-28T01:21:22.835069+00:00",
   "functions": [
     {
       "name": "branch_slug",

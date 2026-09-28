@@ -378,6 +378,69 @@
       "outputs": []
     },
     {
+      "id": "chat_report",
+      "type": "code",
+      "position": {
+        "x": 1160,
+        "y": 380
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Did the moment live?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "degraded",
+            "label": "degraded",
+            "type": "number"
+          },
+          {
+            "id": "visit_out",
+            "label": "visit_out",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "completed",
+            "label": "completed",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# agent.v1 `success` / `meta` for one chat moment (backlog 0890): the moment\n# succeeded when it was not degraded (the turn did not die, the visit child\n# did not die: CHAT_DEGRADED_CODE's fold). meta carries what the host asked\n# for (provider/model, empty = the gateway default) and what the moment did.\ndegraded = 1 if _input.get(\"degraded\") == 1 else 0\nvout = _input.get(\"visit_out\")\nif not isinstance(vout, dict):\n    vout = {}\ntools = vout.get(\"tools_ran\")\nif not isinstance(tools, list):\n    tools = []\nrounds = vout.get(\"tool_rounds\")\nif not isinstance(rounds, int):\n    rounds = 0\nreturn {\n    \"completed\": degraded == 0,\n    \"meta\": {\n        \"provider\": str(_input.get(\"provider\") or \"\"),\n        \"model\": str(_input.get(\"model\") or \"\"),\n        \"tools_ran\": len(tools),\n        \"tool_rounds\": rounds,\n        \"degraded\": degraded,\n    },\n}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "end",
       "type": "on_flow_end",
       "position": {
@@ -627,9 +690,57 @@
       "target": "end",
       "targetHandle": "tool_rounds",
       "animated": false
+    },
+    {
+      "id": "e-degraded_fold-degraded-chat_report-degraded",
+      "source": "degraded_fold",
+      "sourceHandle": "degraded",
+      "target": "chat_report",
+      "targetHandle": "degraded",
+      "animated": false
+    },
+    {
+      "id": "e-visit-output-chat_report-visit_out",
+      "source": "visit",
+      "sourceHandle": "output",
+      "target": "chat_report",
+      "targetHandle": "visit_out",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-chat_report-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "chat_report",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-chat_report-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "chat_report",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-chat_report-completed-end-success",
+      "source": "chat_report",
+      "sourceHandle": "completed",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-chat_report-meta-end-meta",
+      "source": "chat_report",
+      "sourceHandle": "meta",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-08-01T04:56:46.105455+00:00",
-  "updated_at": "2026-08-01T04:56:46.105455+00:00"
+  "created_at": "2026-09-28T01:21:21.855180+00:00",
+  "updated_at": "2026-09-28T01:21:21.855180+00:00"
 }

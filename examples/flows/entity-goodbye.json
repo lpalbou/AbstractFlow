@@ -324,6 +324,64 @@
       "outputs": []
     },
     {
+      "id": "close_report",
+      "type": "code",
+      "position": {
+        "x": 940,
+        "y": 600
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Did the close run?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "close_out",
+            "label": "close_out",
+            "type": "object"
+          },
+          {
+            "id": "turns",
+            "label": "turns",
+            "type": "number"
+          },
+          {
+            "id": "reason",
+            "label": "reason",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "completed",
+            "label": "completed",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "\n# agent.v1 `success` / `meta` for the goodbye (backlog 0890): the close ran\n# when the session-close child delivered its output (a dead child delivers\n# None). meta says what closed: the turns folded and why the visitor left.\nout = _input.get(\"close_out\")\nturns = _input.get(\"turns\")\ntry:\n    n = int(turns)\nexcept Exception:\n    n = 0\nreturn {\n    \"completed\": isinstance(out, dict),\n    \"meta\": {\"turns\": n, \"reason\": str(_input.get(\"reason\") or \"the visitor left\")},\n}\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "end",
       "type": "on_flow_end",
       "position": {
@@ -490,9 +548,49 @@
       "target": "end",
       "targetHandle": "diary_entry_id",
       "animated": false
+    },
+    {
+      "id": "e-close-output-close_report-close_out",
+      "source": "close",
+      "sourceHandle": "output",
+      "target": "close_report",
+      "targetHandle": "close_out",
+      "animated": false
+    },
+    {
+      "id": "e-turns_out-value-close_report-turns",
+      "source": "turns_out",
+      "sourceHandle": "value",
+      "target": "close_report",
+      "targetHandle": "turns",
+      "animated": false
+    },
+    {
+      "id": "e-start-reason-close_report-reason",
+      "source": "start",
+      "sourceHandle": "reason",
+      "target": "close_report",
+      "targetHandle": "reason",
+      "animated": false
+    },
+    {
+      "id": "e-close_report-completed-end-success",
+      "source": "close_report",
+      "sourceHandle": "completed",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-close_report-meta-end-meta",
+      "source": "close_report",
+      "sourceHandle": "meta",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-08-01T04:56:46.105471+00:00",
-  "updated_at": "2026-08-01T04:56:46.105471+00:00"
+  "created_at": "2026-09-28T01:21:21.855217+00:00",
+  "updated_at": "2026-09-28T01:21:21.855217+00:00"
 }
