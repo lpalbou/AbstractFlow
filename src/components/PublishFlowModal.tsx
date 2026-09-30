@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { AfSwitch } from '@abstractframework/ui-kit';
 import {
   capabilityUnavailable,
   endpointFromDescriptor,
@@ -114,15 +115,17 @@ export function PublishFlowModal({
           <span className="property-hint">Leave empty to auto-bump (e.g., 0.0.1 → 0.0.2).</span>
         </div>
 
-        <label className="run-form-checkbox" style={{ marginTop: 12 }}>
-          <input
-            type="checkbox"
+        <div style={{ marginTop: 12 }}>
+          <AfSwitch
+            variant="row"
+            label="Reload gateway bundles"
+            description="Load the new version into the gateway right after publishing."
+            action="reload-gateway"
             checked={reloadGateway}
-            onChange={(e) => setReloadGateway(e.target.checked)}
-            disabled={isSubmitting}
+            busy={isSubmitting}
+            onChange={setReloadGateway}
           />
-          Reload gateway bundles after publish
-        </label>
+        </div>
 
         {result ? (
           <div style={{ marginTop: 16 }}>

@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
-import { SpeculationSelect, normalizeSpeculationValue, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AfSwitch, SpeculationSelect, normalizeSpeculationValue, type SpeculationValue } from '@abstractframework/ui-kit';
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { getBundledFlow } from '../utils/bundledFlows';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
@@ -4331,14 +4331,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </div>
 
           <div className="property-group">
-            <label className="property-sublabel">Structured Output</label>
-            <label className="toggle-container">
-              <input
-                type="checkbox"
-                className="toggle-checkbox"
-                checked={agentSchemaEnabled}
-                onChange={(e) => {
-                  const enabled = e.target.checked;
+            <AfSwitch
+              variant="row"
+              className="property-switch"
+              label="Structured output"
+              description="Return a JSON result that matches a schema."
+              action="structured-output"
+              checked={agentSchemaEnabled}
+              onChange={(enabled) => {
                   setAgentSchemaEnabled(enabled);
                   if (agentSchemaMode === 'fields') {
                     commitAgentSchema(enabled, agentSchemaFields, 'fields');
@@ -4367,11 +4367,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     },
                   });
                 }}
-              />
-              <span className="toggle-label">
-                Return JSON result
-              </span>
-            </label>
+            />
 
             {agentSchemaEnabled && (
               <>
@@ -4612,14 +4608,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 )}
 
 	                <span className="property-hint">
-	                  When enabled, the Agent&apos;s <code>response</code> output is a JSON string matching this schema.
+	                  While Structured output is on, the Agent&apos;s <code>response</code> output is a JSON string matching this schema.
 	                </span>
               </>
             )}
 
 	            {!agentSchemaEnabled && (
 	              <span className="property-hint">
-	                Disabled: the Agent returns a free-form response string.
+	                Off: the Agent returns a free-form response string.
 	              </span>
 	            )}
           </div>
@@ -4945,28 +4941,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             </span>
           </div>
           <div className="property-group">
-            <label className="property-sublabel">Recurrent</label>
-            <label className="toggle-container">
-              <input
-                type="checkbox"
-                className="toggle-checkbox"
-                checked={data.eventConfig?.recurrent ?? true}
-                onChange={(e) =>
-                  updateNodeData(node.id, {
-                    eventConfig: {
-                      ...data.eventConfig,
-                      recurrent: e.target.checked,
-                    },
-                  })
-                }
-              />
-              <span className="toggle-label">
-                {(data.eventConfig?.recurrent ?? true) ? 'Enabled' : 'Disabled'}
-              </span>
-            </label>
-            <span className="property-hint">
-              When enabled, the schedule re-arms after the branch completes.
-            </span>
+            <AfSwitch
+              variant="row"
+              className="property-switch"
+              label="Recurrent"
+              description="The schedule re-arms after the branch completes."
+              action="recurrent"
+              checked={data.eventConfig?.recurrent ?? true}
+              onChange={(recurrent) =>
+                updateNodeData(node.id, {
+                  eventConfig: {
+                    ...data.eventConfig,
+                    recurrent,
+                  },
+                })
+              }
+            />
           </div>
         </div>
       )}
@@ -6053,25 +6043,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {data.nodeType === 'ask_user' && (
         <div className="property-section">
           <label className="property-label">User Prompt Settings</label>
-          <label className="toggle-container">
-            <input
-              type="checkbox"
-              className="toggle-checkbox"
-              checked={data.effectConfig?.allowFreeText ?? true}
-              onChange={(e) =>
-                updateNodeData(node.id, {
-                  effectConfig: {
-                    ...data.effectConfig,
-                    allowFreeText: e.target.checked,
-                  },
-                })
-              }
-            />
-            <span className="toggle-label">Allow free text response</span>
-          </label>
-          <span className="property-hint">
-            If disabled, user must choose from provided choices
-          </span>
+          <AfSwitch
+            variant="row"
+            className="property-switch"
+            label="Free text answers"
+            description="Off: the user must pick one of the provided choices."
+            action="allow-free-text"
+            checked={data.effectConfig?.allowFreeText ?? true}
+            onChange={(allowFreeText) =>
+              updateNodeData(node.id, {
+                effectConfig: {
+                  ...data.effectConfig,
+                  allowFreeText,
+                },
+              })
+            }
+          />
         </div>
       )}
 

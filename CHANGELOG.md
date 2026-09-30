@@ -7,16 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Phones and tablets get more of the screen for reading. Desktop windows
-1024 px or wider with a mouse look the same as in 0.5.0. Nothing changes in
-VisualFlow documents, the server, or the Gateway contract.
+Phones and tablets get more of the screen for reading, and on/off options in
+the editor are switches labelled by what they control. Desktop windows 1024 px
+or wider with a mouse keep the 0.5.0 layout. Anyone editing node properties,
+publishing, starting a run or using the Resources panel sees the switches.
+Nothing changes in VisualFlow documents, the server, or the Gateway contract.
 
 ### Added
 - **Collapsible lists.** In the flow library and the run window, the list
   above the detail has a header you tap to hide or show it (Flows,
   Execution), with a mouse, a tap, or Enter and Space. Lists start open. The
-  editor remembers your choice in this browser. Hiding the list gives the preview or the step details the whole
-  sheet.
+  editor remembers your choice in this browser. Hiding the list gives the
+  preview or the step details the whole sheet.
 
 ### Changed
 - **One scroll per sheet.** On phones and tablets, the flow library, the run
@@ -35,6 +37,19 @@ VisualFlow documents, the server, or the Gateway contract.
   zoom.
 - Dialogs opened from the toolbar are no longer inside the page header, so
   screen readers no longer read them as part of the header.
+- **Switches show their state.** A switch is highlighted with a check mark
+  when on, plain when off.
+- **Node settings.** **Structured output** (Agent), **Recurrent** (On
+  Schedule) and **Free text answers** (Ask User) are switches in the
+  properties panel. Recurrent no longer shows an "Enabled" / "Disabled" label.
+- **Dialog options.** **Reload gateway bundles** (Publish), **New folder per
+  run** (the run window's workspace folder), **Durable** (sending an event to
+  a waiting run), **Lock after load** and **Cached and non-resident models**
+  (Resources) are switches. In the run window, New folder per run shows why it
+  cannot change while the gateway manages the workspace or a run is in
+  progress.
+- Pause and Resume on a running run stay buttons: they act on the run once,
+  they are not a setting.
 
 ## [0.5.0] - 2026-09-30
 

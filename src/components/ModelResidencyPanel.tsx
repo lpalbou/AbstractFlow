@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { AfSwitch } from '@abstractframework/ui-kit';
 import { useModels, useProviders } from '../hooks/useProviders';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 import {
@@ -833,19 +834,27 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
 
       <div className="model-residency-loadbar-meta">
         {lockAvailable ? (
-          <label className="run-form-checkbox model-residency-lock-checkbox" title="Ask the Gateway to protect the loaded model from unload/eviction.">
-            <input type="checkbox" checked={lockOnLoad} onChange={(e) => setLockOnLoad(e.target.checked)} />
-            <span>Lock after load</span>
-          </label>
+          <AfSwitch
+            variant="sm"
+            label="Lock after load"
+            hint="Ask the Gateway to protect the loaded model from unload/eviction."
+            action="lock-after-load"
+            checked={lockOnLoad}
+            onChange={setLockOnLoad}
+          />
         ) : null}
         {loadEstimateHint ? <span className="model-residency-estimate-hint">{loadEstimateHint}</span> : null}
       </div>
 
       <div className="model-residency-note">
-        <label className="run-form-checkbox model-residency-filter-toggle">
-          <input type="checkbox" checked={showNonResident} onChange={(e) => setShowNonResident(e.target.checked)} />
-          <span>Show cached/non-resident</span>
-        </label>
+        <AfSwitch
+          variant="sm"
+          label="Cached and non-resident models"
+          hint="List cached and configuration rows next to the models loaded in memory."
+          action="show-non-resident"
+          checked={showNonResident}
+          onChange={setShowNonResident}
+        />
         {!showNonResident && hiddenCount > 0
           ? ` ${hiddenCount} configuration/cache row${hiddenCount === 1 ? '' : 's'} hidden from this list.`
           : ''}
@@ -871,7 +880,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
           {loadedQuery.isLoading
             ? 'Loading resident models…'
             : hiddenCount > 0
-              ? 'No provider-resident models reported. Enable "Show cached/non-resident" to inspect cached and configuration rows.'
+              ? 'No provider-resident models reported. Switch "Cached and non-resident models" on to inspect cached and configuration rows.'
               : 'No provider-resident models reported.'}
         </div>
       ) : (
