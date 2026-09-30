@@ -442,7 +442,7 @@ function App() {
 
       {/* Main content */}
       <main
-        className={`app-main ${right_drawer_open ? 'properties-open' : 'properties-collapsed'} ${palette_drawer_open ? 'palette-open' : ''}`}
+        className={`app-main ${right_drawer_open ? 'properties-open' : 'properties-collapsed'}`}
       >
         {/* Left sidebar - Node palette (a drawer below 1024 px) */}
         <aside

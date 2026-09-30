@@ -645,8 +645,15 @@ body {
     bottom: max(16px, var(--safe-bottom, 0px));
   }
 
+  /* Inside the minimap's top-right corner (15 px margin + 150 px map). */
   .canvas-preview-toggle:not(.collapsed) {
-    bottom: 160px;
+    bottom: 117px;
+  }
+
+  /* Flow library tree: the kit disclosure chevrons are 22 px. */
+  .flow-library-list .af-disclosure__chevron {
+    min-width: 44px;
+    min-height: 44px;
   }
 
   /* Run window traffic lights: a 44 px hit box around the 18 px dot. */
