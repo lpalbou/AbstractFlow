@@ -1,7 +1,7 @@
 {
   "id": "co-scientist",
-  "name": "co-scientist",
-  "description": "Deep multi-agent hypothesis engine (Nature 'AI co-scientist' replica). Starts FROM the literature by delegating grounding to the deep-research investigation engine (deep-plan + deep-investigate: real web search + a verified source ledger), then runs a supervisor loop of Generation -> Reflection -> Elo-ranking (prioritized pairwise scientific debate) -> Evolution -> research-expansion, threading meta-feedback forward each cycle with near-duplicate pruning, then a final search-grounded full review of the finalists and a Meta-review research overview. Deliberately deeper than a single-pass report - it scales test-time compute via the cycle budget.",
+  "name": "Co-scientist",
+  "description": "Takes a research goal, grounds it in web sources, then generates, debates and ranks hypotheses over cycles; returns a research overview.",
   "interfaces": [
     "abstractresearch.coscientist.v1"
   ],

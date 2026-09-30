@@ -29,6 +29,21 @@ Bundle versions are immutable by sha, so publishing a changed graph means
 bumping the version in the generator and updating the packaging pin in
 `abstractgateway/pyproject.toml`.
 
+The name and one-line description each entrypoint shows on the Gateway's
+Workflows page come from one table, `scripts/workflow_labels.py`. The
+generators read it, and `scripts/relabel_shipped_bundles.py` keeps the shipped
+bundles in line without repacking their graphs:
+
+```bash
+python3 scripts/relabel_shipped_bundles.py check --bundles-dir ../abstractgateway/flows/bundles
+python3 scripts/relabel_shipped_bundles.py apply --bundles-dir ../abstractgateway/flows/bundles
+```
+
+`check` fails when a generator, an example JSON or the latest shipped bundle
+of a family carries other text, or when a shipped bundle has an entrypoint the
+table does not name. `apply` rewrites only the labels of the latest version of
+each family; older versions are never touched.
+
 None of these shipped flows cuts what a model reads (ADR-0026): no message or
 character caps on prompts, tool output or documents, and no default output-token
 caps. The only bounds left are labeled display previews (for example, a

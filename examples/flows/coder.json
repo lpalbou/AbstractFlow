@@ -1,7 +1,7 @@
 {
   "id": "coder",
-  "name": "coder",
-  "description": "Chat-agent entrypoint for the coding-agent pipeline: takes a plain prompt (abstractcode.agent.v1), runs the verify-gated build loop in the session workspace with inferred gates (no explicit build/run commands — the verifier executes what it can and reports honestly), and returns the build report as the response.",
+  "name": "Coding agent (chat)",
+  "description": "Chat version of the coding agent: builds what the prompt asks in the session workspace, checks it each round, and replies with a report.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

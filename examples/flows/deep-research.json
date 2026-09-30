@@ -1,7 +1,7 @@
 {
   "id": "deep-research",
-  "name": "deep-research",
-  "description": "Production research workflow with adversarial review, provenance, and Markdown/PDF/DOCX export.",
+  "name": "Deep research",
+  "description": "Takes a research question, searches the web, has three critics review the draft, and writes a cited report (Markdown, PDF, DOCX).",
   "interfaces": [
     "abstractcode.agent.v1",
     "abstractresearch.deep.v1"

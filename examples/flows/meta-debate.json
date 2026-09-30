@@ -1,7 +1,7 @@
 {
   "id": "meta-debate",
-  "name": "meta-debate",
-  "description": "Meta-intelligence: proposer answers, an adversarial challenger attacks the answer (flaws, counterexamples, missing cases), then the proposer concedes-or-rebuts point by point and writes the defended final answer. Multi-agent debate pattern; comparable 1:1 against an isolated LLM call.",
+  "name": "Debate",
+  "description": "One model answers, a challenger attacks the answer, then the first model concedes or rebuts each point and writes the final answer.",
   "interfaces": [
     "abstractcode.agent.v1",
     "abstractmeta.intelligence.v1"

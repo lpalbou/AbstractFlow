@@ -1,7 +1,7 @@
 {
   "id": "adversarial-review",
-  "name": "adversarial-review",
-  "description": "Reusable review primitive: three independent critics review an artifact through correctness / design-robustness / requirements-fit lenses, then a merge step consolidates and severity-ranks the findings into one pass/revise/block verdict. Composable as a subflow.",
+  "name": "Adversarial review",
+  "description": "Three critics review text or code for correctness, design and fit to requirements; returns ranked findings and a pass/revise/block verdict.",
   "interfaces": [
     "abstractreview.adversarial.v1"
   ],

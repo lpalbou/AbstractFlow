@@ -26,8 +26,9 @@ describe('bundled deep research flows', () => {
       bundleVersion: '0.1.8',
       bundleRef: 'deep-research@0.1.8',
     });
-    // 2026-07-16: ids, names, files, and the bundle id are all deep-* (dp- retired).
-    expect(flows.find((flow) => flow.id === 'deep-research')?.name).toBe('deep-research');
+    // 2026-07-16: ids, files, and the bundle id are all deep-* (dp- retired).
+    // The root's name is its display name from scripts/workflow_labels.py.
+    expect(flows.find((flow) => flow.id === 'deep-research')?.name).toBe('Deep research');
     expect(flows.find((flow) => flow.id === 'deep-plan')?.name).toBe('deep-research-plan');
   });
 

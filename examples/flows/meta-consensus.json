@@ -1,7 +1,7 @@
 {
   "id": "meta-consensus",
-  "name": "meta-consensus",
-  "description": "Meta-intelligence: two independent LLM answers reconciled into one consensus answer — agreement is kept as reliable, divergence is resolved by reasoning, not averaged. Diversity comes from temperature (0.3 vs 0.9) by default, or from a genuinely different second model via the optional provider_b/model_b inputs. Self-consistency pattern; comparable 1:1 against an isolated LLM call on the same prompt. Consensus across N>2 answerers needs a loop-based flow (future scope).",
+  "name": "Consensus",
+  "description": "Gets two independent answers (two temperatures or two models) and merges them into one, keeping agreements and resolving differences.",
   "interfaces": [
     "abstractcode.agent.v1",
     "abstractmeta.intelligence.v1"

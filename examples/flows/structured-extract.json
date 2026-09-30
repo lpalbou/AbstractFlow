@@ -1,7 +1,7 @@
 {
   "id": "structured-extract",
-  "name": "structured-extract",
-  "description": "Reusable extraction primitive: an LLM extracts JSON from source text against a caller-supplied JSON Schema; a deterministic validator checks required keys/types and feeds specific errors back as a correction reprompt until the output is valid or the attempt budget is spent.",
+  "name": "Structured extraction",
+  "description": "Extracts JSON matching a given schema from text, checks required fields and types, and retries with the errors until it is valid.",
   "interfaces": [
     "abstractextract.structured.v1"
   ],

@@ -1,7 +1,7 @@
 {
   "id": "meta-baseline",
-  "name": "meta-baseline",
-  "description": "Control arm for the meta-intelligence benchmark: ONE isolated LLM call answering directly (same system prompt, same machinery, no orchestration). Conforms to abstractcode.agent.v1.",
+  "name": "Single call (baseline)",
+  "description": "Answers the prompt with one direct LLM call; the baseline the other deliberation workflows are compared against.",
   "interfaces": [
     "abstractcode.agent.v1",
     "abstractmeta.intelligence.v1"

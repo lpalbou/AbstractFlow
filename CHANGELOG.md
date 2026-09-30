@@ -21,6 +21,17 @@ Nothing changes in VisualFlow documents, the server, or the Gateway contract.
   preview or the step details the whole sheet.
 
 ### Changed
+- **Plain names and descriptions for the shipped workflows.** Every shipped
+  entrypoint has a name a person would use ("Basic agent", "Coding agent
+  (chat)", "Deep research") and one sentence of at most 140 characters that
+  says what it takes and what it returns, instead of its id and a developer
+  note. The text lives in one table, `scripts/workflow_labels.py`; the
+  generators take it from there, and `scripts/relabel_shipped_bundles.py`
+  writes it into the latest shipped bundle of each family and the example
+  JSONs (`apply`) and checks that generators, examples and bundles agree
+  (`check`). Only the labels change: graphs, versions and older versions stay
+  as they were, except docs-qa, which the gateway keeps in its catalog and
+  therefore ships the new text as 0.1.2.
 - **One scroll per sheet.** On phones and tablets, the flow library, the run
   window and the run history scroll as one page. Lists no longer scroll inside
   their own box, and sections are flat, with a thin line between items.

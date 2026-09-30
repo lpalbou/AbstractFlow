@@ -1,7 +1,7 @@
 {
   "id": "meta-deliberate",
-  "name": "meta-deliberate",
-  "description": "Meta-intelligence: a planner absorbs the question first (what is really asked, required steps, known pitfalls, a correctness checklist), an executor answers following the plan, and a verifier checks the answer against the plan's own checklist and repairs failures. Plan-and-Solve pattern; comparable 1:1 against an isolated LLM call.",
+  "name": "Plan, answer, verify",
+  "description": "Plans the question (steps, pitfalls, checklist), answers following the plan, then checks the answer against the checklist and fixes it.",
   "interfaces": [
     "abstractcode.agent.v1",
     "abstractmeta.intelligence.v1"

@@ -1,7 +1,7 @@
 {
   "id": "meta-perspectives",
-  "name": "meta-perspectives",
-  "description": "Meta-intelligence: a decomposer picks the 3 most revealing angles for THIS question (disciplines, stances, timescales, stakeholders...), each angle answers independently, then an integrator weaves them into one answer that names the tensions between angles instead of papering over them. Comparable 1:1 against an isolated LLM call.",
+  "name": "Three perspectives",
+  "description": "Picks three angles on the question, answers from each separately, then combines them into one answer that names where they disagree.",
   "interfaces": [
     "abstractcode.agent.v1",
     "abstractmeta.intelligence.v1"

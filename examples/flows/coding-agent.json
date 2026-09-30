@@ -1,7 +1,7 @@
 {
   "id": "coding-agent",
-  "name": "coding-agent",
-  "description": "Advanced coding agent with recursive verification: a builder agent writes code, an independent verifier runs build/execute/match gates each round, and failures are fed back as specific reprompts until all gates pass or the round budget is spent.",
+  "name": "Coding agent",
+  "description": "Takes a build request and a workspace, writes the code, and runs build and run checks each round until they pass; returns a report.",
   "interfaces": [
     "abstractcode.coding.v1"
   ],

@@ -37,6 +37,7 @@ import io
 import json
 import sys
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -156,7 +157,9 @@ def _relabel_zip(src: Path, dest: Path, bundle_id: str, *, new_version: str | No
             except ValueError as exc:
                 raise ValueError(f"{src.name}:{rel} {exc}") from exc
     if new_version is not None:
+        # A new version is a new artifact: its own version and creation time.
         man["bundle_version"] = new_version
+        man["created_at"] = datetime.now(timezone.utc).isoformat()
         changed.append(f"bundle_version -> {new_version}")
     try:
         members["manifest.json"] = _json_dump_like(man_raw, man)

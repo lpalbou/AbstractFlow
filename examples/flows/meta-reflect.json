@@ -1,7 +1,7 @@
 {
   "id": "meta-reflect",
-  "name": "meta-reflect",
-  "description": "Meta-intelligence: draft an answer, then an introspection pass interrogates the reasoning itself (assumptions, weakest step, missed cases, overconfidence), then a revision folds the introspection into the final answer. Reflexion/Self-Refine pattern; comparable 1:1 against an isolated LLM call.",
+  "name": "Reflect and revise",
+  "description": "Drafts an answer, questions its own reasoning (assumptions, weak steps, missed cases), then writes a revised final answer.",
   "interfaces": [
     "abstractcode.agent.v1",
     "abstractmeta.intelligence.v1"

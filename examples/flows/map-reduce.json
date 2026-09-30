@@ -1,7 +1,7 @@
 {
   "id": "map-reduce",
-  "name": "map-reduce",
-  "description": "Reusable batch primitive: map a per-item LLM instruction over an input array (ForEach), accumulate the per-item results, then reduce them with a synthesis LLM instruction. Returns the per-item results and the synthesized output.",
+  "name": "Map-reduce",
+  "description": "Applies one LLM instruction to each item of a list, then combines the per-item results into one synthesis; returns both.",
   "interfaces": [
     "abstractbatch.mapreduce.v1"
   ],
