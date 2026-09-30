@@ -118,9 +118,9 @@ three tabs:
   length (✓ marks a calibrated value). Locked models carry a lock marker;
   Lock/Unlock and a per-model context Estimate appear when Gateway advertises
   those endpoints. Unloading a locked model asks for an explicit Force Unload
-  confirmation. A "Show cached/non-resident" toggle reveals cached and
-  configuration-only rows, and the load bar can lock a model as part of
-  loading it.
+  confirmation. The **Cached and non-resident models** switch reveals cached
+  and configuration-only rows, and the load bar's **Lock after load** switch
+  locks a model as part of loading it.
 - **Memory** shows host RAM, device, and per-GPU meters, process RSS, and
   degraded-state reasons from Gateway host state, refreshed every 5 seconds
   while the tab is open.
