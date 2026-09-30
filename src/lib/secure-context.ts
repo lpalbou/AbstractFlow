@@ -15,8 +15,13 @@
  * The kit may lift this file later; keep every copy identical.
  */
 
-/** Shown on a voice or camera control when getUserMedia is unavailable. */
-export const MEDIA_NEEDS_HTTPS = "Voice and camera need an https address (Network → HTTPS in the gateway console).";
+import { insecureContextReason } from "@abstractframework/ui-kit";
+
+/** Shown on a voice or camera control when getUserMedia is unavailable: over plain http the kit's
+ * insecureContextReason() sentence (single source, names the tailscale serve fix); otherwise the old line. */
+export const MEDIA_NEEDS_HTTPS =
+  insecureContextReason("voice and camera") ??
+  "Voice and camera need an https address (Network → HTTPS in the gateway console).";
 
 /** Shown after a copy that did not reach the clipboard. */
 export const COPY_FAILED = "Copy failed — select and copy";
