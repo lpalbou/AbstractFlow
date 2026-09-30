@@ -3,6 +3,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { loadEdgeNotice, useFlowStore } from '../hooks/useFlow';
@@ -1990,168 +1991,177 @@ export function Toolbar() {
         <div className="toolbar-spacer" />
       </div>
 
-      {showNewFlowModal ? (
-        <div className="modal-overlay" onClick={() => setShowNewFlowModal(false)} role="presentation">
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>New flow</h3>
-            <p>Create a new flow? Any unsaved changes will be lost.</p>
-            <div className="modal-actions">
-              <button className="modal-button cancel" onClick={() => setShowNewFlowModal(false)}>
-                Cancel
-              </button>
-              <button className="modal-button danger" onClick={createNewFlow}>
-                Create new flow
-              </button>
+      {/* The toolbar's dialogs render into <body>, not inside the page
+          <header>: a dialog is not part of the banner landmark (screen
+          readers announced the run window as header content), and the
+          header's own layout and stacking no longer reach the sheets. */}
+      {createPortal(
+        <>
+        {showNewFlowModal ? (
+          <div className="modal-overlay" onClick={() => setShowNewFlowModal(false)} role="presentation">
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h3>New flow</h3>
+              <p>Create a new flow? Any unsaved changes will be lost.</p>
+              <div className="modal-actions">
+                <button className="modal-button cancel" onClick={() => setShowNewFlowModal(false)}>
+                  Cancel
+                </button>
+                <button className="modal-button danger" onClick={createNewFlow}>
+                  Create new flow
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
 
-      {/* Smart Run Modal */}
-      {(() => {
-        const viewing = inspectedRun !== null;
-        const evs = viewing ? inspectedEvents : executionEvents;
-        const traces = viewing ? inspectedTraceEvents : traceEvents;
-        const status = inspectedRun?.status || '';
-        const runningLike =
-          status === 'running' ||
-          (status === 'waiting' && inspectedRun?.wait_reason === 'subworkflow' && !inspectedRun?.paused);
-        const approvalWaitInfo = viewing ? extractPendingApprovalWait(evs) : null;
-        const waitingLike =
-          Boolean(approvalWaitInfo) ||
-          (status === 'waiting' && !inspectedRun?.paused && inspectedRun?.wait_reason !== 'subworkflow');
-        const pausedLike = Boolean(inspectedRun?.paused);
-        const waitingInfo2 =
-          approvalWaitInfo ||
-          (waitingLike
-            ? {
-                prompt: inspectedRun?.prompt || 'Please respond:',
-                choices: inspectedRun?.choices || [],
-                allowFreeText: inspectedRun?.allow_free_text !== false,
-                nodeId: inspectedRun?.current_node || null,
-              }
-            : waitingInfo);
+        {/* Smart Run Modal */}
+        {(() => {
+          const viewing = inspectedRun !== null;
+          const evs = viewing ? inspectedEvents : executionEvents;
+          const traces = viewing ? inspectedTraceEvents : traceEvents;
+          const status = inspectedRun?.status || '';
+          const runningLike =
+            status === 'running' ||
+            (status === 'waiting' && inspectedRun?.wait_reason === 'subworkflow' && !inspectedRun?.paused);
+          const approvalWaitInfo = viewing ? extractPendingApprovalWait(evs) : null;
+          const waitingLike =
+            Boolean(approvalWaitInfo) ||
+            (status === 'waiting' && !inspectedRun?.paused && inspectedRun?.wait_reason !== 'subworkflow');
+          const pausedLike = Boolean(inspectedRun?.paused);
+          const waitingInfo2 =
+            approvalWaitInfo ||
+            (waitingLike
+              ? {
+                  prompt: inspectedRun?.prompt || 'Please respond:',
+                  choices: inspectedRun?.choices || [],
+                  allowFreeText: inspectedRun?.allow_free_text !== false,
+                  nodeId: inspectedRun?.current_node || null,
+                }
+              : waitingInfo);
 
-        return (
-      <RunFlowModal
-	        isOpen={showRunModal}
-	        onClose={handleRunModalClose}
-	        onRun={handleRunExecute}
-	        onFollowUpSubmit={!viewing && runWorkflowId && runWorkflowId === flowId ? handleFollowUpSubmit : undefined}
-        onNewRun={handleNewRun}
-        onApproveAll={handleApproveAll}
-        onRevokeAutoApprove={handleRevokeAutoApprove}
-        isRunning={viewing ? runningLike : isRunning}
-        isPaused={viewing ? pausedLike : isPaused}
-        result={viewing ? null : runResult}
-        events={evs}
-        traceEvents={traces}
-        isWaiting={viewing ? waitingLike : isWaiting}
-	        waitingInfo={viewing ? waitingInfo2 : waitingInfo}
-	        stableSessionId={stableSessionId}
-        autoApproveSessions={autoApproveSessions}
-        threadRootRunId={viewing ? undefined : threadRootRunId || undefined}
-        runWorkflowId={viewing ? inspectedRun?.workflow_id || flowId || null : runWorkflowId}
-        gatewayContracts={gatewayContracts}
-        onResume={resumeFlow}
-        onEmitEvent={emitEvent}
-        onPause={() => pauseRun(inspectedRun?.run_id)}
-        onResumeRun={() => resumeRun(inspectedRun?.run_id)}
-        onCancelRun={() =>
-          cancelRun(inspectedRun?.run_id).then((confirmed) => {
-            // Surface the failure path visibly (adversary A1): without this,
-            // a refused/timed-out cancel wrote an error nobody rendered.
-            if (!confirmed) toast.error('Cancel not confirmed — the gateway may still be processing it. Try again.');
-          })
-        }
-        onSelectRunId={handleSelectRunFromModal}
-        runSummary={viewing ? inspectedRun : null}
-      />
-        );
-      })()}
+          return (
+        <RunFlowModal
+  	        isOpen={showRunModal}
+  	        onClose={handleRunModalClose}
+  	        onRun={handleRunExecute}
+  	        onFollowUpSubmit={!viewing && runWorkflowId && runWorkflowId === flowId ? handleFollowUpSubmit : undefined}
+          onNewRun={handleNewRun}
+          onApproveAll={handleApproveAll}
+          onRevokeAutoApprove={handleRevokeAutoApprove}
+          isRunning={viewing ? runningLike : isRunning}
+          isPaused={viewing ? pausedLike : isPaused}
+          result={viewing ? null : runResult}
+          events={evs}
+          traceEvents={traces}
+          isWaiting={viewing ? waitingLike : isWaiting}
+  	        waitingInfo={viewing ? waitingInfo2 : waitingInfo}
+  	        stableSessionId={stableSessionId}
+          autoApproveSessions={autoApproveSessions}
+          threadRootRunId={viewing ? undefined : threadRootRunId || undefined}
+          runWorkflowId={viewing ? inspectedRun?.workflow_id || flowId || null : runWorkflowId}
+          gatewayContracts={gatewayContracts}
+          onResume={resumeFlow}
+          onEmitEvent={emitEvent}
+          onPause={() => pauseRun(inspectedRun?.run_id)}
+          onResumeRun={() => resumeRun(inspectedRun?.run_id)}
+          onCancelRun={() =>
+            cancelRun(inspectedRun?.run_id).then((confirmed) => {
+              // Surface the failure path visibly (adversary A1): without this,
+              // a refused/timed-out cancel wrote an error nobody rendered.
+              if (!confirmed) toast.error('Cancel not confirmed — the gateway may still be processing it. Try again.');
+            })
+          }
+          onSelectRunId={handleSelectRunFromModal}
+          runSummary={viewing ? inspectedRun : null}
+        />
+          );
+        })()}
 
-      <RunHistoryModal
-        isOpen={showRunHistory}
-        workflowId={runnableFlowId || ''}
-        workflowName={flowName}
-        gatewayContracts={gatewayContracts}
-        onClose={() => setShowRunHistory(false)}
-        onSelectRun={handleSelectHistoryRun}
-      />
+        <RunHistoryModal
+          isOpen={showRunHistory}
+          workflowId={runnableFlowId || ''}
+          workflowName={flowName}
+          gatewayContracts={gatewayContracts}
+          onClose={() => setShowRunHistory(false)}
+          onSelectRun={handleSelectHistoryRun}
+        />
 
-      <FlowLibraryModal
-        isOpen={showFlowLibrary}
-        currentFlowId={flowId}
-        flows={flowLibraryCatalog.flows}
-        readonlyFlowIds={flowLibraryCatalog.bundledFlowIds}
-        bundledRunTargetIds={flowLibraryCatalog.bundledRunTargetIds}
-        isLoading={flowsQuery.isLoading && flowLibraryCatalog.flows.length === 0}
-        isRefreshing={flowsQuery.isFetching && flowLibraryCatalog.flows.length > 0 && !flowsQuery.data}
-        // `flows` ALWAYS contains the ~25 bundled examples (a static glob), so
-        // gating this on `length === 0` made the error branch unreachable: when
-        // the session expired and the user opened the library to find their
-        // work, they saw the shipped examples and no explanation — their own
-        // flows looked deleted. Surface the fetch error whenever there is one.
-        error={flowsQuery.error}
-        onClose={() => setShowFlowLibrary(false)}
-        onRefresh={() => flowsQuery.refetch()}
-        onLoadFlow={handleLoadFlow}
-        onRenameFlow={handleRenameFlow}
-        onUpdateDescription={handleUpdateDescription}
-        onUpdateInterfaces={handleUpdateInterfaces}
-        onUpdateAutomationDefaults={handleUpdateAutomationDefaults}
-        gatewayContracts={gatewayContracts}
-        onDuplicateFlow={handleDuplicateFlow}
-        onDeleteFlow={handleDeleteFlow}
-      />
+        <FlowLibraryModal
+          isOpen={showFlowLibrary}
+          currentFlowId={flowId}
+          flows={flowLibraryCatalog.flows}
+          readonlyFlowIds={flowLibraryCatalog.bundledFlowIds}
+          bundledRunTargetIds={flowLibraryCatalog.bundledRunTargetIds}
+          isLoading={flowsQuery.isLoading && flowLibraryCatalog.flows.length === 0}
+          isRefreshing={flowsQuery.isFetching && flowLibraryCatalog.flows.length > 0 && !flowsQuery.data}
+          // `flows` ALWAYS contains the ~25 bundled examples (a static glob), so
+          // gating this on `length === 0` made the error branch unreachable: when
+          // the session expired and the user opened the library to find their
+          // work, they saw the shipped examples and no explanation — their own
+          // flows looked deleted. Surface the fetch error whenever there is one.
+          error={flowsQuery.error}
+          onClose={() => setShowFlowLibrary(false)}
+          onRefresh={() => flowsQuery.refetch()}
+          onLoadFlow={handleLoadFlow}
+          onRenameFlow={handleRenameFlow}
+          onUpdateDescription={handleUpdateDescription}
+          onUpdateInterfaces={handleUpdateInterfaces}
+          onUpdateAutomationDefaults={handleUpdateAutomationDefaults}
+          gatewayContracts={gatewayContracts}
+          onDuplicateFlow={handleDuplicateFlow}
+          onDeleteFlow={handleDeleteFlow}
+        />
 
-      <PublishFlowModal
-        isOpen={showPublishModal}
-        flowId={flowId}
-        flowName={flowName}
-        gatewayContracts={gatewayContracts}
-        onClose={() => setShowPublishModal(false)}
-      />
+        <PublishFlowModal
+          isOpen={showPublishModal}
+          flowId={flowId}
+          flowName={flowName}
+          gatewayContracts={gatewayContracts}
+          onClose={() => setShowPublishModal(false)}
+        />
 
-      <WorkflowLifecycleModal
-        isOpen={showLifecycleModal}
-        flowName={flowName}
-        gatewayContracts={gatewayContracts}
-        onClose={() => setShowLifecycleModal(false)}
-      />
+        <WorkflowLifecycleModal
+          isOpen={showLifecycleModal}
+          flowName={flowName}
+          gatewayContracts={gatewayContracts}
+          onClose={() => setShowLifecycleModal(false)}
+        />
 
-      <ModelResidencyPanel
-        isOpen={showModelResidency}
-        gatewayContracts={gatewayContracts}
-        onClose={() => setShowModelResidency(false)}
-      />
+        <ModelResidencyPanel
+          isOpen={showModelResidency}
+          gatewayContracts={gatewayContracts}
+          onClose={() => setShowModelResidency(false)}
+        />
 
-      {/* In-app confirmation modal (browser dialogs are banned in this UI).
-          Rendered last so it stacks above any other open modal. */}
-      {confirmPrompt ? (
-        <div className="modal-overlay" onClick={() => setConfirmPrompt(null)} role="presentation">
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{confirmPrompt.title}</h3>
-            <p style={{ whiteSpace: 'pre-line' }}>{confirmPrompt.message}</p>
-            <div className="modal-actions">
-              <button className="modal-button cancel" onClick={() => setConfirmPrompt(null)}>
-                Cancel
-              </button>
-              <button
-                className={confirmPrompt.danger ? 'modal-button danger' : 'modal-button primary'}
-                onClick={() => {
-                  const action = confirmPrompt.onConfirm;
-                  setConfirmPrompt(null);
-                  action();
-                }}
-              >
-                {confirmPrompt.confirmLabel}
-              </button>
+        {/* In-app confirmation modal (browser dialogs are banned in this UI).
+            Rendered last so it stacks above any other open modal. */}
+        {confirmPrompt ? (
+          <div className="modal-overlay" onClick={() => setConfirmPrompt(null)} role="presentation">
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h3>{confirmPrompt.title}</h3>
+              <p style={{ whiteSpace: 'pre-line' }}>{confirmPrompt.message}</p>
+              <div className="modal-actions">
+                <button className="modal-button cancel" onClick={() => setConfirmPrompt(null)}>
+                  Cancel
+                </button>
+                <button
+                  className={confirmPrompt.danger ? 'modal-button danger' : 'modal-button primary'}
+                  onClick={() => {
+                    const action = confirmPrompt.onConfirm;
+                    setConfirmPrompt(null);
+                    action();
+                  }}
+                >
+                  {confirmPrompt.confirmLabel}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+        </>,
+        document.body,
+      )}
     </>
   );
 }

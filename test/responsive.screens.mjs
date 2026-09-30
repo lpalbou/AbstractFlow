@@ -39,7 +39,11 @@ async function closeOverlays(page) {
   // Modals that ignore Escape: use their visible Cancel/Close button.
   const cancel = page.locator('.modal-overlay .modal-button.cancel, .run-window-control.close, .af-appearance-overlay button[aria-label="Close"]').first();
   if (await cancel.count()) {
-    try { await cancel.click({ timeout: 1500 }); } catch { /* not clickable */ }
+    // dispatchEvent, not click(): in 0.5.0 a top-centre toast sat over the run
+    // window's close control on phones (fixed in space.css; checked by
+    // test/toast_over_sheet.probe.mjs). Kept so BEFORE captures still run.
+    try { await cancel.dispatchEvent('click'); } catch { /* not clickable */ }
+    await page.waitForTimeout(250);
   }
 }
 
@@ -48,7 +52,9 @@ async function clickToolbar(page, name) {
   // into the toolbar's "More" menu.
   const direct = page.getByRole('button', { name, exact: true }).first();
   if (await direct.isVisible().catch(() => false)) {
-    await direct.click();
+    // dispatchEvent: a phone's top-centre toast ("Click to copy full error")
+    // can sit over the header buttons; a real click would copy the toast.
+    await direct.dispatchEvent('click');
     return;
   }
   const more = page.locator('.toolbar-more-button').first();
@@ -61,7 +67,12 @@ async function clickToolbar(page, name) {
 }
 
 async function openLibrary(page) {
-  await clickToolbar(page, 'Open Flow');
+  // Right after a (re)load the toolbar can still be settling: retry once.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await clickToolbar(page, 'Open Flow');
+    if (await page.locator('.flow-library-modal').isVisible({ timeout: 4000 }).catch(() => false)) break;
+    await page.waitForTimeout(800);
+  }
   await page.waitForSelector('.flow-library-modal', { timeout: 10000 });
   await page.waitForTimeout(600);
 }
@@ -104,9 +115,86 @@ async function closeDrawers(page) {
   }
 }
 
+// A real run on the fixture gateway (its bundled `prompt-structured` flow:
+// answer_user -> ask_user, no model): gives the run history a row and the run
+// window a ledger with a message and a waiting question. Started once per
+// capture process.
+let seededRun = null;
+async function seedRun() {
+  if (seededRun) return seededRun;
+  const res = await fetch(`${GATEWAY_URL}/api/gateway/runs/start`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bundle_id: 'abstractcode-web-e2e',
+      flow_id: 'prompt-structured',
+      input_data: {
+        prompt: 'Summarise the release notes for the mail watcher and list the three changes that matter to someone who reads their mail on a phone.',
+        ticket: 'T-1234',
+      },
+    }),
+  });
+  if (!res.ok) throw new Error(`seed run: HTTP ${res.status}`);
+  seededRun = (await res.json()).run_id;
+  return seededRun;
+}
+
+// The editor lists runs of the loaded flow only; the seeded run belongs to the
+// fixture bundle, so the runs list is widened to every root run.
+async function widenRunList(page) {
+  await page.route(/\/api\/gateway\/runs\?/, async (route) => {
+    const url = new URL(route.request().url());
+    url.searchParams.delete('workflow_id');
+    const resp = await route.fetch({ url: url.toString() });
+    await route.fulfill({ response: resp });
+  });
+}
+
+async function openFromToolbar(page, label, selector) {
+  await ensureFlowLoaded(page);
+  await closeDrawers(page);
+  await closeOverlays(page);
+  await clickToolbar(page, label);
+  await page.waitForSelector(selector, { timeout: 10000 });
+  await page.waitForTimeout(600);
+}
+
+// Select the first row of a list inside a dialog so its detail is showing.
+async function selectFirst(page, rowSelector) {
+  const row = page.locator(rowSelector).first();
+  if (await row.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await row.click().catch(() => {});
+    await page.waitForTimeout(700);
+  }
+}
+
 export default {
-  async setup(page) {
-    // Nothing: the first screen is the sign-in gate itself.
+  // Space metrics (untracked/responsive/harness README "Space metrics"),
+  // documented exceptions excluded from the text-box search and the scroll
+  // count: the React Flow canvas (it pans and zooms in its own box by design)
+  // and the toasts (transient notices with an icon gutter, not a reading
+  // column; they leave on their own).
+  spaceIgnore: ['.react-flow', '.app-toaster'],
+  async setup(page, info) {
+    // The first screen is the sign-in gate itself.
+    // Monaco writes the clipboard on some focus/escape paths; headless
+    // Chromium denies it and logs NotAllowedError + "Canceled" (noise, seen on
+    // main too). A real browser allows it on a user gesture.
+    if (!info || info.browser === 'chromium') {
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+    }
+    // Flow's theme is its Appearance setting (not prefers-color-scheme):
+    // FLOW_THEME=light (or any kit theme id) captures that theme.
+    if (process.env.FLOW_THEME) {
+      await page.evaluate((theme) => {
+        try {
+          localStorage.setItem('af_appearance_abstractflow_v1', JSON.stringify({ theme, font_scale: 'md', header_density: 'standard' }));
+        } catch { /* storage blocked: default theme */ }
+      }, process.env.FLOW_THEME);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+    }
+    await seedRun();
+    await widenRunList(page);
     await page.waitForTimeout(300);
   },
   screens: [
@@ -203,14 +291,43 @@ export default {
       settle: 1200,
     },
     {
+      name: 'run-history',
+      async run(page) {
+        // The list itself: picking a run opens it in the run window (the 'run' screen).
+        await openFromToolbar(page, 'Open run history', '.run-history-list, .run-history-empty');
+      },
+      settle: 900,
+    },
+    {
+      name: 'run-detail',
+      async run(page) {
+        // The seeded run opened from the history: its ledger (message, waiting
+        // question) and the step details.
+        await openFromToolbar(page, 'Open run history', '.run-history-list, .run-history-empty');
+        await page.locator('.run-history-button').first().click();
+        await page.waitForSelector('.run-modal', { timeout: 10000 });
+        await page.waitForTimeout(1500);
+        const step = page.locator('.run-modal .run-step, .run-modal [class*="step-row"], .run-modal [class*="timeline"] button').first();
+        if (await step.isVisible().catch(() => false)) await step.click().catch(() => {});
+      },
+      settle: 1200,
+    },
+    {
+      name: 'resources',
+      async run(page) {
+        await openFromToolbar(page, 'Open resources', '.modal-overlay, [role="dialog"], .functions-drawer, .resources-drawer');
+      },
+      settle: 900,
+    },
+    {
       name: 'assistant',
       async run(page) {
         await ensureSignedIn(page);
         await closeOverlays(page);
         await closeOverlays(page);
         const b = page.getByRole('button', { name: 'Authoring assistant' }).first();
-        if (await b.isVisible().catch(() => false)) await b.click();
-        else await page.getByRole('button', { name: 'Open authoring assistant' }).first().click();
+        if (await b.isVisible().catch(() => false)) await b.dispatchEvent('click');
+        else await page.getByRole('button', { name: 'Open authoring assistant' }).first().dispatchEvent('click');
       },
       settle: 1200,
     },
@@ -219,7 +336,7 @@ export default {
       async run(page) {
         await closeDrawers(page);
         await closeOverlays(page);
-        await page.getByRole('button', { name: /Appearance/ }).first().click();
+        await page.getByRole('button', { name: /Appearance/ }).first().dispatchEvent('click');
         await page.waitForTimeout(300);
       },
     },

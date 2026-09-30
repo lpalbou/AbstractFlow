@@ -16,7 +16,9 @@ import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
-import { SteerComposer, SpeculationSelect, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AF_MEDIA, AfSwitch, SteerComposer, SpeculationSelect, useAfMedia, type SpeculationValue } from '@abstractframework/ui-kit';
+import { ListDisclosure } from './ListDisclosure';
+import { useListOpen } from '../utils/listOpen';
 import { parseSpeculationInput, withRunSpeculation } from '../utils/speculationControls';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
@@ -2069,6 +2071,12 @@ export function RunFlowModal({
   // the "Follow live" pill re-arms it.
   const [followLive, setFollowLive] = useState(true);
   const stepsListRef = useRef<HTMLDivElement | null>(null);
+  // Below 1024 px the steps sit above the step details (space.css): the
+  // "Execution" header is a disclosure (open by default, remembered) so
+  // collapsing the steps gives the details the whole sheet.
+  const stackedExecution = useAfMedia(AF_MEDIA.md);
+  const [stepsOpen, toggleStepsOpen] = useListOpen('runSteps');
+  const stepsHidden = stackedExecution && !stepsOpen;
   const lastFollowedStepIdRef = useRef<string | null>(null);
   const [progressClockMs, setProgressClockMs] = useState(() => Date.now());
   const lastAutoTerminalStepIdRef = useRef<string | null>(null);
@@ -5234,8 +5242,8 @@ export function RunFlowModal({
               else onPause?.();
             }}
             disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
-            title={isPaused ? 'Resume' : 'Pause'}
-            aria-label={isPaused ? 'Resume run' : 'Pause run'}
+            title={isPaused ? 'Resume' : 'Pause'} // state-toggle-lint: allow one-shot action on a running run (not a saved setting)
+            aria-label={isPaused ? 'Resume run' : 'Pause run'} // state-toggle-lint: allow one-shot action on a running run (not a saved setting)
           >
             {isPaused ? '▶' : '⏸'}
           </button>
@@ -6491,7 +6499,17 @@ export function RunFlowModal({
             <div className="run-modal-execution">
             <div className="run-steps">
               <div className="run-steps-header">
-                <div className="run-steps-title">Execution</div>
+                {stackedExecution ? (
+                  <ListDisclosure
+                    open={stepsOpen}
+                    onToggle={toggleStepsOpen}
+                    controls="run-steps-list"
+                    title="Execution"
+                    className="run-steps-title"
+                  />
+                ) : (
+                  <div className="run-steps-title">Execution</div>
+                )}
                 <div className="run-steps-subtitle">
                   {isRunning ? <span className="run-spinner" aria-label="running" /> : null}
                   {runStatusLabel}
@@ -6618,6 +6636,7 @@ export function RunFlowModal({
               // waiting-like flags (e.g. an unresolved approval on a cancelled
               // run) — a "Following live" pill on a dead run lies (review
               // P2-7).
+              !stepsHidden &&
               !(runSummary && ['completed', 'failed', 'cancelled'].includes(String(runSummary.status || '').toLowerCase())) ? (
                 <div className="run-follow-row">
                   {followLive ? (
@@ -6644,7 +6663,7 @@ export function RunFlowModal({
                 </div>
               ) : null}
 
-              <div className="run-steps-list" ref={stepsListRef}>
+              <div className="run-steps-list" id="run-steps-list" ref={stepsListRef} hidden={stepsHidden}>
                 {displayStepTree.length === 0 ? (
                   <div className="run-steps-empty">No execution events yet.</div>
                 ) : (
@@ -7124,10 +7143,14 @@ export function RunFlowModal({
                               spellCheck={false}
                             />
                             <div className="run-waiting-actions run-event-composer-actions">
-                              <label className="run-event-composer-durable" title="Also append to durable mailboxes declaring this event name (survives busy listeners)">
-                                <input type="checkbox" checked={eventDurable} onChange={(e) => setEventDurable(e.target.checked)} />
-                                durable
-                              </label>
+                              <AfSwitch
+                                variant="sm"
+                                label="Durable"
+                                hint="Also append to durable mailboxes declaring this event name (survives busy listeners)."
+                                action="event-durable"
+                                checked={eventDurable}
+                                onChange={setEventDurable}
+                              />
                               <button
                                 type="button"
                                 className="modal-button primary"
@@ -7862,22 +7885,22 @@ export function RunFlowModal({
                               disabled={isRunning || !workspaceInputEnabled}
                             />
 
-                            <label className="run-form-checkbox run-form-inline-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={workspaceRandom}
-                                onChange={(e) => handleWorkspaceRandomChange(e.target.checked)}
-                                disabled={isRunning || !workspaceInputEnabled}
-                              />
-                              <span>Random (default)</span>
-                              <span
-                                className="run-form-tooltip"
-                                title="When enabled, workspace_root is left unset and the gateway allocates a fresh per-run folder. Uncheck to run in a specific folder."
-                                aria-label="Workspace folder randomization help"
-                              >
-                                i
-                              </span>
-                            </label>
+                            <AfSwitch
+                              className="run-form-inline-switch"
+                              label="New folder per run"
+                              hint="On (the default): workspace_root stays unset and the gateway allocates a fresh folder for each run. Off: run in the folder typed here."
+                              action="workspace-random"
+                              checked={workspaceRandom}
+                              unavailableReason={
+                                !workspaceInputEnabled
+                                  ? 'The gateway manages the workspace folder.'
+                                  : isRunning
+                                    ? 'A run is in progress.'
+                                    : null
+                              }
+                              reasonVisible={false}
+                              onChange={handleWorkspaceRandomChange}
+                            />
                           </div>
 
                           {!workspaceInputEnabled ? (
@@ -8765,7 +8788,7 @@ export function RunFlowModal({
                       }}
                       disabled={cancelRequested || (isPaused ? !isPaused : !(isRunning && !isWaiting))}
                     >
-                      {isPaused ? 'Resume' : 'Pause'}
+                      {isPaused ? 'Resume' : 'Pause' /* state-toggle-lint: allow one-shot action on a running run (not a saved setting) */}
                     </button>
                   )}
 

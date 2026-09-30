@@ -1,0 +1,467 @@
+/**
+ * AbstractFlow — space on phones and tablets (DESIGN §12, "you do not use
+ * enough the space") and body text on touch screens (§12.1). Imported after
+ * responsive.css (main.tsx). Guarded by space.test.ts.
+ *
+ * Where a list sits next to its detail (the flow library: list + preview; the
+ * run window: steps + step details):
+ *   - desktop (>= 1024 px): unchanged, side by side;
+ *   - phones and tablets: the list stacks above the detail (two columns would
+ *     give one of them less than ~360 px) and the dialog has ONE scroll (a
+ *     list never scrolls inside a scrolling sheet); the list's header is a
+ *     disclosure (ListDisclosure, open by default, remembered); sections are
+ *     flat (no card inside the dialog card, a hairline between items). Phone
+ *     landscape keeps the library side by side (both columns >= 360 px);
+ *   - phones (< 768 px): the sheet's gutter is at most 16 px (12 px in the
+ *     run window), label/value pairs share a line, code and paths are a plain
+ *     full-width monospace block, the run history grows the sheet.
+ * The right drawer (assistant / properties / functions) on a phone puts its
+ * rail on top as a tab row, so the canvas and the open panel get the full
+ * width. On a coarse pointer the type scale moves up (body 14–15 px).
+ */
+
+/* ------------------------------------------------------------------ */
+/* The disclosure header (rendered below 1024 px only)                */
+/* ------------------------------------------------------------------ */
+
+.list-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.list-disclosure:hover {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.list-disclosure:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.list-disclosure__detail {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+/* A collapsed list is gone: `hidden` must win over the lists' own display
+   (.run-steps-list is display: flex, which beat the UA [hidden] rule). */
+.flow-library-list[hidden],
+.run-steps-list[hidden] {
+  display: none;
+}
+
+/* In the run window the disclosure shares the header row with the status. */
+.run-steps-header .list-disclosure {
+  width: auto;
+  flex: 0 1 auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Below 1024 px: stacked, one scroll, flat sections                  */
+/* ------------------------------------------------------------------ */
+
+/* Flow library. Phone landscape (>= 768 px wide, <= 500 px tall) keeps list |
+   preview side by side (responsive.css): both columns get >= 360 px there.
+   The query is LIBRARY_STACKED_QUERY in utils/listOpen.ts (same string). */
+@media (max-width: 767.98px), (max-width: 1023.98px) and (min-height: 500.02px) {
+  /* List above preview; the sheet is the one scroller. */
+  .flow-library-modal {
+    overflow-y: auto;
+  }
+
+  .flow-library-body {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    min-height: 0;
+    gap: 8px;
+  }
+
+  .flow-library-list,
+  .flow-library-preview {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  .flow-library-preview {
+    border-top: 1px solid var(--ui-border-1);
+    padding-top: 12px;
+  }
+
+  /* Rows: a hairline between items instead of a card per item. */
+  .flow-library-tree .af-disclosure__row {
+    border-width: 0 0 1px;
+    border-radius: 0;
+    border-color: var(--ui-border-1);
+  }
+
+  .flow-library-tree .af-disclosure__row--selected {
+    border-color: var(--ui-border-1);
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-primary) 70%, transparent);
+  }
+
+  /* The tree's expand chevron (44 px hit area on touch) sits at the row's
+     end and leaf rows drop its placeholder, so a name starts at the sheet
+     gutter instead of 74 px in (child rows keep their depth indent). */
+  .flow-library-tree .af-disclosure__row {
+    padding-right: 0;
+  }
+
+  .flow-library-tree .af-disclosure__chevron {
+    order: 2;
+  }
+
+  .flow-library-tree .af-disclosure__chevron--spacer {
+    display: none;
+  }
+}
+
+/* Tablets: the stacked sheet is taller than the screen, so its action row
+   (Load) stays pinned at the bottom as on phones. */
+@media (min-width: 768px) and (max-width: 1023.98px) and (min-height: 500.02px) {
+  .flow-library-actions {
+    position: sticky;
+    bottom: -24px;
+    z-index: 1;
+    margin: 0;
+    padding: 12px 0 24px;
+    background: var(--bg-secondary);
+  }
+}
+
+/* Run window: below 1024 px the steps column would get < 360 px, so steps
+   stack above details and the body is the one scroller. */
+@media (max-width: 1023.98px) {
+  .run-modal-execution {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    gap: 12px;
+  }
+
+  .run-steps,
+  .run-details {
+    flex: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .run-steps-header,
+  .run-details-header {
+    flex-wrap: wrap;
+    min-height: 44px;
+    padding: 0;
+    background: transparent;
+    border-bottom: 1px solid var(--ui-border-1);
+  }
+
+  .run-steps-list,
+  .run-details-body {
+    overflow: visible;
+    min-height: 0;
+  }
+
+  .run-steps-list {
+    padding: 0;
+    gap: 0;
+  }
+
+  .run-step {
+    border-width: 0 0 1px;
+    border-radius: 0;
+    border-color: var(--ui-border-1);
+    background: transparent;
+  }
+
+  .run-step:hover,
+  .run-step.selected,
+  .run-step.selected:hover {
+    border-color: var(--ui-border-1);
+  }
+
+  .run-step.selected {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .run-details-body {
+    padding: 10px 0 12px;
+  }
+
+  /* Long values grow the one scroll instead of opening their own. */
+  .run-modal-body .run-details-output,
+  .run-modal-body .run-param-markdown {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Phones (< 768 px): full width                                      */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 767.98px) {
+  .run-modal-body {
+    gap: 12px;
+    padding: 8px max(12px, var(--safe-right, 0px)) 0 max(12px, var(--safe-left, 0px));
+  }
+
+  .run-step {
+    padding: 10px 4px;
+  }
+
+  /* Label / value on one line where the value fits; a block value (text,
+     JSON, markdown) takes the full width under its label. */
+  .run-param-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .run-param-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 10px;
+    row-gap: 4px;
+  }
+
+  .run-param-key {
+    flex: 0 0 auto;
+    padding-top: 0;
+    font-size: var(--font-size-md);
+  }
+
+  .run-param-val {
+    flex: 1 1 12em;
+  }
+
+  .run-param-val:has(> .run-details-markdown, > .json-viewer, > .run-details-output, > pre) {
+    flex-basis: 100%;
+  }
+
+  /* Code, paths and markdown values: plain full-width blocks, no box. */
+  .run-modal-body .run-details-output,
+  .run-modal-body .run-details-markdown {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  .run-modal-body .run-details-output {
+    overflow-wrap: anywhere;
+  }
+
+  .run-param-inline {
+    flex-wrap: wrap;
+  }
+
+  .run-param-inline .run-param-text,
+  .run-param-link {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Reading text: 14 px on phones (dense code stays 13 px). */
+  .run-step-summary,
+  .run-details-body .markdown-body,
+  .run-param-val,
+  .flow-library-item-sub,
+  .flow-library-preview-desc-text {
+    font-size: var(--font-size-body, 14px);
+  }
+
+  .run-modal-body .run-details-output,
+  .flow-library-preview-val {
+    font-size: var(--font-size-md, 13px);
+  }
+
+  .flow-library-preview-key {
+    font-size: var(--font-size-sm, 12px);
+  }
+
+  .flow-library-preview-row {
+    flex-wrap: wrap;
+    column-gap: 10px;
+    row-gap: 2px;
+  }
+
+  .flow-library-preview-val {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Run history: the sheet is the one scroller (the list was a 420 px
+     bordered box scrolling inside it). */
+  .run-history-list {
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* Right drawer: the rail becomes a tab row across the top — above the
+     canvas when the drawer is closed, on top of the open panel — so neither
+     the canvas nor the panel loses a 44 px column (11 % of a phone). */
+  .app-main {
+    flex-direction: column;
+  }
+
+  .properties-drawer.collapsed {
+    order: -1;
+    flex-direction: column;
+    flex: 0 0 44px;
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+  }
+
+  .properties-drawer.open {
+    flex-direction: column-reverse;
+  }
+
+  .properties-drawer .right-drawer-rail {
+    flex: 0 0 44px;
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    flex-direction: row;
+    border-bottom: 1px solid var(--ui-border-1);
+  }
+
+  .properties-drawer .right-drawer-rail-action {
+    writing-mode: horizontal-tb;
+    flex: 1 1 0;
+    min-height: 44px;
+    padding: 0 8px;
+    font-size: var(--font-size-sm);
+  }
+
+  .properties-drawer .right-drawer-rail-action + .right-drawer-rail-action {
+    border-top: 0;
+    border-left: 1px solid var(--ui-border-1);
+  }
+
+  .properties-drawer .right-drawer-rail-action.active {
+    box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--accent) 72%, transparent);
+  }
+
+  .properties-drawer.open .right-drawer-content {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    border-right: 0;
+  }
+
+  .properties-panel {
+    padding: 12px;
+  }
+
+  /* Assistant transcript: the assistant's turns are flat text on the drawer
+     (the user's turns keep their bubble), 14 px. */
+  .assistant-messages {
+    padding: 12px;
+  }
+
+  .assistant-message.assistant {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .assistant-markdown {
+    font-size: var(--font-size-body, 14px);
+  }
+
+  /* The empty-canvas hint spans the canvas instead of a 105 px column. */
+  .canvas-empty-state {
+    left: 16px;
+    right: 16px;
+    max-width: none;
+    padding: 16px;
+    transform: translateY(-50%);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Type scale floors (§12.1)                                          */
+/* ------------------------------------------------------------------ */
+
+/* Desktop: dense text (badges, keys, ledger rows) 12 px minimum; helper and
+   secondary text 13 px (the kit scale starts at 10/11/12 px, and the dominant
+   text of the palette, the properties panel and the run history was 11 px).
+   The user's font scale still multiplies everything. */
+:root {
+  --font-size-xxs: calc(12px * var(--font-scale));
+  --font-size-xs: calc(12px * var(--font-scale));
+  --font-size-sm: calc(13px * var(--font-scale));
+}
+
+/* Touch screens (phones and tablets): body text 14–17 px. The scale itself
+   moves up on a coarse pointer, so every surface that uses it follows (the
+   dominant text was 11–12 px): helper/dense text 13 px, body 14–15 px. */
+@media (pointer: coarse) {
+  :root {
+    --font-size-xxs: calc(12px * var(--font-scale));
+    --font-size-xs: calc(13px * var(--font-scale));
+    --font-size-sm: calc(14px * var(--font-scale));
+    --font-size-md: calc(14px * var(--font-scale));
+    --font-size-base: calc(15px * var(--font-scale));
+  }
+
+  /* A run's time and current node are the second line of each history row,
+     read on every row: body size, not helper size. */
+  .run-history-row.subtle {
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* Documented exception: canvas node text keeps the node design's sizes at
+   every width (it lives in the canvas zoom transform and grows with
+   pinch-zoom / zoom). */
+.react-flow {
+  --font-size-xxs: calc(10px * var(--font-scale));
+  --font-size-xs: calc(11px * var(--font-scale));
+  --font-size-sm: calc(12px * var(--font-scale));
+  --font-size-md: calc(13px * var(--font-scale));
+  --font-size-base: calc(14px * var(--font-scale));
+}
+
+/* ------------------------------------------------------------------ */
+/* Toasts over an open sheet (phones, phone landscape)                */
+/* ------------------------------------------------------------------ */
+
+/* Toasts sit top-centre where dialogs are bottom sheets (toastPlacement.ts,
+   same query). With a sheet open, its title bar is at the top — the run
+   window's close/reduce/maximize controls were under the "Workflow failed …
+   Click to copy" toast, so a tap copied the error instead of closing. While a
+   dialog is open the toasts start below the sheet's title bar (8 px sheet
+   inset + a 56 px bar with 44 px controls + 8 px gap). */
+@media (max-width: 767.98px), (max-height: 500px) {
+  body:has(.modal-overlay) .app-toaster {
+    top: calc(max(8px, env(safe-area-inset-top, 0px)) + 72px) !important;
+  }
+}

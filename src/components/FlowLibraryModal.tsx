@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AfChip } from '@abstractframework/ui-kit';
+import { AfChip, useAfMedia } from '@abstractframework/ui-kit';
 import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import type { GatewayContracts } from '../utils/gatewayClient';
 import { describeAutomationDefaults } from '../utils/triggerBindings';
@@ -20,6 +20,8 @@ import {
   type LibraryViewMode,
 } from '../utils/flowLibraryRows';
 import { FlowLibraryList } from './FlowLibraryList';
+import { ListDisclosure } from './ListDisclosure';
+import { LIBRARY_STACKED_QUERY, useListOpen } from '../utils/listOpen';
 
 export interface FlowLibraryModalProps {
   isOpen: boolean;
@@ -116,6 +118,12 @@ export function FlowLibraryModal({
 }: FlowLibraryModalProps) {
   const searchRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  // Phones and tablets stack the list above the preview (space.css): its
+  // header is a disclosure (open by default, remembered) so collapsing the
+  // list gives the preview the whole sheet. Side by side on desktop and in
+  // phone landscape, nothing to collapse.
+  const stacked = useAfMedia(LIBRARY_STACKED_QUERY);
+  const [listOpen, toggleListOpen] = useListOpen('library');
 
   const [query, setQuery] = useState('');
   const [sortMode, setSortMode] = useState<LibrarySortMode>('recent');
@@ -333,6 +341,9 @@ export function FlowLibraryModal({
       // onSelect keeps modal state in sync, so skipping here is lossless.
       const target = e.target as HTMLElement | null;
       if (target && typeof target.closest === 'function' && target.closest('.af-disclosure')) return;
+      // The list's own disclosure header is a button: Enter/Space toggle the
+      // list there (Enter must not load the selected flow).
+      if (target && typeof target.closest === 'function' && target.closest('.list-disclosure')) return;
 
       // Anchor on the selected INSTANCE when known; a STALE row key (its
       // parent collapsed) falls back to the flow's first visible row rather
@@ -623,7 +634,17 @@ export function FlowLibraryModal({
         </div>
 
         <div className="flow-library-body">
-          <div className="flow-library-list" ref={listRef}>
+          {stacked ? (
+            <ListDisclosure
+              open={listOpen}
+              onToggle={toggleListOpen}
+              controls="flow-library-list"
+              title="Flows"
+              detail={isRefreshing ? null : shownCount}
+              className="flow-library-disclosure"
+            />
+          ) : null}
+          <div className="flow-library-list" id="flow-library-list" ref={listRef} hidden={stacked && !listOpen}>
             {/* A banner, not a replacement: the bundled examples below load from
               * a static glob and stay usable during a gateway outage. Blanking
               * the list would also hide them, and saying nothing would make the

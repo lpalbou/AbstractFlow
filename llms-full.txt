@@ -459,9 +459,9 @@ three tabs:
   length (✓ marks a calibrated value). Locked models carry a lock marker;
   Lock/Unlock and a per-model context Estimate appear when Gateway advertises
   those endpoints. Unloading a locked model asks for an explicit Force Unload
-  confirmation. A "Show cached/non-resident" toggle reveals cached and
-  configuration-only rows, and the load bar can lock a model as part of
-  loading it.
+  confirmation. The **Cached and non-resident models** switch reveals cached
+  and configuration-only rows, and the load bar's **Lock after load** switch
+  locks a model as part of loading it.
 - **Memory** shows host RAM, device, and per-GPU meters, process RSS, and
   degraded-state reasons from Gateway host state, refreshed every 5 seconds
   while the tab is open.
@@ -5269,6 +5269,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+On/off options in the editor are switches labelled by what they control. The
+switch shows the state: highlighted with a check mark when on, plain when
+off. Anyone editing node properties, publishing, starting a run or using the
+Resources panel is affected; nothing changes in VisualFlow documents, the
+server or the Gateway contract.
+
+### Changed
+- **Node settings.** **Structured output** (Agent), **Recurrent** (On
+  Schedule) and **Free text answers** (Ask User) are switches in the
+  properties panel. Recurrent no longer shows an "Enabled" / "Disabled" label.
+- **Dialog options.** **Reload gateway bundles** (Publish), **New folder per
+  run** (the run window's workspace folder), **Durable** (sending an event to
+  a waiting run), **Lock after load** and **Cached and non-resident models**
+  (Resources) are switches. In the run window, New folder per run shows why it
+  cannot change while the gateway manages the workspace or a run is in
+  progress.
+- Pause and Resume on a running run stay buttons: they act on the run once,
+  they are not a setting.
 
 ## [0.5.0] - 2026-09-30
 
