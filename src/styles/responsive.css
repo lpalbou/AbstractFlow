@@ -665,6 +665,15 @@ body {
     bottom: 117px;
   }
 
+  /* The badge rail clips its overflow sideways (fade truncation,
+     index.css .flow-library-item-badges). overflow: hidden also clipped the
+     kit 0.3.1 chips' invisible 44 px hit area (::after) to the 18 px rail:
+     clip only the x axis. */
+  .flow-library-item-badges {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
   /* Flow library tree: the kit disclosure chevrons are 22 px. */
   .flow-library-list .af-disclosure__chevron {
     min-width: 44px;
