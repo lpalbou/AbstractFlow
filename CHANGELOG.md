@@ -58,8 +58,8 @@ of 1024 px or wider with a mouse it looks as before.
   cover a sheet's primary action.
 - On touch screens the properties panel's help text is 14 px and its labels
   13 px.
-- `@abstractframework/ui-kit` 0.3.1 is vendored as
-  `vendor/abstractframework-ui-kit-0.3.1.tgz`. The Vite alias and tsconfig
+- `@abstractframework/ui-kit` 0.3.2 is vendored as
+  `vendor/abstractframework-ui-kit-0.3.2.tgz`. The Vite alias and tsconfig
   path point at this package instead of the sibling abstractuic checkout. The
   coordinator switches it back to the registry version after publishing.
 
