@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { copyWithFeedback } from '../lib/copy_feedback';
 import { loadEdgeNotice, useFlowStore } from '../hooks/useFlow';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
@@ -529,20 +530,6 @@ export function Toolbar() {
     }
   }, []);
 
-  const copyTextToClipboard = useCallback(async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Fallback: best-effort legacy copy
-      const el = document.createElement('textarea');
-      el.value = text;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    }
-  }, []);
-
   const showWorkflowFailedToast = useCallback(
     (fullError: unknown) => {
       const full = formatValue(fullError) || 'Unknown error';
@@ -556,16 +543,14 @@ export function Toolbar() {
           style={{ cursor: 'pointer' }}
           onClick={() => {
             void (async () => {
-              await copyTextToClipboard(full);
-              toast.success('Copied error to clipboard');
+              await copyWithFeedback(full, 'Copied error to clipboard');
             })();
           }}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             e.preventDefault();
             void (async () => {
-              await copyTextToClipboard(full);
-              toast.success('Copied error to clipboard');
+              await copyWithFeedback(full, 'Copied error to clipboard');
             })();
           }}
         >
@@ -577,7 +562,7 @@ export function Toolbar() {
         </div>
       );
     },
-    [copyTextToClipboard, formatValue]
+    [formatValue]
   );
 
   async function fetchRunHistory(runId: string): Promise<RunHistoryResponse> {

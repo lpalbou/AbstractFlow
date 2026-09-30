@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RunSummary } from '../types/flow';
+import { copyWithFeedback } from '../lib/copy_feedback';
 import { filterRunSummariesByFlowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
 import { endpointFromDescriptor, gatewayJson, type GatewayContracts } from '../utils/gatewayClient';
 
@@ -38,16 +39,7 @@ function formatRunTime(iso?: string | null): string {
 async function copyText(text: string): Promise<void> {
   const value = String(text || '');
   if (!value) return;
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    const el = document.createElement('textarea');
-    el.value = value;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-  }
+  await copyWithFeedback(value, 'Run id copied');
 }
 
 export function RunSwitcherDropdown({

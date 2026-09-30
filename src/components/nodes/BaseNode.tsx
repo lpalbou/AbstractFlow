@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Handle, Position, NodeProps, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
+import { randomId } from '@abstractframework/ui-kit';
 import type { FlowNodeData, JsonValue, Pin, PinType, VisualFlow } from '../../types/flow';
 import { getBundledFlow } from '../../utils/bundledFlows';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
@@ -3810,9 +3811,7 @@ export const BaseNode = memo(function BaseNode({
       const existingCases = data.switchConfig?.cases ?? [];
 
       const newId =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? (crypto.randomUUID() as string).slice(0, 8)
-          : `c${Date.now().toString(16)}${Math.random().toString(16).slice(2, 6)}`;
+        randomId().slice(0, 8);
 
       const nextCases = [...existingCases, { id: newId, value: '' }];
 

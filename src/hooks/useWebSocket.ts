@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExecutionEvent } from '../types/flow';
+import { randomId } from '@abstractframework/ui-kit';
 import { useFlowStore } from './useFlow';
 import {
   closeOpenNodes,
@@ -38,10 +39,7 @@ function getOrCreateStableSessionId(): string | undefined {
     const existing = window.sessionStorage.getItem(STABLE_SESSION_ID_KEY);
     if (existing && existing.trim()) return existing.trim();
 
-    const next =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `af_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+    const next = randomId();
     window.sessionStorage.setItem(STABLE_SESSION_ID_KEY, next);
     return next;
   } catch {

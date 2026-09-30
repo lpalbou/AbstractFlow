@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
-import { AfSwitch, SpeculationSelect, normalizeSpeculationValue, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AfSwitch, SpeculationSelect, normalizeSpeculationValue, randomId, type SpeculationValue } from '@abstractframework/ui-kit';
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { getBundledFlow } from '../utils/bundledFlows';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
@@ -3457,9 +3457,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               const addCase = () => {
                 const id =
-                  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                    ? (crypto.randomUUID() as string).slice(0, 8)
-                    : `c${Date.now().toString(16)}${Math.random().toString(16).slice(2, 6)}`;
+                  randomId().slice(0, 8);
 
                 const nextCases = [...cases, { id, value: '' }];
                 updateNodeData(node.id, {

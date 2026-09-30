@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
+import { copyWithFeedback } from '../lib/copy_feedback';
 
 const DEFAULT_FOLDED_DEPTH = 3;
 const UNFOLDED_DEPTH = Number.MAX_SAFE_INTEGER;
@@ -54,16 +55,7 @@ function copyStringForJson(value: unknown): string {
 async function copyText(text: string): Promise<void> {
   const value = String(text || '');
   if (!value) return;
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    const el = document.createElement('textarea');
-    el.value = value;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-  }
+  await copyWithFeedback(value);
 }
 
 function Token({

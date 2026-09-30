@@ -59,6 +59,14 @@ Nothing changes in VisualFlow documents, the server, or the Gateway contract.
   progress.
 - Pause and Resume on a running run stay buttons: they act on the run once,
   they are not a setting.
+- **Plain http from another machine** (LAN, Tailscale). Browsers withhold
+  `crypto.randomUUID`, the clipboard API and the microphone outside https and
+  localhost. Request, session and switch-case ids now come from the kit's
+  `randomId()` (v4 UUIDs everywhere), every **Copy** falls back to a
+  text-selection copy and says "Copied" or "Copy failed — select and copy",
+  and a voice wait shows "Voice and camera need an https address (Network →
+  HTTPS in the gateway console)." with **Record** disabled. Needs
+  `@abstractframework/ui-kit` 0.3.3.
 
 ## [0.5.0] - 2026-09-30
 

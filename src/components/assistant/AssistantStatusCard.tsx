@@ -12,6 +12,7 @@ import {
 } from './assistantActivity';
 import { formatTokenCount } from '../../utils/plannerUsage';
 import { IconChevron, IconCopy } from './icons';
+import { copyWithFeedback } from '../../lib/copy_feedback';
 
 interface AssistantStatusCardProps {
   workingStatus: WorkingStatus;
@@ -177,13 +178,13 @@ export function AssistantStatusCard({
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                void navigator.clipboard.writeText(entry.detail || '');
+                                void copyWithFeedback(entry.detail || '');
                               }}
                               onKeyDown={(event) => {
                                 if (event.key === 'Enter' || event.key === ' ') {
                                   event.preventDefault();
                                   event.stopPropagation();
-                                  void navigator.clipboard.writeText(entry.detail || '');
+                                  void copyWithFeedback(entry.detail || '');
                                 }
                               }}
                               title="Copy full payload to clipboard"

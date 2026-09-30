@@ -1,5 +1,5 @@
 import type { GatewayAuthoringCapability } from './nodeCapabilities';
-import { GATEWAY_API_PATH, gatewayApiPath } from '@abstractframework/ui-kit';
+import { GATEWAY_API_PATH, gatewayApiPath, randomId } from '@abstractframework/ui-kit';
 
 export type GatewayQueryValue = string | number | boolean | null | undefined;
 
@@ -1295,9 +1295,7 @@ export async function gatewayRunLedger(
   return gatewayJson<GatewayLedgerResponse>(endpoint);
 }
 
-export function makeGatewayRequestId(prefix = 'gw'): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+/** A v4 UUID (kit randomId: works over plain http too). `prefix` is kept for callers; UUIDs need none. */
+export function makeGatewayRequestId(_prefix = 'gw'): string {
+  return randomId();
 }
