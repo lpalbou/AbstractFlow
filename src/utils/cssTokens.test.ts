@@ -16,7 +16,7 @@ import { join, resolve } from 'node:path';
 
 const APP_ROOT = resolve(__dirname, '..', '..');
 const STYLE_DIR = join(APP_ROOT, 'src', 'styles');
-const UI_KIT_THEME = resolve(APP_ROOT, '..', 'abstractuic', 'ui-kit', 'src', 'theme.css');
+const UI_KIT_THEME = resolve(APP_ROOT, 'node_modules', '@abstractframework', 'ui-kit', 'src', 'theme.css');
 
 function readAppCss(): string[] {
   return readdirSync(STYLE_DIR)

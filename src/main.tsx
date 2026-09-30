@@ -2,7 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
-import { installViewportVars } from '@abstractframework/ui-kit';
+import { installViewportVars, useAfMedia } from '@abstractframework/ui-kit';
+import { TOAST_TOP_QUERY, toastPosition } from './utils/toastPlacement';
 import App from './App';
 import '@abstractframework/ui-kit/theme.css';
 import './styles/index.css';
@@ -13,9 +14,22 @@ import './styles/tooltip.css';
 import './styles/responsive.css';
 
 // Mirrors the visual viewport into --vv-height / --keyboard-inset (iOS keeps
-// the layout viewport under the on-screen keyboard; the assistant composer
-// and bottom sheets stay above it).
+// the layout viewport under the on-screen keyboard). responsive.css reads
+// them: the assistant composer pads by --keyboard-inset, bottom sheets sit on
+// top of the keyboard and cap their height at --vv-height.
 installViewportVars();
+
+// Phones: dialogs are bottom sheets whose primary action is at the bottom, so
+// toasts move to the top there (they covered "Load" and the run footer).
+function ResponsiveToaster() {
+  const top = useAfMedia(TOAST_TOP_QUERY);
+  return (
+    <Toaster
+      position={toastPosition(top)}
+      containerStyle={top ? { top: 'max(8px, env(safe-area-inset-top, 0px))' } : undefined}
+    />
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,7 +44,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
-      <Toaster position="bottom-right" />
+      <ResponsiveToaster />
     </QueryClientProvider>
   </React.StrictMode>
 );

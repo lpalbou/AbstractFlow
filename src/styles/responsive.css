@@ -70,13 +70,13 @@ body {
   left: 51px;
 }
 
-/* The toolbar row may not grow past its lane (it was clipped by the kit
-   actions at 900-1300 px). Between 1024 and ~1300 px the strip scrolls. */
-.toolbar {
-  overflow: hidden;
-}
-
 @media (max-width: 1439.98px) {
+  /* The toolbar row may not grow past its lane (it ran under the kit
+     actions at 900-1300 px); the action strip inside it scrolls. */
+  .toolbar {
+    overflow: hidden;
+  }
+
   .toolbar-actions {
     display: flex;
     align-items: center;
@@ -251,6 +251,33 @@ body {
     overscroll-behavior: contain;
   }
 
+  .right-drawer-content:focus {
+    outline: none;
+  }
+
+  /* On-screen keyboard (iOS keeps the layout viewport under it;
+     installViewportVars() writes --keyboard-inset): the assistant's composer,
+     at the bottom of the drawer, stays above the keyboard. */
+  /* The open drawer ends at the top of the on-screen keyboard. */
+  .properties-drawer.open {
+    bottom: var(--keyboard-inset, 0px);
+  }
+
+  .authoring-assistant {
+    /* When the keyboard leaves less room than the column needs, the column
+       scrolls and the composer stays pinned at the visible bottom. */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .authoring-assistant .assistant-input-area {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    /* Same tint as before, made opaque (content scrolls under it). */
+    background: color-mix(in srgb, var(--bg-primary) 55%, var(--bg-secondary));
+  }
+
   /* Backdrop behind an open drawer (tap closes). Not named *drawer* so the
      harness's sidebar detector does not count it as a docked panel. */
   .overlay-scrim {
@@ -411,6 +438,13 @@ body {
 
 /* Phone landscape: one thin header row, no footer. */
 @media (max-height: 500px) {
+  /* rows=4 made the composer ~170 px, taller than what a landscape phone
+     keeps above its keyboard: two lines, still resizable. */
+  .assistant-input-area textarea {
+    min-height: 56px;
+    height: 56px;
+  }
+
   .app-footer {
     display: none;
   }
@@ -422,16 +456,18 @@ body {
 
 /* Dialogs become bottom sheets on phones (width < 768 or height < 500). */
 @media (max-width: 767.98px), (max-height: 500px) {
+  /* The sheet sits on top of the on-screen keyboard (--keyboard-inset from
+     installViewportVars()), so its sticky action row stays reachable. */
   .modal-overlay {
     align-items: flex-end;
-    padding: max(8px, var(--safe-top, 0px)) 0 0;
+    padding: max(8px, var(--safe-top, 0px)) 0 var(--keyboard-inset, 0px);
   }
 
   .modal {
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    max-height: 100%;
+    max-height: min(100%, calc(var(--vv-height, 100vh) - max(8px, var(--safe-top, 0px))));
     border-radius: 14px 14px 0 0;
     padding: 18px max(16px, var(--safe-right, 0px)) max(16px, var(--safe-bottom, 0px)) max(16px, var(--safe-left, 0px));
   }
@@ -450,7 +486,7 @@ body {
 
   /* Sign-in: the kit card is the sheet. */
   .gateway-connection-overlay {
-    padding: max(8px, var(--safe-top, 0px)) 0 0;
+    padding: max(8px, var(--safe-top, 0px)) 0 var(--keyboard-inset, 0px);
   }
 
   .gateway-connection-modal {
@@ -472,7 +508,10 @@ body {
   .flow-library-modal {
     height: 100%;
     gap: 10px;
-    overflow: hidden;
+    /* Scrolls when the keyboard leaves less room than the header + list
+       need; the action row (Load) stays pinned at the sheet bottom. */
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .flow-library-body {
@@ -492,9 +531,16 @@ body {
   }
 
   .flow-library-actions {
-    position: static;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
     margin: 0;
-    padding: 0;
+    padding: 8px 0 0;
+    background: var(--bg-secondary);
+  }
+
+  .flow-library-body {
+    min-height: 160px;
   }
 
   /* Run window: full-height sheet; steps above details. */
@@ -518,7 +564,7 @@ body {
   }
 
   .code-editor-overlay {
-    padding: max(8px, var(--safe-top, 0px)) 0 0;
+    padding: max(8px, var(--safe-top, 0px)) 0 var(--keyboard-inset, 0px);
   }
 
   .code-editor-modal {
@@ -708,6 +754,24 @@ body {
   .palette-toggle {
     width: 44px;
     height: 44px;
+  }
+}
+
+/* Touch: the properties panel is a reading surface (help copy was 10-11 px).
+   Canvas node text keeps the node design's size. */
+@media (pointer: coarse) {
+  .properties-panel p,
+  .properties-panel .property-hint,
+  .properties-panel .tool-desc,
+  .functions-drawer p {
+    font-size: var(--font-size-body, 14px);
+    line-height: 1.45;
+  }
+
+  .properties-panel .property-label,
+  .properties-panel .property-sublabel,
+  .properties-panel label {
+    font-size: max(13px, var(--font-size-md, 13px));
   }
 }
 

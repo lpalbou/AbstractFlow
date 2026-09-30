@@ -48,6 +48,16 @@ of 1024 px or wider with a mouse it looks as before.
 - App breakpoints now use the shared values 480/768/1024/1440 (the old ones
   were 720, 860 and 900).
 - On touch screens the assistant and functions panels use 16 px inputs.
+- The side panels follow the window across 1024 px: going narrower closes
+  them, so the properties panel no longer reappears over the canvas; going
+  wider re-opens the panel that was open before. The right drawer takes focus
+  when it opens over the canvas and gives it back when it closes.
+- With the on-screen keyboard open, the assistant composer and the bottom
+  sheets' action rows (such as the library's Load) stay above the keyboard.
+- Below 768 px wide or 500 px tall, toasts appear at the top so they do not
+  cover a sheet's primary action.
+- On touch screens the properties panel's help text is 14 px and its labels
+  13 px.
 - `@abstractframework/ui-kit` 0.3.1 is vendored as
   `vendor/abstractframework-ui-kit-0.3.1.tgz`. The Vite alias and tsconfig
   path point at this package instead of the sibling abstractuic checkout. The

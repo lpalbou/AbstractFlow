@@ -1,5 +1,5 @@
 import 'reactflow/dist/style.css';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Canvas } from './components/Canvas';
@@ -26,6 +26,7 @@ import {
   type GatewayConnectionPhase,
 } from '@abstractframework/ui-kit';
 import { PALETTE_ADD_NODE_EVENT } from './utils/paletteAdd';
+import { drawerReducer, initialDrawerState } from './utils/drawerLayout';
 import { registerMonitorGpuWidget } from '@abstractframework/monitor-gpu';
 import { registerMonitorMemoryWidget } from '@abstractframework/monitor-memory';
 
@@ -58,8 +59,6 @@ function monitor_memory_enabled(): boolean {
   }
 }
 
-type RightDrawerMode = 'assistant' | 'properties' | 'functions' | null;
-
 function App() {
   const { selectedNode } = useFlowStore();
   const queryClient = useQueryClient();
@@ -82,7 +81,6 @@ function App() {
   const [connection_checked, set_connection_checked] = useState(false);
   const [connection_status, set_connection_status] = useState<GatewayConnectionStatus | null>(null);
   const [connection_required, set_connection_required] = useState(false);
-  const [right_drawer_mode, set_right_drawer_mode] = useState<RightDrawerMode>(null);
   // Once the assistant has been opened it stays mounted for the whole editor
   // session (it renders null while hidden). Unmounting on tab switch would
   // destroy the in-flight autonomous authoring loop plus all conversation,
@@ -91,8 +89,13 @@ function App() {
   // Below the md breakpoint (1024 px) the node palette and the right drawer
   // leave the layout and float over the full-bleed canvas as drawers
   // (DESIGN.md 5.2/5.4). The palette is closed by default there.
+  // Explicit drawer state (utils/drawerLayout.ts): crossing below 1024 closes
+  // the drawers, crossing back up re-docks the right panel that was open.
   const narrow = useAfMedia(AF_MEDIA.md);
-  const [palette_open, set_palette_open] = useState(false);
+  const [drawers, dispatch_drawers] = useReducer(drawerReducer, narrow, initialDrawerState);
+  const right_drawer_mode = drawers.right;
+  const palette_open = drawers.paletteOpen;
+  const right_drawer_ref = useRef<HTMLDivElement | null>(null);
   const palette_toggle_ref = useRef<HTMLButtonElement | null>(null);
   const palette_ref = useRef<HTMLElement | null>(null);
   const gateway_connected = hasBrowserGatewaySession(connection_status);
@@ -123,55 +126,47 @@ function App() {
   const properties_open = right_drawer_mode === 'properties';
   const functions_open = right_drawer_mode === 'functions';
   const right_drawer_open = assistant_open || properties_open || functions_open;
-  const toggle_assistant_drawer = () => {
-    set_right_drawer_mode((mode) => (mode === 'assistant' ? null : 'assistant'));
-  };
-  const toggle_properties_drawer = () => {
-    set_right_drawer_mode((mode) => (mode === 'properties' ? null : 'properties'));
-  };
-  const toggle_functions_drawer = () => {
-    set_right_drawer_mode((mode) => (mode === 'functions' ? null : 'functions'));
-  };
+  const toggle_assistant_drawer = () => dispatch_drawers({ type: 'toggleRight', mode: 'assistant' });
+  const toggle_properties_drawer = () => dispatch_drawers({ type: 'toggleRight', mode: 'properties' });
+  const toggle_functions_drawer = () => dispatch_drawers({ type: 'toggleRight', mode: 'functions' });
+
+  // Selecting a node shows its properties (Assistant / Functions hold their
+  // ground: the functions panel's Used-by rows SELECT nodes).
+  useEffect(() => {
+    dispatch_drawers({ type: 'select', nodeId: selected_node_id });
+  }, [selected_node_id]);
 
   useEffect(() => {
-    set_right_drawer_mode((mode) => {
-      // Assistant and Functions drawers hold their ground on selection: the
-      // functions panel's Used-by rows SELECT nodes — flipping to Properties
-      // on that click would close the panel the user is navigating from.
-      if (mode === 'assistant' || mode === 'functions') return mode;
-      if (selected_node_id) return 'properties';
-      return null;
-    });
-  }, [selected_node_id]);
+    dispatch_drawers({ type: 'viewport', narrow });
+  }, [narrow]);
 
   useEffect(() => {
     if (assistant_open) set_assistant_mounted(true);
   }, [assistant_open]);
 
-  // Leaving the narrow layout: the palette is docked again, so drop the
-  // drawer state (it would otherwise reopen as a drawer on the way back down).
-  useEffect(() => {
-    if (!narrow) set_palette_open(false);
-  }, [narrow]);
-
-  // Narrow drawers: one at a time. Opening the palette closes the right
-  // drawer and vice versa, so the backdrop always belongs to one drawer.
+  // Narrow drawers: one at a time (the reducer enforces it), so the backdrop
+  // always belongs to one drawer.
   const palette_drawer_open = narrow && palette_open;
   const right_drawer_overlay = narrow && right_drawer_open;
-  const close_narrow_drawers = () => {
-    set_palette_open(false);
-    set_right_drawer_mode(null);
-  };
-  const toggle_palette = () => {
-    set_palette_open((open) => {
-      const next = !open;
-      if (next) set_right_drawer_mode((mode) => (mode === 'assistant' ? mode : null));
-      return next;
-    });
-  };
+  const close_narrow_drawers = () => dispatch_drawers({ type: 'closeNarrow' });
+  const toggle_palette = () => dispatch_drawers({ type: 'togglePalette' });
+
+  // The right drawer takes focus when it opens over the canvas and gives it
+  // back to whatever opened it (rail button, top-bar button) on close.
+  const right_opener_ref = useRef<HTMLElement | null>(null);
+  const right_was_overlay_ref = useRef(false);
   useEffect(() => {
-    if (right_drawer_open && narrow) set_palette_open(false);
-  }, [right_drawer_open, narrow]);
+    if (right_drawer_overlay && !right_was_overlay_ref.current) {
+      const active = document.activeElement;
+      right_opener_ref.current = active instanceof HTMLElement && active !== document.body ? active : null;
+      right_drawer_ref.current?.focus({ preventScroll: true });
+    } else if (!right_drawer_overlay && right_was_overlay_ref.current) {
+      const opener = right_opener_ref.current;
+      if (opener && opener.isConnected) opener.focus({ preventScroll: true });
+      right_opener_ref.current = null;
+    }
+    right_was_overlay_ref.current = right_drawer_overlay;
+  }, [right_drawer_overlay]);
 
   // Focus moves into the palette drawer on open and back to its opener on
   // close (the drawer container itself takes focus: focusing the search field
@@ -202,12 +197,10 @@ function App() {
   // Tap-to-add from the palette (touch / narrow layouts) closes the drawer so
   // the new node is visible on the canvas.
   useEffect(() => {
-    const on_add = () => {
-      if (narrow) set_palette_open(false);
-    };
+    const on_add = () => dispatch_drawers({ type: 'paletteAdded' });
     window.addEventListener(PALETTE_ADD_NODE_EVENT, on_add);
     return () => window.removeEventListener(PALETTE_ADD_NODE_EVENT, on_add);
-  }, [narrow]);
+  }, []);
 
   useEffect(() => {
     if (!gpu_enabled) return;
@@ -455,7 +448,7 @@ function App() {
           <button
             type="button"
             className="drawer-close palette-close"
-            onClick={() => set_palette_open(false)}
+            onClick={() => dispatch_drawers({ type: 'closePalette' })}
             aria-label="Close node palette"
             title="Close node palette"
           >
@@ -479,7 +472,12 @@ function App() {
           className={`sidebar right properties-drawer ${right_drawer_open ? 'open' : 'collapsed'} ${assistant_open ? 'assistant-drawer-open' : ''} ${properties_open ? 'properties-drawer-open' : ''} ${functions_open ? 'functions-drawer-open' : ''}`}
         >
           {right_drawer_open || assistant_mounted ? (
-            <div className="right-drawer-content" style={right_drawer_open ? undefined : { display: 'none' }}>
+            <div
+              ref={right_drawer_ref}
+              className="right-drawer-content"
+              tabIndex={-1}
+              style={right_drawer_open ? undefined : { display: 'none' }}
+            >
               {assistant_mounted ? <AuthoringAssistantDrawer isOpen={assistant_open} /> : null}
               {properties_open ? <PropertiesPanel node={selectedNode} /> : null}
               {functions_open ? <FunctionsDrawer /> : null}

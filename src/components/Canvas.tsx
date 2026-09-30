@@ -25,7 +25,7 @@ import { useFlowStore } from '../hooks/useFlow';
 import { getConnectionError, validateConnection } from '../utils/validation';
 import { isRouteOverrideEdge } from '../utils/multiEntryRoutes';
 import { NodeTemplate } from '../types/nodes';
-import { PALETTE_ADD_NODE_EVENT } from '../utils/paletteAdd';
+import { PALETTE_ADD_NODE_EVENT, addPaletteNodeAtCentre } from '../utils/paletteAdd';
 import type { FlowNodeData, PinConnectionFeedback, PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
 import { PinLegend } from './PinLegend';
@@ -697,19 +697,14 @@ function CanvasBody() {
   // canvas drops it at the centre of what is visible (utils/paletteAdd.ts).
   useEffect(() => {
     const onPaletteAdd = (event: Event) => {
-      const template = (event as CustomEvent<NodeTemplate>).detail;
-      if (!template || !reactFlowInstance.current || !reactFlowWrapper.current) return;
-      if (useFlowStore.getState().execView) {
-        toast('Switch back to the full view to add nodes', { icon: 'ℹ️' });
-        return;
-      }
-      const bounds = reactFlowWrapper.current.getBoundingClientRect();
-      const position = reactFlowInstance.current.screenToFlowPosition({
-        x: bounds.left + bounds.width / 2,
-        y: bounds.top + bounds.height / 2,
+      const instance = reactFlowInstance.current;
+      addPaletteNodeAtCentre((event as CustomEvent<NodeTemplate>).detail, {
+        getBounds: () => reactFlowWrapper.current?.getBoundingClientRect() ?? null,
+        project: instance ? (point) => instance.screenToFlowPosition(point) : null,
+        addNode,
+        isExecView: () => useFlowStore.getState().execView,
+        notify: (message, kind) => (kind === 'success' ? toast.success(message) : toast(message, { icon: 'ℹ️' })),
       });
-      addNode(template, position);
-      toast.success(`Added ${template.label} node`);
     };
     window.addEventListener(PALETTE_ADD_NODE_EVENT, onPaletteAdd);
     return () => window.removeEventListener(PALETTE_ADD_NODE_EVENT, onPaletteAdd);
