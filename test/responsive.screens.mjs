@@ -66,10 +66,10 @@ async function openLibrary(page) {
   await page.waitForTimeout(600);
 }
 
-async function ensureFlowLoaded(page) {
+async function ensureFlowLoaded(page, { reload = false } = {}) {
   await ensureSignedIn(page);
   const name = await page.locator('.flow-name-input, .app-header input').first().inputValue().catch(() => '');
-  if (name.startsWith(FLOW_NAME)) return;
+  if (!reload && name.startsWith(FLOW_NAME)) return;
   await closeOverlays(page);
   await openLibrary(page);
   await page.fill('.flow-library-search', FLOW_NAME);
@@ -174,7 +174,14 @@ export default {
         // A bundled flow is read-only and Run stays gated while the editor
         // holds edits: save a standalone copy in the (throwaway) fixture
         // gateway first.
-        const run = page.getByRole('button', { name: 'Run flow', exact: true }).first();
+        let run = page.getByRole('button', { name: 'Run flow', exact: true }).first();
+        // An earlier screen's tap can leave the bundled flow marked modified
+        // (Run is gated then): reload it unmodified first.
+        if (await run.isDisabled().catch(() => true)) {
+          await ensureFlowLoaded(page, { reload: true });
+          await closeDrawers(page);
+          run = page.getByRole('button', { name: 'Run flow', exact: true }).first();
+        }
         if (await run.isDisabled().catch(() => true)) {
           await clickToolbar(page, 'Duplicate Flow');
           const save = page.locator('.modal .modal-button.primary', { hasText: 'Save copy' }).first();
