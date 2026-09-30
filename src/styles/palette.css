@@ -1648,7 +1648,9 @@
   padding: 4px 8px;
   border: 1px solid rgba(120, 120, 160, 0.35);
   border-radius: 6px;
-  background: rgba(10, 10, 20, 0.6);
+  /* background-color, not the shorthand: the kit's touch rule draws the
+     native-select chevron with background-image (ui-kit >= 0.3.2). */
+  background-color: rgba(10, 10, 20, 0.6);
   color: var(--text-primary);
   font-size: var(--font-size-xs);
   outline: none;
