@@ -585,9 +585,18 @@ body {
   .properties-panel textarea,
   .modal input,
   .modal select,
-  .modal textarea {
+  .modal textarea,
+  .authoring-assistant input,
+  .authoring-assistant select,
+  .authoring-assistant textarea,
+  .functions-drawer input,
+  .functions-drawer select,
+  .functions-drawer textarea {
     font-size: max(16px, var(--font-size-input, 13px));
   }
+  /* Documented exception: pin inputs inside canvas nodes
+     (.react-flow__node .af-pin-input) keep the node design's 11 px; they live
+     in the canvas zoom transform and grow with pinch-zoom. */
 
   .flow-name-input,
   .flow-library-search,

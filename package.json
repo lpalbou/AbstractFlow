@@ -43,7 +43,7 @@
   },
   "dependencies": {
     "@abstractframework/app-server": "^0.1.11",
-    "@abstractframework/ui-kit": "file:vendor/abstractframework-ui-kit-0.3.0.tgz",
+    "@abstractframework/ui-kit": "file:vendor/abstractframework-ui-kit-0.3.1.tgz",
     "@monaco-editor/react": "^4.6.0",
     "@tanstack/react-query": "^5.17.0",
     "clsx": "^2.1.0",

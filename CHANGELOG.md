@@ -47,8 +47,9 @@ of 1024 px or wider with a mouse it looks as before.
   interactivity lock button.
 - App breakpoints now use the shared values 480/768/1024/1440 (the old ones
   were 720, 860 and 900).
-- `@abstractframework/ui-kit` 0.3.0 is vendored as
-  `vendor/abstractframework-ui-kit-0.3.0.tgz`. The Vite alias and tsconfig
+- On touch screens the assistant and functions panels use 16 px inputs.
+- `@abstractframework/ui-kit` 0.3.1 is vendored as
+  `vendor/abstractframework-ui-kit-0.3.1.tgz`. The Vite alias and tsconfig
   path point at this package instead of the sibling abstractuic checkout. The
   coordinator switches it back to the registry version after publishing.
 
