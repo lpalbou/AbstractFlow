@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Phones and tablets get more of the screen for reading, and on/off options in
 the editor are switches labelled by what they control. Desktop windows 1024 px
-or wider with a mouse keep the 0.5.0 layout. Anyone editing node properties,
+or wider with a mouse keep the 0.5.0 layout, with text at 12 px or more. Anyone editing node properties,
 publishing, starting a run or using the Resources panel sees the switches.
 Nothing changes in VisualFlow documents, the server, or the Gateway contract.
 
@@ -35,6 +35,10 @@ Nothing changes in VisualFlow documents, the server, or the Gateway contract.
   scale: body text 14 to 15 px, secondary text 13 px. Your font-size setting
   still applies. Text inside canvas nodes keeps its size and grows when you
   zoom.
+- **No text under 12 px on desktops.** Dense text (badges, keys, list
+  details) is at least 12 px and secondary text 13 px, so the palette, the
+  properties panel and the run history read at 12 to 13 px instead of 11 px.
+  Some palette names are shortened one character sooner.
 - Dialogs opened from the toolbar are no longer inside the page header, so
   screen readers no longer read them as part of the header.
 - **Switches show their state.** A switch is highlighted with a check mark

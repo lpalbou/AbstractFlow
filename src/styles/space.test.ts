@@ -208,8 +208,15 @@ describe('touch screens: body text 14–17 px (§12.1)', () => {
     expectRule(TOUCH, ':root', /--font-size-base:\s*calc\(15px \* var\(--font-scale\)\)/);
   });
 
-  it('canvas node text keeps the node design sizes (documented exception)', () => {
-    expectRule(TOUCH, '.react-flow', /--font-size-xs:\s*calc\(11px \* var\(--font-scale\)\)/);
+  it('desktop floors: dense text 12 px, helper text 13 px', () => {
+    expectRule(null, ':root', /--font-size-xxs:\s*calc\(12px \* var\(--font-scale\)\)/);
+    expectRule(null, ':root', /--font-size-xs:\s*calc\(12px \* var\(--font-scale\)\)/);
+    expectRule(null, ':root', /--font-size-sm:\s*calc\(13px \* var\(--font-scale\)\)/);
+  });
+
+  it('canvas node text keeps the node design sizes at every width (documented exception)', () => {
+    expectRule(null, '.react-flow', /--font-size-xs:\s*calc\(11px \* var\(--font-scale\)\)/);
+    expectRule(null, '.react-flow', /--font-size-xxs:\s*calc\(10px \* var\(--font-scale\)\)/);
   });
 
   it('run history: row metadata at body size, the list grows the sheet on phones', () => {

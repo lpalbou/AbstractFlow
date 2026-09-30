@@ -407,13 +407,22 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Touch screens (phones and tablets): body text 14–17 px (§12.1)      */
+/* Type scale floors (§12.1)                                          */
 /* ------------------------------------------------------------------ */
 
-/* The type scale itself moves up on a coarse pointer, so every surface that
-   uses the scale follows (the dominant text was 11–12 px on phones and
-   tablets): helper/dense text 13 px, body 14–15 px. The user's font scale
-   still multiplies everything. Desktop keeps the kit scale. */
+/* Desktop: dense text (badges, keys, ledger rows) 12 px minimum; helper and
+   secondary text 13 px (the kit scale starts at 10/11/12 px, and the dominant
+   text of the palette, the properties panel and the run history was 11 px).
+   The user's font scale still multiplies everything. */
+:root {
+  --font-size-xxs: calc(12px * var(--font-scale));
+  --font-size-xs: calc(12px * var(--font-scale));
+  --font-size-sm: calc(13px * var(--font-scale));
+}
+
+/* Touch screens (phones and tablets): body text 14–17 px. The scale itself
+   moves up on a coarse pointer, so every surface that uses it follows (the
+   dominant text was 11–12 px): helper/dense text 13 px, body 14–15 px. */
 @media (pointer: coarse) {
   :root {
     --font-size-xxs: calc(12px * var(--font-scale));
@@ -428,14 +437,15 @@
   .run-history-row.subtle {
     font-size: var(--font-size-sm);
   }
+}
 
-  /* Documented exception: canvas node text keeps the node design's sizes
-     (it lives in the canvas zoom transform and grows with pinch-zoom). */
-  .react-flow {
-    --font-size-xxs: calc(10px * var(--font-scale));
-    --font-size-xs: calc(11px * var(--font-scale));
-    --font-size-sm: calc(12px * var(--font-scale));
-    --font-size-md: calc(13px * var(--font-scale));
-    --font-size-base: calc(14px * var(--font-scale));
-  }
+/* Documented exception: canvas node text keeps the node design's sizes at
+   every width (it lives in the canvas zoom transform and grows with
+   pinch-zoom / zoom). */
+.react-flow {
+  --font-size-xxs: calc(10px * var(--font-scale));
+  --font-size-xs: calc(11px * var(--font-scale));
+  --font-size-sm: calc(12px * var(--font-scale));
+  --font-size-md: calc(13px * var(--font-scale));
+  --font-size-base: calc(14px * var(--font-scale));
 }
