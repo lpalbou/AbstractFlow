@@ -16,7 +16,7 @@ import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
-import { SteerComposer, SpeculationSelect, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AfSwitch, SteerComposer, SpeculationSelect, type SpeculationValue } from '@abstractframework/ui-kit';
 import { parseSpeculationInput, withRunSpeculation } from '../utils/speculationControls';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
@@ -5234,8 +5234,8 @@ export function RunFlowModal({
               else onPause?.();
             }}
             disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
-            title={isPaused ? 'Resume' : 'Pause'}
-            aria-label={isPaused ? 'Resume run' : 'Pause run'}
+            title={isPaused ? 'Resume' : 'Pause'} // state-toggle-lint: allow one-shot action on a running run (not a saved setting)
+            aria-label={isPaused ? 'Resume run' : 'Pause run'} // state-toggle-lint: allow one-shot action on a running run (not a saved setting)
           >
             {isPaused ? '▶' : '⏸'}
           </button>
@@ -7124,10 +7124,14 @@ export function RunFlowModal({
                               spellCheck={false}
                             />
                             <div className="run-waiting-actions run-event-composer-actions">
-                              <label className="run-event-composer-durable" title="Also append to durable mailboxes declaring this event name (survives busy listeners)">
-                                <input type="checkbox" checked={eventDurable} onChange={(e) => setEventDurable(e.target.checked)} />
-                                durable
-                              </label>
+                              <AfSwitch
+                                variant="sm"
+                                label="Durable"
+                                hint="Also append to durable mailboxes declaring this event name (survives busy listeners)."
+                                action="event-durable"
+                                checked={eventDurable}
+                                onChange={setEventDurable}
+                              />
                               <button
                                 type="button"
                                 className="modal-button primary"
@@ -7862,22 +7866,22 @@ export function RunFlowModal({
                               disabled={isRunning || !workspaceInputEnabled}
                             />
 
-                            <label className="run-form-checkbox run-form-inline-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={workspaceRandom}
-                                onChange={(e) => handleWorkspaceRandomChange(e.target.checked)}
-                                disabled={isRunning || !workspaceInputEnabled}
-                              />
-                              <span>Random (default)</span>
-                              <span
-                                className="run-form-tooltip"
-                                title="When enabled, workspace_root is left unset and the gateway allocates a fresh per-run folder. Uncheck to run in a specific folder."
-                                aria-label="Workspace folder randomization help"
-                              >
-                                i
-                              </span>
-                            </label>
+                            <AfSwitch
+                              className="run-form-inline-switch"
+                              label="New folder per run"
+                              hint="On (the default): workspace_root stays unset and the gateway allocates a fresh folder for each run. Off: run in the folder typed here."
+                              action="workspace-random"
+                              checked={workspaceRandom}
+                              unavailableReason={
+                                !workspaceInputEnabled
+                                  ? 'The gateway manages the workspace folder.'
+                                  : isRunning
+                                    ? 'A run is in progress.'
+                                    : null
+                              }
+                              reasonVisible={false}
+                              onChange={handleWorkspaceRandomChange}
+                            />
                           </div>
 
                           {!workspaceInputEnabled ? (
@@ -8765,7 +8769,7 @@ export function RunFlowModal({
                       }}
                       disabled={cancelRequested || (isPaused ? !isPaused : !(isRunning && !isWaiting))}
                     >
-                      {isPaused ? 'Resume' : 'Pause'}
+                      {isPaused ? 'Resume' : 'Pause' /* state-toggle-lint: allow one-shot action on a running run (not a saved setting) */}
                     </button>
                   )}
 

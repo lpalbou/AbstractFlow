@@ -3996,17 +3996,9 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   flex: 1 1 320px;
 }
 
-.run-form-inline-checkbox {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--ui-border-1);
-  background: var(--ui-surface-1);
-  transition: background var(--motion-fast), border-color var(--motion-fast);
-}
-
-.run-form-inline-checkbox:hover {
-  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
-  border-color: var(--ui-border-2);
+/* The "New folder per run" kit switch sits beside the path input. */
+.run-form-inline-switch {
+  flex: 0 0 auto;
 }
 
 .run-form-action {
@@ -4543,14 +4535,7 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   margin-top: -6px;
 }
 
-.model-residency-lock-checkbox,
-.model-residency-filter-toggle {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.model-residency-filter-toggle {
-  display: inline-flex;
+.model-residency-note .af-switch {
   margin-right: 8px;
 }
 
@@ -5775,15 +5760,6 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   align-items: center;
   gap: 12px;
   justify-content: flex-end;
-}
-
-.run-event-composer-durable {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-  cursor: pointer;
 }
 
 .run-event-composer-note {
