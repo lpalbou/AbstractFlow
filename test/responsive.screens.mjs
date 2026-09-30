@@ -39,8 +39,9 @@ async function closeOverlays(page) {
   // Modals that ignore Escape: use their visible Cancel/Close button.
   const cancel = page.locator('.modal-overlay .modal-button.cancel, .run-window-control.close, .af-appearance-overlay button[aria-label="Close"]').first();
   if (await cancel.count()) {
-    // dispatchEvent, not click(): on phones a top-centre toast can sit over the
-    // run window's close control (a real 0.5.0 overlap, reported separately).
+    // dispatchEvent, not click(): in 0.5.0 a top-centre toast sat over the run
+    // window's close control on phones (fixed in space.css; checked by
+    // test/toast_over_sheet.probe.mjs). Kept so BEFORE captures still run.
     try { await cancel.dispatchEvent('click'); } catch { /* not clickable */ }
     await page.waitForTimeout(250);
   }

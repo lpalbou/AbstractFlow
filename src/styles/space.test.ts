@@ -5,6 +5,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { ListDisclosure } from '../components/ListDisclosure';
+import { TOAST_TOP_QUERY } from '../utils/toastPlacement';
 import { LIBRARY_STACKED_QUERY, LIST_OPEN_KEYS, readListOpen, writeListOpen } from '../utils/listOpen';
 
 // Space on phones and tablets (DESIGN §12). Each test goes red when its part
@@ -223,6 +224,14 @@ describe('touch screens: body text 14–17 px (§12.1)', () => {
     expectRule(TOUCH, '.run-history-row.subtle', /font-size:\s*var\(--font-size-sm\)/);
     expectRule(PHONE, '.run-history-list', /max-height:\s*none/);
     expectRule(PHONE, '.run-history-list', /overflow:\s*visible/);
+  });
+});
+
+describe('toasts never cover an open sheet\'s title bar', () => {
+  it('with a dialog open, top toasts start below the sheet title bar (same query as toastPlacement)', () => {
+    const q = TOAST_TOP_QUERY;
+    expectRule(q, 'body:has(.modal-overlay) .app-toaster', /top:\s*calc\(max\(8px, env\(safe-area-inset-top, 0px\)\) \+ 72px\) !important/);
+    expect(read('src', 'main.tsx')).toMatch(/containerClassName="app-toaster"/);
   });
 });
 

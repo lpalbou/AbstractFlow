@@ -449,3 +449,19 @@
   --font-size-md: calc(13px * var(--font-scale));
   --font-size-base: calc(14px * var(--font-scale));
 }
+
+/* ------------------------------------------------------------------ */
+/* Toasts over an open sheet (phones, phone landscape)                */
+/* ------------------------------------------------------------------ */
+
+/* Toasts sit top-centre where dialogs are bottom sheets (toastPlacement.ts,
+   same query). With a sheet open, its title bar is at the top — the run
+   window's close/reduce/maximize controls were under the "Workflow failed …
+   Click to copy" toast, so a tap copied the error instead of closing. While a
+   dialog is open the toasts start below the sheet's title bar (8 px sheet
+   inset + a 56 px bar with 44 px controls + 8 px gap). */
+@media (max-width: 767.98px), (max-height: 500px) {
+  body:has(.modal-overlay) .app-toaster {
+    top: calc(max(8px, env(safe-area-inset-top, 0px)) + 72px) !important;
+  }
+}

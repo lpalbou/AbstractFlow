@@ -41,6 +41,11 @@ Nothing changes in VisualFlow documents, the server, or the Gateway contract.
   Some palette names are shortened one character sooner.
 - Dialogs opened from the toolbar are no longer inside the page header, so
   screen readers no longer read them as part of the header.
+
+### Fixed
+- On phones, a notice raised while a dialog is open appears below the
+  dialog's title bar. It used to cover the run window's close button, and a
+  tap copied the error instead of closing the window.
 - **Switches show their state.** A switch is highlighted with a check mark
   when on, plain when off.
 - **Node settings.** **Structured output** (Agent), **Recurrent** (On
