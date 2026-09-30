@@ -76,6 +76,9 @@ async function ensureFlowLoaded(page, { reload = false } = {}) {
   await page.waitForTimeout(500);
   await page.locator('.flow-library-row', { hasText: FLOW_NAME }).first().click();
   await page.locator('.flow-library-actions .modal-button.primary', { hasText: 'Load' }).click();
+  // Replacing a modified flow asks for confirmation.
+  const cont = page.locator('.modal .modal-button', { hasText: /^Continue$/ }).first();
+  if (await cont.isVisible({ timeout: 1500 }).catch(() => false)) await cont.click();
   await page.waitForSelector('.react-flow__node', { timeout: 10000 });
   await page.waitForTimeout(600);
 }
