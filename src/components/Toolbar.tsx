@@ -1803,8 +1803,13 @@ export function Toolbar() {
           value={flowName}
           onChange={(e) => setFlowName(e.target.value)}
           placeholder="Flow name..."
+          aria-label="Flow name"
         />
 
+        {/* The action groups. On desktop this wrapper is display: contents (the
+            groups sit in the toolbar row exactly as before); below 1024 px it is
+            a horizontally scrolling strip so the header never overflows. */}
+        <div className="toolbar-actions" role="toolbar" aria-label="Flow actions">
         {/* Edit: undo / redo */}
         <div className="toolbar-group" role="group" aria-label="Edit history">
           <ToolbarAction
@@ -1978,6 +1983,8 @@ export function Toolbar() {
           >
             <span aria-hidden="true" style={{ fontSize: 13, lineHeight: 1 }}>&#x1F4E5;</span>
           </ToolbarAction>
+        </div>
+
         </div>
 
         <div className="toolbar-spacer" />

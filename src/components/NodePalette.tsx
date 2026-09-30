@@ -20,6 +20,7 @@ import {
   type GatewayAuthoringCapabilityStatus,
 } from '../utils/gatewayClient';
 import { AfTooltip } from './AfTooltip';
+import { paletteTapAddsNode, requestPaletteAdd } from '../utils/paletteAdd';
 
 /** Ordered display sections; each pulls one or more semantic categories. */
 const PALETTE_SECTIONS: { key: string; label: string; icon: string; categories: string[] }[] = [
@@ -164,6 +165,11 @@ export function NodePalette() {
               status ? (status.checking ? 'checking' : status.available ? 'available' : 'unavailable') : undefined
             }
             onDragStart={(e) => onDragStart(e, template, status)}
+            // Touch screens have no drag-and-drop: a tap adds the node at the
+            // centre of the canvas (utils/paletteAdd.ts). Desktop stays drag-only.
+            onClick={() => {
+              if (!disabled && paletteTapAddsNode()) requestPaletteAdd(template);
+            }}
           >
             <span
               className="node-icon"
@@ -258,7 +264,8 @@ export function NodePalette() {
 
       {/* Help text */}
       <div className="palette-help">
-        <p>Drag nodes to the canvas to add them to your flow.</p>
+        <p className="palette-help-drag">Drag nodes to the canvas to add them to your flow.</p>
+        <p className="palette-help-tap">Tap a node to add it to the centre of the canvas.</p>
       </div>
     </div>
   );

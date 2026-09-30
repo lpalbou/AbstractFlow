@@ -25,6 +25,7 @@ import { useFlowStore } from '../hooks/useFlow';
 import { getConnectionError, validateConnection } from '../utils/validation';
 import { isRouteOverrideEdge } from '../utils/multiEntryRoutes';
 import { NodeTemplate } from '../types/nodes';
+import { PALETTE_ADD_NODE_EVENT } from '../utils/paletteAdd';
 import type { FlowNodeData, PinConnectionFeedback, PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
 import { PinLegend } from './PinLegend';
@@ -257,7 +258,14 @@ function CanvasBody() {
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   const reactFlowStore = useStoreApi();
   const activeCanvasPointerIds = useRef<Set<number>>(new Set());
-  const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  // The minimap would cover a third of a phone canvas: collapsed by default on
+  // small or short screens (the toggle brings it back).
+  const [previewCollapsed, setPreviewCollapsed] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 767.98px), (max-height: 500px)').matches
+  );
   const [activeConnection, setActiveConnection] = useState<ConnectionDragEndpoint | null>(null);
 
   // React Flow uses a multiplicative zoom factor of 1.2 per zoom step.
@@ -684,6 +692,39 @@ function CanvasBody() {
     },
     [addNode]
   );
+
+  // Tap-to-add (touch / narrow layouts): the palette asks for a node and the
+  // canvas drops it at the centre of what is visible (utils/paletteAdd.ts).
+  useEffect(() => {
+    const onPaletteAdd = (event: Event) => {
+      const template = (event as CustomEvent<NodeTemplate>).detail;
+      if (!template || !reactFlowInstance.current || !reactFlowWrapper.current) return;
+      if (useFlowStore.getState().execView) {
+        toast('Switch back to the full view to add nodes', { icon: 'ℹ️' });
+        return;
+      }
+      const bounds = reactFlowWrapper.current.getBoundingClientRect();
+      const position = reactFlowInstance.current.screenToFlowPosition({
+        x: bounds.left + bounds.width / 2,
+        y: bounds.top + bounds.height / 2,
+      });
+      addNode(template, position);
+      toast.success(`Added ${template.label} node`);
+    };
+    window.addEventListener(PALETTE_ADD_NODE_EVENT, onPaletteAdd);
+    return () => window.removeEventListener(PALETTE_ADD_NODE_EVENT, onPaletteAdd);
+  }, [addNode]);
+
+  // Rotating a phone/tablet changes the canvas aspect completely: refit.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia('(orientation: portrait)');
+    const onChange = () => {
+      window.setTimeout(() => reactFlowInstance.current?.fitView({ maxZoom: DEFAULT_ZOOM, duration: 0 }), 120);
+    };
+    mql.addEventListener?.('change', onChange);
+    return () => mql.removeEventListener?.('change', onChange);
+  }, []);
 
   // Store ReactFlow instance
   const handleInit = useCallback((instance: ReactFlowInstance) => {

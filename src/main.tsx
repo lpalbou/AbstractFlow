@@ -8,6 +8,8 @@ import './styles/index.css';
 import './styles/nodes.css';
 import './styles/palette.css';
 import './styles/tooltip.css';
+// Last: adapts the desktop rules above to narrow, short and touch screens.
+import './styles/responsive.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

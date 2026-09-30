@@ -18,11 +18,14 @@ import { Toolbar } from './components/Toolbar';
 import { useFlowStore } from './hooks/useFlow';
 import { useAboutAction } from './hooks/useAboutAction';
 import {
+  AF_MEDIA,
   AfAppearanceDialog,
   AfTopBarActions,
+  useAfMedia,
   useAppearanceSettings,
   type GatewayConnectionPhase,
 } from '@abstractframework/ui-kit';
+import { PALETTE_ADD_NODE_EVENT } from './utils/paletteAdd';
 import { registerMonitorGpuWidget } from '@abstractframework/monitor-gpu';
 import { registerMonitorMemoryWidget } from '@abstractframework/monitor-memory';
 
@@ -85,6 +88,13 @@ function App() {
   // destroy the in-flight autonomous authoring loop plus all conversation,
   // plan, and activity state that lives in the drawer.
   const [assistant_mounted, set_assistant_mounted] = useState(false);
+  // Below the md breakpoint (1024 px) the node palette and the right drawer
+  // leave the layout and float over the full-bleed canvas as drawers
+  // (DESIGN.md 5.2/5.4). The palette is closed by default there.
+  const narrow = useAfMedia(AF_MEDIA.md);
+  const [palette_open, set_palette_open] = useState(false);
+  const palette_toggle_ref = useRef<HTMLButtonElement | null>(null);
+  const palette_ref = useRef<HTMLElement | null>(null);
   const gateway_connected = hasBrowserGatewaySession(connection_status);
   // Once the editor has rendered it owns unsaved graph state, so losing the
   // session must never throw the user back to the full-screen sign-in gate.
@@ -137,6 +147,67 @@ function App() {
   useEffect(() => {
     if (assistant_open) set_assistant_mounted(true);
   }, [assistant_open]);
+
+  // Leaving the narrow layout: the palette is docked again, so drop the
+  // drawer state (it would otherwise reopen as a drawer on the way back down).
+  useEffect(() => {
+    if (!narrow) set_palette_open(false);
+  }, [narrow]);
+
+  // Narrow drawers: one at a time. Opening the palette closes the right
+  // drawer and vice versa, so the backdrop always belongs to one drawer.
+  const palette_drawer_open = narrow && palette_open;
+  const right_drawer_overlay = narrow && right_drawer_open;
+  const close_narrow_drawers = () => {
+    set_palette_open(false);
+    set_right_drawer_mode(null);
+  };
+  const toggle_palette = () => {
+    set_palette_open((open) => {
+      const next = !open;
+      if (next) set_right_drawer_mode((mode) => (mode === 'assistant' ? mode : null));
+      return next;
+    });
+  };
+  useEffect(() => {
+    if (right_drawer_open && narrow) set_palette_open(false);
+  }, [right_drawer_open, narrow]);
+
+  // Focus moves into the palette drawer on open and back to its opener on
+  // close (the drawer container itself takes focus: focusing the search field
+  // would pop the on-screen keyboard over the list on phones).
+  const palette_was_open_ref = useRef(false);
+  useEffect(() => {
+    if (palette_drawer_open) {
+      palette_ref.current?.focus({ preventScroll: true });
+    } else if (palette_was_open_ref.current) {
+      palette_toggle_ref.current?.focus({ preventScroll: true });
+    }
+    palette_was_open_ref.current = palette_drawer_open;
+  }, [palette_drawer_open]);
+
+  // Escape closes whichever narrow drawer is open.
+  useEffect(() => {
+    if (!palette_drawer_open && !right_drawer_overlay) return;
+    const on_key = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // A dialog above the drawer owns Escape.
+      if (document.querySelector('.modal-overlay, .af-appearance-overlay, .af-connect-overlay')) return;
+      close_narrow_drawers();
+    };
+    window.addEventListener('keydown', on_key);
+    return () => window.removeEventListener('keydown', on_key);
+  }, [palette_drawer_open, right_drawer_overlay]);
+
+  // Tap-to-add from the palette (touch / narrow layouts) closes the drawer so
+  // the new node is visible on the canvas.
+  useEffect(() => {
+    const on_add = () => {
+      if (narrow) set_palette_open(false);
+    };
+    window.addEventListener(PALETTE_ADD_NODE_EVENT, on_add);
+    return () => window.removeEventListener(PALETTE_ADD_NODE_EVENT, on_add);
+  }, [narrow]);
 
   useEffect(() => {
     if (!gpu_enabled) return;
@@ -277,6 +348,23 @@ function App() {
     <div className="app-container">
       {/* Header */}
       <header className="app-header">
+        <button
+          type="button"
+          ref={palette_toggle_ref}
+          className={`palette-toggle ${palette_drawer_open ? 'active' : ''}`}
+          onClick={toggle_palette}
+          aria-expanded={palette_drawer_open}
+          aria-controls="node-palette-drawer"
+          aria-label={palette_drawer_open ? 'Close node palette' : 'Open node palette'}
+          title={palette_drawer_open ? 'Close node palette' : 'Open node palette'}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            <path d="M17.5 14v7M14 17.5h7" />
+          </svg>
+        </button>
         <div className="logo">
           <span className="logo-icon">&#x1F300;</span>
           <span className="logo-text">AbstractFlow</span>
@@ -353,11 +441,33 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className={`app-main ${right_drawer_open ? 'properties-open' : 'properties-collapsed'}`}>
-        {/* Left sidebar - Node palette */}
-        <aside className="sidebar left">
+      <main
+        className={`app-main ${right_drawer_open ? 'properties-open' : 'properties-collapsed'} ${palette_drawer_open ? 'palette-open' : ''}`}
+      >
+        {/* Left sidebar - Node palette (a drawer below 1024 px) */}
+        <aside
+          id="node-palette-drawer"
+          ref={palette_ref}
+          className={`sidebar left ${palette_drawer_open ? 'open' : ''}`}
+          tabIndex={narrow ? -1 : undefined}
+          aria-label="Node palette"
+        >
+          <button
+            type="button"
+            className="drawer-close palette-close"
+            onClick={() => set_palette_open(false)}
+            aria-label="Close node palette"
+            title="Close node palette"
+          >
+            ×
+          </button>
           <NodePalette />
         </aside>
+
+        {/* Narrow layouts: tap outside an open drawer to close it. */}
+        {palette_drawer_open || right_drawer_overlay ? (
+          <div className="overlay-scrim" onClick={close_narrow_drawers} aria-hidden="true" />
+        ) : null}
 
         {/* Center - Canvas */}
         <div className="canvas-container">

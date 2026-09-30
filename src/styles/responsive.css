@@ -1,0 +1,699 @@
+/**
+ * AbstractFlow — responsive layout (DESIGN.md, the AbstractFramework
+ * responsive system). Imported LAST (main.tsx) so it adapts the desktop rules
+ * in index.css / nodes.css / palette.css without touching them.
+ *
+ * Breakpoints (literal values are the contract, desktop-first max-width):
+ *   xs < 480   sm < 768   md < 1024   lg < 1440   xl >= 1440
+ *   short = max-height: 500px (phone landscape)
+ *   touch = pointer: coarse
+ *
+ * Desktop (>= 1024 px, fine pointer) renders exactly as before: every rule
+ * below sits inside a narrow, short or touch query, except the few
+ * zero-effect-on-desktop defaults at the top (safe-area insets are 0 on a
+ * desktop browser, --vh-full equals 100% there).
+ */
+
+/* ------------------------------------------------------------------ */
+/* Shell                                                              */
+/* ------------------------------------------------------------------ */
+
+body {
+  /* A full-screen app shell: no pull-to-refresh bounce dragging the editor. */
+  overscroll-behavior-y: none;
+}
+
+.app-container {
+  /* The dynamic viewport (kit token; 100dvh where supported) so the canvas
+     never extends under the iOS URL bar. */
+  height: var(--vh-full, 100%);
+}
+
+.app-header {
+  height: calc(var(--header-height) + var(--safe-top, 0px));
+  padding-top: var(--safe-top, 0px);
+  padding-left: max(16px, var(--safe-left, 0px));
+  padding-right: max(16px, var(--safe-right, 0px));
+  min-width: 0;
+}
+
+.app-footer {
+  height: calc(var(--footer-height) + var(--safe-bottom, 0px));
+  padding-bottom: var(--safe-bottom, 0px);
+}
+
+/* The header keeps its three clusters in their own lanes: the kit's top-bar
+   actions never get overlapped by the toolbar (they did at every width below
+   ~1300 px: the toolbar groups were flex-shrink: 0 inside a min-width: 0 row). */
+.app-header > .af-topbar {
+  flex: 0 0 auto;
+}
+
+/* Desktop: the action strip is transparent to layout (groups sit directly in
+   the toolbar row, as before). */
+.toolbar-actions {
+  display: contents;
+}
+
+/* Only below md. */
+.palette-toggle,
+.drawer-close,
+.overlay-scrim,
+.palette-help-tap {
+  display: none;
+}
+
+/* The pin legend sat on top of the zoom controls' last button (the
+   interactivity lock) at every size: park it right of the controls column
+   (15 px margin + 26 px buttons + 10 px gap). Intentional desktop change. */
+.pin-legend {
+  left: 51px;
+}
+
+/* The toolbar row may not grow past its lane (it was clipped by the kit
+   actions at 900-1300 px). Between 1024 and ~1300 px the strip scrolls. */
+.toolbar {
+  overflow: hidden;
+}
+
+@media (max-width: 1439.98px) {
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    /* Room for the group chrome and focus rings inside the scroller. */
+    padding-block: 3px;
+  }
+
+  .toolbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .toolbar-spacer {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* md (< 1024): drawers over a full-bleed canvas                      */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 1023.98px) {
+  .app-header {
+    gap: 8px;
+    padding-left: max(8px, var(--safe-left, 0px));
+    padding-right: max(8px, var(--safe-right, 0px));
+  }
+
+  .logo-text {
+    display: none;
+  }
+
+  .flow-name-input {
+    width: clamp(96px, 22vw, 200px);
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .palette-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: var(--tap-min, 32px);
+    height: var(--tap-min, 32px);
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+    background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+    color: var(--text-secondary);
+  }
+
+  .palette-toggle.active,
+  .palette-toggle:hover {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
+  .app-main {
+    position: relative;
+  }
+
+  /* The canvas's own overlays (pin legend z 100, preflight panel, minimap)
+     stay inside the canvas: the drawers (z 80/90) float above all of them. */
+  .canvas-container {
+    isolation: isolate;
+  }
+
+  /* Node palette: an overlay drawer from the left edge, closed by default. */
+  .sidebar.left {
+    display: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 90;
+    width: min(320px, 86%);
+    flex: none;
+    padding-left: var(--safe-left, 0px);
+    padding-bottom: var(--safe-bottom, 0px);
+    overscroll-behavior: contain;
+    box-shadow: 18px 0 40px rgba(0, 0, 0, 0.38);
+  }
+
+  .sidebar.left.open {
+    display: block;
+  }
+
+  .sidebar.left:focus {
+    outline: none;
+  }
+
+  .drawer-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    width: var(--tap-min, 32px);
+    height: var(--tap-min, 32px);
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .drawer-close:hover {
+    background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+    color: var(--text-primary);
+  }
+
+  .palette-title {
+    /* Leave room for the close button. */
+    padding-right: 40px;
+  }
+
+  .palette-help-drag {
+    display: none;
+  }
+
+  .palette-help-tap {
+    display: block;
+  }
+
+  .palette-node {
+    cursor: pointer;
+  }
+
+  /* Right drawer (properties / assistant / functions): its rail stays docked
+     (44 px), the open panel floats over the canvas instead of squeezing it. */
+  .properties-drawer.open {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 80;
+    height: auto;
+    flex: none;
+    max-width: 100%;
+    padding-right: var(--safe-right, 0px);
+    box-shadow: -18px 0 40px rgba(0, 0, 0, 0.38);
+  }
+
+  .properties-drawer.open.properties-drawer-open {
+    width: min(100%, calc(360px + var(--right-drawer-rail-width)));
+  }
+
+  .properties-drawer.open.assistant-drawer-open,
+  .properties-drawer.open.functions-drawer-open {
+    width: min(100%, calc(480px + var(--right-drawer-rail-width)));
+  }
+
+  .right-drawer-content {
+    overscroll-behavior: contain;
+  }
+
+  /* Backdrop behind an open drawer (tap closes). Not named *drawer* so the
+     harness's sidebar detector does not count it as a docked panel. */
+  .overlay-scrim {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 70;
+    background: rgba(4, 8, 18, 0.46);
+  }
+
+  /* Modals: a real gutter around every dialog. */
+  .modal-overlay {
+    padding:
+      max(var(--gutter, 16px), var(--safe-top, 0px))
+      max(var(--gutter, 16px), var(--safe-right, 0px))
+      max(var(--gutter, 16px), var(--safe-bottom, 0px))
+      max(var(--gutter, 16px), var(--safe-left, 0px));
+  }
+
+  .modal {
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+
+  /* Run window: the steps column shrinks with the modal (was 380px fixed). */
+  .run-modal {
+    width: 100%;
+    max-width: 100%;
+    height: min(900px, 100%);
+    max-height: 100%;
+  }
+
+  .run-modal-execution {
+    grid-template-columns: minmax(220px, 36%) minmax(0, 1fr);
+  }
+
+  .run-modal.run-modal-maximized {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+  }
+
+  .flow-library-modal {
+    width: 100%;
+    max-width: 100%;
+    height: min(760px, 100%);
+  }
+
+  .flow-library-header {
+    flex-wrap: wrap;
+  }
+
+  .flow-library-controls {
+    flex: 1 1 360px;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-library-search {
+    flex: 1 1 180px;
+    width: auto;
+    min-width: 0;
+  }
+
+  .code-editor-overlay {
+    padding:
+      max(12px, var(--safe-top, 0px))
+      max(12px, var(--safe-right, 0px))
+      max(12px, var(--safe-bottom, 0px))
+      max(12px, var(--safe-left, 0px));
+  }
+
+  .code-editor-modal {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+  }
+
+  .canvas-preview-toggle:not(.collapsed) {
+    right: max(18px, var(--safe-right, 0px));
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* sm (< 768) and phone landscape (short): header on two rows,        */
+/* dialogs as bottom sheets, single-column dialogs                    */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 767.98px) {
+  /* Row 1: palette toggle | logo | flow name | kit actions.
+     Row 2: the action strip (scrolls horizontally). */
+  .app-header {
+    height: auto;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "palette logo name actions"
+      "tools tools tools tools";
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 4px;
+    padding-top: calc(6px + var(--safe-top, 0px));
+    padding-bottom: 4px;
+  }
+
+  .app-header > .palette-toggle { grid-area: palette; }
+  .app-header > .logo { grid-area: logo; }
+  .app-header > .af-topbar { grid-area: actions; gap: 6px; }
+
+  .app-header > .toolbar {
+    display: contents;
+  }
+
+  .flow-name-input {
+    grid-area: name;
+    width: 100%;
+  }
+
+  .toolbar-actions {
+    grid-area: tools;
+    gap: 8px;
+  }
+
+  .app-footer {
+    display: none;
+  }
+
+  .sidebar.left {
+    width: min(360px, 100%);
+  }
+}
+
+@media (max-width: 479.98px) {
+  .sidebar.left,
+  .properties-drawer.open.properties-drawer-open,
+  .properties-drawer.open.assistant-drawer-open,
+  .properties-drawer.open.functions-drawer-open {
+    width: 100%;
+  }
+
+  .logo {
+    display: none;
+  }
+
+  .app-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "palette name actions"
+      "tools tools tools";
+  }
+}
+
+/* Phone landscape: one thin header row, no footer. */
+@media (max-height: 500px) {
+  .app-footer {
+    display: none;
+  }
+
+  .app-header {
+    gap: 6px;
+  }
+}
+
+/* Dialogs become bottom sheets on phones (width < 768 or height < 500). */
+@media (max-width: 767.98px), (max-height: 500px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: max(8px, var(--safe-top, 0px)) 0 0;
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    max-height: 100%;
+    border-radius: 14px 14px 0 0;
+    padding: 18px max(16px, var(--safe-right, 0px)) max(16px, var(--safe-bottom, 0px)) max(16px, var(--safe-left, 0px));
+  }
+
+  .modal-actions {
+    position: sticky;
+    bottom: calc(-1 * max(16px, var(--safe-bottom, 0px)));
+    margin-inline: -4px;
+    padding: 10px 4px max(4px, var(--safe-bottom, 0px));
+    background: var(--bg-secondary);
+  }
+
+  .modal-actions > .modal-button {
+    flex: 1 1 auto;
+  }
+
+  /* Sign-in: the kit card is the sheet. */
+  .gateway-connection-overlay {
+    padding: max(8px, var(--safe-top, 0px)) 0 0;
+  }
+
+  .gateway-connection-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    padding: 0;
+    overflow-y: auto;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .gateway-connection-modal .af-gateway-signin {
+    border-radius: 14px 14px 0 0;
+    padding-bottom: max(16px, var(--safe-bottom, 0px));
+  }
+
+  /* Flow library: list above preview, each scrolling; the sheet uses the
+     whole height. */
+  .flow-library-modal {
+    height: 100%;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  .flow-library-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .flow-library-item-top {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .flow-library-controls {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .flow-library-actions {
+    position: static;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Run window: full-height sheet; steps above details. */
+  .run-modal {
+    height: 100%;
+    border-radius: 14px 14px 0 0;
+    padding: 0;
+  }
+
+  .run-modal-body {
+    padding: 12px max(12px, var(--safe-right, 0px)) 0 max(12px, var(--safe-left, 0px));
+  }
+
+  .run-modal-footer {
+    padding: 10px max(12px, var(--safe-right, 0px)) max(10px, var(--safe-bottom, 0px)) max(12px, var(--safe-left, 0px));
+  }
+
+  .run-modal-titlebar {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  .code-editor-overlay {
+    padding: max(8px, var(--safe-top, 0px)) 0 0;
+  }
+
+  .code-editor-modal {
+    border-radius: 14px 14px 0 0;
+  }
+}
+
+/* Phone landscape is wide enough for list | preview side by side. */
+@media (max-height: 500px) and (min-width: 768px) {
+  .flow-library-body {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .flow-library-subtitle {
+    display: none;
+  }
+
+  .flow-library-header {
+    flex-wrap: nowrap;
+  }
+
+  .flow-library-controls {
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .run-modal-execution {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(160px, 0.9fr) minmax(200px, 1.1fr);
+  }
+}
+
+@media (max-width: 479.98px) {
+  .modal-actions {
+    gap: 6px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Touch: 44 px targets, 16 px inputs (no iOS focus zoom)             */
+/* ------------------------------------------------------------------ */
+
+@media (pointer: coarse) {
+  .toolbar-button,
+  .toolbar-button.icon-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .toolbar-group {
+    gap: 4px;
+  }
+
+  .flow-name-input,
+  .palette-search input,
+  .flow-library-search,
+  .flow-library-sort,
+  .properties-panel input,
+  .properties-panel select,
+  .properties-panel textarea,
+  .modal input,
+  .modal select,
+  .modal textarea {
+    font-size: max(16px, var(--font-size-input, 13px));
+  }
+
+  .flow-name-input,
+  .flow-library-search,
+  .flow-library-sort,
+  .palette-search input {
+    min-height: 44px;
+  }
+
+  .palette-node,
+  .category-header {
+    min-height: 44px;
+  }
+
+  .palette-node .node-label,
+  .category-label {
+    font-size: 14px;
+  }
+
+  .palette-empty-clear,
+  .pin-legend-toggle,
+  .modal-button,
+  .flow-library-link,
+  .flow-library-view-toggle button {
+    min-height: 44px;
+  }
+
+  .flow-library-row {
+    min-height: 44px;
+  }
+
+  .react-flow__controls-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .react-flow__controls-button svg {
+    max-width: 16px;
+    max-height: 16px;
+  }
+
+  .react-flow__controls {
+    margin-left: max(15px, var(--safe-left, 0px));
+    margin-bottom: max(15px, var(--safe-bottom, 0px));
+  }
+
+  /* Right of the 44 px zoom controls instead of on top of them. */
+  .pin-legend {
+    bottom: max(16px, var(--safe-bottom, 0px));
+    left: calc(max(15px, var(--safe-left, 0px)) + 44px + 10px);
+  }
+
+  .canvas-preview-toggle,
+  .canvas-preview-toggle.collapsed {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .canvas-preview-toggle.collapsed {
+    right: max(16px, var(--safe-right, 0px));
+    bottom: max(16px, var(--safe-bottom, 0px));
+  }
+
+  .canvas-preview-toggle:not(.collapsed) {
+    bottom: 160px;
+  }
+
+  /* Run window traffic lights: a 44 px hit box around the 18 px dot. */
+  .run-window-controls {
+    gap: 0;
+  }
+
+  /* Two classes: beats the per-colour `background` shorthands, which would
+     reset background-clip. */
+  .run-window-controls .run-window-control {
+    width: 44px;
+    height: 44px;
+    padding: 13px;
+    border: 0;
+    box-shadow: none;
+    background-clip: content-box;
+  }
+
+  .run-window-control svg {
+    display: none;
+  }
+
+  .drawer-close,
+  .palette-toggle {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Hover-only affordances are always visible without hover. */
+@media (hover: none) {
+  .run-window-controls .run-window-control svg {
+    opacity: 1;
+  }
+}
+
+/* Phone landscape + touch: the kit sizes its top-bar buttons to 44 px; keep
+   the single header row compact around them. */
+@media (max-height: 500px) and (pointer: coarse) {
+  .app-header {
+    height: calc(52px + var(--safe-top, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar.left,
+  .properties-drawer.open {
+    transition: none;
+  }
+}

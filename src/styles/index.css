@@ -1278,29 +1278,8 @@ body,
   background: var(--error, #e74c3c);
 }
 
-@media (max-width: 720px) {
-  .app-main {
-    position: relative;
-  }
-
-  .properties-drawer.open {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 80;
-    width: min(100vw, 480px);
-    max-width: 100vw;
-    height: auto;
-    flex: none;
-  }
-
-  .properties-drawer.assistant-drawer-open {
-    width: min(100vw, 480px);
-    max-width: 100vw;
-    flex-basis: auto;
-  }
-}
+/* The right drawer's narrow-screen overlay (was a 720px rule) lives in the
+   "Responsive layout" section at the end of this file (md = 1023.98px). */
 
 /* Canvas Container */
 .canvas-container {
@@ -1916,8 +1895,10 @@ button.primary:hover:not(:disabled) {
   background: var(--bg-secondary);
   border-radius: 8px;
   padding: 24px;
-  min-width: 400px;
-  max-width: 600px;
+  /* Never wider than the overlay's content box (was min-width: 400px, which
+     pushed every dialog past a phone screen). */
+  min-width: min(400px, 100%);
+  max-width: min(600px, 100%);
 }
 
 .modal h3 {
@@ -4810,7 +4791,7 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   line-height: 1.45;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1023.98px) {
   .model-residency-loadbar {
     grid-template-columns: 1fr;
     align-items: stretch;
@@ -7667,7 +7648,7 @@ body.af-schema-editor-open .af-tooltip-bubble {
   color: var(--text-primary);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1023.98px) {
   .code-editor-overlay {
     padding: 12px;
   }
