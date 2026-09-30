@@ -121,6 +121,12 @@ body {
     flex: 0 1 auto;
   }
 
+  /* Run is the primary action: first in the scrolling strip so it is never
+     scrolled out of sight on a phone or tablet. */
+  .toolbar-actions > .toolbar-group:has(.run-button) {
+    order: -1;
+  }
+
   .palette-toggle {
     display: inline-flex;
     align-items: center;
