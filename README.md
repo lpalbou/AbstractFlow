@@ -119,6 +119,14 @@ Use:
 - User: `admin`
 - Token: the `agw_...` token printed by Gateway or stored in `auth/bootstrap-admin-token`
 
+## Phones And Tablets
+
+The editor adapts to phones, tablets, and resized browser windows. Below
+1024 px the canvas fills the width and the node palette, properties,
+assistant and functions panels open as drawers. On touch screens you tap a
+palette node to add it to the canvas, and dialogs open as bottom sheets on
+phones. See [Web editor > Responsive Layout](docs/web-editor.md#responsive-layout).
+
 ## What Lives Here
 
 - `src/` - React/Vite visual editor.
@@ -143,7 +151,7 @@ npm run docs:llms
 
 - [Documentation index](docs/README.md)
 - [Getting started](docs/getting-started.md)
-- [Web editor](docs/web-editor.md)
+- [Web editor](docs/web-editor.md) (including the [responsive layout](docs/web-editor.md#responsive-layout))
 - [Architecture](docs/architecture.md)
 - [API and contracts](docs/api.md)
 - [VisualFlow JSON](docs/visualflow.md)

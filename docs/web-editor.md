@@ -40,6 +40,55 @@ Opened through the Gateway (**Apps > Flow Editor > Open** in the Gateway console
 
 The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About dialog: the AbstractFlow version, the author and license, and links to the website, source, documentation, issue tracker and feedback form. When the dialog opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`) and lists the gateway, AbstractFramework and package versions it reports. If that request fails, the dialog shows `Gateway: unavailable (...)` with the HTTP status or error.
 
+## Responsive Layout
+
+The editor works on a desktop window, a laptop, a tablet, a phone, and a
+browser window at any size. The canvas always fills the space between the
+header and the bottom of the screen. The side panels change behaviour with
+the window width:
+
+| Window | Node palette | Properties, assistant, functions | Dialogs |
+|---|---|---|---|
+| 1024 px and wider | Docked on the left | Docked on the right, opened from the rail or by selecting a node | Centered |
+| 768-1023 px (tablet portrait, narrow window) | Drawer from the left, opened with the palette button at the left of the header | Drawer over the canvas; the rail stays on the right edge | Centered, with a margin around them |
+| Below 768 px, or below 500 px tall (phones) | Full-width drawer on phones in portrait | Full-width drawer on phones in portrait | Bottom sheets with the action row pinned at the bottom |
+
+- **Drawers.** Only one drawer is open at a time. Close it with Escape, its ×
+  button, or a tap on the dimmed canvas. Selecting a node opens its
+  properties.
+- **Changing the window size.** When the window narrows below 1024 px, the
+  open panels close so the canvas stays visible. When it widens again, the
+  panel that was open is docked again.
+- **Header.** Between 1024 and 1439 px the toolbar scrolls sideways within
+  its row. Below 768 px the header has two rows: the palette button, flow name
+  and top-bar buttons, then the toolbar, with Run first.
+- **Adding nodes on a touch screen.** Touch screens have no drag-and-drop. Tap
+  a node in the palette to add it at the centre of the visible canvas; the
+  palette closes so you can see it. The same tap works whenever the palette is
+  a drawer. On a desktop with a mouse, drag nodes from the palette as usual.
+- **Canvas.** Pinch to zoom and drag to pan. The zoom controls are 44 px on
+  touch screens. The minimap starts collapsed on phones and short screens;
+  use the toggle in the bottom-right corner to show it. The view fits the
+  flow again when you rotate the device.
+- **Flow library and run window on phones.** The library shows the flow list
+  above the preview (side by side in landscape). The run window shows the
+  execution steps above the details. Both scroll inside the sheet.
+- **On-screen keyboard.** The assistant composer and the sheets' action rows,
+  such as the library's Load button, stay above the keyboard. In phone
+  landscape a 200 px keyboard leaves room for the composer; a taller keyboard
+  leaves less space than the composer needs.
+- **Touch targets and text.** Toolbar buttons, palette nodes, library rows,
+  selects and dialog buttons are at least 44 px on touch screens. Inputs use
+  16 px text so iOS does not zoom in when you focus them, and the properties
+  panel's help text is 14 px.
+- **Notifications** appear at the top of the screen on phones, clear of the
+  sheets' action rows, and at the bottom right elsewhere.
+
+What stays desktop-sized: node cards and the controls inside them (pin
+inputs, pin selects, "Edit Code") keep their compact design and scale with
+the canvas zoom, so zoom in to work on them on a small screen. The desktop
+panels keep their dense 11-13 px text on a mouse-driven screen.
+
 ## Provider And Model Discovery
 
 Flow does not store API keys or endpoint secrets. It asks Gateway for provider catalogs, endpoint profiles, model lists, capability defaults, and media route descriptors.

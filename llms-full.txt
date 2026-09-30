@@ -125,6 +125,14 @@ Use:
 - User: `admin`
 - Token: the `agw_...` token printed by Gateway or stored in `auth/bootstrap-admin-token`
 
+## Phones And Tablets
+
+The editor adapts to phones, tablets, and resized browser windows. Below
+1024 px the canvas fills the width and the node palette, properties,
+assistant and functions panels open as drawers. On touch screens you tap a
+palette node to add it to the canvas, and dialogs open as bottom sheets on
+phones. See [Web editor > Responsive Layout](docs/web-editor.md#responsive-layout).
+
 ## What Lives Here
 
 - `src/` - React/Vite visual editor.
@@ -149,7 +157,7 @@ npm run docs:llms
 
 - [Documentation index](docs/README.md)
 - [Getting started](docs/getting-started.md)
-- [Web editor](docs/web-editor.md)
+- [Web editor](docs/web-editor.md) (including the [responsive layout](docs/web-editor.md#responsive-layout))
 - [Architecture](docs/architecture.md)
 - [API and contracts](docs/api.md)
 - [VisualFlow JSON](docs/visualflow.md)
@@ -220,7 +228,7 @@ The canvas reflects that split:
 Start here:
 
 - [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
-- [Web editor](web-editor.md): the editor's features: sign-in, About, discovery, Resources, flow interfaces, automation defaults and trigger-source discovery, hidden connections, the authoring assistant, media and file nodes.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, discovery, Resources, flow interfaces, automation defaults and trigger-source discovery, hidden connections, the authoring assistant, media and file nodes.
 - [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
 - [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
@@ -372,6 +380,55 @@ Opened through the Gateway (**Apps > Flow Editor > Open** in the Gateway console
 ## About
 
 The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About dialog: the AbstractFlow version, the author and license, and links to the website, source, documentation, issue tracker and feedback form. When the dialog opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`) and lists the gateway, AbstractFramework and package versions it reports. If that request fails, the dialog shows `Gateway: unavailable (...)` with the HTTP status or error.
+
+## Responsive Layout
+
+The editor works on a desktop window, a laptop, a tablet, a phone, and a
+browser window at any size. The canvas always fills the space between the
+header and the bottom of the screen. The side panels change behaviour with
+the window width:
+
+| Window | Node palette | Properties, assistant, functions | Dialogs |
+|---|---|---|---|
+| 1024 px and wider | Docked on the left | Docked on the right, opened from the rail or by selecting a node | Centered |
+| 768-1023 px (tablet portrait, narrow window) | Drawer from the left, opened with the palette button at the left of the header | Drawer over the canvas; the rail stays on the right edge | Centered, with a margin around them |
+| Below 768 px, or below 500 px tall (phones) | Full-width drawer on phones in portrait | Full-width drawer on phones in portrait | Bottom sheets with the action row pinned at the bottom |
+
+- **Drawers.** Only one drawer is open at a time. Close it with Escape, its ×
+  button, or a tap on the dimmed canvas. Selecting a node opens its
+  properties.
+- **Changing the window size.** When the window narrows below 1024 px, the
+  open panels close so the canvas stays visible. When it widens again, the
+  panel that was open is docked again.
+- **Header.** Between 1024 and 1439 px the toolbar scrolls sideways within
+  its row. Below 768 px the header has two rows: the palette button, flow name
+  and top-bar buttons, then the toolbar, with Run first.
+- **Adding nodes on a touch screen.** Touch screens have no drag-and-drop. Tap
+  a node in the palette to add it at the centre of the visible canvas; the
+  palette closes so you can see it. The same tap works whenever the palette is
+  a drawer. On a desktop with a mouse, drag nodes from the palette as usual.
+- **Canvas.** Pinch to zoom and drag to pan. The zoom controls are 44 px on
+  touch screens. The minimap starts collapsed on phones and short screens;
+  use the toggle in the bottom-right corner to show it. The view fits the
+  flow again when you rotate the device.
+- **Flow library and run window on phones.** The library shows the flow list
+  above the preview (side by side in landscape). The run window shows the
+  execution steps above the details. Both scroll inside the sheet.
+- **On-screen keyboard.** The assistant composer and the sheets' action rows,
+  such as the library's Load button, stay above the keyboard. In phone
+  landscape a 200 px keyboard leaves room for the composer; a taller keyboard
+  leaves less space than the composer needs.
+- **Touch targets and text.** Toolbar buttons, palette nodes, library rows,
+  selects and dialog buttons are at least 44 px on touch screens. Inputs use
+  16 px text so iOS does not zoom in when you focus them, and the properties
+  panel's help text is 14 px.
+- **Notifications** appear at the top of the screen on phones, clear of the
+  sheets' action rows, and at the bottom right elsewhere.
+
+What stays desktop-sized: node cards and the controls inside them (pin
+inputs, pin selects, "Edit Code") keep their compact design and scale with
+the canvas zoom, so zoom in to work on them on a small screen. The desktop
+panels keep their dense 11-13 px text on a mouse-driven screen.
 
 ## Provider And Model Discovery
 
@@ -1125,8 +1182,7 @@ When a validator reports a type mismatch, change the target dynamic pin type,
 wire a compatible source, or insert a transform/schema/break node. Do not
 re-emit the same invalid edge.
 
-Common rejected-edge mistakes (observed in real authoring runs — avoid them
-in the FIRST emitted document):
+Common rejected-edge mistakes (avoid them in the FIRST emitted document):
 
 - Scalars into object inputs: `string`/`number`/`boolean` outputs do NOT
   connect to an `object` input such as `string_template.vars`. Build the
@@ -5005,6 +5061,13 @@ returned keys. Those connections run and are saved as stored. See
 Open the About dialog (the `i` button in the top bar). See
 [Web editor > About](web-editor.md#about).
 
+## Can I Edit Workflows On A Phone Or Tablet?
+
+Yes. Below 1024 px the canvas fills the screen and the palette and panels
+open as drawers. On a touch screen, tap a palette node to add it to the
+centre of the canvas, and pinch to zoom in on node cards. See
+[Web editor > Responsive Layout](web-editor.md#responsive-layout).
+
 ## Something Does Not Work
 
 See [Troubleshooting](troubleshooting.md) for symptoms, causes, and fixes.
@@ -5207,6 +5270,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-30
+
+The editor works on phones, tablets, and browser windows of any size. On a
+desktop window 1024 px or wider with a mouse, the layout is the same as in
+0.4.0. Everyone who opens the editor on a touch device or in a narrow
+window is affected. Nothing changes in VisualFlow documents, the server, or
+the Gateway contract.
+
+### Added
+- **Drawers below 1024 px.** The canvas uses the whole width. The node palette
+  opens as a drawer from a header button. The properties, assistant and
+  functions panels open over the canvas next to their rail. Close a drawer
+  with Escape, its × button, or a tap on the backdrop. Focus moves into the
+  drawer and back to the button that opened it. Only one drawer is open at a
+  time.
+- **Tap to add nodes.** On a touch screen, or when the palette is a drawer,
+  tapping a palette node adds it at the centre of the visible canvas.
+- The canvas fits the view again when the device rotates.
+
+### Changed
+- **Side panels follow the window.** When a window narrows below 1024 px the
+  panels close. When it widens again, the panel that was open is docked
+  again.
+- **Header.** Below 1440 px the toolbar scrolls sideways within its row.
+  Below 768 px the header has two rows: palette button, flow name and top-bar
+  buttons, then the toolbar with Run first.
+- **Dialogs** (flow library, run window, sign-in, code editor, confirmations)
+  always fit the screen. Below 768 px wide or 500 px tall they open as bottom
+  sheets with their action row pinned at the bottom. On phones the flow
+  library shows the list above the preview (side by side in landscape), and
+  the run window shows steps above details.
+- **On-screen keyboard.** The assistant composer and the sheets' action rows
+  (such as the library's Load) stay above the keyboard.
+- **Touch.** Toolbar, palette, zoom controls, minimap toggle, library rows,
+  selects and dialog buttons are at least 44 px. Inputs use 16 px text so iOS
+  does not zoom in on focus. On touch screens the properties panel's help
+  text is 14 px.
+- Below 768 px wide or 500 px tall, notifications appear at the top of the
+  screen.
+- The minimap starts collapsed on screens narrower than 768 px or shorter than
+  500 px. The footer is hidden on phones.
+- Safe-area insets (notch, home indicator) pad the header, drawers, zoom
+  controls and sheets. The page height follows the dynamic viewport.
+- The pin legend sits to the right of the zoom controls.
+- Uses `@abstractframework/ui-kit` 0.3.2.
+
 ## [0.4.0] - 2026-09-28
 
 Serving the editor through the Gateway at `/apps/flow/` needs AbstractGateway
@@ -5358,6 +5467,9 @@ Standalone use at `/` works with any supported Gateway.
   unavailable or unserved source version is refused with a message.
 
 ### Fixed
+- The Flow Library's one-click runs of `deep-research` and the basic agent
+  point at the versions a fresh Gateway ships (`deep-research@0.1.8`,
+  `basic-agent@0.0.5`); they asked for 0.1.7 and 0.0.4 and failed with 404.
 - `On Schedule` and `On Event` are described as what they are: waits inside a
   run that has already started. They do not start a workflow; recurring runs
   are automations. The schedule setting accepts an interval (`15s`, `5m`,
@@ -5673,7 +5785,7 @@ monitor packages, including `monitor-memory`).
 - Media defaults and advanced media pin disclosure now use one editor surface backed by Gateway discovery.
 
 ### Fixed
-- Repaired code node, pin, media artifact, and run UI regressions around resumed runs, validated variables, and modality-specific source selection.
+- Code node, pin, media artifact, and run UI behave correctly with resumed runs, validated variables, and modality-specific source selection.
 
 ## [0.3.13] - 2026-05-22
 

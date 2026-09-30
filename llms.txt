@@ -23,7 +23,7 @@ Key behavior:
 - [README.md](README.md): project overview, install, and feature summary
 - [docs/README.md](docs/README.md): documentation index
 - [docs/getting-started.md](docs/getting-started.md): start a Gateway, run the editor, sign in, local development
-- [docs/web-editor.md](docs/web-editor.md): editor features, sign-in, About, interfaces, automation defaults and trigger-source discovery, hidden connections, authoring assistant, media and file nodes
+- [docs/web-editor.md](docs/web-editor.md): editor features, sign-in, About, responsive layout (phones, tablets, tap-to-add), interfaces, automation defaults and trigger-source discovery, hidden connections, authoring assistant, media and file nodes
 - [docs/architecture.md](docs/architecture.md): components, boundaries, and diagrams
 - [docs/api.md](docs/api.md): CLI options, environment variables, proxy contract, frontend modules
 - [docs/visualflow.md](docs/visualflow.md): VisualFlow JSON format, interfaces and their boundary pins, `automation_defaults`, pin expressions

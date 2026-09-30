@@ -71,6 +71,13 @@ returned keys. Those connections run and are saved as stored. See
 Open the About dialog (the `i` button in the top bar). See
 [Web editor > About](web-editor.md#about).
 
+## Can I Edit Workflows On A Phone Or Tablet?
+
+Yes. Below 1024 px the canvas fills the screen and the palette and panels
+open as drawers. On a touch screen, tap a palette node to add it to the
+centre of the canvas, and pinch to zoom in on node cards. See
+[Web editor > Responsive Layout](web-editor.md#responsive-layout).
+
 ## Something Does Not Work
 
 See [Troubleshooting](troubleshooting.md) for symptoms, causes, and fixes.

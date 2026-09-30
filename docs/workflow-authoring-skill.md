@@ -357,8 +357,7 @@ When a validator reports a type mismatch, change the target dynamic pin type,
 wire a compatible source, or insert a transform/schema/break node. Do not
 re-emit the same invalid edge.
 
-Common rejected-edge mistakes (observed in real authoring runs — avoid them
-in the FIRST emitted document):
+Common rejected-edge mistakes (avoid them in the FIRST emitted document):
 
 - Scalars into object inputs: `string`/`number`/`boolean` outputs do NOT
   connect to an `object` input such as `string_template.vars`. Build the

@@ -7,61 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - unreleased (branch feat/responsive)
+## [0.5.0] - 2026-09-30
 
-The editor adapts to phones, tablets and resized windows. On a desktop window
-of 1024 px or wider with a mouse it looks as before.
+The editor works on phones, tablets, and browser windows of any size. On a
+desktop window 1024 px or wider with a mouse, the layout is the same as in
+0.4.0. Everyone who opens the editor on a touch device or in a narrow
+window is affected. Nothing changes in VisualFlow documents, the server, or
+the Gateway contract.
 
 ### Added
 - **Drawers below 1024 px.** The canvas uses the whole width. The node palette
-  opens as a drawer from a new header button. The properties, assistant and
-  functions panels open over the canvas next to their 44 px rail. Close a
-  drawer with Escape, its × button, or a tap on the backdrop. Focus returns
-  to the button that opened it.
+  opens as a drawer from a header button. The properties, assistant and
+  functions panels open over the canvas next to their rail. Close a drawer
+  with Escape, its × button, or a tap on the backdrop. Focus moves into the
+  drawer and back to the button that opened it. Only one drawer is open at a
+  time.
 - **Tap to add nodes.** On a touch screen, or when the palette is a drawer,
-  tapping a palette node adds it at the centre of the visible canvas (touch
-  screens have no drag-and-drop).
+  tapping a palette node adds it at the centre of the visible canvas.
 - The canvas fits the view again when the device rotates.
 
 ### Changed
-- **Header.** Below 1440 px the toolbar scrolls sideways instead of running
-  under the top-bar buttons, which were covered and unclickable at 900 px. Below
-  768 px the header has two rows: palette button, flow name and top-bar
-  buttons, then the toolbar. Below 1024 px Run comes first in the toolbar.
+- **Side panels follow the window.** When a window narrows below 1024 px the
+  panels close. When it widens again, the panel that was open is docked
+  again.
+- **Header.** Below 1440 px the toolbar scrolls sideways within its row.
+  Below 768 px the header has two rows: palette button, flow name and top-bar
+  buttons, then the toolbar with Run first.
 - **Dialogs** (flow library, run window, sign-in, code editor, confirmations)
-  fit the screen. Below 768 px wide or 500 px tall they open as bottom sheets.
-  The flow library shows the list above the preview (side by side in phone
-  landscape). The run window shows steps above details below 768 px. A dialog
-  never has a fixed 400 px minimum width.
-- **Touch.** Toolbar, palette, zoom controls, minimap toggle, library rows and
-  dialog buttons are at least 44 px. Inputs use 16 px text so iOS does not
-  zoom in on focus. The run window's traffic-light buttons have 44 px tap
-  areas.
+  always fit the screen. Below 768 px wide or 500 px tall they open as bottom
+  sheets with their action row pinned at the bottom. On phones the flow
+  library shows the list above the preview (side by side in landscape), and
+  the run window shows steps above details.
+- **On-screen keyboard.** The assistant composer and the sheets' action rows
+  (such as the library's Load) stay above the keyboard.
+- **Touch.** Toolbar, palette, zoom controls, minimap toggle, library rows,
+  selects and dialog buttons are at least 44 px. Inputs use 16 px text so iOS
+  does not zoom in on focus. On touch screens the properties panel's help
+  text is 14 px.
+- Below 768 px wide or 500 px tall, notifications appear at the top of the
+  screen.
 - The minimap starts collapsed on screens narrower than 768 px or shorter than
   500 px. The footer is hidden on phones.
 - Safe-area insets (notch, home indicator) pad the header, drawers, zoom
-  controls and sheets. The page viewport uses
-  `viewport-fit=cover, interactive-widget=resizes-content`. The shell height
-  follows the dynamic viewport (`--vh-full`).
-- The pin legend moves to the right of the zoom controls. It used to cover the
-  interactivity lock button.
-- App breakpoints now use the shared values 480/768/1024/1440 (the old ones
-  were 720, 860 and 900).
-- On touch screens the assistant and functions panels use 16 px inputs.
-- The side panels follow the window across 1024 px: going narrower closes
-  them, so the properties panel no longer reappears over the canvas; going
-  wider re-opens the panel that was open before. The right drawer takes focus
-  when it opens over the canvas and gives it back when it closes.
-- With the on-screen keyboard open, the assistant composer and the bottom
-  sheets' action rows (such as the library's Load) stay above the keyboard.
-- Below 768 px wide or 500 px tall, toasts appear at the top so they do not
-  cover a sheet's primary action.
-- On touch screens the properties panel's help text is 14 px and its labels
-  13 px.
-- `@abstractframework/ui-kit` 0.3.2 is vendored as
-  `vendor/abstractframework-ui-kit-0.3.2.tgz`. The Vite alias and tsconfig
-  path point at this package instead of the sibling abstractuic checkout. The
-  coordinator switches it back to the registry version after publishing.
+  controls and sheets. The page height follows the dynamic viewport.
+- The pin legend sits to the right of the zoom controls.
+- Uses `@abstractframework/ui-kit` 0.3.2.
 
 ## [0.4.0] - 2026-09-28
 
@@ -532,7 +522,7 @@ monitor packages, including `monitor-memory`).
 - Media defaults and advanced media pin disclosure now use one editor surface backed by Gateway discovery.
 
 ### Fixed
-- Repaired code node, pin, media artifact, and run UI regressions around resumed runs, validated variables, and modality-specific source selection.
+- Code node, pin, media artifact, and run UI behave correctly with resumed runs, validated variables, and modality-specific source selection.
 
 ## [0.3.13] - 2026-05-22
 
