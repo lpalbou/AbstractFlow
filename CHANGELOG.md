@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - unreleased (branch feat/responsive)
+
+The editor adapts to phones, tablets and resized windows. On a desktop window
+of 1024 px or wider with a mouse it looks as before.
+
+### Added
+- **Drawers below 1024 px.** The canvas uses the whole width. The node palette
+  opens as a drawer from a new header button. The properties, assistant and
+  functions panels open over the canvas next to their 44 px rail. Close a
+  drawer with Escape, its × button, or a tap on the backdrop. Focus returns
+  to the button that opened it.
+- **Tap to add nodes.** On a touch screen, or when the palette is a drawer,
+  tapping a palette node adds it at the centre of the visible canvas (touch
+  screens have no drag-and-drop).
+- The canvas fits the view again when the device rotates.
+
+### Changed
+- **Header.** Below 1440 px the toolbar scrolls sideways instead of running
+  under the top-bar buttons, which were covered and unclickable at 900 px. Below
+  768 px the header has two rows: palette button, flow name and top-bar
+  buttons, then the toolbar. Below 1024 px Run comes first in the toolbar.
+- **Dialogs** (flow library, run window, sign-in, code editor, confirmations)
+  fit the screen. Below 768 px wide or 500 px tall they open as bottom sheets.
+  The flow library shows the list above the preview (side by side in phone
+  landscape). The run window shows steps above details below 768 px. A dialog
+  never has a fixed 400 px minimum width.
+- **Touch.** Toolbar, palette, zoom controls, minimap toggle, library rows and
+  dialog buttons are at least 44 px. Inputs use 16 px text so iOS does not
+  zoom in on focus. The run window's traffic-light buttons have 44 px tap
+  areas.
+- The minimap starts collapsed on screens narrower than 768 px or shorter than
+  500 px. The footer is hidden on phones.
+- Safe-area insets (notch, home indicator) pad the header, drawers, zoom
+  controls and sheets. The page viewport uses
+  `viewport-fit=cover, interactive-widget=resizes-content`. The shell height
+  follows the dynamic viewport (`--vh-full`).
+- The pin legend moves to the right of the zoom controls. It used to cover the
+  interactivity lock button.
+- App breakpoints now use the shared values 480/768/1024/1440 (the old ones
+  were 720, 860 and 900).
+- `@abstractframework/ui-kit` 0.3.0 is vendored as
+  `vendor/abstractframework-ui-kit-0.3.0.tgz`. The Vite alias and tsconfig
+  path point at this package instead of the sibling abstractuic checkout. The
+  coordinator switches it back to the registry version after publishing.
+
 ## [0.4.0] - 2026-09-28
 
 Serving the editor through the Gateway at `/apps/flow/` needs AbstractGateway
