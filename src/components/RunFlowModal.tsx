@@ -8,6 +8,9 @@
 import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { randomId } from '@abstractframework/ui-kit';
+import { copyWithFeedback } from '../lib/copy_feedback';
+import { MEDIA_NEEDS_HTTPS, mediaAvailable } from '../lib/secure-context';
 import { useFlowStore } from '../hooks/useFlow';
 import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
@@ -195,11 +198,7 @@ function approvalDismissKey(runId?: string, waitKey?: string): string {
 }
 
 function createRunModalSessionId(): string {
-  const random =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  return `abstractflow-run-${random}`;
+  return `abstractflow-run-${randomId()}`;
 }
 
 /** Short, human-scannable session/run id (keeps the tail so a copy stays
@@ -372,16 +371,7 @@ function durableBlocEndpoint(
 async function copyTextToClipboard(text: string): Promise<void> {
   const value = String(text || '');
   if (!value) return;
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    const el = document.createElement('textarea');
-    el.value = value;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-  }
+  await copyWithFeedback(value);
 }
 
 function isExecutionHandle(value: unknown): boolean {
@@ -5486,18 +5476,7 @@ export function RunFlowModal({
   ]);
 
   const copyToClipboard = async (value: unknown) => {
-    const text = formatValue(value);
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Fallback: best-effort legacy copy
-      const el = document.createElement('textarea');
-      el.value = text;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    }
+    await copyWithFeedback(formatValue(value));
   };
 
   const outputPreview = useMemo(() => {
@@ -6298,8 +6277,8 @@ export function RunFlowModal({
 
   const startVoiceWaitRecording = useCallback(async () => {
     if (voiceWaitRecording || voiceWaitBusy || resumeSubmitting) return;
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      setVoiceWaitError('This browser cannot record microphone audio.');
+    if (!mediaAvailable()) {
+      setVoiceWaitError(MEDIA_NEEDS_HTTPS);
       return;
     }
     if (typeof MediaRecorder === 'undefined') {
@@ -7018,7 +6997,9 @@ export function RunFlowModal({
                                 ? 'Uploading audio...'
                                 : voiceWaitUploadedRef
                                   ? 'Audio captured.'
-                                  : 'Ready to record from this browser.'}
+                                  : mediaAvailable()
+                                    ? 'Ready to record from this browser.'
+                                    : MEDIA_NEEDS_HTTPS}
                           </div>
                           <div className="run-voice-wait-actions">
                             {!voiceWaitRecording ? (
@@ -7026,7 +7007,7 @@ export function RunFlowModal({
                                 type="button"
                                 className="modal-button primary"
                                 onClick={startVoiceWaitRecording}
-                                disabled={voiceWaitBusy || resumeSubmitting}
+                                disabled={voiceWaitBusy || resumeSubmitting || !mediaAvailable()}
                               >
                                 Record
                               </button>

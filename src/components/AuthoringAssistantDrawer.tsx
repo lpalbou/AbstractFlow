@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { clipboardWriteOrThrow } from '../lib/copy_feedback';
 import authoringSkillText from '../../docs/workflow-authoring-skill.md?raw';
 // Conceptual core docs the assistant uses to EXPLAIN AbstractFlow to users and
 // to author with real product grounding (operator ask 2026-07-15). Kept as raw
@@ -3894,7 +3895,7 @@ export function AuthoringAssistantDrawer({
 
   const copyActivity = async () => {
     try {
-      await navigator.clipboard.writeText(
+      await clipboardWriteOrThrow(
         activityClipboardText(workingStatus?.label || 'Authoring activity', activity, turnStartedAt)
       );
       toast.success('Authoring activity copied');
@@ -3905,7 +3906,7 @@ export function AuthoringAssistantDrawer({
 
   const copyConversation = async () => {
     try {
-      await navigator.clipboard.writeText(
+      await clipboardWriteOrThrow(
         assistantConversationClipboardText({
           workflowKey: workflowStorageKey,
           flowId,
@@ -4061,7 +4062,7 @@ export function AuthoringAssistantDrawer({
         onAskReplyChange={setTestAskReply}
         onSendAskReply={() => void resolveTestWait({ response: testAskReply })}
         onOpenRun={(runId) => {
-          void navigator.clipboard.writeText(runId).then(
+          void clipboardWriteOrThrow(runId).then(
             () => toast.success('Run id copied — open it from Run History'),
             () => toast(`Run id: ${runId}`)
           );

@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { useMonaco } from '@monaco-editor/react';
 import { THEME_SPECS } from '@abstractframework/ui-kit';
+import { clipboardWrite, COPY_FAILED } from '../lib/secure-context';
 
 /**
  * Pick the Monaco colorize theme from the applied app theme class
@@ -147,16 +148,12 @@ export function MarkdownRenderer({ markdown, className }: MarkdownRendererProps)
     const text = (codeEl ? rawCodeByElRef.current.get(codeEl) : null) || codeEl?.textContent || '';
     if (!text) return;
 
-    try {
-      await navigator.clipboard.writeText(text);
-      // Best-effort feedback (no dependency on toast)
-      btn.textContent = 'Copied';
-      window.setTimeout(() => {
-        if (btn) btn.textContent = 'Copy';
-      }, 900);
-    } catch {
-      // Ignore
-    }
+    // Feedback on the button itself (no dependency on toast); plain http falls back to execCommand.
+    const ok = await clipboardWrite(text);
+    btn.textContent = ok ? 'Copied' : COPY_FAILED;
+    window.setTimeout(() => {
+      if (btn) btn.textContent = 'Copy';
+    }, ok ? 900 : 2500);
   };
 
   return (
