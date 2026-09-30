@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
+import { installViewportVars } from '@abstractframework/ui-kit';
 import App from './App';
 import '@abstractframework/ui-kit/theme.css';
 import './styles/index.css';
@@ -10,6 +11,11 @@ import './styles/palette.css';
 import './styles/tooltip.css';
 // Last: adapts the desktop rules above to narrow, short and touch screens.
 import './styles/responsive.css';
+
+// Mirrors the visual viewport into --vv-height / --keyboard-inset (iOS keeps
+// the layout viewport under the on-screen keyboard; the assistant composer
+// and bottom sheets stay above it).
+installViewportVars();
 
 const queryClient = new QueryClient({
   defaultOptions: {

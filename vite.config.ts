@@ -66,7 +66,10 @@ export default defineConfig({
       { find: '@', replacement: resolve(__dirname, './src') },
       { find: '@abstractframework/monitor-flow', replacement: resolve(__dirname, '../abstractuic/monitor-flow/src') },
       { find: '@abstractframework/monitor-active-memory', replacement: resolve(__dirname, '../abstractuic/monitor-active-memory/src') },
-      { find: '@abstractframework/ui-kit', replacement: resolve(__dirname, '../abstractuic/ui-kit/src') },
+      // ui-kit comes from the vendored package (package.json file:vendor/…tgz),
+      // pinned exactly so shared workspace packages resolve the same copy.
+      { find: /^@abstractframework\/ui-kit$/, replacement: resolve(__dirname, './node_modules/@abstractframework/ui-kit/dist/index.js') },
+      { find: /^@abstractframework\/ui-kit\/theme\.css$/, replacement: resolve(__dirname, './node_modules/@abstractframework/ui-kit/src/theme.css') },
       { find: '@abstractframework/monitor-gpu', replacement: resolve(__dirname, '../abstractuic/monitor-gpu/src') },
       { find: '@abstractframework/monitor-memory', replacement: resolve(__dirname, '../abstractuic/monitor-memory/src') },
       // Shared workspace packages (imported from outside this Vite root) can’t
