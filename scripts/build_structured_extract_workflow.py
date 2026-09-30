@@ -10,6 +10,7 @@ attempt budget is spent. The reusable extraction primitive.
 from __future__ import annotations
 
 import wf_common as W
+from workflow_labels import label
 
 BUILD_PROMPT_CODE = """
 src = str(source_text or "").strip()
@@ -104,8 +105,7 @@ return {
 
 def build_flow():
     flow = W.base_flow(
-        "structured-extract", "structured-extract",
-        "Reusable extraction primitive: an LLM extracts JSON from source text against a caller-supplied JSON Schema; a deterministic validator checks required keys/types and feeds specific errors back as a correction reprompt until the output is valid or the attempt budget is spent.",
+        "structured-extract", *label("structured-extract", "structured-extract"),
         ["abstractextract.structured.v1"],
     )
     fields = [

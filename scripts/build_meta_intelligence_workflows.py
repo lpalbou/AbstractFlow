@@ -60,6 +60,7 @@ Design rules shared by all five:
 from __future__ import annotations
 
 import wf_common as W
+from workflow_labels import label
 
 BUNDLE_VERSION = "0.1.1"
 
@@ -127,8 +128,7 @@ return {"provider": p, "model": m}
 
 def build_consensus() -> dict:
     flow = W.base_flow(
-        "meta-consensus", "meta-consensus",
-        "Meta-intelligence: two independent LLM answers reconciled into one consensus answer — agreement is kept as reliable, divergence is resolved by reasoning, not averaged. Diversity comes from temperature (0.3 vs 0.9) by default, or from a genuinely different second model via the optional provider_b/model_b inputs. Self-consistency pattern; comparable 1:1 against an isolated LLM call on the same prompt. Consensus across N>2 answerers needs a loop-based flow (future scope).",
+        "meta-consensus", *label("meta-consensus", "meta-consensus"),
         [W.AGENT_INTERFACE, "abstractmeta.intelligence.v1"],
     )
     flow["nodes"] = [
@@ -263,8 +263,7 @@ return {
 
 def build_debate() -> dict:
     flow = W.base_flow(
-        "meta-debate", "meta-debate",
-        "Meta-intelligence: proposer answers, an adversarial challenger attacks the answer (flaws, counterexamples, missing cases), then the proposer concedes-or-rebuts point by point and writes the defended final answer. Multi-agent debate pattern; comparable 1:1 against an isolated LLM call.",
+        "meta-debate", *label("meta-debate", "meta-debate"),
         [W.AGENT_INTERFACE, "abstractmeta.intelligence.v1"],
     )
     flow["nodes"] = [
@@ -392,8 +391,7 @@ return {
 
 def build_reflect() -> dict:
     flow = W.base_flow(
-        "meta-reflect", "meta-reflect",
-        "Meta-intelligence: draft an answer, then an introspection pass interrogates the reasoning itself (assumptions, weakest step, missed cases, overconfidence), then a revision folds the introspection into the final answer. Reflexion/Self-Refine pattern; comparable 1:1 against an isolated LLM call.",
+        "meta-reflect", *label("meta-reflect", "meta-reflect"),
         [W.AGENT_INTERFACE, "abstractmeta.intelligence.v1"],
     )
     flow["nodes"] = [
@@ -562,8 +560,7 @@ return {
 
 def build_perspectives() -> dict:
     flow = W.base_flow(
-        "meta-perspectives", "meta-perspectives",
-        "Meta-intelligence: a decomposer picks the 3 most revealing angles for THIS question (disciplines, stances, timescales, stakeholders...), each angle answers independently, then an integrator weaves them into one answer that names the tensions between angles instead of papering over them. Comparable 1:1 against an isolated LLM call.",
+        "meta-perspectives", *label("meta-perspectives", "meta-perspectives"),
         [W.AGENT_INTERFACE, "abstractmeta.intelligence.v1"],
     )
     angle_defaults = {"system": "You answer questions from one assigned angle only, sharply — balance is someone else's job.", "temperature": 0.6}
@@ -744,8 +741,7 @@ return {
 
 def build_deliberate() -> dict:
     flow = W.base_flow(
-        "meta-deliberate", "meta-deliberate",
-        "Meta-intelligence: a planner absorbs the question first (what is really asked, required steps, known pitfalls, a correctness checklist), an executor answers following the plan, and a verifier checks the answer against the plan's own checklist and repairs failures. Plan-and-Solve pattern; comparable 1:1 against an isolated LLM call.",
+        "meta-deliberate", *label("meta-deliberate", "meta-deliberate"),
         [W.AGENT_INTERFACE, "abstractmeta.intelligence.v1"],
     )
     flow["nodes"] = [
@@ -830,8 +826,7 @@ return {
 
 def build_baseline() -> dict:
     flow = W.base_flow(
-        "meta-baseline", "meta-baseline",
-        "Control arm for the meta-intelligence benchmark: ONE isolated LLM call answering directly (same system prompt, same machinery, no orchestration). Conforms to abstractcode.agent.v1.",
+        "meta-baseline", *label("meta-baseline", "meta-baseline"),
         [W.AGENT_INTERFACE, "abstractmeta.intelligence.v1"],
     )
     flow["nodes"] = [

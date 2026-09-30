@@ -12,6 +12,7 @@ node pulled after the spine completes.
 from __future__ import annotations
 
 import wf_common as W
+from workflow_labels import label
 
 CRITIC_SCHEMA = {
     "type": "object", "additionalProperties": False,
@@ -117,8 +118,7 @@ def _critic(node_id, label, x, y):
 
 def build_flow():
     flow = W.base_flow(
-        "adversarial-review", "adversarial-review",
-        "Reusable review primitive: three independent critics review an artifact through correctness / design-robustness / requirements-fit lenses, then a merge step consolidates and severity-ranks the findings into one pass/revise/block verdict. Composable as a subflow.",
+        "adversarial-review", *label("adversarial-review", "adversarial-review"),
         ["abstractreview.adversarial.v1"],
     )
     fields = [

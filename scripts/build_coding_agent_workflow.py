@@ -28,6 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# Entrypoint display names/descriptions: one table (workflow_labels.py),
+# importable whether this file runs as a script or is loaded by path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from workflow_labels import label  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
@@ -2591,8 +2596,7 @@ def build_verifier_subflow() -> dict[str, Any]:
 
 def build_root_flow() -> dict[str, Any]:
     flow = _base_flow(
-        "coding-agent", "coding-agent",
-        "Advanced coding agent with recursive verification: a builder agent writes code, an independent verifier runs build/execute/match gates each round, and failures are fed back as specific reprompts until all gates pass or the round budget is spent.",
+        "coding-agent", *label("coding-agent", "coding-agent"),
         # Own coding interface only — the boundary is request -> report/passed,
         # not the chat-agent prompt/response contract of abstractcode.agent.v1.
         ["abstractcode.coding.v1"],
@@ -2891,8 +2895,7 @@ def build_chat_entrypoint_flow() -> dict[str, Any]:
     enforcement regardless of this flow's wiring.
     """
     flow = _base_flow(
-        "coder", "coder",
-        "Chat-agent entrypoint for the coding-agent pipeline: takes a plain prompt (abstractcode.agent.v1), runs the verify-gated build loop in the session workspace with inferred gates (no explicit build/run commands — the verifier executes what it can and reports honestly), and returns the build report as the response.",
+        "coder", *label("coding-agent", "coder"),
         ["abstractcode.agent.v1"],
     )
     # Layout: three-node exec spine at y=0 (start -> build -> end); the input

@@ -12,6 +12,7 @@ VisualFlow; swap in a subflow node for a fixed heavier per-item pipeline.)
 from __future__ import annotations
 
 import wf_common as W
+from workflow_labels import label
 
 RESET_CODE = "return []".strip()
 
@@ -49,8 +50,7 @@ return {"results": items, "count": len(items)}
 
 def build_flow():
     flow = W.base_flow(
-        "map-reduce", "map-reduce",
-        "Reusable batch primitive: map a per-item LLM instruction over an input array (ForEach), accumulate the per-item results, then reduce them with a synthesis LLM instruction. Returns the per-item results and the synthesized output.",
+        "map-reduce", *label("map-reduce", "map-reduce"),
         ["abstractbatch.mapreduce.v1"],
     )
     fields = [

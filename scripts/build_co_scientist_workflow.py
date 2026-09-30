@@ -89,6 +89,7 @@ Fidelity note (honest - faithful / simplified / dropped):
 from __future__ import annotations
 
 import wf_common as W
+from workflow_labels import label
 from wf_common import EXEC_IN, EXEC_OUT, code_node, edge, pin
 
 # ===========================================================================
@@ -2106,8 +2107,7 @@ class Graph:
 
 def build_flow():
     flow = W.base_flow(
-        "co-scientist", "co-scientist",
-        "Deep multi-agent hypothesis engine (Nature 'AI co-scientist' replica). Starts FROM the literature by delegating grounding to the deep-research investigation engine (deep-plan + deep-investigate: real web search + a verified source ledger), then runs a supervisor loop of Generation -> Reflection -> Elo-ranking (prioritized pairwise scientific debate) -> Evolution -> research-expansion, threading meta-feedback forward each cycle with near-duplicate pruning, then a final search-grounded full review of the finalists and a Meta-review research overview. Deliberately deeper than a single-pass report - it scales test-time compute via the cycle budget.",
+        "co-scientist", *label("co-scientist", "co-scientist"),
         ["abstractresearch.coscientist.v1"],
     )
     G = Graph()

@@ -13,6 +13,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# Entrypoint display names/descriptions: one table (workflow_labels.py),
+# importable whether this file runs as a script or is loaded by path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from workflow_labels import label  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
@@ -1457,11 +1462,7 @@ def _write_node(node_id: str, node_type: str, label: str) -> dict[str, Any]:
 def build_root_flow() -> dict[str, Any]:
     flow = _base_flow(
         "deep-research",
-        "deep-research",
-        (
-            "Production research workflow with adversarial review, provenance, and "
-            "Markdown/PDF/DOCX export."
-        ),
+        *label("deep-research", "deep-research"),
         ["abstractcode.agent.v1", "abstractresearch.deep.v1"],
     )
     root_fields = _input_fields()
