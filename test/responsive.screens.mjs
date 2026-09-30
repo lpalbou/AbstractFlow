@@ -182,6 +182,16 @@ export default {
     if (!info || info.browser === 'chromium') {
       await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
     }
+    // Flow's theme is its Appearance setting (not prefers-color-scheme):
+    // FLOW_THEME=light (or any kit theme id) captures that theme.
+    if (process.env.FLOW_THEME) {
+      await page.evaluate((theme) => {
+        try {
+          localStorage.setItem('af_appearance_abstractflow_v1', JSON.stringify({ theme, font_scale: 'md', header_density: 'standard' }));
+        } catch { /* storage blocked: default theme */ }
+      }, process.env.FLOW_THEME);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+    }
     await seedRun();
     await widenRunList(page);
     await page.waitForTimeout(300);
