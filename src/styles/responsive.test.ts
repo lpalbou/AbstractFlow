@@ -48,10 +48,10 @@ function expectRule(query: string, selector: string, decl: RegExp) {
 }
 
 describe('responsive.css (layout guard)', () => {
-  it('is imported last by the app entry', () => {
+  it('is imported after the desktop styles by the app entry (only space.css comes later)', () => {
     const main = readFileSync(resolve(ROOT, 'src', 'main.tsx'), 'utf-8');
     const imports = [...main.matchAll(/^import '\.\/styles\/([\w-]+)\.css';/gm)].map((m) => m[1]);
-    expect(imports[imports.length - 1]).toBe('responsive');
+    expect(imports.slice(-2)).toEqual(['responsive', 'space']);
   });
 
   it('below 1024 px the palette and the right drawer float over the canvas as drawers', () => {

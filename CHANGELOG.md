@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Phones and tablets get more of the screen for reading. Desktop windows
+1024 px or wider with a mouse look the same as in 0.5.0. Nothing changes in
+VisualFlow documents, the server, or the Gateway contract.
+
+### Added
+- **Collapsible lists.** In the flow library and the run window, the list
+  above the detail has a header you tap to hide or show it (Flows,
+  Execution), with a mouse, a tap, or Enter and Space. Lists start open. The
+  editor remembers your choice in this browser. Hiding the list gives the preview or the step details the whole
+  sheet.
+
+### Changed
+- **One scroll per sheet.** On phones and tablets, the flow library, the run
+  window and the run history scroll as one page. Lists no longer scroll inside
+  their own box, and sections are flat, with a thin line between items.
+- **Full width on phones.** The run window's text uses the width of the
+  screen: a 12 px margin, label and value on one line when they fit, JSON and
+  paths without a box. The assistant's replies are plain text across the
+  drawer. The Assistant, Properties and Functions tabs sit in a row at the
+  top, so the canvas and the open panel lose no side column. In the flow
+  library, a flow's name starts at the margin and the expand arrow sits at
+  the end of its row.
+- **Larger text on touch screens.** Phones and tablets use a larger type
+  scale: body text 14 to 15 px, secondary text 13 px. Your font-size setting
+  still applies. Text inside canvas nodes keeps its size and grows when you
+  zoom.
+- Dialogs opened from the toolbar are no longer inside the page header, so
+  screen readers no longer read them as part of the header.
+
 ## [0.5.0] - 2026-09-30
 
 The editor works on phones, tablets, and browser windows of any size. On a

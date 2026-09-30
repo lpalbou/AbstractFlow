@@ -16,7 +16,9 @@ import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
-import { SteerComposer, SpeculationSelect, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AF_MEDIA, SteerComposer, SpeculationSelect, useAfMedia, type SpeculationValue } from '@abstractframework/ui-kit';
+import { ListDisclosure } from './ListDisclosure';
+import { useListOpen } from '../utils/listOpen';
 import { parseSpeculationInput, withRunSpeculation } from '../utils/speculationControls';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
@@ -2069,6 +2071,12 @@ export function RunFlowModal({
   // the "Follow live" pill re-arms it.
   const [followLive, setFollowLive] = useState(true);
   const stepsListRef = useRef<HTMLDivElement | null>(null);
+  // Below 1024 px the steps sit above the step details (space.css): the
+  // "Execution" header is a disclosure (open by default, remembered) so
+  // collapsing the steps gives the details the whole sheet.
+  const stackedExecution = useAfMedia(AF_MEDIA.md);
+  const [stepsOpen, toggleStepsOpen] = useListOpen('runSteps');
+  const stepsHidden = stackedExecution && !stepsOpen;
   const lastFollowedStepIdRef = useRef<string | null>(null);
   const [progressClockMs, setProgressClockMs] = useState(() => Date.now());
   const lastAutoTerminalStepIdRef = useRef<string | null>(null);
@@ -6491,7 +6499,17 @@ export function RunFlowModal({
             <div className="run-modal-execution">
             <div className="run-steps">
               <div className="run-steps-header">
-                <div className="run-steps-title">Execution</div>
+                {stackedExecution ? (
+                  <ListDisclosure
+                    open={stepsOpen}
+                    onToggle={toggleStepsOpen}
+                    controls="run-steps-list"
+                    title="Execution"
+                    className="run-steps-title"
+                  />
+                ) : (
+                  <div className="run-steps-title">Execution</div>
+                )}
                 <div className="run-steps-subtitle">
                   {isRunning ? <span className="run-spinner" aria-label="running" /> : null}
                   {runStatusLabel}
@@ -6618,6 +6636,7 @@ export function RunFlowModal({
               // waiting-like flags (e.g. an unresolved approval on a cancelled
               // run) — a "Following live" pill on a dead run lies (review
               // P2-7).
+              !stepsHidden &&
               !(runSummary && ['completed', 'failed', 'cancelled'].includes(String(runSummary.status || '').toLowerCase())) ? (
                 <div className="run-follow-row">
                   {followLive ? (
@@ -6644,7 +6663,7 @@ export function RunFlowModal({
                 </div>
               ) : null}
 
-              <div className="run-steps-list" ref={stepsListRef}>
+              <div className="run-steps-list" id="run-steps-list" ref={stepsListRef} hidden={stepsHidden}>
                 {displayStepTree.length === 0 ? (
                   <div className="run-steps-empty">No execution events yet.</div>
                 ) : (

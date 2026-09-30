@@ -12,6 +12,9 @@ import './styles/palette.css';
 import './styles/tooltip.css';
 // Last: adapts the desktop rules above to narrow, short and touch screens.
 import './styles/responsive.css';
+// After responsive.css: list + detail screens use the full width on phones and
+// tablets (DESIGN §12).
+import './styles/space.css';
 
 // Mirrors the visual viewport into --vv-height / --keyboard-inset (iOS keeps
 // the layout viewport under the on-screen keyboard). responsive.css reads
@@ -25,6 +28,7 @@ function ResponsiveToaster() {
   const top = useAfMedia(TOAST_TOP_QUERY);
   return (
     <Toaster
+      containerClassName="app-toaster"
       position={toastPosition(top)}
       containerStyle={top ? { top: 'max(8px, env(safe-area-inset-top, 0px))' } : undefined}
     />
