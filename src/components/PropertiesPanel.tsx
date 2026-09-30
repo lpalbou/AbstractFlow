@@ -4608,14 +4608,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 )}
 
 	                <span className="property-hint">
-	                  When enabled, the Agent&apos;s <code>response</code> output is a JSON string matching this schema.
+	                  While Structured output is on, the Agent&apos;s <code>response</code> output is a JSON string matching this schema.
 	                </span>
               </>
             )}
 
 	            {!agentSchemaEnabled && (
 	              <span className="property-hint">
-	                Disabled: the Agent returns a free-form response string.
+	                Off: the Agent returns a free-form response string.
 	              </span>
 	            )}
           </div>
