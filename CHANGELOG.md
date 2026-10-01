@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
 ### Added
+
 - **Open a Gateway workflow from a link.** `/apps/flow/?bundle=<bundle_id>&version=<bundle_version>[&flow=<flow_id>]`
   opens that workflow in the editor; the Gateway console's Workflows **Open** button uses it. A bundle
   published from one of your flows opens that flow; any other bundle opens as an unsaved copy titled
