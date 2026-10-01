@@ -17,6 +17,7 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { Toolbar } from './components/Toolbar';
 import { useFlowStore } from './hooks/useFlow';
 import { useAboutAction } from './hooks/useAboutAction';
+import { useDeepLinkBanner } from './hooks/deepLinkBanner';
 import {
   AF_MEDIA,
   AfAppearanceDialog,
@@ -61,6 +62,8 @@ function monitor_memory_enabled(): boolean {
 
 function App() {
   const { selectedNode } = useFlowStore();
+  const deep_link_banner = useDeepLinkBanner((s) => s.text);
+  const clear_deep_link_banner = useDeepLinkBanner((s) => s.clear);
   const queryClient = useQueryClient();
   const gpu_enabled = monitor_gpu_enabled();
   const memory_enabled = monitor_memory_enabled();
@@ -432,6 +435,21 @@ function App() {
           }}
         />
       </header>
+
+      {deep_link_banner ? (
+        <div className="deeplink-banner" role="status">
+          <span>{deep_link_banner}</span>
+          <button
+            type="button"
+            className="deeplink-banner__close"
+            onClick={clear_deep_link_banner}
+            aria-label="Dismiss this notice"
+            title="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
 
       {/* Main content */}
       <main

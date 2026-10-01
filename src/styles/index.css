@@ -7645,3 +7645,27 @@ body.af-schema-editor-open .af-tooltip-bubble {
     min-height: 420px;
   }
 }
+
+/* Deep-link notice (utils/bundleDeepLink.ts): one line between the header and the
+   canvas, e.g. "Shipped workflow — read-only. Save creates your own copy." */
+.deeplink-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--warning, #f39c12) 32%, transparent);
+  background: color-mix(in srgb, var(--warning, #f39c12) 10%, var(--bg-primary));
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+.deeplink-banner > span { flex: 1 1 auto; min-width: 0; }
+.deeplink-banner__close {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}

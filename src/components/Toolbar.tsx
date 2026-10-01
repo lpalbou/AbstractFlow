@@ -53,6 +53,14 @@ import { errorSnippet } from '../utils/errorSnippet';
 import { saveButtonDisabled, saveGateTooltip, type SaveGateInput } from '../utils/saveGate';
 import { savedBaselineSnapshot, shouldRebaselineOnIdentityChange } from '../utils/saveBaseline';
 import type { PublishedBundleTarget } from '../utils/workflowBundles';
+import {
+  SHIPPED_BANNER,
+  deepLinkErrorSentence,
+  loadBundleDeepLink,
+  parseBundleDeepLink,
+  type BundleManifestView,
+} from '../utils/bundleDeepLink';
+import { useDeepLinkBanner } from '../hooks/deepLinkBanner';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import {
   endpointFromDescriptor,
@@ -435,9 +443,11 @@ export function Toolbar() {
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
   const [loadedBundledRunTarget, setLoadedBundledRunTarget] = useState<PublishedBundleTarget | null>(null);
+  const clearDeepLinkBanner = useDeepLinkBanner((s) => s.clear);
   const resetLoadedDocument = useCallback(() => {
     setLoadedBundledRunTarget(null);
-  }, []);
+    clearDeepLinkBanner();
+  }, [clearDeepLinkBanner]);
   const [threadRootRunId, setThreadRootRunId] = useState<string | null>(null);
   const [runWorkflowId, setRunWorkflowId] = useState<string | null>(null);
   const threadRootRunIdRef = useRef<string | null>(null);
@@ -760,6 +770,58 @@ export function Toolbar() {
     },
     [bundledFlowIdSet, flowLibraryCatalog.flows, gatewayContracts, loadFlow, setFlowId]
   );
+
+  // `?bundle=<id>&version=<v>[&flow=<flow_id>]` (gateway "Open in AbstractFlow",
+  // utils/bundleDeepLink.ts): once per page load, after the gateway answered
+  // its capability probe. A shipped bundle opens as an unsaved copy with a banner.
+  const deepLinkHandledRef = useRef(false);
+  const showDeepLinkBanner = useDeepLinkBanner((s) => s.show);
+  useEffect(() => {
+    if (deepLinkHandledRef.current || gatewayCapabilitiesQuery.isLoading) return;
+    const link = parseBundleDeepLink(typeof window !== 'undefined' ? window.location.search : '');
+    if (!link) return;
+    deepLinkHandledRef.current = true;
+    if ('error' in link) {
+      toast.error(link.error, { duration: 10000 });
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await loadBundleDeepLink(link, {
+          getBundle: (bundleId, version) =>
+            gatewayJson<BundleManifestView>(
+              gatewayPath('api/gateway/bundles/{bundle_id}', { bundle_id: bundleId }, version ? { bundle_version: version } : {})
+            ),
+          getBundleFlow: async (bundleId, flowId, version) =>
+            (
+              await gatewayJson<{ flow: VisualFlow }>(
+                gatewayPath(
+                  'api/gateway/bundles/{bundle_id}/flows/{flow_id}',
+                  { bundle_id: bundleId, flow_id: flowId },
+                  version ? { bundle_version: version } : {}
+                )
+              )
+            ).flow,
+          getVisualFlow: async (flowId) => {
+            try {
+              return await fetchFlow(flowId, gatewayContracts);
+            } catch (error) {
+              if (error instanceof GatewayHttpError && error.status === 404) return null;
+              throw error;
+            }
+          },
+        });
+        const loaded = loadFlow(res.flow);
+        resetLoadedDocument();
+        if (res.kind === 'copy') setFlowId(null);
+        adoptLoadedDocument(loaded);
+        if (res.shipped) showDeepLinkBanner(SHIPPED_BANNER);
+        toast.success(res.kind === 'saved' ? `Opened your flow "${res.flow.name}" (${res.bundleRef})` : `Opened ${res.bundleRef} as an unsaved copy`);
+      } catch (error) {
+        toast.error(deepLinkErrorSentence(error, link), { duration: 12000 });
+      }
+    })();
+  }, [adoptLoadedDocument, gatewayCapabilitiesQuery.isLoading, gatewayContracts, loadFlow, resetLoadedDocument, setFlowId, showDeepLinkBanner]);
 
   // Handle loading a flow
   const handleLoadFlow = useCallback(

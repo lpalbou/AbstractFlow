@@ -377,6 +377,26 @@ Every request the Flow server sends to the Gateway carries `X-Forwarded-For` set
 
 Opened through the Gateway (**Apps > Flow Editor > Open** in the Gateway console), the editor lives at `/apps/flow/` and the browser arrives signed in. The session cookies there belong to `/apps/flow/` only. See [API and contracts > Serving Under A Base Path](api.md#serving-under-a-base-path).
 
+## Open A Gateway Workflow From A Link
+
+The Gateway console's **Workflows** page has an **Open in AbstractFlow** button on every workflow. It opens the editor at:
+
+```text
+/apps/flow/?bundle=<bundle_id>&version=<bundle_version>[&flow=<flow_id>]
+```
+
+- `bundle` (required): the workflow id, as listed on the Workflows page.
+- `version`: the bundle version. Without it, Flow opens the latest version the Gateway serves.
+- `flow`: one flow inside the bundle. Without it, Flow opens the bundle's default entry point.
+
+Once signed in, Flow reads the bundle from the Gateway (`GET /api/gateway/bundles/{bundle_id}?bundle_version=` and `GET /api/gateway/bundles/{bundle_id}/flows/{flow_id}?bundle_version=`) and opens it:
+
+- If the bundle was published from a flow you still have (its `metadata.source.root_flow_id` is one of your flows), Flow opens that flow. Save updates it, as usual.
+- Otherwise Flow opens the bundle's flow as an unsaved copy titled `<name> · <bundle_id>@<version>`. Save creates your own flow. Nothing is ever written back into the bundle.
+- A workflow that ships with the Gateway shows the notice "Shipped workflow — read-only. Save creates your own copy."
+
+If the workflow cannot be opened, Flow says why: "This workflow isn't on this gateway any more." when the Gateway no longer has it, the Gateway's own reason when it refuses (for example a workflow an admin made unavailable to users), and "Sign in to the gateway to open …" when the session is missing. The link is read once per page load; reloading the page opens the workflow again.
+
 ## About
 
 The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About dialog: the AbstractFlow version, the author and license, and links to the website, source, documentation, issue tracker and feedback form. When the dialog opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`) and lists the gateway, AbstractFramework and package versions it reports. If that request fails, the dialog shows `Gateway: unavailable (...)` with the HTTP status or error.
@@ -5324,6 +5344,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+- **Open a Gateway workflow from a link.** `/apps/flow/?bundle=<bundle_id>&version=<bundle_version>[&flow=<flow_id>]`
+  opens that workflow in the editor; the Gateway console's **Open in AbstractFlow** button uses it. A bundle
+  published from one of your flows opens that flow; any other bundle opens as an unsaved copy titled
+  `<name> · <bundle_id>@<version>`, and Save creates your own flow. A workflow that ships with the Gateway shows
+  "Shipped workflow — read-only. Save creates your own copy." A workflow the Gateway no longer has, or refuses to
+  show, opens nothing and says why. See [Web Editor](docs/web-editor.md#open-a-gateway-workflow-from-a-link).
 
 ## [0.6.0] - 2026-10-01
 
