@@ -17,11 +17,12 @@
 
 import { insecureContextReason } from "@abstractframework/ui-kit";
 
-/** Shown on a voice or camera control when getUserMedia is unavailable: over plain http the kit's
- * insecureContextReason() sentence (single source, names the tailscale serve fix); otherwise the old line. */
+/** Shown on a voice or camera control when getUserMedia is unavailable. Over plain http: the kit's
+ * insecureContextReason() sentence, the only https sentence (it names the tailscale serve fix). In a
+ * secure context (https, localhost) the browser itself lacks the API, so https is not the fix. */
 export const MEDIA_NEEDS_HTTPS =
   insecureContextReason("voice and camera") ??
-  "Voice and camera need an https address (Network → HTTPS in the gateway console).";
+  "Voice and camera are not supported in this browser (getUserMedia unavailable).";
 
 /** Shown after a copy that did not reach the clipboard. */
 export const COPY_FAILED = "Copy failed — select and copy";
