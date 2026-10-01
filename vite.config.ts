@@ -66,7 +66,7 @@ export default defineConfig({
       { find: '@', replacement: resolve(__dirname, './src') },
       { find: '@abstractframework/monitor-flow', replacement: resolve(__dirname, '../abstractuic/monitor-flow/src') },
       { find: '@abstractframework/monitor-active-memory', replacement: resolve(__dirname, '../abstractuic/monitor-active-memory/src') },
-      // ui-kit comes from the installed registry package (package.json ^0.3.2),
+      // ui-kit comes from the installed registry package (package.json ^0.4.0),
       // pinned exactly so shared workspace packages resolve the same copy.
       { find: /^@abstractframework\/ui-kit$/, replacement: resolve(__dirname, './node_modules/@abstractframework/ui-kit/dist/index.js') },
       { find: /^@abstractframework\/ui-kit\/theme\.css$/, replacement: resolve(__dirname, './node_modules/@abstractframework/ui-kit/src/theme.css') },
