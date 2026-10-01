@@ -11,9 +11,9 @@ npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 For a local checkout, clone [AbstractUIC](https://github.com/lpalbou/AbstractUIC)
-next to this repository (`../abstractuic`): the editor builds the shared UI
-packages (`@abstractframework/ui-kit` and the monitor widgets) from that sibling
-checkout.
+next to this repository (`../abstractuic`): the editor builds the monitor
+widgets from that sibling checkout. `@abstractframework/ui-kit` installs from
+npm with `npm install`.
 
 ```bash
 git clone https://github.com/lpalbou/AbstractUIC.git ../abstractuic

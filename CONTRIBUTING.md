@@ -8,7 +8,7 @@ Requirements:
 
 - Node.js 20+ (the CI uses Node.js 24)
 - npm
-- a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout at `../abstractuic`: the editor builds the shared UI packages (`@abstractframework/ui-kit` and the monitor widgets) from it
+- a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout at `../abstractuic`: the editor builds the monitor widgets from it (`@abstractframework/ui-kit` installs from npm)
 - a reachable AbstractGateway for integration testing
 
 ```bash

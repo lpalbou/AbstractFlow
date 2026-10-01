@@ -50,7 +50,7 @@ for compatible models only; Flow itself does not impose that default.
 
 ## Local Development
 
-A local checkout needs Node.js 20+ and a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout: the editor builds the shared UI packages (`@abstractframework/ui-kit` and the monitor widgets) from `../abstractuic`.
+A local checkout needs Node.js 20+ and a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout: the editor builds the monitor widgets from `../abstractuic`. `@abstractframework/ui-kit` installs from npm with `npm install`.
 
 ```bash
 git clone https://github.com/lpalbou/AbstractUIC.git abstractuic

@@ -161,12 +161,27 @@ it through the interface receives missing or mistyped values.
   editor at build time.
 - **Fix:** run `npm run build` again and reload the editor tab.
 
+### Voice is unavailable, or Copy says "Copy failed — select and copy"
+
+- **Cause:** the editor is open over plain `http://` from another machine (a
+  LAN or Tailscale address such as `http://100.x.y.z:8080/apps/flow/`).
+  Browsers offer the microphone, the camera and the clipboard only on https
+  pages or on `localhost`. Over plain http, a voice wait in the run window
+  disables **Record** and says why, and **Copy** falls back to a
+  text-selection copy that the browser may refuse.
+- **Fix:** open the editor over https, or on the gateway's own computer. With
+  Tailscale, run `tailscale serve --bg http://127.0.0.1:<port>` on the gateway
+  machine and open `https://<host>.<tailnet>.ts.net/apps/flow/`; the gateway
+  console's Network page explains the steps. Everything else in the editor
+  works over plain http.
+
 ## Local Development
 
 ### The build cannot resolve `@abstractframework/ui-kit` or a monitor package
 
-- **Cause:** a local checkout builds the shared UI packages from a sibling
-  AbstractUIC checkout at `../abstractuic`.
+- **Cause:** `@abstractframework/ui-kit` installs from npm, so `npm install`
+  has not run yet; or the monitor widgets, which a local checkout builds from
+  a sibling AbstractUIC checkout at `../abstractuic`, are missing.
 - **Fix:**
 
 ```bash

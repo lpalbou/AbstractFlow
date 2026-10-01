@@ -70,24 +70,49 @@ the window width:
   touch screens. The minimap starts collapsed on phones and short screens;
   use the toggle in the bottom-right corner to show it. The view fits the
   flow again when you rotate the device.
-- **Flow library and run window on phones.** The library shows the flow list
-  above the preview (side by side in landscape). The run window shows the
-  execution steps above the details. Both scroll inside the sheet.
+- **Flow library and run window on phones and tablets.** Below 1024 px the
+  library shows the flow list above the preview (side by side in phone
+  landscape), and the run window shows the execution steps above the step
+  details. Each sheet scrolls as one page; the lists do not scroll inside
+  their own box. Sections are flat, with a thin line between items. The
+  list's header (**Flows**, **Execution**) hides or shows the list with a
+  tap, a click, Enter or Space; lists start open and the editor remembers
+  your choice in this browser. On phones the run window uses the width of
+  the screen with a 12 px margin, and label and value share a line when they
+  fit.
+- **Side panel tabs on phones.** The Assistant, Properties and Functions tabs
+  sit in a row at the top of the drawer, so the open panel uses the full
+  width.
 - **On-screen keyboard.** The assistant composer and the sheets' action rows,
   such as the library's Load button, stay above the keyboard. In phone
   landscape a 200 px keyboard leaves room for the composer; a taller keyboard
   leaves less space than the composer needs.
 - **Touch targets and text.** Toolbar buttons, palette nodes, library rows,
-  selects and dialog buttons are at least 44 px on touch screens. Inputs use
-  16 px text so iOS does not zoom in when you focus them, and the properties
-  panel's help text is 14 px.
+  selects and dialog buttons are at least 44 px on touch screens. Text on
+  touch screens uses a larger scale: body text 14 to 15 px, secondary text
+  13 px. Inputs use 16 px text so iOS does not zoom in when you focus them.
+  Your font-size setting multiplies every size.
 - **Notifications** appear at the top of the screen on phones, clear of the
   sheets' action rows, and at the bottom right elsewhere.
 
 What stays desktop-sized: node cards and the controls inside them (pin
 inputs, pin selects, "Edit Code") keep their compact design and scale with
-the canvas zoom, so zoom in to work on them on a small screen. The desktop
-panels keep their dense 11-13 px text on a mouse-driven screen.
+the canvas zoom, so zoom in to work on them on a small screen. On a desktop
+with a mouse, the panels keep their dense layout with text at 12 px or more
+(secondary text 13 px).
+
+## Switches
+
+On/off settings are switches labelled by what they control; a switch is
+highlighted with a check mark when on and plain when off. The properties
+panel has **Structured output** (Agent), **Recurrent** (On Schedule) and
+**Free text answers** (Ask User). The dialogs have **Reload gateway bundles**
+(Publish), **New folder per run** (the run window's workspace folder),
+**Durable** (sending an event to a waiting run), and **Lock after load** and
+**Cached and non-resident models** (Resources). When a switch cannot change,
+it says why next to it: **New folder per run** is fixed while the gateway
+manages the workspace or a run is in progress. Pause and Resume on a running
+run are buttons, because they act on the run once.
 
 ## Provider And Model Discovery
 

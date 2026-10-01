@@ -17,9 +17,9 @@ npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 For a local checkout, clone [AbstractUIC](https://github.com/lpalbou/AbstractUIC)
-next to this repository (`../abstractuic`): the editor builds the shared UI
-packages (`@abstractframework/ui-kit` and the monitor widgets) from that sibling
-checkout.
+next to this repository (`../abstractuic`): the editor builds the monitor
+widgets from that sibling checkout. `@abstractframework/ui-kit` installs from
+npm with `npm install`.
 
 ```bash
 git clone https://github.com/lpalbou/AbstractUIC.git ../abstractuic
@@ -228,7 +228,7 @@ The canvas reflects that split:
 Start here:
 
 - [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
-- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, discovery, Resources, flow interfaces, automation defaults and trigger-source discovery, hidden connections, the authoring assistant, media and file nodes.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, flow interfaces, automation defaults and trigger-source discovery, hidden connections, the authoring assistant, media and file nodes.
 - [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
 - [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
@@ -308,7 +308,7 @@ for compatible models only; Flow itself does not impose that default.
 
 ## Local Development
 
-A local checkout needs Node.js 20+ and a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout: the editor builds the shared UI packages (`@abstractframework/ui-kit` and the monitor widgets) from `../abstractuic`.
+A local checkout needs Node.js 20+ and a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout: the editor builds the monitor widgets from `../abstractuic`. `@abstractframework/ui-kit` installs from npm with `npm install`.
 
 ```bash
 git clone https://github.com/lpalbou/AbstractUIC.git abstractuic
@@ -411,24 +411,49 @@ the window width:
   touch screens. The minimap starts collapsed on phones and short screens;
   use the toggle in the bottom-right corner to show it. The view fits the
   flow again when you rotate the device.
-- **Flow library and run window on phones.** The library shows the flow list
-  above the preview (side by side in landscape). The run window shows the
-  execution steps above the details. Both scroll inside the sheet.
+- **Flow library and run window on phones and tablets.** Below 1024 px the
+  library shows the flow list above the preview (side by side in phone
+  landscape), and the run window shows the execution steps above the step
+  details. Each sheet scrolls as one page; the lists do not scroll inside
+  their own box. Sections are flat, with a thin line between items. The
+  list's header (**Flows**, **Execution**) hides or shows the list with a
+  tap, a click, Enter or Space; lists start open and the editor remembers
+  your choice in this browser. On phones the run window uses the width of
+  the screen with a 12 px margin, and label and value share a line when they
+  fit.
+- **Side panel tabs on phones.** The Assistant, Properties and Functions tabs
+  sit in a row at the top of the drawer, so the open panel uses the full
+  width.
 - **On-screen keyboard.** The assistant composer and the sheets' action rows,
   such as the library's Load button, stay above the keyboard. In phone
   landscape a 200 px keyboard leaves room for the composer; a taller keyboard
   leaves less space than the composer needs.
 - **Touch targets and text.** Toolbar buttons, palette nodes, library rows,
-  selects and dialog buttons are at least 44 px on touch screens. Inputs use
-  16 px text so iOS does not zoom in when you focus them, and the properties
-  panel's help text is 14 px.
+  selects and dialog buttons are at least 44 px on touch screens. Text on
+  touch screens uses a larger scale: body text 14 to 15 px, secondary text
+  13 px. Inputs use 16 px text so iOS does not zoom in when you focus them.
+  Your font-size setting multiplies every size.
 - **Notifications** appear at the top of the screen on phones, clear of the
   sheets' action rows, and at the bottom right elsewhere.
 
 What stays desktop-sized: node cards and the controls inside them (pin
 inputs, pin selects, "Edit Code") keep their compact design and scale with
-the canvas zoom, so zoom in to work on them on a small screen. The desktop
-panels keep their dense 11-13 px text on a mouse-driven screen.
+the canvas zoom, so zoom in to work on them on a small screen. On a desktop
+with a mouse, the panels keep their dense layout with text at 12 px or more
+(secondary text 13 px).
+
+## Switches
+
+On/off settings are switches labelled by what they control; a switch is
+highlighted with a check mark when on and plain when off. The properties
+panel has **Structured output** (Agent), **Recurrent** (On Schedule) and
+**Free text answers** (Ask User). The dialogs have **Reload gateway bundles**
+(Publish), **New folder per run** (the run window's workspace folder),
+**Durable** (sending an event to a waiting run), and **Lock after load** and
+**Cached and non-resident models** (Resources). When a switch cannot change,
+it says why next to it: **New folder per run** is fixed while the gateway
+manages the workspace or a run is in progress. Pause and Resume on a running
+run are buttons, because they act on the run once.
 
 ## Provider And Model Discovery
 
@@ -4621,6 +4646,21 @@ Bundle versions are immutable by sha, so publishing a changed graph means
 bumping the version in the generator and updating the packaging pin in
 `abstractgateway/pyproject.toml`.
 
+The name and one-line description each entrypoint shows on the Gateway's
+Workflows page come from one table, `scripts/workflow_labels.py`. The
+generators read it, and `scripts/relabel_shipped_bundles.py` keeps the shipped
+bundles in line without repacking their graphs:
+
+```bash
+python3 scripts/relabel_shipped_bundles.py check --bundles-dir ../abstractgateway/flows/bundles
+python3 scripts/relabel_shipped_bundles.py apply --bundles-dir ../abstractgateway/flows/bundles
+```
+
+`check` fails when a generator, an example JSON or the latest shipped bundle
+of a family carries other text, or when a shipped bundle has an entrypoint the
+table does not name. `apply` rewrites only the labels of the latest version of
+each family; older versions are never touched.
+
 None of these shipped flows cuts what a model reads (ADR-0026): no message or
 character caps on prompts, tool output or documents, and no default output-token
 caps. The only bounds left are labeled display previews (for example, a
@@ -5237,12 +5277,27 @@ it through the interface receives missing or mistyped values.
   editor at build time.
 - **Fix:** run `npm run build` again and reload the editor tab.
 
+### Voice is unavailable, or Copy says "Copy failed — select and copy"
+
+- **Cause:** the editor is open over plain `http://` from another machine (a
+  LAN or Tailscale address such as `http://100.x.y.z:8080/apps/flow/`).
+  Browsers offer the microphone, the camera and the clipboard only on https
+  pages or on `localhost`. Over plain http, a voice wait in the run window
+  disables **Record** and says why, and **Copy** falls back to a
+  text-selection copy that the browser may refuse.
+- **Fix:** open the editor over https, or on the gateway's own computer. With
+  Tailscale, run `tailscale serve --bg http://127.0.0.1:<port>` on the gateway
+  machine and open `https://<host>.<tailnet>.ts.net/apps/flow/`; the gateway
+  console's Network page explains the steps. Everything else in the editor
+  works over plain http.
+
 ## Local Development
 
 ### The build cannot resolve `@abstractframework/ui-kit` or a monitor package
 
-- **Cause:** a local checkout builds the shared UI packages from a sibling
-  AbstractUIC checkout at `../abstractuic`.
+- **Cause:** `@abstractframework/ui-kit` installs from npm, so `npm install`
+  has not run yet; or the monitor widgets, which a local checkout builds from
+  a sibling AbstractUIC checkout at `../abstractuic`, are missing.
 - **Fix:**
 
 ```bash
@@ -5270,13 +5325,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-On/off options in the editor are switches labelled by what they control. The
-switch shows the state: highlighted with a check mark when on, plain when
-off. Anyone editing node properties, publishing, starting a run or using the
-Resources panel is affected; nothing changes in VisualFlow documents, the
-server or the Gateway contract.
+## [0.6.0] - 2026-10-01
+
+Phones and tablets get more of the screen for reading, and on/off options in
+the editor are switches labelled by what they control. Desktop windows 1024 px
+or wider with a mouse keep the 0.5.0 layout, with text at 12 px or more. Anyone editing node properties,
+publishing, starting a run or using the Resources panel sees the switches.
+Nothing changes in VisualFlow documents, the server, or the Gateway contract.
+
+### Added
+- **Collapsible lists.** In the flow library and the run window, the list
+  above the detail has a header you tap to hide or show it (Flows,
+  Execution), with a mouse, a tap, or Enter and Space. Lists start open. The
+  editor remembers your choice in this browser. Hiding the list gives the
+  preview or the step details the whole sheet.
 
 ### Changed
+- **Plain names and descriptions for the shipped workflows.** Every shipped
+  entrypoint has a name a person would use ("Basic agent", "Coding agent
+  (chat)", "Deep research") and one sentence of at most 140 characters that
+  says what it takes and what it returns, instead of its id and a developer
+  note. The text lives in one table, `scripts/workflow_labels.py`; the
+  generators take it from there, and `scripts/relabel_shipped_bundles.py`
+  writes it into the latest shipped bundle of each family and the example
+  JSONs (`apply`) and checks that generators, examples and bundles agree
+  (`check`). Only the labels change: graphs, versions and older versions stay
+  as they were, except docs-qa, which the gateway keeps in its catalog and
+  therefore ships the new text as 0.1.2.
+- **One scroll per sheet.** On phones and tablets, the flow library, the run
+  window and the run history scroll as one page. Lists no longer scroll inside
+  their own box, and sections are flat, with a thin line between items.
+- **Full width on phones.** The run window's text uses the width of the
+  screen: a 12 px margin, label and value on one line when they fit, JSON and
+  paths without a box. The assistant's replies are plain text across the
+  drawer. The Assistant, Properties and Functions tabs sit in a row at the
+  top, so the canvas and the open panel lose no side column. In the flow
+  library, a flow's name starts at the margin and the expand arrow sits at
+  the end of its row.
+- **Larger text on touch screens.** Phones and tablets use a larger type
+  scale: body text 14 to 15 px, secondary text 13 px. Your font-size setting
+  still applies. Text inside canvas nodes keeps its size and grows when you
+  zoom.
+- **No text under 12 px on desktops.** Dense text (badges, keys, list
+  details) is at least 12 px and secondary text 13 px, so the palette, the
+  properties panel and the run history read at 12 to 13 px instead of 11 px.
+  Some palette names are shortened one character sooner.
+- Dialogs opened from the toolbar are no longer inside the page header, so
+  screen readers no longer read them as part of the header.
+
+### Fixed
+- On phones, a notice raised while a dialog is open appears below the
+  dialog's title bar. It used to cover the run window's close button, and a
+  tap copied the error instead of closing the window.
+- **Switches show their state.** A switch is highlighted with a check mark
+  when on, plain when off.
 - **Node settings.** **Structured output** (Agent), **Recurrent** (On
   Schedule) and **Free text answers** (Ask User) are switches in the
   properties panel. Recurrent no longer shows an "Enabled" / "Disabled" label.
@@ -5288,6 +5390,16 @@ server or the Gateway contract.
   progress.
 - Pause and Resume on a running run stay buttons: they act on the run once,
   they are not a setting.
+- **Plain http from another machine** (LAN, Tailscale). Browsers withhold
+  `crypto.randomUUID`, the clipboard API and the microphone outside https and
+  localhost. Request, session and switch-case ids now come from the kit's
+  `randomId()` (v4 UUIDs everywhere), every **Copy** falls back to a
+  text-selection copy and says "Copied" or "Copy failed — select and copy",
+  and a voice wait over plain http disables **Record** and says why: "This
+  page is loaded over http, so voice and camera is unavailable — open it over
+  https (for example through tailscale serve; the gateway console's Network
+  page explains how) or on the gateway's own computer." Needs
+  `@abstractframework/ui-kit` 0.4.0.
 
 ## [0.5.0] - 2026-09-30
 
@@ -6133,7 +6245,7 @@ Requirements:
 
 - Node.js 20+ (the CI uses Node.js 24)
 - npm
-- a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout at `../abstractuic`: the editor builds the shared UI packages (`@abstractframework/ui-kit` and the monitor widgets) from it
+- a sibling [AbstractUIC](https://github.com/lpalbou/AbstractUIC) checkout at `../abstractuic`: the editor builds the monitor widgets from it (`@abstractframework/ui-kit` installs from npm)
 - a reachable AbstractGateway for integration testing
 
 ```bash

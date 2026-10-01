@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-01
+
 Phones and tablets get more of the screen for reading, and on/off options in
 the editor are switches labelled by what they control. Desktop windows 1024 px
 or wider with a mouse keep the 0.5.0 layout, with text at 12 px or more. Anyone editing node properties,
@@ -75,9 +77,11 @@ Nothing changes in VisualFlow documents, the server, or the Gateway contract.
   localhost. Request, session and switch-case ids now come from the kit's
   `randomId()` (v4 UUIDs everywhere), every **Copy** falls back to a
   text-selection copy and says "Copied" or "Copy failed — select and copy",
-  and a voice wait shows "Voice and camera need an https address (Network →
-  HTTPS in the gateway console)." with **Record** disabled. Needs
-  `@abstractframework/ui-kit` 0.3.3.
+  and a voice wait over plain http disables **Record** and says why: "This
+  page is loaded over http, so voice and camera is unavailable — open it over
+  https (for example through tailscale serve; the gateway console's Network
+  page explains how) or on the gateway's own computer." Needs
+  `@abstractframework/ui-kit` 0.4.0.
 
 ## [0.5.0] - 2026-09-30
 
