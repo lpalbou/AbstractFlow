@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Open a Gateway workflow from a link.** `/apps/flow/?bundle=<bundle_id>&version=<bundle_version>[&flow=<flow_id>]`
-  opens that workflow in the editor; the Gateway console's **Open in AbstractFlow** button uses it. A bundle
+  opens that workflow in the editor; the Gateway console's Workflows **Open** button uses it. A bundle
   published from one of your flows opens that flow; any other bundle opens as an unsaved copy titled
   `<name> · <bundle_id>@<version>`, and Save creates your own flow. A workflow that ships with the Gateway shows
   "Shipped workflow — read-only. Save creates your own copy." A workflow the Gateway no longer has, or refuses to

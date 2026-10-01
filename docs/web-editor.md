@@ -38,7 +38,7 @@ Opened through the Gateway (**Apps > Flow Editor > Open** in the Gateway console
 
 ## Open A Gateway Workflow From A Link
 
-The Gateway console's **Workflows** page has an **Open in AbstractFlow** button on every workflow. It opens the editor at:
+The Gateway console's **Workflows** page has an **Open** button (tooltip "Open in AbstractFlow") on every workflow. It opens the editor at:
 
 ```text
 /apps/flow/?bundle=<bundle_id>&version=<bundle_version>[&flow=<flow_id>]
