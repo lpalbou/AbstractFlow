@@ -27,6 +27,7 @@ import { buildDraftRunMetadata, buildPublishedRunMetadata, draftBundleVersion } 
 import { isDraftBundleVersion, type PublishedBundleTarget } from '../utils/workflowBundles';
 import { classifyWait, type WaitInteractivity } from '../utils/waitClassification';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from './useGatewayCapabilities';
+import type { RunStartOptions, RunWorkspace } from '../utils/runWorkspaceChoice';
 
 // Stable per-tab session id for run context continuity.
 const STABLE_SESSION_ID_KEY = 'abstractflow_session_id_v1';
@@ -799,6 +800,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       inputData: Record<string, unknown>;
       runLifecycle: unknown;
       sessionId?: string;
+      workspace?: RunWorkspace | null;
     }) => {
       const bundleId = String(args.bundleId || '').trim();
       const bundleVersion = String(args.bundleVersion || '').trim();
@@ -844,6 +846,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         input_data: normalized.inputData,
         run_lifecycle: args.runLifecycle,
         session_id: sessionId || undefined,
+        ...(args.workspace ? { workspace: args.workspace } : {}),
       }, {
         method: 'POST',
       }));
@@ -869,7 +872,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   );
 
   const runFlow = useCallback(
-    async (inputData: Record<string, unknown> = {}) => {
+    async (inputData: Record<string, unknown> = {}, opts: RunStartOptions = {}) => {
       if (!flowId) {
         setError('flow_id is required');
         return;
@@ -953,6 +956,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           inputData: mergedInputData,
           runLifecycle,
           sessionId: effectiveSessionId || undefined,
+          workspace: opts.workspace,
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to run flow';
@@ -974,7 +978,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   );
 
   const runPublishedFlow = useCallback(
-    async (target: PublishedBundleTarget, inputData: Record<string, unknown> = {}) => {
+    async (target: PublishedBundleTarget, inputData: Record<string, unknown> = {}, opts: RunStartOptions = {}) => {
       const targetFlowId = String(target?.flowId || flowId || '').trim();
       const bundleId = String(target?.bundleId || '').trim();
       const bundleVersion = String(target?.bundleVersion || '').trim();
@@ -1014,6 +1018,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
             bundleVersion,
             bundleRef: target.bundleRef,
           }),
+          workspace: opts.workspace,
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to run published flow';

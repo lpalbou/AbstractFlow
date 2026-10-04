@@ -1,3 +1,4 @@
+import type { RunWorkspace } from './runWorkspaceChoice';
 import type { GatewayAuthoringCapability } from './nodeCapabilities';
 import { GATEWAY_API_PATH, gatewayApiPath, randomId } from '@abstractframework/ui-kit';
 
@@ -1091,7 +1092,12 @@ async function gatewayErrorFromResponse(res: Response): Promise<GatewayHttpError
       : typeof detail === 'string'
         ? detail.trim()
         : messageFromJsonError(detail);
-  const msg = formatHttpErrorMessage(res.status, res.statusText || '', rawMessage);
+  // A workspace refusal is one sentence meant for the user: shown verbatim (no HTTP prefix).
+  const refusal = asRecord(asRecord(detail)?.detail);
+  const msg =
+    refusal?.reason === 'workspace_refused' && typeof refusal.message === 'string' && refusal.message.trim()
+      ? refusal.message.trim()
+      : formatHttpErrorMessage(res.status, res.statusText || '', rawMessage);
   return new GatewayHttpError(msg, res.status, detail);
 }
 
@@ -1214,6 +1220,8 @@ export interface GatewayStartRunRequest {
   thinking?: boolean | string;
   run_lifecycle?: Record<string, unknown>;
   session_id?: string;
+  /** This run's workspaces (R11 run level); absent = the gateway resolves session > account > gateway. */
+  workspace?: RunWorkspace | null;
 }
 
 export interface GatewayStartRunResponse {
@@ -1262,6 +1270,7 @@ export async function gatewayStartRun(
         thinking: request.thinking,
         run_lifecycle: request.run_lifecycle,
         session_id: request.session_id,
+        ...(request.workspace ? { workspace: request.workspace } : {}),
       },
       { method: 'POST' }
     )

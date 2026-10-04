@@ -1,13 +1,22 @@
-// Run → File System Access (round 9): the kit WorkspaceChooser, the same
-// folder model and words as the gateway console, AbstractCode, Observer and
-// the Assistant. The run may use the account's effective folders
-// (GET api/gateway/workspace/policy/me); the chosen set rides the run as
-// input_data.workspace_allowed_paths (null = follows the account). The gateway
-// decides: a folder outside the account's folders is refused at run start
-// with a sentence. No policy logic here (no path checks, no clamp).
-import { useEffect, useState } from 'react';
-import { WorkspaceChooser, workspaceChooserClient, type WorkspaceEffective, type WorkspaceRequest } from '@abstractframework/ui-kit';
+// Run → File System Access (round 11, DESIGN R11.6): the kit WorkspaceChooser
+// at the RUN level, the same model and words as the gateway console,
+// AbstractCode, Observer and the Assistant. The value is this run's own
+// workspaces (`{posture, default_mode, folders}`, null = "Use my default");
+// it rides the run-start body as `workspace` (RunFlowModal → useWebSocket).
+// What it means is the gateway's dry run (POST api/gateway/workspace/effective/me):
+// the effective line, the gateway line and the caps come from there, and a
+// change the gateway refuses is shown with its sentence + "Not saved." and not
+// kept. No policy logic here (no path checks, no clamp, no caps).
+import { useCallback, useEffect, useState } from 'react';
+import {
+  WorkspaceChooser,
+  workspaceDryRun,
+  workspaceErrorSentence,
+  type WorkspaceEffective,
+  type WorkspaceRequest,
+} from '@abstractframework/ui-kit';
 import { gatewayJson, jsonRequest } from '../utils/gatewayClient';
+import type { RunWorkspace } from '../utils/runWorkspaceChoice';
 
 /** The kit client's request over Flow's gateway transport (session CSRF, the gateway's sentence on 4xx). */
 export const flowWorkspaceRequest: WorkspaceRequest = (path, init) =>
@@ -15,34 +24,44 @@ export const flowWorkspaceRequest: WorkspaceRequest = (path, init) =>
 
 export function RunWorkspaceFolders(props: {
   enabled: boolean;
-  selection: string[] | null;
-  onSelectionChange: (next: string[] | null) => void;
+  value: RunWorkspace | null;
+  onChange: (next: RunWorkspace | null) => void;
   disabled?: boolean;
   request?: WorkspaceRequest;
 }) {
-  const { enabled, selection, onSelectionChange, disabled, request = flowWorkspaceRequest } = props;
+  const { enabled, value, onChange, disabled, request = flowWorkspaceRequest } = props;
   const [effective, setEffective] = useState<WorkspaceEffective | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const valueKey = JSON.stringify(value);
   useEffect(() => {
     if (!enabled) return;
     let live = true;
     setError(null);
-    workspaceChooserClient(request)
-      .load()
-      .then((state) => live && setEffective(state.effective))
-      .catch((e) => live && setError(`Could not read your workspaces: ${e instanceof Error ? e.message : String(e)}`));
+    workspaceDryRun(request)(value)
+      .then((next) => live && setEffective(next))
+      .catch((e) => live && setError(`Could not read your workspaces: ${workspaceErrorSentence(e)}`));
     return () => {
       live = false;
     };
-  }, [enabled, request]);
+    // `value` is identified by `valueKey`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, valueKey, request]);
+  // A change is dry-run first: a refusal rejects (the kit shows the sentence) and the value stays.
+  const change = useCallback(
+    async (next: RunWorkspace | null) => {
+      const answer = await workspaceDryRun(request)(next);
+      setEffective(answer);
+      onChange(next);
+    },
+    [request, onChange],
+  );
   return (
     <WorkspaceChooser
-      mode="automation"
-      subject="run"
+      level="run"
       idPrefix="flow-run-workspace"
+      value={value}
       effective={effective}
-      selection={selection}
-      onSelectionChange={onSelectionChange}
+      onChange={change}
       loadError={error}
       unavailableReason={disabled ? 'A run is in progress.' : null}
     />

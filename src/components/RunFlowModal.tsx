@@ -20,6 +20,7 @@ import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
 import { RunWorkspaceFolders } from './RunWorkspaceFolders';
+import type { RunStartOptions, RunWorkspace } from '../utils/runWorkspaceChoice';
 import { AF_MEDIA, AfAudioPlayer, AfSwitch, SteerComposer, SpeculationSelect, useAfMedia, type SpeculationValue } from '@abstractframework/ui-kit';
 import { ListDisclosure } from './ListDisclosure';
 import { useListOpen } from '../utils/listOpen';
@@ -124,7 +125,7 @@ type PromptCacheBindingValue = string | Record<string, unknown>;
 interface RunFlowModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRun: (inputData: Record<string, unknown>) => void;
+  onRun: (inputData: Record<string, unknown>, opts?: RunStartOptions) => void;
   runMode?: 'draft' | 'published';
   runTargetLabel?: string;
   onFollowUpSubmit?: (payload: {
@@ -2059,8 +2060,8 @@ export function RunFlowModal({
   const [workspaceRandom, setWorkspaceRandom] = useState(true);
   const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [manualWorkspaceRoot, setManualWorkspaceRoot] = useState('');
-  // Round 9: the run's folders (kit WorkspaceChooser); null = follows the account.
-  const [workspaceFolders, setWorkspaceFolders] = useState<string[] | null>(null);
+  // R11 run level: this run's workspaces (kit WorkspaceChooser); null = "Use my default".
+  const [runWorkspace, setRunWorkspace] = useState<RunWorkspace | null>(null);
   const [sessionIdOverride, setSessionIdOverride] = useState('');
   const [showSessionEdit, setShowSessionEdit] = useState(false);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -2864,7 +2865,6 @@ export function RunFlowModal({
         console.warn('#FALLBACK: workspace_root ignored because gateway policy disallows client overrides');
       }
     }
-    if (workspaceFolders !== null) inputData.workspace_allowed_paths = workspaceFolders;
 
     const sessionValue = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
     const sessionIdRaw = typeof sessionValue === 'string' ? sessionValue.trim() : '';
@@ -2897,7 +2897,8 @@ export function RunFlowModal({
       inputData.context = existingContext;
     }
 
-    onRun(withRunSpeculation(inputData, runSpeculation));
+    // The run's workspaces ride the start body (absent = Use my default); never input_data.
+    onRun(withRunSpeculation(inputData, runSpeculation), runWorkspace ? { workspace: runWorkspace } : {});
     if (followUpContext) setFollowUpContext(null);
   }, [
     formInputPins,
@@ -2906,7 +2907,7 @@ export function RunFlowModal({
     onRun,
     toolsValues,
     visibleFormInputPins,
-    workspaceFolders,
+    runWorkspace,
     workspaceInputEnabled,
     workspaceRoot,
     followUpContext,
@@ -7752,7 +7753,7 @@ export function RunFlowModal({
                           File System Access
                         </span>
                         <span className="run-form-section-meta">
-                          {workspaceFolders === null ? 'Your workspace folders' : `${workspaceFolders.length} chosen`}
+                          {runWorkspace === null ? 'My default workspaces' : 'Workspaces for this run'}
                         </span>
                       </summary>
                       <div className="run-form-section-body">
@@ -7762,15 +7763,15 @@ export function RunFlowModal({
                         <div className="run-form-field">
                           <RunWorkspaceFolders
                             enabled={isOpen}
-                            selection={workspaceFolders}
-                            onSelectionChange={setWorkspaceFolders}
+                            value={runWorkspace}
+                            onChange={setRunWorkspace}
                             disabled={isRunning}
                           />
                         </div>
 
                         <div className="run-form-field">
                           <label className="run-form-label">
-                            Workspace folder
+                            Run workspace
                             <span className="run-form-type">(workspace_root)</span>
                             {workspaceRootRequired ? (
                               <span className="run-form-required">required</span>
@@ -7792,7 +7793,7 @@ export function RunFlowModal({
                                     ? executionWorkspaceQuery.isLoading
                                       ? 'Generating…'
                                       : 'Will be generated on Run'
-                                    : 'Folder path…'
+                                    : 'Workspace path…'
                               }
                               readOnly={!workspaceInputEnabled || workspaceRandom}
                               disabled={isRunning || !workspaceInputEnabled}
@@ -7800,13 +7801,13 @@ export function RunFlowModal({
 
                             <AfSwitch
                               className="run-form-inline-switch"
-                              label="New folder per run"
-                              hint="On (the default): workspace_root stays unset and the gateway allocates a fresh folder for each run. Off: run in the folder typed here."
+                              label="Private workspace per run"
+                              hint="On (the default): workspace_root stays unset and the gateway gives each run its own private workspace. Off: run in the workspace typed here."
                               action="workspace-random"
                               checked={workspaceRandom}
                               unavailableReason={
                                 !workspaceInputEnabled
-                                  ? 'The gateway manages the workspace folder.'
+                                  ? 'The gateway manages the run workspace.'
                                   : isRunning
                                     ? 'A run is in progress.'
                                     : null
@@ -7818,11 +7819,11 @@ export function RunFlowModal({
 
                           {!workspaceInputEnabled ? (
                             <p className="run-form-note">
-                              Workspace is managed by the gateway (a new per-run folder is created by default). Client overrides are disabled by policy.
+                              The gateway manages the run workspace (each run gets its own private workspace). Client overrides are disabled by policy.
                             </p>
                           ) : executionWorkspaceQuery.isError ? (
                             <p className="run-form-note">
-                              Could not fetch defaults; the server will generate a folder on Run.
+                              Could not fetch defaults; the gateway creates the run's private workspace on Run.
                             </p>
                           ) : null}
                         </div>

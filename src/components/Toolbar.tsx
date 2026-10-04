@@ -2,6 +2,7 @@
  * Toolbar component with Run, Save, Export, Import actions.
  */
 
+import type { RunStartOptions } from '../utils/runWorkspaceChoice';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1447,7 +1448,7 @@ export function Toolbar() {
   }, [runnableFlowId, resetThreadState]);
 
   // Handle run from modal
-  const handleRunExecute = useCallback((inputData: Record<string, unknown>) => {
+  const handleRunExecute = useCallback((inputData: Record<string, unknown>, opts: RunStartOptions = {}) => {
     if (!runnableFlowId) return;
     setIsRunning(true);
     setInspectedRun(null);
@@ -1460,10 +1461,10 @@ export function Toolbar() {
     setRunWorkflowId(target?.flowId || flowId);
     resetThreadState();
     if (target) {
-      void runPublishedFlow(target, inputData);
+      void runPublishedFlow(target, inputData, opts);
       return;
     }
-    runFlow(inputData);
+    runFlow(inputData, opts);
   }, [flowId, loadedBundledRunTarget, resetThreadState, runFlow, runPublishedFlow, runnableFlowId, setIsRunning]);
 
   // Handle modal close
