@@ -7674,3 +7674,60 @@ body.af-schema-editor-open .af-tooltip-bubble {
   font-size: 20px;
   cursor: pointer;
 }
+
+/* Flow loading screen (round 8, R8.3): while a flow opens (deep link or Open). */
+.app-main { position: relative; }
+.flow-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg-primary, #111) 78%, transparent);
+  backdrop-filter: blur(2px);
+}
+.flow-loading__card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(520px, 100%);
+  padding: 16px 18px;
+  border: 1px solid var(--ui-border-1, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary, #1b1b1b);
+  box-shadow: var(--ui-shadow-1, 0 8px 24px rgba(0, 0, 0, 0.35));
+  color: var(--text-primary, #eee);
+}
+.flow-loading__spinner {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--ui-border-2, rgba(255, 255, 255, 0.2));
+  border-top-color: var(--accent, #e94560);
+  border-radius: 50%;
+  animation: flow-loading-spin 0.9s linear infinite;
+}
+@keyframes flow-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .flow-loading__spinner { animation: none; } }
+.flow-loading__text { flex: 1 1 auto; min-width: 0; }
+.flow-loading__title { font-size: var(--font-size-base, 14px); overflow-wrap: anywhere; }
+.flow-loading__hint { margin-top: 2px; color: var(--text-secondary, #aaa); font-size: var(--font-size-sm, 12px); }
+.flow-loading__cancel {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-border-2, rgba(255, 255, 255, 0.2));
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-primary, #eee);
+  font: inherit;
+  cursor: pointer;
+}
+.flow-loading__cancel:hover { background: var(--ui-overlay-bg-hover, rgba(255, 255, 255, 0.06)); }
+@media (pointer: coarse) { .flow-loading__cancel { min-height: var(--tap-min, 44px); } }
+@media (max-width: 479.98px) {
+  .flow-loading__card { flex-wrap: wrap; }
+  .flow-loading__cancel { width: 100%; }
+}

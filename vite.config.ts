@@ -53,11 +53,33 @@ function devAppServerPlugin(): Plugin {
   };
 }
 
+/**
+ * The app's llms.txt ships in dist/ and is served at /llms.txt (dev too): the
+ * gateway's `GET /docs/corpus?app=flow` reads it from the running app to
+ * ground the Docs assistant (round 8, R8.3). One file, the repo's own.
+ */
+const LLMS_TXT = resolve(__dirname, 'llms.txt');
+function llmsTxtPlugin(): Plugin {
+  return {
+    name: 'abstractframework-llms-txt',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (String(req.url || '').split('?')[0] !== '/llms.txt') return next();
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.end(readFileSync(LLMS_TXT, 'utf8'));
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'llms.txt', source: readFileSync(LLMS_TXT, 'utf8') });
+    },
+  };
+}
+
 export default defineConfig({
   // Relative asset URLs: the same build serves at / and under the gateway at
   // /apps/flow/ (bin/server.js puts a <base href> in the page).
   base: './',
-  plugins: [devAppServerPlugin(), react()],
+  plugins: [llmsTxtPlugin(), devAppServerPlugin(), react()],
   define: {
     __APP_VERSION__: JSON.stringify(APP_VERSION),
   },

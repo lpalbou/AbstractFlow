@@ -6,6 +6,8 @@ import { installViewportVars, useAfMedia } from '@abstractframework/ui-kit';
 import { TOAST_TOP_QUERY, toastPosition } from './utils/toastPlacement';
 import App from './App';
 import '@abstractframework/ui-kit/theme.css';
+// panel-chat's chat styles (the Docs assistant drawer, round 8).
+import '@abstractframework/panel-chat/panel_chat.css';
 import './styles/index.css';
 import './styles/nodes.css';
 import './styles/palette.css';

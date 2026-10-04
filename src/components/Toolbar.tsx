@@ -61,6 +61,7 @@ import {
   type BundleManifestView,
 } from '../utils/bundleDeepLink';
 import { useDeepLinkBanner } from '../hooks/deepLinkBanner';
+import { deepLinkLoadingName, isAbortError, useFlowLoading } from '../hooks/flowLoading';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import {
   endpointFromDescriptor,
@@ -81,9 +82,9 @@ async function listFlows(contracts: GatewayContracts | null): Promise<VisualFlow
 }
 
 // Load a specific flow
-async function fetchFlow(flowId: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
+async function fetchFlow(flowId: string, contracts: GatewayContracts | null, signal?: AbortSignal): Promise<VisualFlow> {
   const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
-  return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }));
+  return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), signal ? { signal } : undefined);
 }
 
 async function deleteFlow(flowId: string, contracts: GatewayContracts | null): Promise<void> {
@@ -738,6 +739,9 @@ export function Toolbar() {
     [flowLibraryCatalog.bundledFlowIds]
   );
 
+  const beginFlowLoading = useFlowLoading((st) => st.begin);
+  const finishFlowLoading = useFlowLoading((st) => st.finish);
+
   // Load a flow into the editor (no unsaved-changes gate — see handleLoadFlow).
   const doLoadFlow = useCallback(
     async (selectedFlowId: string) => {
@@ -758,17 +762,33 @@ export function Toolbar() {
           );
           return;
         }
-        const flow = await fetchFlow(selectedFlowId, gatewayContracts);
-        const loaded = loadFlow(flow);
-        resetLoadedDocument();
-        adoptLoadedDocument(loaded);
+        // The loading screen (name + Cancel) covers the editor while the
+        // gateway answers; Cancel aborts the request and keeps the open flow.
+        const listed = flowLibraryCatalog.flows.find((f) => f.id === selectedFlowId);
+        const loadingName = String(listed?.name || selectedFlowId);
         setShowFlowLibrary(false);
-        toast.success(`Loaded "${flow.name}"`);
+        const signal = beginFlowLoading(loadingName);
+        try {
+          const flow = await fetchFlow(selectedFlowId, gatewayContracts, signal);
+          if (signal.aborted) return;
+          const loaded = loadFlow(flow);
+          resetLoadedDocument();
+          adoptLoadedDocument(loaded);
+          toast.success(`Loaded "${flow.name}"`);
+        } catch (error) {
+          if (signal.aborted || isAbortError(error)) {
+            toast(`Stopped opening "${loadingName}". The editor still shows the flow you had.`);
+            return;
+          }
+          throw error;
+        } finally {
+          finishFlowLoading(signal);
+        }
       } catch (error) {
         toast.error('Failed to load flow');
       }
     },
-    [bundledFlowIdSet, flowLibraryCatalog.flows, gatewayContracts, loadFlow, setFlowId]
+    [beginFlowLoading, bundledFlowIdSet, finishFlowLoading, flowLibraryCatalog.flows, gatewayContracts, loadFlow, setFlowId]
   );
 
   // `?bundle=<id>&version=<v>[&flow=<flow_id>]` (gateway "Open in AbstractFlow",
@@ -785,12 +805,15 @@ export function Toolbar() {
       toast.error(link.error, { duration: 10000 });
       return;
     }
+    const loadingName = deepLinkLoadingName(link);
+    const signal = beginFlowLoading(loadingName);
     void (async () => {
       try {
         const res = await loadBundleDeepLink(link, {
           getBundle: (bundleId, version) =>
             gatewayJson<BundleManifestView>(
-              gatewayPath('api/gateway/bundles/{bundle_id}', { bundle_id: bundleId }, version ? { bundle_version: version } : {})
+              gatewayPath('api/gateway/bundles/{bundle_id}', { bundle_id: bundleId }, version ? { bundle_version: version } : {}),
+              { signal }
             ),
           getBundleFlow: async (bundleId, flowId, version) =>
             (
@@ -799,18 +822,20 @@ export function Toolbar() {
                   'api/gateway/bundles/{bundle_id}/flows/{flow_id}',
                   { bundle_id: bundleId, flow_id: flowId },
                   version ? { bundle_version: version } : {}
-                )
+                ),
+                { signal }
               )
             ).flow,
           getVisualFlow: async (flowId) => {
             try {
-              return await fetchFlow(flowId, gatewayContracts);
+              return await fetchFlow(flowId, gatewayContracts, signal);
             } catch (error) {
               if (error instanceof GatewayHttpError && error.status === 404) return null;
               throw error;
             }
           },
         });
+        if (signal.aborted) return;
         const loaded = loadFlow(res.flow);
         resetLoadedDocument();
         if (res.kind === 'copy') setFlowId(null);
@@ -818,10 +843,16 @@ export function Toolbar() {
         if (res.shipped) showDeepLinkBanner(SHIPPED_BANNER);
         toast.success(res.kind === 'saved' ? `Opened your flow "${res.flow.name}" (${res.bundleRef})` : `Opened ${res.bundleRef} as an unsaved copy`);
       } catch (error) {
+        if (signal.aborted || isAbortError(error)) {
+          toast(`Stopped opening ${loadingName}. Open it again from the console or the flow library.`);
+          return;
+        }
         toast.error(deepLinkErrorSentence(error, link), { duration: 12000 });
+      } finally {
+        finishFlowLoading(signal);
       }
     })();
-  }, [adoptLoadedDocument, gatewayCapabilitiesQuery.isLoading, gatewayContracts, loadFlow, resetLoadedDocument, setFlowId, showDeepLinkBanner]);
+  }, [adoptLoadedDocument, beginFlowLoading, finishFlowLoading, gatewayCapabilitiesQuery.isLoading, gatewayContracts, loadFlow, resetLoadedDocument, setFlowId, showDeepLinkBanner]);
 
   // Handle loading a flow
   const handleLoadFlow = useCallback(

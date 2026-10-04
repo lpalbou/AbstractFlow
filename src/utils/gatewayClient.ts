@@ -1095,6 +1095,31 @@ async function gatewayErrorFromResponse(res: Response): Promise<GatewayHttpError
   return new GatewayHttpError(msg, res.status, detail);
 }
 
+/** The app proxy's CSRF header for a write to `api/gateway/...`, else nothing. */
+function flowCsrfHeader(url: string, method: string): string | null {
+  if (!url.startsWith('api/gateway/') || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return null;
+  const csrf = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('abstractflow_gateway_csrf='))
+    ?.slice('abstractflow_gateway_csrf='.length);
+  return csrf ? decodeURIComponent(csrf) : null;
+}
+
+/**
+ * The kit's GatewayFetch for the Docs assistant (panel-chat
+ * DocsAssistantDrawer): this app's proxy, same-origin cookie, CSRF on writes.
+ * It returns the Response as is (the kit reads errors and SSE streams itself)
+ * and sets no timeout (an answer may stream for minutes; the kit stops it).
+ */
+export function docsGatewayFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const url = gatewayRequestPath(path);
+  const headers = new Headers(init.headers || {});
+  const csrf = flowCsrfHeader(url, String(init.method || 'GET').toUpperCase());
+  if (csrf && !headers.has('X-AbstractFlow-CSRF')) headers.set('X-AbstractFlow-CSRF', csrf);
+  return fetch(url, { ...init, headers, credentials: 'same-origin' });
+}
+
 export async function gatewayFetch(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<Response> {
   const timeoutMs = typeof init?.timeoutMs === 'number' ? init.timeoutMs : 30_000;
   const controller = typeof AbortController !== 'undefined' && timeoutMs > 0 ? new AbortController() : null;
@@ -1103,18 +1128,8 @@ export async function gatewayFetch(path: string, init?: RequestInit & { timeoutM
   const method = String(fetchInit.method || 'GET').toUpperCase();
   const headers = new Headers(fetchInit.headers || {});
   const url = gatewayRequestPath(path);
-  if (
-    url.startsWith('api/gateway/') &&
-    ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
-    !headers.has('X-AbstractFlow-CSRF')
-  ) {
-    const csrf = document.cookie
-      .split(';')
-      .map((part) => part.trim())
-      .find((part) => part.startsWith('abstractflow_gateway_csrf='))
-      ?.slice('abstractflow_gateway_csrf='.length);
-    if (csrf) headers.set('X-AbstractFlow-CSRF', decodeURIComponent(csrf));
-  }
+  const csrf = headers.has('X-AbstractFlow-CSRF') ? null : flowCsrfHeader(url, method);
+  if (csrf) headers.set('X-AbstractFlow-CSRF', csrf);
   const mergedSignal = signal || controller?.signal;
   let res: Response;
   try {

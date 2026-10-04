@@ -11,6 +11,8 @@ import {
   type GatewayConnectionStatus,
 } from './components/GatewayConnectionModal';
 import { AuthoringAssistantDrawer } from './components/AuthoringAssistantDrawer';
+import { FlowDocsAssistant } from './components/FlowDocsAssistant';
+import { FlowLoadingScreen } from './components/FlowLoadingScreen';
 import { FunctionsDrawer } from './components/FunctionsDrawer';
 import { NodePalette } from './components/NodePalette';
 import { PropertiesPanel } from './components/PropertiesPanel';
@@ -77,6 +79,9 @@ function App() {
     legacyKey: 'abstractflow_ui_settings_v1',
   });
   const [show_appearance, set_show_appearance] = useState(false);
+  // The Docs assistant (round 8): the kit's shared drawer on Flow's llms.txt.
+  const [docs_open, set_docs_open] = useState(false);
+  const header_ref = useRef<HTMLElement | null>(null);
   // About dialog (identity + gateway versions fetched when it opens).
   const about_action = useAboutAction();
   const [show_connection, set_show_connection] = useState(false);
@@ -343,7 +348,7 @@ function App() {
   return (
     <div className="app-container">
       {/* Header */}
-      <header className="app-header">
+      <header className="app-header" ref={header_ref}>
         <button
           type="button"
           ref={palette_toggle_ref}
@@ -369,6 +374,7 @@ function App() {
         {/* The unified upper-right cluster (same order in every
           * AbstractFramework app): assistant → appearance → about → [gpu] → Disconnect. */}
         <AfTopBarActions
+          docs={{ open: docs_open, onToggle: () => set_docs_open((v) => !v), label: 'Docs assistant' }}
           assistant={{
             open: assistant_open,
             onToggle: toggle_assistant_drawer,
@@ -455,6 +461,7 @@ function App() {
       <main
         className={`app-main ${right_drawer_open ? 'properties-open' : 'properties-collapsed'}`}
       >
+        <FlowLoadingScreen />
         {/* Left sidebar - Node palette (a drawer below 1024 px) */}
         <aside
           id="node-palette-drawer"
@@ -541,6 +548,12 @@ function App() {
         <span>AbstractFlow Visual Editor v0.1.0</span>
       </footer>
 
+      <FlowDocsAssistant
+        open={docs_open}
+        onClose={() => set_docs_open(false)}
+        connected={gateway_connected}
+        headerRef={header_ref}
+      />
       <AfAppearanceDialog
         open={show_appearance}
         value={appearance}
