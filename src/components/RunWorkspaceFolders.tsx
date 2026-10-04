@@ -44,7 +44,6 @@ export function RunWorkspaceFolders(props: {
       live = false;
     };
     // `value` is identified by `valueKey`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, valueKey, request]);
   // A change is dry-run first: a refusal rejects (the kit shows the sentence) and the value stays.
   const change = useCallback(

@@ -804,7 +804,6 @@ export function Toolbar() {
     const link = parseBundleDeepLink(typeof window !== 'undefined' ? window.location.search : '');
     if (!link || 'error' in link || deepLinkSignalRef.current) return;
     deepLinkSignalRef.current = beginFlowLoading(deepLinkLoadingName(link));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     if (deepLinkHandledRef.current || gatewayCapabilitiesQuery.isLoading) return;
