@@ -5426,7 +5426,7 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-10-05
 
 ### Changed
 
@@ -5437,20 +5437,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Run window → **File System Access** is the kit `WorkspaceChooser` (ui-kit 0.8.3) at the run level: "Gateway: <the admin's eligible workspaces>" on top, **Use my default** (on by default), the posture, each workspace with Read-only / Read & write / Refused (a mode above the gateway's cap disabled), **Add a workspace path** and the effective line — the same words as the gateway console, AbstractCode, Observer and the AbstractAssistant. Each change is checked by the gateway (`POST /api/gateway/workspace/effective/me`, nothing stored); a refusal shows its sentence with "Not saved.". The run's workspaces ride the run-start body as `workspace: {posture, default_mode, folders}` (nothing when **Use my default** is on), never `input_data`. Requires the AbstractGateway round-11 workspace model.
 - A workspace refusal at run start (`{"detail": {"reason": "workspace_refused", "message"}}`) is shown as the gateway's sentence, without the HTTP prefix.
 - Run window wording: **Private workspace per run** (was "New folder per run"), **Run workspace** (was "Workspace folder").
-
-### Removed
-
-- The run window's **Access mode** select and **Ignored folders** list, and the `workspace_access_mode` / `workspace_ignored_paths` parameters the server-file browser and artifact import sent (the gateway scopes them to your folders).
-
-## [0.8.0] - 2026-10-04
-
-### Added
-
-- **Docs assistant** (book icon in the top bar, beside the Authoring assistant): the kit's shared `DocsAssistantDrawer`, the same chat as the gateway console and the other apps, answering from AbstractFlow's llms.txt (served by this app at `/llms.txt`, read by the gateway at `docs/corpus?app=flow`) through the gateway's docs-qa workflow, with attachments, streaming, copy and an icon-only New conversation. See [Web Editor](docs/web-editor.md#docs-assistant).
-- **A loading screen while a flow opens** from a `?bundle=` link or **Open**: the flow's name and **Cancel** (or Esc), which stops the gateway requests and keeps the flow you had. See [Web Editor](docs/web-editor.md#open-a-gateway-workflow-from-a-link).
-
-### Changed
-
 - **About is the shared compact kit card.** The top-bar About opens ui-kit's `AfAboutDialog`: AbstractFlow
   name and version, the AbstractFramework and AbstractGateway versions, links (website, source, docs,
   issues, feedback, contact) and one author/licence line. It no longer lists the gateway's package
@@ -5462,6 +5448,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   total time) in place of the browser's bare audio controls. See [Architecture](docs/architecture.md#audio-previews).
 - The footer prints the editor's real version (from package.json, the same source as About) instead of a fixed "v0.1.0".
 - Dependencies: `@abstractframework/ui-kit` ^0.8.0 and, new, `@abstractframework/panel-chat` ^0.4.0.
+
+### Removed
+
+- The run window's **Access mode** select and **Ignored folders** list, and the `workspace_access_mode` / `workspace_ignored_paths` parameters the server-file browser and artifact import sent (the gateway scopes them to your folders).
+
+### Added
+
+- **Docs assistant** (book icon in the top bar, beside the Authoring assistant): the kit's shared `DocsAssistantDrawer`, the same chat as the gateway console and the other apps, answering from AbstractFlow's llms.txt (served by this app at `/llms.txt`, read by the gateway at `docs/corpus?app=flow`) through the gateway's docs-qa workflow, with attachments, streaming, copy and an icon-only New conversation. See [Web Editor](docs/web-editor.md#docs-assistant).
+- **A loading screen while a flow opens** from a `?bundle=` link or **Open**: the flow's name and **Cancel** (or Esc), which stops the gateway requests and keeps the flow you had. See [Web Editor](docs/web-editor.md#open-a-gateway-workflow-from-a-link).
 
 ## [0.7.0] - 2026-10-01
 
