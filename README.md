@@ -101,8 +101,11 @@ the context mode, and default inputs that an automation created from the
 published workflow starts with. See
 [Web editor > Automation Defaults](docs/web-editor.md#automation-defaults).
 
-The About button in the top bar shows the AbstractFlow version and the versions
-the connected Gateway reports.
+The About button in the top bar opens the shared AbstractFramework About card:
+the AbstractFlow version, the AbstractFramework and AbstractGateway versions the
+connected Gateway reports, the project links and the licence line. Audio
+artifacts play in the shared ui-kit waveform player. See
+[Web editor > About](docs/web-editor.md#about).
 
 ## Gateway Setup
 

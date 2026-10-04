@@ -208,7 +208,7 @@ See [API and contracts > Proxy Contract](api.md#proxy-contract).
 ## About Dialog
 
 The top bar's About button uses the shared AbstractFramework About card
-(`AfAboutDialog`, ui-kit 0.7.0). The AbstractFlow version is injected from
+(`AfAboutDialog`, ui-kit 0.8.0). The AbstractFlow version is injected from
 `package.json` at build time; the framework and gateway versions come from
 `GET /api/gateway/about` when the dialog opens and are picked by the ui-kit
 `aboutVersionsFromGateway` helper, the same way in every AbstractFramework app.
@@ -217,7 +217,7 @@ About never lists per-package versions.
 ## Audio Previews
 
 Audio artifacts (the artifact player and the run modal's generated-audio card)
-play in the ui-kit waveform player (`AfAudioPlayer`, ui-kit 0.7.0): play/pause,
+play in the ui-kit waveform player (`AfAudioPlayer`, ui-kit 0.8.0): play/pause,
 a waveform you click, drag or arrow-key to seek, and elapsed / total time. Flow
 fetches the bytes with its Gateway credentials and passes an object URL; when
 the browser cannot decode the waveform the bars stay flat and the audio still

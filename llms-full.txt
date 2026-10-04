@@ -107,8 +107,11 @@ the context mode, and default inputs that an automation created from the
 published workflow starts with. See
 [Web editor > Automation Defaults](docs/web-editor.md#automation-defaults).
 
-The About button in the top bar shows the AbstractFlow version and the versions
-the connected Gateway reports.
+The About button in the top bar opens the shared AbstractFramework About card:
+the AbstractFlow version, the AbstractFramework and AbstractGateway versions the
+connected Gateway reports, the project links and the licence line. Audio
+artifacts play in the shared ui-kit waveform player. See
+[Web editor > About](docs/web-editor.md#about).
 
 ## Gateway Setup
 
@@ -4003,7 +4006,7 @@ See [API and contracts > Proxy Contract](api.md#proxy-contract).
 ## About Dialog
 
 The top bar's About button uses the shared AbstractFramework About card
-(`AfAboutDialog`, ui-kit 0.7.0). The AbstractFlow version is injected from
+(`AfAboutDialog`, ui-kit 0.8.0). The AbstractFlow version is injected from
 `package.json` at build time; the framework and gateway versions come from
 `GET /api/gateway/about` when the dialog opens and are picked by the ui-kit
 `aboutVersionsFromGateway` helper, the same way in every AbstractFramework app.
@@ -4012,7 +4015,7 @@ About never lists per-package versions.
 ## Audio Previews
 
 Audio artifacts (the artifact player and the run modal's generated-audio card)
-play in the ui-kit waveform player (`AfAudioPlayer`, ui-kit 0.7.0): play/pause,
+play in the ui-kit waveform player (`AfAudioPlayer`, ui-kit 0.8.0): play/pause,
 a waveform you click, drag or arrow-key to seek, and elapsed / total time. Flow
 fetches the bytes with its Gateway credentials and passes an object URL; when
 the browser cannot decode the waveform the bars stay flat and the audio still
@@ -5355,18 +5358,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-04
+
 ### Changed
 
 - **About is the shared compact kit card.** The top-bar About opens ui-kit's `AfAboutDialog`: AbstractFlow
   name and version, the AbstractFramework and AbstractGateway versions, links (website, source, docs,
   issues, feedback, contact) and one author/licence line. It no longer lists the gateway's package
   versions. A failed `GET /api/gateway/about` reads `unavailable (...)` in place of the gateway version.
-  `useAboutAction()` now returns `{ identity, versions, onOpen }` (`fetchGatewayAboutVersions` replaces
+  `useAboutAction()` returns `{ identity, versions, onOpen }` (`fetchGatewayAboutVersions` replaces
   `fetchGatewayAboutRows`). See [Web Editor](docs/web-editor.md#about).
 - **Audio previews use the shared waveform player.** The artifact player and the run modal's generated-audio
   card play audio in ui-kit's `AfAudioPlayer` (play/pause, click/drag/arrow-key seek on a waveform, elapsed /
-  total time) instead of the browser's bare audio controls. See [Architecture](docs/architecture.md#audio-previews).
-- Requires `@abstractframework/ui-kit` 0.7.0.
+  total time) in place of the browser's bare audio controls. See [Architecture](docs/architecture.md#audio-previews).
+- Dependencies: `@abstractframework/ui-kit` ^0.8.0.
 
 ## [0.7.0] - 2026-10-01
 
