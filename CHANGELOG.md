@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.0] - 2026-10-04
 
+### Added
+
+- **Docs assistant** (book icon in the top bar, beside the Authoring assistant): the kit's shared `DocsAssistantDrawer`, the same chat as the gateway console and the other apps, answering from AbstractFlow's llms.txt (served by this app at `/llms.txt`, read by the gateway at `docs/corpus?app=flow`) through the gateway's docs-qa workflow, with attachments, streaming, copy and an icon-only New conversation. See [Web Editor](docs/web-editor.md#docs-assistant).
+- **A loading screen while a flow opens** from a `?bundle=` link or **Open**: the flow's name and **Cancel** (or Esc), which stops the gateway requests and keeps the flow you had. See [Web Editor](docs/web-editor.md#open-a-gateway-workflow-from-a-link).
+
 ### Changed
 
 - **About is the shared compact kit card.** The top-bar About opens ui-kit's `AfAboutDialog`: AbstractFlow
@@ -20,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Audio previews use the shared waveform player.** The artifact player and the run modal's generated-audio
   card play audio in ui-kit's `AfAudioPlayer` (play/pause, click/drag/arrow-key seek on a waveform, elapsed /
   total time) in place of the browser's bare audio controls. See [Architecture](docs/architecture.md#audio-previews).
-- Dependencies: `@abstractframework/ui-kit` ^0.8.0.
+- Dependencies: `@abstractframework/ui-kit` ^0.8.0 and, new, `@abstractframework/panel-chat` ^0.4.0.
 
 ## [0.7.0] - 2026-10-01
 

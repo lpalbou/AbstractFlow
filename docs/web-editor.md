@@ -54,6 +54,8 @@ Once signed in, Flow reads the bundle from the Gateway (`GET /api/gateway/bundle
 - Otherwise Flow opens the bundle's flow as an unsaved copy titled `<name> · <bundle_id>@<version>`. Save creates your own flow. Nothing is ever written back into the bundle.
 - A workflow that ships with the Gateway shows the notice "Shipped workflow — read-only. Save creates your own copy."
 
+While the flow loads (from a link or from **Open**), a loading screen covers the editor with the flow's name and **Cancel**. Cancel (or Esc) stops the requests to the Gateway; the editor keeps the flow it had and says so.
+
 If the workflow cannot be opened, Flow says why: "This workflow isn't on this gateway any more." when the Gateway no longer has it, the Gateway's own reason when it refuses (for example a workflow an admin made unavailable to users), and "Sign in to the gateway to open …" when the session is missing. The link is read once per page load; reloading the page opens the workflow again.
 
 ## About
@@ -211,6 +213,10 @@ The editor validates settings with a subset of JSON Schema: `type`, `properties`
 ## Hidden Connections
 
 Some workflows wire pins the editor cannot draw: a code node's returned keys and a subflow's `child_output` are resolved by name when the workflow runs, but they are not declared pins, and a few connections (for example a model into a plain string pin) are refused by the editor's connection rules. AbstractFlow keeps these connections exactly as stored and saves them back. A node that has any shows an **N hidden** badge in its header; hover it to list the connections (`source.pin -> target.pin`). They disappear from the saved workflow only when you delete one of their nodes. Opening or importing such a workflow also shows a notice listing them. Only a connection to a node that does not exist is removed, and the notice says so. Drawing these connections as editable pins is planned (backlog 0157).
+
+## Docs Assistant
+
+The book icon in the top bar opens the **Docs assistant**: the same chat as the Gateway console and the other apps, separate from the Authoring assistant below. It answers questions about AbstractFlow from its llms.txt (the editor serves it at `/llms.txt`; the Gateway reads it at `GET /api/gateway/docs/corpus?app=flow`) through the Gateway's docs-qa workflow, in its own Gateway session. Questions sit on the right and answers on the left with Markdown, code and links; you can attach files, each message has **Copy**, the answer streams when the Gateway's **Streamed replies** setting is on, and the icon in its header starts a new conversation.
 
 ## Workflow Authoring Assistant
 

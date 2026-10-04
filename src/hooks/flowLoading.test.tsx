@@ -65,6 +65,9 @@ describe('FlowLoadingScreen', () => {
     expect(toolbar).toContain('await fetchFlow(selectedFlowId, gatewayContracts, signal)');
     // Deep link: same screen, signal on every request of the loader.
     expect(toolbar).toContain('const loadingName = deepLinkLoadingName(link);');
+    // The screen shows from the first render of a deep link (before the capability probe).
+    expect(toolbar).toContain('deepLinkSignalRef.current = beginFlowLoading(deepLinkLoadingName(link));');
+    expect(toolbar).toContain('const signal = deepLinkSignalRef.current || beginFlowLoading(loadingName);');
     expect((toolbar.match(/\{ signal \}/g) || []).length).toBeGreaterThanOrEqual(2);
     expect(toolbar).toContain('return await fetchFlow(flowId, gatewayContracts, signal);');
     expect((toolbar.match(/finishFlowLoading\(signal\)/g) || []).length).toBe(2);

@@ -796,6 +796,15 @@ export function Toolbar() {
   // its capability probe. A shipped bundle opens as an unsaved copy with a banner.
   const deepLinkHandledRef = useRef(false);
   const showDeepLinkBanner = useDeepLinkBanner((s) => s.show);
+  // The loading screen shows from the first render of a deep link, not only once the
+  // gateway's capability probe answered (that probe can take a while on a busy gateway).
+  const deepLinkSignalRef = useRef<AbortSignal | null>(null);
+  useEffect(() => {
+    const link = parseBundleDeepLink(typeof window !== 'undefined' ? window.location.search : '');
+    if (!link || 'error' in link || deepLinkSignalRef.current) return;
+    deepLinkSignalRef.current = beginFlowLoading(deepLinkLoadingName(link));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (deepLinkHandledRef.current || gatewayCapabilitiesQuery.isLoading) return;
     const link = parseBundleDeepLink(typeof window !== 'undefined' ? window.location.search : '');
@@ -806,7 +815,11 @@ export function Toolbar() {
       return;
     }
     const loadingName = deepLinkLoadingName(link);
-    const signal = beginFlowLoading(loadingName);
+    const signal = deepLinkSignalRef.current || beginFlowLoading(loadingName);
+    if (signal.aborted) {
+      toast(`Stopped opening ${loadingName}. Open it again from the console or the flow library.`);
+      return;
+    }
     void (async () => {
       try {
         const res = await loadBundleDeepLink(link, {
