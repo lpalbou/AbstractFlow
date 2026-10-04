@@ -17,8 +17,6 @@ type WorkspacePathInputFieldProps = {
   gatewayContracts: GatewayContracts | null | undefined;
   disabled?: boolean;
   workspaceRoot?: string;
-  workspaceAccessMode?: string;
-  workspaceIgnoredPaths?: string[];
 };
 
 type WorkspaceListItem = {
@@ -45,8 +43,6 @@ export function WorkspacePathInputField({
   gatewayContracts,
   disabled = false,
   workspaceRoot = '',
-  workspaceAccessMode = '',
-  workspaceIgnoredPaths = [],
 }: WorkspacePathInputFieldProps) {
   const [browsePath, setBrowsePath] = useState(kind === 'folder' ? value : parentFolder(value));
   const [query, setQuery] = useState('');
@@ -70,11 +66,10 @@ export function WorkspacePathInputField({
     ? 'Flow receives a canonical server workspace folder path.'
     : 'Flow receives a canonical server workspace file path.';
   const accessSummary = useMemo(() => {
-    const mode = String(workspaceAccessMode || 'workspace_only').trim() || 'workspace_only';
-    const ignored = workspaceIgnoredPaths.length > 0 ? `${workspaceIgnoredPaths.length} ignored path${workspaceIgnoredPaths.length === 1 ? '' : 's'}` : 'no ignored paths';
-    if (workspaceRoot.trim()) return `${mode} under ${workspaceRoot.trim()} (${ignored}).`;
-    return `${mode} with the gateway-managed run workspace (${ignored}).`;
-  }, [workspaceAccessMode, workspaceIgnoredPaths, workspaceRoot]);
+    // Round 9: the run's folders are the account's workspace folders (File System Access).
+    if (workspaceRoot.trim()) return `In ${workspaceRoot.trim()} or another of your workspace folders.`;
+    return "In the run's private folder or one of your workspace folders.";
+  }, [workspaceRoot]);
 
   useEffect(() => {
     if (!browseAvailable || disabled) return;
@@ -88,8 +83,6 @@ export function WorkspacePathInputField({
       limit: 200,
       query: query.trim() || undefined,
       workspace_root: workspaceRoot.trim() || undefined,
-      workspace_access_mode: workspaceAccessMode.trim() || undefined,
-      workspace_ignored_paths: workspaceIgnoredPaths.length > 0 ? workspaceIgnoredPaths.join('\n') : undefined,
     });
     gatewayJson<{ items?: WorkspaceListItem[] }>(endpoint)
       .then((payload) => {
@@ -114,8 +107,6 @@ export function WorkspacePathInputField({
     kind,
     listDescriptor,
     query,
-    workspaceAccessMode,
-    workspaceIgnoredPaths,
     workspaceRoot,
   ]);
 

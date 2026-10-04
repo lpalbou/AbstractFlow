@@ -490,6 +490,15 @@ Flow uses one explicit source model for file-like work:
   `Workspace File` / `Workspace Folder` path such as `docs/report.md` or
   `mount_alias/reports`.
 
+**File System Access** in the run window is the kit `WorkspaceChooser`, the same
+folder model and words as the gateway console, AbstractCode, Observer and the
+AbstractAssistant: the shared workspace (always on) and your account's other
+folders as switches (`GET /api/gateway/workspace/policy/me`), with "Agents may
+use: …". The run follows your account's folders until you change a switch; the
+chosen set rides as `input_data.workspace_allowed_paths` and the gateway refuses
+a folder outside your account's folders (round 9: no access modes, no ignored
+folders per run).
+
 The run modal and node defaults expose workspace path browsing for
 `Workspace File` / `Workspace Folder` pins, plus artifact-backed local intake
 for one file, many files, or one or more local folders. Typical graph patterns are:

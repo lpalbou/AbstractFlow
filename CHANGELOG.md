@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Run window → **File System Access** is the kit `WorkspaceChooser` (ui-kit 0.8.1): the shared workspace (always on) and your account's folders as switches, the gateway's "Agents may use: …" line, the same model and words as the gateway console, AbstractCode, Observer and the AbstractAssistant. The run follows your account's folders until you change a switch; the chosen set rides as `input_data.workspace_allowed_paths`. Requires the gateway's round-9 workspace model.
+
+### Removed
+
+- The run window's **Access mode** select and **Ignored folders** list, and the `workspace_access_mode` / `workspace_ignored_paths` parameters the server-file browser and artifact import sent (the gateway scopes them to your folders).
+
 ## [0.8.0] - 2026-10-04
 
 ### Added

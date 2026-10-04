@@ -30,8 +30,6 @@ type ArtifactInputFieldProps = {
   gatewayContracts: GatewayContracts | null | undefined;
   disabled?: boolean;
   workspaceRoot?: string;
-  workspaceAccessMode?: string;
-  workspaceIgnoredPaths?: string[];
 };
 
 type SourceMode = 'upload' | 'workspace' | 'existing';
@@ -169,8 +167,6 @@ export function ArtifactInputField({
   gatewayContracts,
   disabled = false,
   workspaceRoot = '',
-  workspaceAccessMode = '',
-  workspaceIgnoredPaths = [],
 }: ArtifactInputFieldProps) {
   const [mode, setMode] = useState<SourceMode>('existing');
   const [selectionSource, setSelectionSource] = useState<SourceMode | null>(null);
@@ -330,8 +326,6 @@ export function ArtifactInputField({
         pin_id: pin.id,
       };
       if (workspaceRoot.trim()) payload.workspace_root = workspaceRoot.trim();
-      if (workspaceAccessMode.trim()) payload.workspace_access_mode = workspaceAccessMode.trim();
-      if (workspaceIgnoredPaths.length > 0) payload.workspace_ignored_paths = workspaceIgnoredPaths.join('\n');
       const url = endpointFromDescriptor(importDescriptor, 'api/gateway/artifacts/import');
       const ref = artifactRefFromUploadResponse(
         await gatewayJson<Record<string, unknown>>(url, { ...jsonRequest(payload, { method: 'POST' }), timeoutMs: 0 })
@@ -457,8 +451,6 @@ export function ArtifactInputField({
             gatewayContracts={gatewayContracts}
             disabled={disabled || busy || !importAvailable || !sessionId.trim()}
             workspaceRoot={workspaceRoot}
-            workspaceAccessMode={workspaceAccessMode}
-            workspaceIgnoredPaths={workspaceIgnoredPaths}
           />
           <button
             type="button"

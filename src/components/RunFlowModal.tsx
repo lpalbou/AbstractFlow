@@ -19,6 +19,7 @@ import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
+import { RunWorkspaceFolders } from './RunWorkspaceFolders';
 import { AF_MEDIA, AfAudioPlayer, AfSwitch, SteerComposer, SpeculationSelect, useAfMedia, type SpeculationValue } from '@abstractframework/ui-kit';
 import { ListDisclosure } from './ListDisclosure';
 import { useListOpen } from '../utils/listOpen';
@@ -2058,10 +2059,8 @@ export function RunFlowModal({
   const [workspaceRandom, setWorkspaceRandom] = useState(true);
   const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [manualWorkspaceRoot, setManualWorkspaceRoot] = useState('');
-  type WorkspaceAccessMode = 'workspace_only' | 'workspace_or_allowed' | 'all_except_ignored';
-  const [workspaceAccessMode, setWorkspaceAccessMode] = useState<WorkspaceAccessMode>('workspace_only');
-  const [workspaceIgnoredPathsText, setWorkspaceIgnoredPathsText] = useState('');
-  const [showIgnoredPaths, setShowIgnoredPaths] = useState(false);
+  // Round 9: the run's folders (kit WorkspaceChooser); null = follows the account.
+  const [workspaceFolders, setWorkspaceFolders] = useState<string[] | null>(null);
   const [sessionIdOverride, setSessionIdOverride] = useState('');
   const [showSessionEdit, setShowSessionEdit] = useState(false);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -2269,14 +2268,6 @@ export function RunFlowModal({
   const promptCacheSessionIdRaw = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
   const promptCacheSessionId = String(promptCacheSessionIdRaw || '').trim() || derivedSessionId;
   const artifactSessionId = String(promptCacheSessionIdRaw || '').trim() || derivedSessionId || stableSessionId || '';
-  const workspaceIgnoredPaths = useMemo(
-    () =>
-      String(workspaceIgnoredPathsText || '')
-        .split('\n')
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0),
-    [workspaceIgnoredPathsText]
-  );
   const promptCacheEnabled = Boolean(promptCacheSessionLifecycle && promptCacheProvider && promptCacheModel && promptCacheSessionId);
   const promptCacheResultUnavailable = Boolean(
     promptCacheResult && (promptCacheResult.ok === false || promptCacheResult.supported === false)
@@ -2499,56 +2490,11 @@ export function RunFlowModal({
     typeof workspacePolicy?.target === 'string' && workspacePolicy?.target.trim()
       ? workspacePolicy.target.trim()
       : 'server';
-  const workspaceOverridesAllowed = workspacePolicy?.client_workspace_scope_overrides === true;
   const workspacePolicyLoading = executionWorkspaceQuery.isLoading;
   const workspaceInputEnabled = workspacePolicyLoading
     ? true
-    : workspacePolicyTarget !== 'server' || workspaceOverridesAllowed;
+    : true; // round 9: the gateway checks the folder against the account's folders
   const workspaceRootRequired = workspacePolicyLoading ? false : workspacePolicyTarget !== 'server';
-  const ignoredPathsCount = useMemo(() => {
-    return String(workspaceIgnoredPathsText || '')
-      .split('\n')
-      .filter((line) => line.trim()).length;
-  }, [workspaceIgnoredPathsText]);
-  const allowedAccessModes = useMemo(() => {
-    const raw = workspacePolicy?.allowed_access_modes;
-    let modes: string[] | null = null;
-    if (Array.isArray(raw)) {
-      const cleaned = raw.filter((v) => typeof v === 'string' && v.trim()).map((v) => v.trim());
-      if (cleaned.length > 0) {
-        modes = cleaned;
-      } else {
-        console.warn('#FALLBACK: workspace policy allowed_access_modes is empty; using defaults');
-      }
-    } else if (raw !== undefined) {
-      console.warn('#FALLBACK: workspace policy allowed_access_modes is invalid; using defaults');
-    }
-    if (!modes) {
-      modes = workspaceOverridesAllowed
-        ? ['workspace_only', 'workspace_or_allowed', 'all_except_ignored']
-        : ['workspace_only', 'workspace_or_allowed'];
-    }
-    return modes;
-  }, [workspaceOverridesAllowed, workspacePolicy]);
-  const workspaceAccessModeOptions = useMemo(() => {
-    const labels: Record<string, string> = {
-      workspace_only: 'workspace_only (restrict to workspace_root)',
-      workspace_or_allowed: 'workspace_or_allowed (allow server-approved mounts)',
-      all_except_ignored: 'all_except_ignored (allow absolute paths outside workspace_root)',
-    };
-    return allowedAccessModes.map((mode) => ({
-      value: mode,
-      label: labels[mode] || mode,
-    }));
-  }, [allowedAccessModes]);
-
-  useEffect(() => {
-    if (allowedAccessModes.includes(workspaceAccessMode)) return;
-    const next = (allowedAccessModes[0] || 'workspace_only') as WorkspaceAccessMode;
-    console.warn(`#FALLBACK: workspace_access_mode not allowed; resetting to '${next}'`);
-    setWorkspaceAccessMode(next);
-  }, [allowedAccessModes, workspaceAccessMode]);
-
   useEffect(() => {
     if (workspaceInputEnabled) return;
     // Even when client overrides are disabled, the gateway uses a per-run workspace by default.
@@ -2918,10 +2864,7 @@ export function RunFlowModal({
         console.warn('#FALLBACK: workspace_root ignored because gateway policy disallows client overrides');
       }
     }
-    inputData.workspace_access_mode = workspaceAccessMode;
-    if (workspaceIgnoredPaths.length > 0) {
-      inputData.workspace_ignored_paths = workspaceIgnoredPaths;
-    }
+    if (workspaceFolders !== null) inputData.workspace_allowed_paths = workspaceFolders;
 
     const sessionValue = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
     const sessionIdRaw = typeof sessionValue === 'string' ? sessionValue.trim() : '';
@@ -2963,8 +2906,7 @@ export function RunFlowModal({
     onRun,
     toolsValues,
     visibleFormInputPins,
-    workspaceAccessMode,
-    workspaceIgnoredPaths,
+    workspaceFolders,
     workspaceInputEnabled,
     workspaceRoot,
     followUpContext,
@@ -7810,8 +7752,7 @@ export function RunFlowModal({
                           File System Access
                         </span>
                         <span className="run-form-section-meta">
-                          {workspaceAccessMode}
-                          {ignoredPathsCount > 0 ? ` · ${ignoredPathsCount} ignored` : ''}
+                          {workspaceFolders === null ? 'Your workspace folders' : `${workspaceFolders.length} chosen`}
                         </span>
                       </summary>
                       <div className="run-form-section-body">
@@ -7819,30 +7760,12 @@ export function RunFlowModal({
                           These workspace settings govern Server File imports and Read File/Write File path nodes. Local File uploads become saved artifacts and do not use workspace paths.
                         </p>
                         <div className="run-form-field">
-                          <label className="run-form-label">
-                            Access mode
-                            <span className="run-form-type">(workspace_access_mode)</span>
-                          </label>
-                          <AfSelect
-                            value={workspaceAccessMode}
-                            placeholder="workspace_only"
-                            options={workspaceAccessModeOptions}
-                            searchable={false}
+                          <RunWorkspaceFolders
+                            enabled={isOpen}
+                            selection={workspaceFolders}
+                            onSelectionChange={setWorkspaceFolders}
                             disabled={isRunning}
-                            onChange={(v) => {
-                              const next = typeof v === 'string' ? v.trim() : '';
-                              if (allowedAccessModes.includes(next)) {
-                                setWorkspaceAccessMode(next as WorkspaceAccessMode);
-                              } else if (allowedAccessModes.length > 0) {
-                                const fallback = allowedAccessModes[0] as WorkspaceAccessMode;
-                                console.warn(`#FALLBACK: workspace_access_mode not allowed; resetting to '${fallback}'`);
-                                setWorkspaceAccessMode(fallback);
-                              }
-                            }}
                           />
-                          <p className="run-form-note run-form-note-compact">
-                            Relative paths resolve under workspace root. This only affects absolute paths.
-                          </p>
                         </div>
 
                         <div className="run-form-field">
@@ -7904,39 +7827,6 @@ export function RunFlowModal({
                           ) : null}
                         </div>
 
-                        <div className="run-form-field">
-                          <div className="run-form-label-row">
-                            <label className="run-form-label">
-                              Ignored folders
-                              <span className="run-form-type">(workspace_ignored_paths)</span>
-                            </label>
-                            <button
-                              type="button"
-                              className="run-form-action"
-                              onClick={() => setShowIgnoredPaths((prev) => !prev)}
-                              disabled={isRunning}
-                              aria-expanded={showIgnoredPaths}
-                            >
-                              {showIgnoredPaths ? 'Hide' : `Edit${ignoredPathsCount > 0 ? ` (${ignoredPathsCount})` : ''}`}
-                            </button>
-                          </div>
-
-                          {showIgnoredPaths ? (
-                            <>
-                              <textarea
-                                className="run-form-input run-form-textarea"
-                                value={workspaceIgnoredPathsText}
-                                onChange={(e) => setWorkspaceIgnoredPathsText(e.target.value)}
-                                placeholder={'.git\nnode_modules\n.venv\n~/Library\n~/.ssh'}
-                                rows={4}
-                                disabled={isRunning}
-                              />
-                              <p className="run-form-note">
-                                One path per line. Relative entries are resolved under workspace root.
-                              </p>
-                            </>
-                          ) : null}
-                        </div>
                       </div>
                     </details>
 
@@ -7993,8 +7883,6 @@ export function RunFlowModal({
                                   gatewayContracts={gatewayContracts}
                                   disabled={isRunning}
                                   workspaceRoot={workspaceRoot}
-                                  workspaceAccessMode={workspaceAccessMode}
-                                  workspaceIgnoredPaths={workspaceIgnoredPaths}
                                   onChange={(ref: CanonicalArtifactRef | null) =>
                                     handleFieldChange(pin.id, ref ? JSON.stringify(ref, null, 2) : '')
                                   }
@@ -8038,8 +7926,6 @@ export function RunFlowModal({
                                   gatewayContracts={gatewayContracts}
                                   disabled={isRunning}
                                   workspaceRoot={workspaceRoot}
-                                  workspaceAccessMode={workspaceAccessMode}
-                                  workspaceIgnoredPaths={workspaceIgnoredPaths}
                                   onChange={(next) => handleFieldChange(pin.id, next)}
                                 />
                               </div>
