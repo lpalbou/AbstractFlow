@@ -2,7 +2,6 @@
 // rows and words as the console, Code, Observer and the Assistant); the run's
 // chosen folders ride input_data.workspace_allowed_paths; no access modes or
 // ignored-folder lists; no policy logic in Flow.
-import React from 'react';
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
