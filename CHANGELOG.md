@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Run window → **File System Access** is the kit `WorkspaceChooser` (ui-kit 0.8.1): the gateway's posture, the shared workspace (always on, Read & write) and your account's workspaces as switches with their mode, plus the gateway's line — the same model and words as the gateway console, AbstractCode, Observer and the AbstractAssistant. The run follows your account's workspaces until you change a switch; the chosen set rides as `input_data.workspace_allowed_paths`. Requires the gateway's round-9 workspace model.
+- Run window → **File System Access** is the kit `WorkspaceChooser` (ui-kit 0.8.2) at the run level: "Gateway: <the admin's eligible workspaces>" on top, **Use my default** (on by default), the posture, each workspace with Read-only / Read & write / Refused (a mode above the gateway's cap disabled), **Add a workspace path** and the effective line — the same words as the gateway console, AbstractCode, Observer and the AbstractAssistant. Each change is checked by the gateway (`POST /api/gateway/workspace/effective/me`, nothing stored); a refusal shows its sentence with "Not saved.". The run's workspaces ride the run-start body as `workspace: {posture, default_mode, folders}` (nothing when **Use my default** is on), never `input_data`. Requires the AbstractGateway round-11 workspace model.
+- A workspace refusal at run start (`{"detail": {"reason": "workspace_refused", "message"}}`) is shown as the gateway's sentence, without the HTTP prefix.
+- Run window wording: **Private workspace per run** (was "New folder per run"), **Run workspace** (was "Workspace folder").
 
 ### Removed
 

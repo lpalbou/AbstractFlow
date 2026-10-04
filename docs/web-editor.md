@@ -129,10 +129,10 @@ On/off settings are switches labelled by what they control; a switch is
 highlighted with a check mark when on and plain when off. The properties
 panel has **Structured output** (Agent), **Recurrent** (On Schedule) and
 **Free text answers** (Ask User). The dialogs have **Reload gateway bundles**
-(Publish), **New folder per run** (the run window's workspace folder),
+(Publish), **Private workspace per run** (the run window's run workspace),
 **Durable** (sending an event to a waiting run), and **Lock after load** and
 **Cached and non-resident models** (Resources). When a switch cannot change,
-it says why next to it: **New folder per run** is fixed while the gateway
+it says why next to it: **Private workspace per run** is fixed while the gateway
 manages the workspace or a run is in progress. Pause and Resume on a running
 run are buttons, because they act on the run once.
 
@@ -490,15 +490,22 @@ Flow uses one explicit source model for file-like work:
   `Workspace File` / `Workspace Folder` path such as `docs/report.md` or
   `mount_alias/reports`.
 
-**File System Access** in the run window is the kit `WorkspaceChooser`, the same
-model and words as the gateway console, AbstractCode, Observer and the
-AbstractAssistant: the gateway's posture ("Deny everything, allow listed
-workspaces" / "Allow everything, refuse listed workspaces"), the shared workspace
-(always on, Read & write) and your account's workspaces as switches with their
-mode (`GET /api/gateway/workspace/policy/me`), with the gateway's line. The run
-follows your account's workspaces until you change a switch; the chosen set rides
-as `input_data.workspace_allowed_paths` and the gateway refuses a workspace its
-posture does not reach (round 9: no access modes, no ignored list per run).
+**File System Access** in the run window is the kit `WorkspaceChooser` for THIS
+run, the same words as the gateway console, AbstractCode, Observer and the
+AbstractAssistant: the gateway's line on top ("Gateway: …", the eligible
+workspaces the admin allows), **Use my default** (on by default: the run uses
+your account's default workspaces), the posture ("Deny everything, allow listed
+workspaces" / "Allow everything, refuse listed workspaces"), each workspace with
+Read & write / Read-only / Refused (a mode above the gateway's cap is disabled,
+with the tooltip "The gateway allows this workspace read-only"), **Add a workspace
+path**, and the effective line. Turning **Use my default** off starts from your
+default; each change is checked by the gateway (`POST
+/api/gateway/workspace/effective/me`, nothing stored) and a refused one shows the
+gateway's sentence with "Not saved.". When you run, the choice rides the run-start
+body as `workspace: {posture, default_mode, folders}`; with **Use my default** on
+nothing is sent and the gateway applies your default. The gateway clamps the run to
+the eligible workspaces and refuses a wider request with its sentence, shown as is.
+The run's private workspace (**Run workspace** below) is always Read & write.
 
 The run modal and node defaults expose workspace path browsing for
 `Workspace File` / `Workspace Folder` pins, plus artifact-backed local intake
