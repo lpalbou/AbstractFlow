@@ -15,6 +15,15 @@ const app = readFileSync(resolve(__dirname, '../App.tsx'), 'utf8');
 
 afterEach(() => useFlowLoading.getState().cancel());
 
+describe('footer version', () => {
+  it('prints the package.json version (the About source), never a hard-coded one', () => {
+    const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf8'));
+    expect(app).toContain('AbstractFlow Visual Editor v{APP_VERSION}');
+    expect(app).not.toMatch(/Visual Editor v\d/);
+    expect(pkg.version).toMatch(/^\d+\.\d+\.\d+/);
+  });
+});
+
 describe('flow loading state', () => {
   it('begin shows the name; finish clears only the current load', () => {
     const first = useFlowLoading.getState().begin('Deep research');

@@ -5382,6 +5382,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Audio previews use the shared waveform player.** The artifact player and the run modal's generated-audio
   card play audio in ui-kit's `AfAudioPlayer` (play/pause, click/drag/arrow-key seek on a waveform, elapsed /
   total time) in place of the browser's bare audio controls. See [Architecture](docs/architecture.md#audio-previews).
+- The footer prints the editor's real version (from package.json, the same source as About) instead of a fixed "v0.1.0".
 - Dependencies: `@abstractframework/ui-kit` ^0.8.0 and, new, `@abstractframework/panel-chat` ^0.4.0.
 
 ## [0.7.0] - 2026-10-01

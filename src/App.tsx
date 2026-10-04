@@ -18,7 +18,7 @@ import { NodePalette } from './components/NodePalette';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { Toolbar } from './components/Toolbar';
 import { useFlowStore } from './hooks/useFlow';
-import { useAboutAction } from './hooks/useAboutAction';
+import { APP_VERSION, useAboutAction } from './hooks/useAboutAction';
 import { useDeepLinkBanner } from './hooks/deepLinkBanner';
 import {
   AF_MEDIA,
@@ -545,7 +545,7 @@ function App() {
 
       {/* Footer */}
       <footer className="app-footer">
-        <span>AbstractFlow Visual Editor v0.1.0</span>
+        <span>AbstractFlow Visual Editor v{APP_VERSION}</span>
       </footer>
 
       <FlowDocsAssistant
