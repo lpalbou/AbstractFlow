@@ -11,7 +11,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Handle, Position, NodeProps, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import { randomId } from '@abstractframework/ui-kit';
+import { Icon, randomId } from '@abstractframework/ui-kit';
+import { nodeIconName, nodeTypeBadge } from '../../utils/nodeIcons';
 import type { FlowNodeData, JsonValue, Pin, PinType, VisualFlow } from '../../types/flow';
 import { getBundledFlow } from '../../utils/bundledFlows';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
@@ -748,6 +749,16 @@ export const BaseNode = memo(function BaseNode({
       return '';
     }
   }, [data.nodeType]);
+  // R13.3 card header: a kit icon + a type badge from the node's semantic category.
+  const nodeCategory = useMemo(() => {
+    try {
+      return getNodeTemplate(data.nodeType)?.category;
+    } catch {
+      return undefined;
+    }
+  }, [data.nodeType]);
+  const headerIcon = nodeIconName(data.nodeType, data.label, nodeCategory);
+  const typeBadge = nodeTypeBadge(nodeCategory);
 
   const { executingNodeId, disconnectPin, updateNodeData, setNodes, recentNodeIds, loopProgressByNodeId } = useFlowStore();
   // Render-fold (0156 Stage 1): reads folded onto this node's pin rows.
@@ -755,6 +766,9 @@ export const BaseNode = memo(function BaseNode({
   const flowId = useFlowStore((s) => s.flowId);
   const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
+  const isWaitingHere = useFlowStore((s) => s.waitingNodeId === id);
+  const isFailedHere = useFlowStore((s) => s.failedNodeId === id);
+  const runStatus = isFailedHere ? 'failed' : isWaitingHere ? 'waiting' : isExecuting ? 'running' : undefined;
   const isRecent = Boolean(recentNodeIds && (recentNodeIds as Record<string, true>)[id]);
   const connectionPreview = data.connectionPreview;
   // Document truth, NOT `useEdges()`: React Flow's hook returns the CANVAS
@@ -3889,16 +3903,17 @@ export const BaseNode = memo(function BaseNode({
           `flow-node--${data.nodeType}`,
           isCompactGetter && 'flow-node--compact-getter',
           selected && 'selected',
-          isExecuting && 'executing',
-          isRecent && !isExecuting && 'recent',
+          isExecuting && !isWaitingHere && 'executing',
+          isWaitingHere && 'waiting',
+          isFailedHere && 'failed',
+          isRecent && !isExecuting && !isFailedHere && 'recent',
           connectionPreview?.active && 'connection-preview-active'
         )}
+        data-run-status={runStatus || (isRecent ? 'done' : undefined)}
+        style={{ ['--node-accent' as any]: data.headerColor }}
       >
       {/* Header with execution pins */}
-      <div
-        className="node-header"
-        style={{ backgroundColor: data.headerColor }}
-      >
+      <div className="node-header">
         {/* Execution input pin (left side of header) */}
         {inputExec && (
           <div className="exec-pin exec-pin-in nodrag">
@@ -3923,11 +3938,13 @@ export const BaseNode = memo(function BaseNode({
           </div>
         )}
 
-        <span
-          className="node-icon"
-          dangerouslySetInnerHTML={{ __html: data.icon }}
-        />
-        <span className="node-title">{data.label}</span>
+        <span className="node-icon" aria-hidden="true">
+          <Icon name={headerIcon} size={14} />
+        </span>
+        <span className="node-heading">
+          <span className="node-title">{data.label}</span>
+          <span className="node-type-badge">{typeBadge}</span>
+        </span>
         {loopBadge ? <span className="node-progress-badge" title="Loop progress">{loopBadge}</span> : null}
         <HiddenConnectionsBadge nodeId={id} />
 

@@ -142,6 +142,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const edges = useFlowStore((s) => s.edges);
   const resetExecutionDecorations = useFlowStore((s) => s.resetExecutionDecorations);
   const markRecentNode = useFlowStore((s) => s.markRecentNode);
+  const setNodeRunMark = useFlowStore((s) => s.setNodeRunMark);
   const unmarkRecentNode = useFlowStore((s) => s.unmarkRecentNode);
   const markRecentEdge = useFlowStore((s) => s.markRecentEdge);
   const unmarkRecentEdge = useFlowStore((s) => s.unmarkRecentEdge);
@@ -374,6 +375,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           }
 
           lastRootNodeIdRef.current = event.nodeId;
+          setNodeRunMark('waiting', null);
           setExecutingNodeId(event.nodeId);
           break;
         case 'node_complete':
@@ -477,6 +479,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
             break;
           }
           waitingInfoRef.current = info;
+          setNodeRunMark('waiting', info.nodeId && nodeIdSet.has(info.nodeId) ? info.nodeId : null);
           setWaitingInfo(info);
           onWaiting?.(info);
           break;
@@ -492,6 +495,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           waitingInfoRef.current = null;
           break;
         case 'flow_resumed':
+          setNodeRunMark('waiting', null);
           setIsPaused(false);
           setIsWaiting(false);
           setWaitingInfo(null);
@@ -507,6 +511,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           // whole UI terminal (nulling runIdRef kills root node highlights
           // for the rest of a still-running run) — adversary find.
           if (event.runId && runIdRef.current && event.runId !== runIdRef.current) break;
+          setNodeRunMark('waiting', null);
           setIsRunning(false);
           setIsPaused(false);
           setIsWaiting(false);
@@ -522,6 +527,11 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         case 'flow_complete':
         case 'flow_error':
           if (event.runId && runIdRef.current && event.runId !== runIdRef.current) break;
+          setNodeRunMark('waiting', null);
+          if (event.type === 'flow_error') {
+            const failedAt = event.nodeId && nodeIdSet.has(event.nodeId) ? event.nodeId : lastRootNodeIdRef.current;
+            setNodeRunMark('failed', failedAt || null);
+          }
           setIsRunning(false);
           setIsWaiting(false);
           setIsPaused(false);
@@ -545,6 +555,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       isWaiting,
       markEdgeAfterglow,
       markNodeAfterglow,
+      setNodeRunMark,
       nodeById,
       nodeIdSet,
       isToolApprovalWait,

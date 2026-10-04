@@ -132,38 +132,61 @@
   z-index: 9999 !important;
 }
 
-.react-flow__node:hover .flow-node:not(.selected):not(.executing):not(.recent) {
-  border-color: rgba(192, 211, 242, 0.48);
+.react-flow__node:hover .flow-node:not(.selected):not(.executing):not(.recent):not(.waiting):not(.failed) {
+  border-color: color-mix(in srgb, var(--node-accent, #8495b4) 55%, rgba(192, 211, 242, 0.6));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 14px 32px rgba(0, 0, 0, 0.42),
-    0 0 0 1px rgba(95, 139, 206, 0.18);
+    0 0 0 1px color-mix(in srgb, var(--node-accent, #5f8bce) 30%, transparent);
 }
 
+/* Selected: the theme accent ring (reads in every theme, on any header colour). */
 .flow-node.selected {
-  border-color: rgba(192, 226, 255, 0.92);
+  border-color: var(--accent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 0 0 1px rgba(255, 255, 255, 0.2),
-    0 0 0 4px rgba(47, 140, 255, 0.25),
+    0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent),
     0 18px 38px rgba(0, 0, 0, 0.46);
 }
 
+/* Run status colours come from the theme tokens:
+ *   running = --success (pulse), done = --info (afterglow),
+ *   waiting = --warning, failed = --error. */
 .flow-node.executing {
-  border-color: var(--success);
-  /* Stronger, softer “bloom” (more like emissive glow than a hard outline). */
+  --node-status: var(--success);
+  border-color: var(--node-status);
   box-shadow:
-    0 0 0 2px rgba(39, 174, 96, 0.55),
-    0 0 22px 8px rgba(39, 174, 96, 0.18),
-    0 12px 28px rgba(39, 174, 96, 0.22);
+    0 0 0 2px color-mix(in srgb, var(--node-status) 55%, transparent),
+    0 0 22px 8px color-mix(in srgb, var(--node-status) 18%, transparent),
+    0 12px 28px color-mix(in srgb, var(--node-status) 22%, transparent);
   animation: pulse 1.05s ease-in-out infinite;
+}
+
+.flow-node.waiting {
+  --node-status: var(--warning);
+  border-color: var(--node-status);
+  border-style: dashed;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--node-status) 45%, transparent),
+    0 12px 28px color-mix(in srgb, var(--node-status) 18%, transparent);
+}
+
+.flow-node.failed {
+  --node-status: var(--error);
+  border-color: var(--node-status);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--node-status) 55%, transparent),
+    0 12px 28px color-mix(in srgb, var(--node-status) 22%, transparent);
 }
 
 /* Afterglow: keep a subtle highlight for recently executed nodes to visualize fast flows. */
 .flow-node.recent {
+  --node-status: var(--info);
   /* Smooth, progressive decay (3s) so fast flows still show an understandable trajectory. */
-  border-color: rgba(52, 152, 219, 0.62);
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.35), 0 8px 18px rgba(52, 152, 219, 0.18);
+  border-color: color-mix(in srgb, var(--node-status) 62%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--node-status) 35%, transparent),
+    0 8px 18px color-mix(in srgb, var(--node-status) 18%, transparent);
   animation: recentNodeAfterglow 3s ease-out forwards;
 }
 
@@ -171,22 +194,24 @@
   0%,
   100% {
     box-shadow:
-      0 0 0 2px rgba(39, 174, 96, 0.55),
-      0 0 22px 8px rgba(39, 174, 96, 0.18),
-      0 12px 28px rgba(39, 174, 96, 0.22);
+      0 0 0 2px color-mix(in srgb, var(--node-status) 55%, transparent),
+      0 0 22px 8px color-mix(in srgb, var(--node-status) 18%, transparent),
+      0 12px 28px color-mix(in srgb, var(--node-status) 22%, transparent);
   }
   50% {
     box-shadow:
-      0 0 0 3px rgba(39, 174, 96, 0.70),
-      0 0 34px 14px rgba(39, 174, 96, 0.22),
-      0 18px 40px rgba(39, 174, 96, 0.28);
+      0 0 0 3px color-mix(in srgb, var(--node-status) 70%, transparent),
+      0 0 34px 14px color-mix(in srgb, var(--node-status) 22%, transparent),
+      0 18px 40px color-mix(in srgb, var(--node-status) 28%, transparent);
   }
 }
 
 @keyframes recentNodeAfterglow {
   0% {
-    border-color: rgba(52, 152, 219, 0.72);
-    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.42), 0 10px 22px rgba(52, 152, 219, 0.22);
+    border-color: color-mix(in srgb, var(--node-status) 72%, transparent);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--node-status) 42%, transparent),
+      0 10px 22px color-mix(in srgb, var(--node-status) 22%, transparent);
   }
   100% {
     /* Match `.flow-node` base visuals to avoid a visible “snap” when the class is removed. */
@@ -197,33 +222,26 @@
   }
 }
 
-/* Node Header */
+/* Node card header (R13.3): one consistent treatment for every node — the
+ * node's category colour (--node-accent, from headerColor) is a top band and a
+ * tint, the icon is a monochrome kit glyph, the full title WRAPS (never an
+ * ellipsis), and a small type badge names the category. Same contrast on
+ * every header colour (no white-on-cyan / white-on-lime). */
 .node-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 7px 10px 7px 10px;
+  border-top: 3px solid var(--node-accent, #8495b4);
   border-radius: 4px 4px 0 0;
   font-weight: 600;
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
+  font-size: var(--font-size-md);
   letter-spacing: 0;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.96);
   position: relative;
   min-width: 0;
-  /* Subtle vertical sheen over the per-node headerColor; the execution view
-     header uses the same treatment so both modes feel like one system. */
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.12));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.22);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
-}
-
-/* Cyan headers (object pins) need dark text for contrast. */
-.flow-node.flow-node--literal_json .node-header,
-.flow-node.flow-node--json_schema .node-header {
-  color: #0b1320;
+  background: color-mix(in srgb, var(--node-accent, #8495b4) 24%, #23253a);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.28);
 }
 
 .node-progress-badge {
@@ -414,15 +432,46 @@
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.node-icon {
-  font-size: var(--font-size-base);
+.node-header .node-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--node-accent, #8495b4) 30%, transparent);
+  color: color-mix(in srgb, var(--node-accent, #8495b4) 45%, #ffffff);
 }
 
+.node-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Full title: wraps onto more lines, never truncated. */
 .node-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+
+.node-type-badge {
+  align-self: flex-start;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: var(--font-size-xxs);
+  font-weight: 600;
+  line-height: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* Node Body */
@@ -955,9 +1004,8 @@
 
 /* MiniMap */
 .react-flow__minimap {
-  background:
-    linear-gradient(180deg, rgba(23, 35, 61, 0.96), rgba(13, 19, 34, 0.96));
-  border: 1px solid rgba(104, 139, 196, 0.42);
+  background: var(--bg-secondary);
+  border: 1px solid var(--ui-border-2);
   border-radius: 6px;
   cursor: grab;
   overflow: hidden;
@@ -972,10 +1020,10 @@
 }
 
 .react-flow__minimap:hover {
-  border-color: rgba(145, 184, 248, 0.58);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 18px 42px rgba(0, 0, 0, 0.44);
+    0 18px 42px rgba(0, 0, 0, 0.30);
 }
 
 .react-flow__minimap:active {
@@ -1024,13 +1072,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(211, 226, 255, 0.2);
+  border: 1px solid var(--ui-border-2);
   border-radius: 6px;
-  background: rgba(9, 15, 27, 0.82);
-  color: rgba(220, 232, 255, 0.82);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 10px 22px rgba(0, 0, 0, 0.34);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  box-shadow: var(--ui-shadow-1);
   transition:
     background 160ms ease,
     border-color 160ms ease,
@@ -1048,68 +1094,47 @@
   width: 32px;
   min-width: 32px;
   height: 32px;
-  border-color: rgba(147, 197, 253, 0.32);
 }
 
 .canvas-preview-toggle:hover:not(:disabled) {
   opacity: 1;
-  color: #fff;
-  border-color: rgba(147, 197, 253, 0.72);
-  background: rgba(35, 102, 180, 0.94);
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-secondary));
 }
 
 .canvas-preview-toggle-icon {
-  position: relative;
-  width: 13px;
-  height: 10px;
+  transition: transform var(--motion-fast, 120ms);
 }
 
-.canvas-preview-toggle-icon::before,
-.canvas-preview-toggle-icon::after {
-  content: '';
-  position: absolute;
-  top: 4px;
-  width: 8px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
+/* Collapsed: the chevron points up ("show the preview"). */
+.canvas-preview-toggle--expand .canvas-preview-toggle-icon {
+  transform: rotate(180deg);
 }
 
-.canvas-preview-toggle-icon::before {
-  left: 0;
-  transform: rotate(45deg);
+/* Controls (CanvasControls.tsx): kit icon buttons in one themed column. */
+.react-flow__controls.flow-canvas-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  overflow: visible;
+  background: var(--bg-secondary);
+  border: 1px solid var(--ui-border-2);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--ui-shadow-1);
 }
 
-.canvas-preview-toggle-icon::after {
-  right: 0;
-  transform: rotate(-45deg);
+.flow-canvas-controls .react-flow__controls-button {
+  width: 32px;
+  height: 32px;
+  border-bottom: 1px solid var(--ui-border-1);
+  color: var(--text-secondary);
 }
 
-.canvas-preview-toggle--expand .canvas-preview-toggle-icon::before {
-  transform: rotate(-45deg);
-}
-
-.canvas-preview-toggle--expand .canvas-preview-toggle-icon::after {
-  transform: rotate(45deg);
-}
-
-/* Controls */
-.react-flow__controls {
-  overflow: hidden;
-  background: rgba(14, 22, 39, 0.92);
-  border: 1px solid rgba(104, 139, 196, 0.35);
-  border-radius: 6px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
-}
-
-.react-flow__controls-button {
-  background: transparent;
-  border-bottom: 1px solid rgba(104, 139, 196, 0.24);
-  fill: var(--text-primary);
-}
-
-.react-flow__controls-button:hover {
-  background: rgba(71, 104, 160, 0.36);
+.flow-canvas-controls .react-flow__controls-button:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 /* ============================================================

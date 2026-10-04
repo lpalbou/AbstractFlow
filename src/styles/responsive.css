@@ -67,7 +67,8 @@ body {
    interactivity lock) at every size: park it right of the controls column
    (15 px margin + 26 px buttons + 10 px gap). Intentional desktop change. */
 .pin-legend {
-  left: 51px;
+  /* Right of the canvas controls column (15 px margin + 32 px buttons + 10 px panel chrome). */
+  left: 67px;
 }
 
 @media (max-width: 1439.98px) {
@@ -658,7 +659,7 @@ body {
     min-height: 44px;
   }
 
-  .palette-node .node-label,
+  .palette-node-label,
   .category-label {
     font-size: 14px;
   }
@@ -675,7 +676,8 @@ body {
     min-height: 44px;
   }
 
-  .react-flow__controls-button {
+  .react-flow__controls-button,
+  .flow-canvas-controls .react-flow__controls-button {
     width: 44px;
     height: 44px;
   }
@@ -693,7 +695,7 @@ body {
   /* Right of the 44 px zoom controls instead of on top of them. */
   .pin-legend {
     bottom: max(16px, var(--safe-bottom, 0px));
-    left: calc(max(15px, var(--safe-left, 0px)) + 44px + 10px);
+    left: calc(max(15px, var(--safe-left, 0px)) + 44px + 10px + 10px);
   }
 
   .canvas-preview-toggle,

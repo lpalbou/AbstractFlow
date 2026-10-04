@@ -62,6 +62,53 @@ If the workflow cannot be opened, Flow says why: "This workflow isn't on this ga
 
 The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About card: the AbstractFlow version, the AbstractFramework and AbstractGateway versions, links to the website, source, docs, issues, feedback and contact, and one author/licence line. When the card opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`); it shows only the framework and gateway versions, never a package list. If that request fails, the AbstractGateway line reads `unavailable (...)` with the HTTP status or error.
 
+## Node Palette And Node Cards
+
+The node palette on the left lists every node in one column, with its full
+name (long names wrap onto a second line, they are never cut) and a
+monochrome icon from the shared AbstractFramework icon set.
+
+- **Sections.** Nodes are grouped into sections with a count: Essentials (the
+  eight nodes nearly every flow uses), Core, Control flow, Events and time,
+  Variables, Data and text, Values and schema, Files and artifacts, Media,
+  Memory, Entity mind and Math. Essentials is open and the others are closed
+  the first time; click a section header to open or close it. Your browser
+  remembers which sections are open.
+- **Search.** Type in **Search nodes** to filter every section at once by name,
+  type or description. Sections with a match open and the matching part of
+  each name is highlighted. Esc clears the search.
+- **Descriptions.** Hover or focus a node to see its one-line description in a
+  tooltip. A node that needs a gateway feature your gateway does not offer is
+  dimmed, with a warning icon and the reason in the tooltip.
+- **Keyboard.** From the search box, Down arrow moves into the list. Up and
+  Down arrows, Home and End move between section headers and nodes; Right
+  arrow opens a section and Left arrow closes it (from a node, it returns to
+  the section header). Enter adds the focused node at the centre of the
+  visible canvas, or opens and closes a section.
+- **Adding nodes.** Drag a node onto the canvas to place it where you drop it.
+  On touch screens, tap it to add it at the centre of the canvas.
+- **Width.** On a wide window, drag the palette's right edge (or focus it and
+  use the Left and Right arrows) to make it wider or narrower. The narrowest
+  width still shows full names; your browser remembers the width.
+
+Every node on the canvas is the same card: a header with the node's icon, its
+full title (wrapped, never cut) and a small badge naming its kind (Event,
+Core, Control, Value, Data, Math, File, Memory, Variable, Media, Entity,
+Artifact, Schema), then the input ports on the left and the output ports on
+the right, each labelled and coloured by its type (see **Pin Types**). The
+node's category colour is the band at the top of its header.
+
+- **Selection and hover.** A selected node has an accent ring; a hovered node
+  lifts with a soft outline.
+- **Run status.** While a run is live, the running node pulses in green, a
+  node that just finished glows blue for a few seconds, the node a run is
+  waiting on has a dashed amber outline, and the node a run failed on is
+  outlined in red. The colours come from your theme.
+- **Zoom controls.** The buttons at the bottom left zoom in, zoom out, fit the
+  whole flow in view, and **Canvas lock** (pressed = nodes cannot be moved,
+  connected or selected). Each has a tooltip. The preview map in the bottom
+  right has its own show/hide button.
+
 ## Responsive Layout
 
 The editor works on a desktop window, a laptop, a tablet, a phone, and a

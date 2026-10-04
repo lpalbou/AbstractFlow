@@ -154,6 +154,9 @@ interface FlowState {
   isRunning: boolean;
   // Execution observability (visual “afterglow” + progress)
   recentNodeIds: Record<string, true>;
+  /** Node the run is parked on (a wait) and node a run failed on (R13.3 card status colours). */
+  waitingNodeId: string | null;
+  failedNodeId: string | null;
   recentEdgeIds: Record<string, true>;
   loopProgressByNodeId: Record<string, { index: number; total: number }>;
   lastLoopProgress: { nodeId: string; index: number; total: number } | null;
@@ -248,6 +251,7 @@ interface FlowState {
   setIsRunning: (running: boolean) => void;
   resetExecutionDecorations: () => void;
   markRecentNode: (nodeId: string) => void;
+  setNodeRunMark: (kind: 'waiting' | 'failed', nodeId: string | null) => void;
   unmarkRecentNode: (nodeId: string) => void;
   markRecentEdge: (edgeId: string) => void;
   unmarkRecentEdge: (edgeId: string) => void;
@@ -594,6 +598,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   execView: false,
   foldReads: true,
   recentNodeIds: {},
+  waitingNodeId: null,
+  failedNodeId: null,
   recentEdgeIds: {},
   loopProgressByNodeId: {},
   lastLoopProgress: null,
@@ -1253,10 +1259,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   resetExecutionDecorations: () =>
     set({
       recentNodeIds: {},
+      waitingNodeId: null,
+      failedNodeId: null,
       recentEdgeIds: {},
       loopProgressByNodeId: {},
       lastLoopProgress: null,
     }),
+  setNodeRunMark: (kind, nodeId) =>
+    set(kind === 'waiting' ? { waitingNodeId: nodeId } : { failedNodeId: nodeId }),
   markRecentNode: (nodeId) =>
     set((s) => (nodeId ? { recentNodeIds: { ...s.recentNodeIds, [nodeId]: true } } : s)),
   unmarkRecentNode: (nodeId) =>

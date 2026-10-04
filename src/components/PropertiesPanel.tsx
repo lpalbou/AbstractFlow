@@ -6,7 +6,8 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
-import { AfSwitch, SpeculationSelect, normalizeSpeculationValue, randomId, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AfSwitch, Icon, SpeculationSelect, normalizeSpeculationValue, randomId, type SpeculationValue } from '@abstractframework/ui-kit';
+import { nodeIconName } from '../utils/nodeIcons';
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { getBundledFlow } from '../utils/bundledFlows';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
@@ -2153,11 +2154,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
       <div className="property-section">
         <div className="property-header">
-          <span
-            className="node-icon"
-            style={{ color: data.headerColor }}
-            dangerouslySetInnerHTML={{ __html: data.icon }}
-          />
+          <span className="node-icon" style={{ color: data.headerColor }} aria-hidden="true">
+            <Icon name={nodeIconName(data.nodeType, data.label)} size={16} />
+          </span>
           <span className="node-type">{data.nodeType}</span>
         </div>
       </div>

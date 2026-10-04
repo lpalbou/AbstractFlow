@@ -4,7 +4,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, DragEvent, MouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import ReactFlow, {
-  Controls,
   Background,
   MiniMap,
   Connection,
@@ -21,6 +20,8 @@ import ReactFlow, {
 } from 'reactflow';
 import toast from 'react-hot-toast';
 import { nodeTypes } from './nodes';
+import { CanvasControls } from './CanvasControls';
+import { AfTooltip, Icon } from '@abstractframework/ui-kit';
 import { useFlowStore } from '../hooks/useFlow';
 import { getConnectionError, validateConnection } from '../utils/validation';
 import { isRouteOverrideEdge } from '../utils/multiEntryRoutes';
@@ -1056,7 +1057,7 @@ function CanvasBody() {
           deleteKeyCode={['Backspace', 'Delete']}
           attributionPosition="top-right"
         >
-          <Controls />
+          <CanvasControls />
           <Background
             variant={BackgroundVariant.Dots}
             gap={16}
@@ -1064,15 +1065,16 @@ function CanvasBody() {
             color="rgba(124, 149, 188, 0.28)"
           />
           {previewCollapsed ? (
-            <button
-              type="button"
-              className="canvas-preview-toggle canvas-preview-toggle--expand collapsed"
-              onClick={() => setPreviewCollapsed(false)}
-              aria-label="Show canvas preview"
-              title="Show canvas preview"
-            >
-              <span className="canvas-preview-toggle-icon" aria-hidden="true" />
-            </button>
+            <AfTooltip content="Show the canvas preview">
+              <button
+                type="button"
+                className="canvas-preview-toggle canvas-preview-toggle--expand collapsed af-topbar__btn"
+                onClick={() => setPreviewCollapsed(false)}
+                aria-label="Show canvas preview"
+              >
+                <Icon name="chevronDown" size={16} className="canvas-preview-toggle-icon" />
+              </button>
+            </AfTooltip>
           ) : (
             <>
               <MiniMap
@@ -1081,8 +1083,8 @@ function CanvasBody() {
                 nodeClassName={minimapNodeClassName}
                 nodeBorderRadius={4}
                 nodeStrokeWidth={3}
-                maskColor="rgba(5, 8, 18, 0.66)"
-                maskStrokeColor="rgba(132, 177, 255, 0.32)"
+                maskColor="color-mix(in srgb, var(--bg-primary) 62%, transparent)"
+                maskStrokeColor="color-mix(in srgb, var(--accent) 40%, transparent)"
                 maskStrokeWidth={2}
                 pannable
                 zoomable
@@ -1094,15 +1096,16 @@ function CanvasBody() {
                   focusNode(node.id);
                 }}
               />
-              <button
-                type="button"
-                className="canvas-preview-toggle canvas-preview-toggle--collapse"
-                onClick={() => setPreviewCollapsed(true)}
-                aria-label="Collapse canvas preview"
-                title="Collapse canvas preview"
-              >
-                <span className="canvas-preview-toggle-icon" aria-hidden="true" />
-              </button>
+              <AfTooltip content="Hide the canvas preview">
+                <button
+                  type="button"
+                  className="canvas-preview-toggle canvas-preview-toggle--collapse af-topbar__btn"
+                  onClick={() => setPreviewCollapsed(true)}
+                  aria-label="Collapse canvas preview"
+                >
+                  <Icon name="chevronDown" size={16} className="canvas-preview-toggle-icon" />
+                </button>
+              </AfTooltip>
             </>
           )}
         </ReactFlow>

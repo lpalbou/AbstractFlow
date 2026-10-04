@@ -1,104 +1,97 @@
 /**
- * Node palette: searchable, sectioned, draggable node chips.
+ * Node palette (R13.3): ONE column of full node names (wrapped, never
+ * truncated), a monochrome kit icon per node, collapsible sections with a
+ * count (Essentials open, the rest closed until the viewer opens them;
+ * remembered per browser), search across every section with the match
+ * highlighted, a kit tooltip with each node's one-line description, keyboard
+ * navigation (arrows / Home / End move, Right/Left open/close a section,
+ * Enter adds the node at the centre of the canvas), and a resizable width on
+ * wide layouts. Drag-and-drop onto the canvas is unchanged.
  *
- * Presentation layer only — NODE_CATEGORIES stays the semantic source of
- * truth (tests + assistant catalog read it). The palette regroups those
- * categories into ordered DISPLAY SECTIONS tuned for how workflows are
- * actually built: an always-visible Essentials strip (the ~8 nodes nearly
- * every flow uses), the high-frequency sections first, and the long tail
- * (text/math utilities) last. Chips render in a two-column grid so the full
- * catalog scans without a wall of scrolling; section expansion persists per
- * user in localStorage.
+ * Presentation only — the model (sections, search, storage) lives in
+ * utils/paletteModel.ts; NODE_CATEGORIES stays the semantic source of truth.
  */
 
-import { useState, useCallback, useMemo, DragEvent } from 'react';
-import { NODE_CATEGORIES, getNodeTemplate, NodeTemplate } from '../types/nodes';
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  type DragEvent,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import { AfTooltip, Icon } from '@abstractframework/ui-kit';
+import type { NodeTemplate } from '../types/nodes';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import {
   gatewayAuthoringCapabilityStatus,
   getGatewayFlowEditorReadiness,
   type GatewayAuthoringCapabilityStatus,
 } from '../utils/gatewayClient';
-import { AfTooltip } from './AfTooltip';
 import { paletteTapAddsNode, requestPaletteAdd } from '../utils/paletteAdd';
+import { nodeIconName } from '../utils/nodeIcons';
+import {
+  buildPaletteSections,
+  clampPaletteWidth,
+  filterPaletteSections,
+  highlightSegments,
+  isSectionExpanded,
+  loadExpansion,
+  loadPaletteWidth,
+  paletteKeyAction,
+  type PaletteKeyItem,
+  oneLineDescription,
+  PALETTE_MAX_WIDTH,
+  PALETTE_MIN_WIDTH,
+  saveExpansion,
+  savePaletteWidth,
+} from '../utils/paletteModel';
 
-/** Ordered display sections; each pulls one or more semantic categories. */
-const PALETTE_SECTIONS: { key: string; label: string; icon: string; categories: string[] }[] = [
-  { key: 'core', label: 'Core', icon: '&#x26A1;', categories: ['core'] },
-  { key: 'control', label: 'Control Flow', icon: '&#x1F500;', categories: ['control'] },
-  { key: 'events', label: 'Events & Time', icon: '&#x1F514;', categories: ['events'] },
-  { key: 'variables', label: 'Variables', icon: '&#x1F4E6;', categories: ['variables'] },
-  { key: 'data', label: 'Data & Text', icon: '&#x1F6E0;', categories: ['data'] },
-  { key: 'values', label: 'Values & Schema', icon: '&#x270F;', categories: ['literals', 'schema'] },
-  { key: 'files', label: 'Files & Artifacts', icon: '&#x1F4C1;', categories: ['files', 'artifacts'] },
-  { key: 'media', label: 'Media', icon: '&#x1F3A8;', categories: ['media'] },
-  { key: 'memory', label: 'Memory', icon: '&#x1F4BE;', categories: ['memory'] },
-  { key: 'entity', label: 'Entity Mind', icon: '&#x1F9E0;', categories: ['entity'] },
-  { key: 'math', label: 'Math', icon: '&#x1F522;', categories: ['math'] },
-];
-
-/**
- * Every semantic category must be reachable from the palette: any category
- * key not claimed by a section above gets its own trailing section (a newly
- * added category shows up instead of silently vanishing).
- */
-function sectionsCoveringAllCategories() {
-  const claimed = new Set(PALETTE_SECTIONS.flatMap((s) => s.categories));
-  const extras = Object.entries(NODE_CATEGORIES)
-    .filter(([key]) => !claimed.has(key))
-    .map(([key, category]) => ({ key, label: category.label, icon: category.icon, categories: [key] }));
-  return [...PALETTE_SECTIONS, ...extras];
-}
-
-/** Curated quick-access strip: the nodes nearly every workflow reaches for. */
-const ESSENTIAL_NODE_TYPES: Parameters<typeof getNodeTemplate>[0][] = [
-  'on_flow_start',
-  'on_flow_end',
-  'agent',
-  'llm_call',
-  'code',
-  'if',
-  'for',
-  'string_template',
-];
-
-const EXPANSION_STORAGE_KEY = 'abstractflow_palette_sections_v1';
-const DEFAULT_EXPANDED: Record<string, boolean> = { core: true };
-
-function loadExpansion(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(EXPANSION_STORAGE_KEY);
-    if (!raw) return DEFAULT_EXPANDED;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : DEFAULT_EXPANDED;
-  } catch {
-    return DEFAULT_EXPANDED;
-  }
-}
-
-function saveExpansion(state: Record<string, boolean>) {
-  try {
-    localStorage.setItem(EXPANSION_STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Persistence is a convenience; never break the palette over storage.
-  }
-}
+const ITEM_SELECTOR = '[data-palette-item]';
 
 export function NodePalette() {
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
   const gatewayReadiness = useMemo(() => getGatewayFlowEditorReadiness(gatewayContracts), [gatewayContracts]);
   const gatewayCapabilityKnown = Boolean(gatewayContracts && !gatewayCapabilitiesQuery.isError);
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(loadExpansion);
+  const [expansion, setExpansion] = useState<Record<string, boolean>>(() => loadExpansion());
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeItem, setActiveItem] = useState<string | null>(null);
+  const [width, setWidth] = useState<number>(() => loadPaletteWidth());
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
-  const toggleSection = useCallback((key: string) => {
-    setExpandedSections((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
+  const sections = useMemo(() => buildPaletteSections(), []);
+  const visibleSections = useMemo(() => filterPaletteSections(sections, searchTerm), [sections, searchTerm]);
+  const nothingMatches = Boolean(searchTerm.trim()) && visibleSections.length === 0;
+
+  // The palette width lives on the sidebar (wide layouts only; the narrow
+  // drawer keeps its own width in responsive.css).
+  useEffect(() => {
+    const aside = rootRef.current?.closest<HTMLElement>('.sidebar.left');
+    aside?.style.setProperty('--palette-width', `${width}px`);
+  }, [width]);
+
+  const toggleSection = useCallback((key: string, open?: boolean) => {
+    setExpansion((prev) => {
+      const nextOpen = open ?? !prev[key];
+      if (Boolean(prev[key]) === nextOpen) return prev;
+      const next = { ...prev, [key]: nextOpen };
       saveExpansion(next);
       return next;
     });
   }, []);
+
+  const statusFor = useCallback(
+    (template: NodeTemplate): GatewayAuthoringCapabilityStatus | null =>
+      gatewayAuthoringCapabilityStatus(gatewayReadiness, template.gatewayCapability, {
+        loading: gatewayCapabilitiesQuery.isLoading,
+        known: gatewayCapabilityKnown,
+      }),
+    [gatewayCapabilitiesQuery.isLoading, gatewayCapabilityKnown, gatewayReadiness]
+  );
 
   const onDragStart = useCallback(
     (event: DragEvent<HTMLDivElement>, template: NodeTemplate, status: GatewayAuthoringCapabilityStatus | null) => {
@@ -107,110 +100,195 @@ export function NodePalette() {
         event.dataTransfer.effectAllowed = 'none';
         return;
       }
-      event.dataTransfer.setData(
-        'application/reactflow',
-        JSON.stringify(template)
-      );
+      event.dataTransfer.setData('application/reactflow', JSON.stringify(template));
       event.dataTransfer.effectAllowed = 'move';
     },
     []
   );
 
-  const sections = useMemo(
-    () =>
-      sectionsCoveringAllCategories().map((section) => ({
-        ...section,
-        nodes: section.categories.flatMap((categoryKey) => NODE_CATEGORIES[categoryKey]?.nodes ?? []).filter(
-          (n) => !n.hiddenInPalette
-        ),
-      })),
-    []
-  );
+  const focusItemAt = useCallback((index: number) => {
+    const items = rootRef.current ? Array.from(rootRef.current.querySelectorAll<HTMLElement>(ITEM_SELECTOR)) : [];
+    const el = items[index];
+    if (el) {
+      el.focus();
+      el.scrollIntoView?.({ block: 'nearest' });
+    }
+  }, []);
 
-  const essentials = useMemo(
-    () => ESSENTIAL_NODE_TYPES.map((type) => getNodeTemplate(type)).filter((t): t is NodeTemplate => Boolean(t)),
-    []
-  );
-
-  const filterNodes = useCallback(
-    (nodes: NodeTemplate[]) => {
-      if (!searchTerm) return nodes;
-      const term = searchTerm.toLowerCase();
-      return nodes.filter(
-        (n) =>
-          n.label.toLowerCase().includes(term) ||
-          n.type.toLowerCase().includes(term) ||
-          n.description.toLowerCase().includes(term)
-      );
+  /** Roving focus over the section headers and node rows, in DOM order (decisions: paletteKeyAction). */
+  const onListKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const item = (event.target as HTMLElement).closest<HTMLElement>(ITEM_SELECTOR);
+      if (!item || !rootRef.current) return;
+      const elements = Array.from(rootRef.current.querySelectorAll<HTMLElement>(ITEM_SELECTOR));
+      const items: PaletteKeyItem[] = elements.map((el) => ({
+        kind: el.dataset.paletteItem === 'header' ? 'header' : 'node',
+        section: el.dataset.section || '',
+        nodeType: el.dataset.nodeType,
+        nodeLabel: el.dataset.nodeLabel,
+        disabled: el.getAttribute('aria-disabled') === 'true',
+      }));
+      const action = paletteKeyAction(event.key, items, elements.indexOf(item), Boolean(searchTerm.trim()));
+      if (action.kind === 'none') return;
+      event.preventDefault();
+      if (action.kind === 'focus') focusItemAt(action.index);
+      else if (action.kind === 'focusSearch') searchRef.current?.focus();
+      else if (action.kind === 'toggle') toggleSection(action.section, action.open);
+      else if (action.kind === 'add') {
+        const template = sections
+          .flatMap((s) => s.nodes)
+          .find((n) => n.type === action.nodeType && n.label === action.nodeLabel);
+        if (template) requestPaletteAdd(template);
+      }
     },
-    [searchTerm]
+    [focusItemAt, searchTerm, sections, toggleSection]
   );
 
-  const renderChip = useCallback(
-    (template: NodeTemplate) => {
-      const status = gatewayAuthoringCapabilityStatus(gatewayReadiness, template.gatewayCapability, {
-        loading: gatewayCapabilitiesQuery.isLoading,
-        known: gatewayCapabilityKnown,
-      });
-      const disabled = Boolean(status && !status.available && !status.checking);
-      const tooltip = status && (disabled || status.checking) ? `${template.description}\n${status.reason}` : template.description;
-      return (
-        <AfTooltip key={`${template.type}:${template.label}`} content={tooltip} delayMs={1200} priority={0} block>
-          <div
-            className={`palette-node${disabled ? ' disabled' : ''}${status?.checking ? ' checking' : ''}`}
-            draggable={!disabled}
-            aria-disabled={disabled || undefined}
-            data-gateway-capability={template.gatewayCapability || undefined}
-            data-gateway-capability-status={
-              status ? (status.checking ? 'checking' : status.available ? 'available' : 'unavailable') : undefined
-            }
-            onDragStart={(e) => onDragStart(e, template, status)}
-            // Touch screens have no drag-and-drop: a tap adds the node at the
-            // centre of the canvas (utils/paletteAdd.ts). Desktop stays drag-only.
-            onClick={() => {
-              if (!disabled && paletteTapAddsNode()) requestPaletteAdd(template);
-            }}
-          >
-            <span
-              className="node-icon"
-              style={{ color: template.headerColor }}
-              dangerouslySetInnerHTML={{ __html: template.icon }}
-            />
-            <span className="node-label" title={template.label}>{template.label}</span>
-            {status && (status.checking || disabled) ? (
-              <span className={`palette-node-status ${status.checking ? 'checking' : 'unavailable'}`}>
-                {status.checking ? '…' : '✕'}
-              </span>
-            ) : null}
-          </div>
-        </AfTooltip>
-      );
+  const onSearchKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        // While searching, start on the first matching node (headers are not toggles then).
+        const items = rootRef.current ? Array.from(rootRef.current.querySelectorAll<HTMLElement>(ITEM_SELECTOR)) : [];
+        const first = searchTerm.trim() ? items.findIndex((el) => el.dataset.paletteItem === 'node') : 0;
+        focusItemAt(Math.max(0, first));
+      } else if (event.key === 'Escape' && searchTerm) {
+        event.preventDefault();
+        setSearchTerm('');
+      }
     },
-    [gatewayCapabilitiesQuery.isLoading, gatewayCapabilityKnown, gatewayReadiness, onDragStart]
+    [focusItemAt, searchTerm]
   );
 
-  const nothingMatches =
-    Boolean(searchTerm) && sections.every((section) => filterNodes(section.nodes).length === 0);
+  // Resizable width (wide layouts): pointer drag or arrow keys on the separator.
+  const dragRef = useRef<{ x: number; w: number } | null>(null);
+  const onResizePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      dragRef.current = { x: event.clientX, w: width };
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    },
+    [width]
+  );
+  const onResizePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d) return;
+    setWidth(clampPaletteWidth(d.w + event.clientX - d.x));
+  }, []);
+  const onResizePointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+      savePaletteWidth(width);
+    },
+    [width]
+  );
+  const onResizeKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? 48 : 16;
+      let next: number | null = null;
+      if (event.key === 'ArrowLeft') next = width - step;
+      else if (event.key === 'ArrowRight') next = width + step;
+      else if (event.key === 'Home') next = PALETTE_MIN_WIDTH;
+      else if (event.key === 'End') next = PALETTE_MAX_WIDTH;
+      if (next === null) return;
+      event.preventDefault();
+      const w = clampPaletteWidth(next);
+      setWidth(w);
+      savePaletteWidth(w);
+    },
+    [width]
+  );
+
+  const itemId = (sectionKey: string, template?: NodeTemplate) =>
+    template ? `${sectionKey}:${template.type}:${template.label}` : `${sectionKey}:header`;
+  const firstItem = visibleSections[0] ? itemId(visibleSections[0].key) : null;
+  const tabStop = activeItem ?? firstItem;
+
+  const renderNode = (sectionKey: string, template: NodeTemplate) => {
+    const status = statusFor(template);
+    const disabled = Boolean(status && !status.available && !status.checking);
+    const description = oneLineDescription(template.description);
+    const tooltip = status && (disabled || status.checking) ? `${description} ${status.reason}` : description;
+    const id = itemId(sectionKey, template);
+    return (
+      <AfTooltip key={id} content={tooltip}>
+        <div
+          className={`palette-node${disabled ? ' disabled' : ''}${status?.checking ? ' checking' : ''}`}
+          role="button"
+          tabIndex={tabStop === id ? 0 : -1}
+          draggable={!disabled}
+          aria-disabled={disabled || undefined}
+          aria-label={template.label}
+          aria-description={tooltip}
+          data-palette-item="node"
+          data-section={sectionKey}
+          data-node-type={template.type}
+          data-node-label={template.label}
+          data-gateway-capability={template.gatewayCapability || undefined}
+          data-gateway-capability-status={
+            status ? (status.checking ? 'checking' : status.available ? 'available' : 'unavailable') : undefined
+          }
+          onFocus={() => setActiveItem(id)}
+          onDragStart={(e) => onDragStart(e, template, status)}
+          // Touch screens have no drag-and-drop: a tap adds the node at the
+          // centre of the canvas (utils/paletteAdd.ts). Desktop stays drag-only.
+          onClick={() => {
+            if (!disabled && paletteTapAddsNode()) requestPaletteAdd(template);
+          }}
+        >
+          <Icon
+            name={nodeIconName(template.type, template.label, template.category)}
+            size={16}
+            className="palette-node-icon"
+            aria-hidden="true"
+          />
+          <span className="palette-node-label">
+            {highlightSegments(template.label, searchTerm).map((seg, i) =>
+              seg.match ? <mark key={i}>{seg.text}</mark> : <span key={i}>{seg.text}</span>
+            )}
+          </span>
+          {status && (status.checking || disabled) ? (
+            <span className={`palette-node-status ${status.checking ? 'checking' : 'unavailable'}`} aria-hidden="true">
+              <Icon name={status.checking ? 'loader' : 'warning'} size={14} />
+            </span>
+          ) : null}
+        </div>
+      </AfTooltip>
+    );
+  };
 
   return (
-    <div className="node-palette">
-      <h3 className="palette-title">Nodes</h3>
+    <div className="node-palette" ref={rootRef}>
+      <h3 className="palette-title" id="node-palette-title">Nodes</h3>
 
-      {/* Search */}
       <div className="palette-search">
         <input
-          type="text"
-          placeholder="Search nodes..."
+          ref={searchRef}
+          type="search"
+          placeholder="Search nodes"
+          aria-label="Search nodes"
+          aria-controls="node-palette-list"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setActiveItem(null);
+          }}
+          onKeyDown={onSearchKeyDown}
         />
       </div>
 
-      <div className="palette-categories">
+      <div
+        className="palette-categories"
+        id="node-palette-list"
+        aria-labelledby="node-palette-title"
+        onKeyDown={onListKeyDown}
+      >
         {nothingMatches ? (
           <div className="palette-empty" role="status">
             <p>
-              No nodes match <strong>“{searchTerm}”</strong>.
+              No nodes match <strong>“{searchTerm.trim()}”</strong>.
             </p>
             <button type="button" className="palette-empty-clear" onClick={() => setSearchTerm('')}>
               Clear search
@@ -218,55 +296,64 @@ export function NodePalette() {
           </div>
         ) : null}
 
-        {/* Essentials: always visible, never collapsible, hidden while searching
-            (search results already surface whatever matches). */}
-        {!searchTerm && essentials.length > 0 ? (
-          <div className="palette-category palette-essentials">
-            <div className="category-header static">
-              <span className="category-icon" dangerouslySetInnerHTML={{ __html: '&#x2605;' }} />
-              <span className="category-label">Essentials</span>
-            </div>
-            <div className="category-nodes grid">{essentials.map(renderChip)}</div>
-          </div>
-        ) : null}
-
-        {sections.map((section) => {
-          const filteredNodes = filterNodes(section.nodes);
-          if (searchTerm && filteredNodes.length === 0) return null;
-          const expanded = Boolean(expandedSections[section.key]) || Boolean(searchTerm);
-
+        {visibleSections.map((section) => {
+          const expanded = isSectionExpanded(section.key, expansion, searchTerm);
+          const headerId = itemId(section.key);
+          const listId = `palette-section-${section.key}`;
           return (
-            <div key={section.key} className="palette-category">
-              <div
+            <section key={section.key} className={`palette-category palette-category--${section.key}`}>
+              <button
+                type="button"
                 className="category-header"
-                role="button"
-                tabIndex={0}
                 aria-expanded={expanded}
-                onClick={() => toggleSection(section.key)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggleSection(section.key);
-                  }
+                aria-controls={listId}
+                tabIndex={tabStop === headerId ? 0 : -1}
+                data-palette-item="header"
+                data-section={section.key}
+                data-category={section.key}
+                onFocus={() => setActiveItem(headerId)}
+                onClick={() => {
+                  if (!searchTerm.trim()) toggleSection(section.key);
                 }}
               >
-                <span className="category-icon" dangerouslySetInnerHTML={{ __html: section.icon }} />
+                <Icon name="chevronRight" size={14} className="category-chevron" aria-hidden="true" />
                 <span className="category-label">{section.label}</span>
-                <span className="category-count">{filteredNodes.length}</span>
-                <span className="category-toggle">{expanded ? '▾' : '▸'}</span>
-              </div>
-
-              {expanded && <div className="category-nodes grid">{filteredNodes.map(renderChip)}</div>}
-            </div>
+                <span className="category-count" aria-label={`${section.nodes.length} nodes`}>
+                  {section.nodes.length}
+                </span>
+              </button>
+              {expanded ? (
+                <div className="category-nodes" id={listId} role="group" aria-label={section.label}>
+                  {section.nodes.map((n) => renderNode(section.key, n))}
+                </div>
+              ) : null}
+            </section>
           );
         })}
       </div>
 
-      {/* Help text */}
       <div className="palette-help">
-        <p className="palette-help-drag">Drag nodes to the canvas to add them to your flow.</p>
+        <p className="palette-help-drag">Drag a node onto the canvas, or select it and press Enter.</p>
         <p className="palette-help-tap">Tap a node to add it to the centre of the canvas.</p>
       </div>
+
+      <AfTooltip content="Drag to resize the palette">
+        <div
+          className="palette-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Palette width"
+          aria-valuemin={PALETTE_MIN_WIDTH}
+          aria-valuemax={PALETTE_MAX_WIDTH}
+          aria-valuenow={width}
+          tabIndex={0}
+          onPointerDown={onResizePointerDown}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerUp}
+          onPointerCancel={onResizePointerUp}
+          onKeyDown={onResizeKeyDown}
+        />
+      </AfTooltip>
     </div>
   );
 }
