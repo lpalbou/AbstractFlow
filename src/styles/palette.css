@@ -438,9 +438,9 @@
   background: rgba(0, 0, 0, 0.22);
 }
 
-.artifact-player-audio {
+/* The kit waveform player (ui-kit 0.7.0 AfAudioPlayer) at full width. */
+.af-audio.artifact-player-audio {
   width: 100%;
-  min-height: 38px;
 }
 
 .artifact-player-empty,

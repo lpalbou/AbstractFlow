@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **About is the shared compact kit card.** The top-bar About opens ui-kit's `AfAboutDialog`: AbstractFlow
+  name and version, the AbstractFramework and AbstractGateway versions, links (website, source, docs,
+  issues, feedback, contact) and one author/licence line. It no longer lists the gateway's package
+  versions. A failed `GET /api/gateway/about` reads `unavailable (...)` in place of the gateway version.
+  `useAboutAction()` now returns `{ identity, versions, onOpen }` (`fetchGatewayAboutVersions` replaces
+  `fetchGatewayAboutRows`). See [Web Editor](docs/web-editor.md#about).
+- **Audio previews use the shared waveform player.** The artifact player and the run modal's generated-audio
+  card play audio in ui-kit's `AfAudioPlayer` (play/pause, click/drag/arrow-key seek on a waveform, elapsed /
+  total time) instead of the browser's bare audio controls. See [Architecture](docs/architecture.md#audio-previews).
+- Requires `@abstractframework/ui-kit` 0.7.0.
 
 ## [0.7.0] - 2026-10-01
 

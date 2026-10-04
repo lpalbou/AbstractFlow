@@ -120,7 +120,7 @@ High-value source modules:
 - `src/utils/triggerSources.ts`: trigger-source discovery (`fetchTriggerSources`, `TriggerSourceCache`), contract parsing, and the `ok` / `unavailable` outcomes.
 - `src/utils/triggerBindings.ts`: the `automation_defaults` shape (`parseAutomationDefaults`), the JSON Schema subset validator (`validateTriggerConfig`, `unsupportedSchemaKeywords`), and the schema-driven form conversion.
 - `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog.
-- `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time, Gateway rows from `GET /api/gateway/about` through the ui-kit `gatewayVersionRows` helper).
+- `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time; the framework and gateway versions from `GET /api/gateway/about` through the ui-kit `aboutVersionsFromGateway` helper; no package list).
 - `bin/server.js`: the Flow server (`createFlowServer`) on `@abstractframework/app-server`: base path, identity header, session proxy, static files.
 - `bin/flags.js`: the launch flags and the Gateway URL resolution (`parseFlowFlags`).
 - `scripts/check_relative_urls.mjs`: run by `npm run build`; fails on any app-absolute `/api/` or `/assets/` URL in `src/` or `dist/`.

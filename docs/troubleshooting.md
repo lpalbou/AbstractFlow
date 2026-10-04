@@ -128,12 +128,12 @@ See [Web editor > Hidden Connections](web-editor.md#hidden-connections).
 These warnings are advisory: the workflow still runs, but a host that starts
 it through the interface receives missing or mistyped values.
 
-### The About dialog shows "Gateway: unavailable (...)"
+### The About dialog shows "AbstractGateway: unavailable (...)"
 
 - **Cause:** the request to `GET /api/gateway/about` failed. The text in
   parentheses gives the HTTP status or network error. A Gateway release that
   does not serve that route, a signed-out session, or an unreachable Gateway
-  all produce this row.
+  all produce this line.
 - **Fix:** sign in, check that the Gateway is reachable, and update the Gateway
   if the route returns HTTP 404. The AbstractFlow version shown in the dialog is
   independent of the Gateway.

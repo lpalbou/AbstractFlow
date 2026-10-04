@@ -1,16 +1,16 @@
 // The About action of the top-bar cluster: the AbstractFlow identity (with the
-// build-time app version) plus the versions the connected gateway reports.
+// build-time app version) plus the framework and gateway versions the
+// connected gateway reports (ui-kit 0.7.0 compact About card).
 //
 // Every AfTopBarActions instance takes `about={useAboutAction()}` so all call
-// sites show the same dialog. The gateway versions come from the public
+// sites show the same dialog. The versions come from the public
 // `GET /api/gateway/about` route and are fetched when the dialog opens (not at
-// page load). A failed request becomes one visible "Gateway: unavailable (...)"
-// row; it is never hidden.
+// page load). Only the framework and gateway versions are shown — never a
+// package list. A failed request is shown as "unavailable (...)" in place of
+// the gateway version; it is never hidden.
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { appIdentity, gatewayVersionRows, type AppIdentity, type GatewayAboutPayload } from '@abstractframework/ui-kit';
+import { aboutVersionsFromGateway, appIdentity, type AfAboutVersions, type AppIdentity, type GatewayAboutPayload } from '@abstractframework/ui-kit';
 import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
-
-export type AboutExtraRow = [label: string, value: string];
 
 /** `package.json` version, injected at build time (vite.config.ts `define`). */
 export const APP_VERSION: string = __APP_VERSION__;
@@ -33,41 +33,44 @@ export function gatewayAboutErrorReason(error: unknown): string {
   return detail || 'request failed';
 }
 
+/** Versions shown while `GET /api/gateway/about` is in flight. */
+export const ABOUT_VERSIONS_LOADING: AfAboutVersions = { framework: null, gateway: null, gatewayNote: 'checking…' };
+
 /**
- * Fetches the gateway versions and formats them with the kit's
- * `gatewayVersionRows` (the same rows in every app). Never throws: a failure
- * becomes the single "Gateway: unavailable (...)" row.
+ * Fetches the gateway's About and keeps only the framework and gateway
+ * versions (kit `aboutVersionsFromGateway`, the same in every app). Never
+ * throws: a failure becomes `gatewayNote: "unavailable (...)"`.
  */
-export async function fetchGatewayAboutRows(
+export async function fetchGatewayAboutVersions(
   fetcher: (path: string) => Promise<GatewayAboutPayload> = (path) => gatewayJson<GatewayAboutPayload>(path, { timeoutMs: 10_000 })
-): Promise<AboutExtraRow[]> {
+): Promise<AfAboutVersions> {
   let payload: GatewayAboutPayload;
   try {
     payload = await fetcher(GATEWAY_ABOUT_PATH);
   } catch (error) {
-    return gatewayVersionRows(null, gatewayAboutErrorReason(error));
+    return aboutVersionsFromGateway(null, gatewayAboutErrorReason(error));
   }
-  return gatewayVersionRows(payload);
+  return aboutVersionsFromGateway(payload);
 }
 
 export interface AboutAction {
   identity: AppIdentity;
-  extraRows: AboutExtraRow[];
+  versions: AfAboutVersions;
   onOpen: () => void;
 }
 
 /** `about` prop for AfTopBarActions; refetches the gateway versions on every open. */
 export function useAboutAction(
-  fetchRows: () => Promise<AboutExtraRow[]> = fetchGatewayAboutRows
+  fetchVersions: () => Promise<AfAboutVersions> = fetchGatewayAboutVersions
 ): AboutAction {
-  const [extraRows, setExtraRows] = useState<AboutExtraRow[]>([]);
+  const [versions, setVersions] = useState<AfAboutVersions>(ABOUT_VERSIONS_LOADING);
   const requestSeq = useRef(0);
   const onOpen = useCallback(() => {
     const seq = ++requestSeq.current;
-    setExtraRows([['Gateway', 'checking…']]);
-    void fetchRows().then((rows) => {
-      if (seq === requestSeq.current) setExtraRows(rows);
+    setVersions(ABOUT_VERSIONS_LOADING);
+    void fetchVersions().then((next) => {
+      if (seq === requestSeq.current) setVersions(next);
     });
-  }, [fetchRows]);
-  return useMemo(() => ({ identity: ABSTRACTFLOW_IDENTITY, extraRows, onOpen }), [extraRows, onOpen]);
+  }, [fetchVersions]);
+  return useMemo(() => ({ identity: ABSTRACTFLOW_IDENTITY, versions, onOpen }), [versions, onOpen]);
 }

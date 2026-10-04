@@ -6616,7 +6616,12 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
 
 .run-generated-audio-player {
   width: min(100%, 640px);
-  min-height: 42px;
+  min-width: 0;
+}
+
+/* The kit waveform player (ui-kit 0.7.0 AfAudioPlayer) fills its slot. */
+.run-generated-audio-player .af-audio {
+  width: 100%;
 }
 
 .run-generated-video {

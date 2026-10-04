@@ -10,6 +10,7 @@ import {
   TEXT_PREVIEW_FETCH_CAP_BYTES,
   type ArtifactPreviewKind,
 } from '../utils/artifactPreview';
+import { AfAudioPlayer } from '@abstractframework/ui-kit';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 export type ArtifactPlayerKind = 'image' | 'audio' | 'video' | 'pdf' | 'markdown' | 'text' | 'file';
@@ -333,7 +334,7 @@ export function ArtifactPlayer({
           ) : null}
         </>
       ) : displayUrl && resolvedKind === 'audio' ? (
-        <audio src={displayUrl} controls className="artifact-player-audio" />
+        <AfAudioPlayer src={displayUrl} name={label || downloadName} className="artifact-player-audio" />
       ) : displayUrl && resolvedKind === 'video' ? (
         <video src={displayUrl} controls className="artifact-player-video" />
       ) : displayUrl && resolvedKind === 'pdf' ? (

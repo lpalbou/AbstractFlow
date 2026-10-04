@@ -58,7 +58,7 @@ If the workflow cannot be opened, Flow says why: "This workflow isn't on this ga
 
 ## About
 
-The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About dialog: the AbstractFlow version, the author and license, and links to the website, source, documentation, issue tracker and feedback form. When the dialog opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`) and lists the gateway, AbstractFramework and package versions it reports. If that request fails, the dialog shows `Gateway: unavailable (...)` with the HTTP status or error.
+The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About card: the AbstractFlow version, the AbstractFramework and AbstractGateway versions, links to the website, source, docs, issues, feedback and contact, and one author/licence line. When the card opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`); it shows only the framework and gateway versions, never a package list. If that request fails, the AbstractGateway line reads `unavailable (...)` with the HTTP status or error.
 
 ## Responsive Layout
 
@@ -445,7 +445,7 @@ Flow exposes media nodes only when Gateway advertises the corresponding capabili
 - Transcribe Audio
 - Listen Voice
 
-Generated outputs are Gateway artifacts. The run modal renders image/video/audio previews and keeps the artifact content link available for open/download. When Gateway returns a media child run, Flow streams the child-run ledger and renders `abstract.progress` records for image, image-edit, image-upscale, video, and image-to-video runs when available.
+Generated outputs are Gateway artifacts. The run modal renders image/video/audio previews (audio in the shared ui-kit waveform player) and keeps the artifact content link available for open/download. When Gateway returns a media child run, Flow streams the child-run ledger and renders `abstract.progress` records for image, image-edit, image-upscale, video, and image-to-video runs when available.
 
 Unconnected artifact input pins expose a browser upload affordance directly on the node. Uploads go to Gateway and are stored as session-visible artifacts, then the node stores the canonical artifact ref as its pin default. Flow does not use server workspace paths for browser-local uploads.
 

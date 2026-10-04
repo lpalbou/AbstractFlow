@@ -399,7 +399,7 @@ If the workflow cannot be opened, Flow says why: "This workflow isn't on this ga
 
 ## About
 
-The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About dialog: the AbstractFlow version, the author and license, and links to the website, source, documentation, issue tracker and feedback form. When the dialog opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`) and lists the gateway, AbstractFramework and package versions it reports. If that request fails, the dialog shows `Gateway: unavailable (...)` with the HTTP status or error.
+The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About card: the AbstractFlow version, the AbstractFramework and AbstractGateway versions, links to the website, source, docs, issues, feedback and contact, and one author/licence line. When the card opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`); it shows only the framework and gateway versions, never a package list. If that request fails, the AbstractGateway line reads `unavailable (...)` with the HTTP status or error.
 
 ## Responsive Layout
 
@@ -786,7 +786,7 @@ Flow exposes media nodes only when Gateway advertises the corresponding capabili
 - Transcribe Audio
 - Listen Voice
 
-Generated outputs are Gateway artifacts. The run modal renders image/video/audio previews and keeps the artifact content link available for open/download. When Gateway returns a media child run, Flow streams the child-run ledger and renders `abstract.progress` records for image, image-edit, image-upscale, video, and image-to-video runs when available.
+Generated outputs are Gateway artifacts. The run modal renders image/video/audio previews (audio in the shared ui-kit waveform player) and keeps the artifact content link available for open/download. When Gateway returns a media child run, Flow streams the child-run ledger and renders `abstract.progress` records for image, image-edit, image-upscale, video, and image-to-video runs when available.
 
 Unconnected artifact input pins expose a browser upload affordance directly on the node. Uploads go to Gateway and are stored as session-visible artifacts, then the node stores the canonical artifact ref as its pin default. Flow does not use server workspace paths for browser-local uploads.
 
@@ -4002,11 +4002,21 @@ See [API and contracts > Proxy Contract](api.md#proxy-contract).
 
 ## About Dialog
 
-The top bar's About button uses the shared AbstractFramework About dialog from
-`@abstractframework/ui-kit`. The AbstractFlow version is injected from
-`package.json` at build time; the Gateway rows come from
-`GET /api/gateway/about` when the dialog opens and are formatted by the ui-kit
-`gatewayVersionRows` helper, the same way in every AbstractFramework app.
+The top bar's About button uses the shared AbstractFramework About card
+(`AfAboutDialog`, ui-kit 0.7.0). The AbstractFlow version is injected from
+`package.json` at build time; the framework and gateway versions come from
+`GET /api/gateway/about` when the dialog opens and are picked by the ui-kit
+`aboutVersionsFromGateway` helper, the same way in every AbstractFramework app.
+About never lists per-package versions.
+
+## Audio Previews
+
+Audio artifacts (the artifact player and the run modal's generated-audio card)
+play in the ui-kit waveform player (`AfAudioPlayer`, ui-kit 0.7.0): play/pause,
+a waveform you click, drag or arrow-key to seek, and elapsed / total time. Flow
+fetches the bytes with its Gateway credentials and passes an object URL; when
+the browser cannot decode the waveform the bars stay flat and the audio still
+plays.
 
 ## Discovery Boundary
 
@@ -4200,7 +4210,7 @@ High-value source modules:
 - `src/utils/triggerSources.ts`: trigger-source discovery (`fetchTriggerSources`, `TriggerSourceCache`), contract parsing, and the `ok` / `unavailable` outcomes.
 - `src/utils/triggerBindings.ts`: the `automation_defaults` shape (`parseAutomationDefaults`), the JSON Schema subset validator (`validateTriggerConfig`, `unsupportedSchemaKeywords`), and the schema-driven form conversion.
 - `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog.
-- `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time, Gateway rows from `GET /api/gateway/about` through the ui-kit `gatewayVersionRows` helper).
+- `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time; the framework and gateway versions from `GET /api/gateway/about` through the ui-kit `aboutVersionsFromGateway` helper; no package list).
 - `bin/server.js`: the Flow server (`createFlowServer`) on `@abstractframework/app-server`: base path, identity header, session proxy, static files.
 - `bin/flags.js`: the launch flags and the Gateway URL resolution (`parseFlowFlags`).
 - `scripts/check_relative_urls.mjs`: run by `npm run build`; fails on any app-absolute `/api/` or `/assets/` URL in `src/` or `dist/`.
@@ -5264,12 +5274,12 @@ See [Web editor > Hidden Connections](web-editor.md#hidden-connections).
 These warnings are advisory: the workflow still runs, but a host that starts
 it through the interface receives missing or mistyped values.
 
-### The About dialog shows "Gateway: unavailable (...)"
+### The About dialog shows "AbstractGateway: unavailable (...)"
 
 - **Cause:** the request to `GET /api/gateway/about` failed. The text in
   parentheses gives the HTTP status or network error. A Gateway release that
   does not serve that route, a signed-out session, or an unreachable Gateway
-  all produce this row.
+  all produce this line.
 - **Fix:** sign in, check that the Gateway is reachable, and update the Gateway
   if the route returns HTTP 404. The AbstractFlow version shown in the dialog is
   independent of the Gateway.
@@ -5344,6 +5354,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- **About is the shared compact kit card.** The top-bar About opens ui-kit's `AfAboutDialog`: AbstractFlow
+  name and version, the AbstractFramework and AbstractGateway versions, links (website, source, docs,
+  issues, feedback, contact) and one author/licence line. It no longer lists the gateway's package
+  versions. A failed `GET /api/gateway/about` reads `unavailable (...)` in place of the gateway version.
+  `useAboutAction()` now returns `{ identity, versions, onOpen }` (`fetchGatewayAboutVersions` replaces
+  `fetchGatewayAboutRows`). See [Web Editor](docs/web-editor.md#about).
+- **Audio previews use the shared waveform player.** The artifact player and the run modal's generated-audio
+  card play audio in ui-kit's `AfAudioPlayer` (play/pause, click/drag/arrow-key seek on a waveform, elapsed /
+  total time) instead of the browser's bare audio controls. See [Architecture](docs/architecture.md#audio-previews).
+- Requires `@abstractframework/ui-kit` 0.7.0.
+
+## [0.7.0] - 2026-10-01
 
 
 ### Added

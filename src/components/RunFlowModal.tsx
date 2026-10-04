@@ -19,7 +19,7 @@ import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
-import { AF_MEDIA, AfSwitch, SteerComposer, SpeculationSelect, useAfMedia, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AF_MEDIA, AfAudioPlayer, AfSwitch, SteerComposer, SpeculationSelect, useAfMedia, type SpeculationValue } from '@abstractframework/ui-kit';
 import { ListDisclosure } from './ListDisclosure';
 import { useListOpen } from '../utils/listOpen';
 import { parseSpeculationInput, withRunSpeculation } from '../utils/speculationControls';
@@ -1264,7 +1264,8 @@ function GeneratedImageCard({
   );
 }
 
-function GeneratedAudioCard({
+/** A generated audio artifact, played in the kit waveform player (ui-kit 0.7.0 AfAudioPlayer). */
+export function GeneratedAudioCard({
   preview,
   autoPlay = false,
   compact = false,
@@ -1282,6 +1283,14 @@ function GeneratedAudioCard({
     instanceKey
   );
   const displayUrl = objectUrl || preview.src;
+  // The kit player has no autoPlay prop: start its <audio> once the bytes are
+  // ready (a refused autoplay leaves it paused with the Play button, quietly).
+  const playerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!autoPlay || loading || error || !displayUrl) return;
+    const el = playerRef.current?.querySelector('audio');
+    if (el) void el.play().catch(() => undefined);
+  }, [autoPlay, loading, error, displayUrl]);
   return (
     <div className={`run-generated-audio ${compact ? 'run-generated-artifact-card' : ''}`}>
       {loading ? (
@@ -1294,13 +1303,13 @@ function GeneratedAudioCard({
           </button>
         </div>
       ) : (
-        <audio
-          key={`${preview.artifactId}:${instanceKey || ''}`}
-          src={displayUrl}
-          controls
-          autoPlay={autoPlay}
-          className="run-generated-audio-player"
-        />
+        <div ref={playerRef} className="run-generated-audio-player">
+          <AfAudioPlayer
+            key={`${preview.artifactId}:${instanceKey || ''}`}
+            src={displayUrl}
+            name="Generated audio"
+          />
+        </div>
       )}
       <div className="run-output-meta">
         {preview.text && !compact ? (
