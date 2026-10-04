@@ -12,12 +12,11 @@ const A = '/data/projects';
 const B = '/data/notes';
 const DENIED = '/etc/secrets';
 const effective = {
+  posture: 'allowed_only' as const,
+  default_mode: null,
   shared_workspace: SHARED,
-  folders: [{ path: SHARED, source: 'shared' }, { path: A, source: 'allowed' }],
-  available_folders: [{ path: A, enabled: true }, { path: B, enabled: false }],
-  own_folders_allowed: false,
-  never_allowed: [DENIED],
-  summary: 'Private session folder + Shared workspace (workspaces) + 1 folder. Never: 1 folder.',
+  folders: [{ path: SHARED, mode: 'rw' as const, source: 'shared' }, { path: A, mode: 'rw' as const, source: 'gateway' }, { path: DENIED, mode: 'deny' as const, source: 'gateway' }],
+  summary: 'Deny everything, allow listed workspaces · Shared workspace (rw) · /data/projects (rw)',
 };
 const modal = readFileSync(new URL('./RunFlowModal.tsx', import.meta.url), 'utf8');
 const pathField = readFileSync(new URL('./WorkspacePathInputField.tsx', import.meta.url), 'utf8');
@@ -37,7 +36,7 @@ describe('Run → File System Access (round 9)', () => {
     const html = renderToStaticMarkup(<WorkspaceChooser mode="automation" subject="run" effective={effective} selection={null} onSelectionChange={() => {}} />);
     expect(html).toContain('data-workspace="shared-always"');
     expect(html).toContain(T.runHelp.replace(/'/g, '&#x27;'));
-    expect(html).not.toContain(`aria-label="${B}"`);
+    expect(html).not.toContain(B);
     expect(html).not.toContain(DENIED);
     const view = workspaceSelectionView(effective, [B, DENIED]);
     expect(workspaceSelectionAfterToggle(view, A, true)).toEqual([A]);
@@ -48,7 +47,7 @@ describe('Run → File System Access (round 9)', () => {
     const seen: string[] = [];
     await workspaceChooserClient(async (path) => {
       seen.push(path);
-      return { ok: true, policy: { enabled_folders: [A], own_folders: [] }, effective };
+      return { ok: true, policy: { default_mode: null, folders: [] }, gateway: { shared_workspace: SHARED, posture: 'allowed_only', default_mode: 'rw', folders: [{ path: A, mode: 'rw' }, { path: DENIED, mode: 'deny' }] }, effective };
     }).load();
     expect(seen).toEqual(['api/gateway/workspace/policy/me']);
     expect(chooser).not.toMatch(/never_allowed|available_folders|\.filter\(|startsWith\(/);

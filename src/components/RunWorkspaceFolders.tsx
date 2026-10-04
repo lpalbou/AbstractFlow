@@ -30,7 +30,7 @@ export function RunWorkspaceFolders(props: {
     workspaceChooserClient(request)
       .load()
       .then((state) => live && setEffective(state.effective))
-      .catch((e) => live && setError(`Could not read your workspace folders: ${e instanceof Error ? e.message : String(e)}`));
+      .catch((e) => live && setError(`Could not read your workspaces: ${e instanceof Error ? e.message : String(e)}`));
     return () => {
       live = false;
     };
