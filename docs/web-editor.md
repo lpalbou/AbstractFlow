@@ -68,6 +68,12 @@ The node palette on the left lists every node in one column, with its full
 name (long names wrap onto a second line, they are never cut) and a
 monochrome icon from the shared AbstractFramework icon set.
 
+- **Icons.** Each node draws the kit icon made for its kind: image, video,
+  camera and music for media nodes; a database for stored memory; a branch for
+  If and Switch; a loop for Loop, For and While; a variable for the variable
+  nodes; minus, divide and a function sign for math. The full set is listed in
+  the ui-kit's [Icons](https://github.com/lpalbou/AbstractUIC/blob/main/docs/icons.md) page.
+
 - **Sections.** Nodes are grouped into sections with a count: Essentials (the
   eight nodes nearly every flow uses), Core, Control flow, Events and time,
   Variables, Data and text, Values and schema, Files and artifacts, Media,
@@ -106,7 +112,8 @@ node's category colour is the band at the top of its header.
   outlined in red. The colours come from your theme.
 - **Zoom controls.** The buttons at the bottom left zoom in, zoom out, fit the
   whole flow in view, and **Canvas lock** (pressed = nodes cannot be moved,
-  connected or selected). Each has a tooltip. The preview map in the bottom
+  connected or selected), each with its kit icon (magnifier with plus or
+  minus, four corners, padlock) and a tooltip. The preview map in the bottom
   right has its own show/hide button.
 
 ## Responsive Layout

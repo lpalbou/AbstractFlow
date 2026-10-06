@@ -412,6 +412,12 @@ The node palette on the left lists every node in one column, with its full
 name (long names wrap onto a second line, they are never cut) and a
 monochrome icon from the shared AbstractFramework icon set.
 
+- **Icons.** Each node draws the kit icon made for its kind: image, video,
+  camera and music for media nodes; a database for stored memory; a branch for
+  If and Switch; a loop for Loop, For and While; a variable for the variable
+  nodes; minus, divide and a function sign for math. The full set is listed in
+  the ui-kit's [Icons](https://github.com/lpalbou/AbstractUIC/blob/main/docs/icons.md) page.
+
 - **Sections.** Nodes are grouped into sections with a count: Essentials (the
   eight nodes nearly every flow uses), Core, Control flow, Events and time,
   Variables, Data and text, Values and schema, Files and artifacts, Media,
@@ -450,7 +456,8 @@ node's category colour is the band at the top of its header.
   outlined in red. The colours come from your theme.
 - **Zoom controls.** The buttons at the bottom left zoom in, zoom out, fit the
   whole flow in view, and **Canvas lock** (pressed = nodes cannot be moved,
-  connected or selected). Each has a tooltip. The preview map in the bottom
+  connected or selected), each with its kit icon (magnifier with plus or
+  minus, four corners, padlock) and a tooltip. The preview map in the bottom
   right has its own show/hide button.
 
 ## Responsive Layout
@@ -5426,6 +5433,13 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Dedicated node and control icons.** The palette, the canvas cards and the Properties header draw the ui-kit 0.8.6 icon made for each node instead of the nearest stand-in: `image` (generate / edit / image-to-image / upscale), `video`, `camera`, `music`, `database` (stored memory), `branch` (If, Switch), `loop` (Loop, For, While), `variable`, `minus` (Subtract), `divide`, `function` (Modulo, Power, Abs, Round). The canvas controls use the kit's `zoomIn`, `zoomOut`, `fitView` and `lock` (the locally drawn glyphs are gone). A test proves every mapping names an icon in the kit's `ICON_NAMES`. Requires `@abstractframework/ui-kit` ^0.8.6.
+- CI: `npm run check:lock` (also a CI step) fails when `package-lock.json` lags `package.json` or resolves an `@abstractframework/*` dependency below its floor; the lock now resolves `@abstractframework/app-server` 0.1.12. See [CONTRIBUTING](CONTRIBUTING.md#lockfile-check).
+
 ## [0.8.0] - 2026-10-05
 
 ### Changed
@@ -6451,6 +6465,24 @@ npm run docs:llms
 This rewrites `docs/workflow-node-catalog.md` from `src/types/nodes.ts` and
 `llms-full.txt` from the documentation set.
 
+## Lockfile check
+
+`npm run check:lock` runs `scripts/check_lock.mjs`, and CI runs it before `npm ci`. It
+fails when `package-lock.json` lags `package.json` (the lock's root entry records a different
+dependency spec: `package.json` was edited without `npm install`), and when an
+`@abstractframework/*` dependency (`ui-kit`, `panel-chat`, `app-server`, `monitor-*`) is missing
+from the lock, resolves below the `package.json` floor or to another major.minor, comes from a
+local `file:` tarball, or has a nested copy that differs from the top-level one. Fix it with
+`npm install` (or `npm install @abstractframework/<name>@^<version>` to raise a floor) and commit
+both files.
+
+At release time, `npm run check:lock -- --latest` also fails when npm has a newer patch of an
+`@abstractframework/*` dependency than the lock resolves (needs the network).
+
+```bash
+npm run check:lock
+```
+
 ## Releases
 
 Release version source of truth is `package.json`.
@@ -6467,6 +6499,7 @@ For a release:
 - `npm run build` passes.
 - `npm run lint` passes or any failures are explicitly documented.
 - `npm test` passes.
+- `npm run check:lock` passes (see [Lockfile check](#lockfile-check)).
 - The bundled-flow smokes pass when you change a shipped workflow or its generator.
 - User-facing behavior changes are reflected in docs and changelog.
 - Security-relevant changes follow [SECURITY.md](SECURITY.md).

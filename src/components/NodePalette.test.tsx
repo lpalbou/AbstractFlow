@@ -31,7 +31,11 @@ import {
   savePaletteWidth,
   type PaletteKeyItem,
 } from '../utils/paletteModel';
-import { NODE_ICON_BY_TYPE, NODE_ICON_BY_TYPE_AND_LABEL, nodeIconName } from '../utils/nodeIcons';
+import { Icon, ICON_NAMES } from '@abstractframework/ui-kit';
+import { ReactFlowProvider } from 'reactflow';
+import * as nodeIcons from '../utils/nodeIcons';
+import { CATEGORY_ICON, NODE_ICON_BY_TYPE, NODE_ICON_BY_TYPE_AND_LABEL, nodeIconName } from '../utils/nodeIcons';
+import { CANVAS_CONTROL_ICONS, CanvasControls } from './CanvasControls';
 import { NodePalette } from './NodePalette';
 
 function memoryStore(initial: Record<string, string> = {}) {
@@ -190,7 +194,54 @@ describe('node icons', () => {
   it('the literal_json family reads by label', () => {
     expect(nodeIconName('literal_json', 'Video Artifact')).toBe(NODE_ICON_BY_TYPE_AND_LABEL['literal_json|Video Artifact']);
     expect(nodeIconName('literal_json', 'Renamed by me')).toBe(NODE_ICON_BY_TYPE.literal_json);
-    expect(nodeIconName('brand_new_type', undefined, 'math')).toBe('activity');
+    expect(nodeIconName('brand_new_type', undefined, 'math')).toBe('function');
+  });
+
+  // R14.5: the kit has a dedicated glyph for each of these nodes (ui-kit 0.8.6); no stand-in left.
+  const KIT = new Set<string>(ICON_NAMES);
+  it('every mapped icon exists in the kit (ICON_NAMES), by type, by label and per category', () => {
+    const all = { ...NODE_ICON_BY_TYPE, ...NODE_ICON_BY_TYPE_AND_LABEL, ...CATEGORY_ICON };
+    const unknown = Object.entries(all).filter(([, icon]) => !KIT.has(icon)).map(([k, icon]) => `${k}=${icon}`);
+    expect(unknown).toEqual([]);
+    for (const n of paletteNodes) expect(KIT.has(nodeIconName(n.type, n.label, n.category))).toBe(true);
+  });
+
+  const DEDICATED: Record<string, string[]> = {
+    image: ['generate_image', 'edit_image', 'image_to_image', 'upscale_image', 'literal_json|Image Artifact'],
+    video: ['generate_video', 'text_to_video', 'image_to_video', 'camera_capture_video', 'literal_json|Video Artifact'],
+    camera: ['camera_open', 'camera_capture_photo', 'camera_analyze_media', 'camera_close'],
+    music: ['generate_music', 'literal_json|Music Artifact'],
+    database: ['memory_note', 'memory_query', 'memory_compact', 'memory_kg_query', 'memory_commit'],
+    branch: ['if', 'switch'],
+    loop: ['loop', 'for', 'while'],
+    variable: ['var_decl', 'bool_var', 'get_var', 'get_context', 'set_var', 'set_var_property', 'set_vars'],
+    minus: ['subtract'],
+    divide: ['divide'],
+    function: ['modulo', 'power', 'abs', 'round'],
+  };
+  it.each(Object.entries(DEDICATED))('the %s nodes draw the kit icon of that name', (icon, keys) => {
+    expect(KIT.has(icon)).toBe(true);
+    for (const key of keys) {
+      const [type, label] = key.split('|');
+      expect(nodeIconName(type, label), key).toBe(icon);
+    }
+  });
+
+  it('no "closest icon" stand-in table is left', () => {
+    expect(Object.keys(nodeIcons)).not.toContain('KIT_ICON_GAPS');
+    const src = readFileSync(resolve(__dirname, '../utils/nodeIcons.ts'), 'utf8');
+    expect(src).not.toMatch(/closest|stand-?in|gap/i);
+  });
+
+  it('the canvas controls draw the kit zoomIn / zoomOut / fitView / lock icons, nothing local', () => {
+    expect(Object.values(CANVAS_CONTROL_ICONS).every((n) => KIT.has(n))).toBe(true);
+    const html = renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasControls)));
+    const svgs = html.match(/<svg[\s\S]*?<\/svg>/g) ?? [];
+    expect(svgs).toEqual(
+      (['zoomIn', 'zoomOut', 'fitView', 'lock'] as const).map((name) => renderToStaticMarkup(createElement(Icon, { name, size: 16 }))),
+    );
+    const controlsSrc = readFileSync(resolve(__dirname, './CanvasControls.tsx'), 'utf8');
+    expect(controlsSrc).not.toMatch(/<svg|<path/);
   });
 });
 

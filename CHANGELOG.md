@@ -5,6 +5,13 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Dedicated node and control icons.** The palette, the canvas cards and the Properties header draw the ui-kit 0.8.6 icon made for each node instead of the nearest stand-in: `image` (generate / edit / image-to-image / upscale), `video`, `camera`, `music`, `database` (stored memory), `branch` (If, Switch), `loop` (Loop, For, While), `variable`, `minus` (Subtract), `divide`, `function` (Modulo, Power, Abs, Round). The canvas controls use the kit's `zoomIn`, `zoomOut`, `fitView` and `lock` (the locally drawn glyphs are gone). A test proves every mapping names an icon in the kit's `ICON_NAMES`. Requires `@abstractframework/ui-kit` ^0.8.6.
+- CI: `npm run check:lock` (also a CI step) fails when `package-lock.json` lags `package.json` or resolves an `@abstractframework/*` dependency below its floor; the lock now resolves `@abstractframework/app-server` 0.1.12. See [CONTRIBUTING](CONTRIBUTING.md#lockfile-check).
+
 ## [0.8.0] - 2026-10-05
 
 ### Changed

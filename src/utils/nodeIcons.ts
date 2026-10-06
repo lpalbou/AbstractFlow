@@ -7,8 +7,9 @@
  * older clients; it is simply not rendered any more).
  *
  * Every palette node type has an explicit entry (tests fail on a new type
- * without one). Where the kit has no exact glyph the closest kit icon is used;
- * the gaps are listed in KIT_ICON_GAPS so the kit can grow them.
+ * without one), and every entry names an icon the kit really has
+ * (`ICON_NAMES`, ui-kit 0.8.6: image, video, camera, music, database, branch,
+ * loop, variable, minus, divide, function were added for these nodes).
  */
 import type { IconName } from '@abstractframework/ui-kit';
 
@@ -36,26 +37,26 @@ export const NODE_ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   answer_user: 'send',
   code: 'terminal',
   add_message: 'compose',
-  // Media (gaps: image, video, camera, music)
-  generate_image: 'sparkle',
-  edit_image: 'edit',
-  image_to_image: 'edit',
-  upscale_image: 'refresh',
-  generate_video: 'playCircle',
-  text_to_video: 'playCircle',
-  image_to_video: 'playCircle',
+  // Media
+  generate_image: 'image',
+  edit_image: 'image',
+  image_to_image: 'image',
+  upscale_image: 'image',
+  generate_video: 'video',
+  text_to_video: 'video',
+  image_to_video: 'video',
   generate_voice: 'speaker',
-  generate_music: 'speaker',
+  generate_music: 'music',
   transcribe_audio: 'mic',
   listen_voice: 'mic',
-  camera_open: 'play',
-  camera_capture_photo: 'download',
-  camera_capture_video: 'playCircle',
-  camera_analyze_media: 'info',
-  camera_close: 'stop',
+  camera_open: 'camera',
+  camera_capture_photo: 'camera',
+  camera_capture_video: 'video',
+  camera_analyze_media: 'camera',
+  camera_close: 'camera',
   // Entity mind
   memory_recall: 'history',
-  memory_commit: 'archive',
+  memory_commit: 'database',
   memory_form: 'compose',
   memory_adjust: 'settings',
   memory_appraise: 'thumbsUp',
@@ -78,22 +79,22 @@ export const NODE_ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   import_workspace_file: 'download',
   read_artifact: 'paperclip',
   export_artifact: 'download',
-  // Memory (gap: database)
-  memory_note: 'archive',
-  memory_query: 'history',
+  // Memory
+  memory_note: 'database',
+  memory_query: 'database',
   memory_tag: 'paperclip',
-  memory_compact: 'archive',
+  memory_compact: 'database',
   memory_rehydrate: 'unarchive',
-  memory_kg_query: 'board',
+  memory_kg_query: 'database',
   memory_kg_resolve: 'user',
   memact_compose: 'compose',
   memory_kg_assert: 'check',
-  // Control flow (gaps: branch, loop)
-  loop: 'refresh',
-  for: 'refresh',
-  while: 'refresh',
-  if: 'contrast', // two outcomes (true / false); a chevron read as an expand control
-  switch: 'list',
+  // Control flow
+  loop: 'loop',
+  for: 'loop',
+  while: 'loop',
+  if: 'branch', // two outcomes (true / false)
+  switch: 'branch',
   sequence: 'list',
   parallel: 'board',
   compare: 'activity',
@@ -112,23 +113,23 @@ export const NODE_ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   provider_models: 'server',
   tools_allowlist: 'cog',
   tool_parameters: 'settings',
-  // Variables (gap: variable)
-  var_decl: 'settings',
-  bool_var: 'settings',
-  get_var: 'download',
-  get_context: 'download',
-  set_var: 'edit',
-  set_var_property: 'edit',
-  set_vars: 'edit',
-  // Math (gaps: minus, divide, function)
+  // Variables
+  var_decl: 'variable',
+  bool_var: 'variable',
+  get_var: 'variable',
+  get_context: 'variable',
+  set_var: 'variable',
+  set_var_property: 'variable',
+  set_vars: 'variable',
+  // Math
   add: 'plus',
-  subtract: 'activity',
+  subtract: 'minus',
   multiply: 'x',
-  divide: 'activity',
-  modulo: 'activity',
-  power: 'activity',
-  abs: 'activity',
-  round: 'activity',
+  divide: 'divide',
+  modulo: 'function',
+  power: 'function',
+  abs: 'function',
+  round: 'function',
   random_int: 'refresh',
   random_float: 'refresh',
   // Data & text
@@ -180,26 +181,26 @@ export const NODE_ICON_BY_TYPE_AND_LABEL: Readonly<Record<string, IconName>> = {
   'literal_array|Assertions': 'check',
   'literal_json|Artifact': 'paperclip',
   'literal_json|Text Artifact': 'file',
-  'literal_json|Image Artifact': 'paperclip',
+  'literal_json|Image Artifact': 'image',
   'literal_json|Voice Artifact': 'speaker',
-  'literal_json|Music Artifact': 'speaker',
-  'literal_json|Video Artifact': 'playCircle',
+  'literal_json|Music Artifact': 'music',
+  'literal_json|Video Artifact': 'video',
 };
 
 /** Fallback per semantic category (a node type the map does not know yet). */
 export const CATEGORY_ICON: Readonly<Record<string, IconName>> = {
   events: 'clock',
   core: 'sparkle',
-  media: 'speaker',
+  media: 'image',
   entity: 'user',
   files: 'folder',
-  memory: 'archive',
-  control: 'contrast',
+  memory: 'database',
+  control: 'branch',
   literals: 'edit',
   artifacts: 'paperclip',
   schema: 'board',
-  variables: 'settings',
-  math: 'activity',
+  variables: 'variable',
+  math: 'function',
   data: 'list',
 };
 
@@ -223,12 +224,6 @@ export const CATEGORY_BADGE: Readonly<Record<string, string>> = {
 export function nodeTypeBadge(category: string | undefined): string {
   return (category && CATEGORY_BADGE[category]) || 'Node';
 }
-
-/** Glyphs the kit lacks; the closest kit icon stands in (listed in COORD for the kit owner). */
-export const KIT_ICON_GAPS: readonly string[] = [
-  'image', 'video', 'camera', 'music', 'database', 'branch', 'loop', 'variable', 'minus', 'divide',
-  'function', 'zoom-out', 'fit-view', 'lock',
-];
 
 /** The kit icon for a node (type + label first, then type, then its category, then a neutral file). */
 export function nodeIconName(nodeType: string, label?: string, category?: string): IconName {
