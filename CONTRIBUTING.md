@@ -69,6 +69,24 @@ npm run docs:llms
 This rewrites `docs/workflow-node-catalog.md` from `src/types/nodes.ts` and
 `llms-full.txt` from the documentation set.
 
+## Lockfile check
+
+`npm run check:lock` runs `scripts/check_lock.mjs`, and CI runs it before `npm ci`. It
+fails when `package-lock.json` lags `package.json` (the lock's root entry records a different
+dependency spec: `package.json` was edited without `npm install`), and when an
+`@abstractframework/*` dependency (`ui-kit`, `panel-chat`, `app-server`, `monitor-*`) is missing
+from the lock, resolves below the `package.json` floor or to another major.minor, comes from a
+local `file:` tarball, or has a nested copy that differs from the top-level one. Fix it with
+`npm install` (or `npm install @abstractframework/<name>@^<version>` to raise a floor) and commit
+both files.
+
+At release time, `npm run check:lock -- --latest` also fails when npm has a newer patch of an
+`@abstractframework/*` dependency than the lock resolves (needs the network).
+
+```bash
+npm run check:lock
+```
+
 ## Releases
 
 Release version source of truth is `package.json`.
@@ -85,6 +103,7 @@ For a release:
 - `npm run build` passes.
 - `npm run lint` passes or any failures are explicitly documented.
 - `npm test` passes.
+- `npm run check:lock` passes (see [Lockfile check](#lockfile-check)).
 - The bundled-flow smokes pass when you change a shipped workflow or its generator.
 - User-facing behavior changes are reflected in docs and changelog.
 - Security-relevant changes follow [SECURITY.md](SECURITY.md).

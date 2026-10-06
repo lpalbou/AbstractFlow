@@ -25,6 +25,11 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: package-lock.json
+      # The lockfile guard (scripts/check_lock.mjs, no dependency needed): fails when
+      # package-lock.json lags package.json or resolves an @abstractframework/*
+      # package below its floor, in another major.minor, or from a local tarball.
+      - name: Check the lockfile
+        run: npm run check:lock
       - name: Install
         run: npm ci
       - name: Build
