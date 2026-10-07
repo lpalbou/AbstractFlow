@@ -414,25 +414,67 @@ function CanvasBody() {
   // drag (never select-and-open); a tap selects and opens (utils/nodeTapGesture).
   const nodeTapTracker = useRef(new NodeTapTracker());
 
-  const handleCanvasPointerDownCapture = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    activeCanvasPointerIds.current.add(event.pointerId);
-    const nodeEl = (event.target as Element | null)?.closest?.('.react-flow__node');
-    nodeTapTracker.current.down(event, nodeEl?.getAttribute('data-id') || null);
+  // The pressed pointer is followed on WINDOW from pointerdown to pointerup /
+  // pointercancel: a drag that passes over the properties panel, the palette,
+  // a drawer or the toolbar must count its moves too (the wrapper only sees
+  // the moves over the canvas, and a drag out and back would read as a tap).
+  const pressListeners = useRef<(() => void) | null>(null);
+  const stopFollowingPress = useCallback(() => {
+    pressListeners.current?.();
+    pressListeners.current = null;
   }, []);
+  useEffect(() => stopFollowingPress, [stopFollowingPress]);
 
-  const handleCanvasPointerReleaseCapture = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.type === 'pointerup') {
+  const followPress = useCallback(
+    (pointerId: number) => {
+      stopFollowingPress();
+      const onMove = (e: PointerEvent) => {
+        if (e.pointerId === pointerId) nodeTapTracker.current.move(e);
+      };
+      const onUp = (e: PointerEvent) => {
+        if (e.pointerId !== pointerId) return;
+        stopFollowingPress();
         // The tap is decided here, not on the click (d3-drag drops the click
         // after a 1 px move): select the node and open its properties. A
         // modifier click is left to React Flow (multi-selection).
-        const tapped = nodeTapTracker.current.up(event);
-        if (tapped && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+        const tapped = nodeTapTracker.current.up(e);
+        if (tapped && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
           const store = useFlowStore.getState();
           store.selectNodeById(tapped);
           store.requestNodeProperties(tapped);
         }
-      }
+      };
+      const onCancel = (e: PointerEvent) => {
+        if (e.pointerId !== pointerId) return;
+        stopFollowingPress();
+        nodeTapTracker.current.cancel(e);
+      };
+      window.addEventListener('pointermove', onMove, true);
+      window.addEventListener('pointerup', onUp, true);
+      window.addEventListener('pointercancel', onCancel, true);
+      pressListeners.current = () => {
+        window.removeEventListener('pointermove', onMove, true);
+        window.removeEventListener('pointerup', onUp, true);
+        window.removeEventListener('pointercancel', onCancel, true);
+      };
+    },
+    [stopFollowingPress]
+  );
+
+  const handleCanvasPointerDownCapture = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      activeCanvasPointerIds.current.add(event.pointerId);
+      const nodeEl = (event.target as Element | null)?.closest?.('.react-flow__node');
+      const nodeId = nodeEl?.getAttribute('data-id') || null;
+      nodeTapTracker.current.down(event, nodeId);
+      if (nodeId) followPress(event.pointerId);
+      else stopFollowingPress();
+    },
+    [followPress, stopFollowingPress]
+  );
+
+  const handleCanvasPointerReleaseCapture = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
       resetCanvasInteraction(event.pointerId);
     },
     [resetCanvasInteraction]
@@ -440,7 +482,6 @@ function CanvasBody() {
 
   const handleCanvasPointerCancelCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      nodeTapTracker.current.cancel(event);
       resetCanvasInteraction(event.pointerId, { forceConnectionCancel: true });
     },
     [resetCanvasInteraction]
@@ -448,7 +489,6 @@ function CanvasBody() {
 
   const handleCanvasPointerMoveCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      nodeTapTracker.current.move(event);
       if (event.buttons === 0 && activeCanvasPointerIds.current.size > 0) {
         resetCanvasInteraction(event.pointerId);
       }

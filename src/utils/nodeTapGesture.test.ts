@@ -111,11 +111,15 @@ describe('Canvas wiring', () => {
   });
 
   it('pointerup selects + opens the tapped node (no dependence on the click); drag-start deselection ignored while pressing', () => {
-    expect(canvas).toMatch(/const tapped = nodeTapTracker\.current\.up\(event\);/);
+    expect(canvas).toMatch(/const tapped = nodeTapTracker\.current\.up\(e\);/);
     expect(canvas).toMatch(/store\.selectNodeById\(tapped\);\s*store\.requestNodeProperties\(tapped\);/);
+    // F4: the press is followed on window (moves over the panel / palette / toolbar count).
+    expect(canvas).toMatch(/window\.addEventListener\('pointermove', onMove, true\);/);
+    expect(canvas).toMatch(/window\.addEventListener\('pointerup', onUp, true\);/);
+    expect(canvas).toMatch(/if \(nodeId\) followPress\(event\.pointerId\);/);
     expect(canvas).toMatch(/onNodesChange=\{handleNodesChange\}/);
     expect(canvas).toMatch(/if \(!nodeTapTracker\.current\.pressing\) \{/);
-    expect(canvas).toMatch(/nodeTapTracker\.current\.down\(event, nodeEl\?\.getAttribute\('data-id'\) \|\| null\);/);
+    expect(canvas).toMatch(/nodeTapTracker\.current\.down\(event, nodeId\);/);
   });
 
   it('App opens the properties on every tap request (not only on a selection change)', () => {
