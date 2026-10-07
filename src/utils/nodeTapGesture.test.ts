@@ -104,7 +104,7 @@ describe('the tap is decided at pointerup', () => {
 describe('Canvas wiring', () => {
   const canvas = readFileSync(resolve(__dirname, '../components/Canvas.tsx'), 'utf8');
   it('React Flow never selects on drag and the click that ends a drag is swallowed before React Flow', () => {
-    expect(canvas).toMatch(/selectNodesOnDrag=\{false\}/);
+    expect(canvas).toMatch(/^\s+selectNodesOnDrag=\{false\}$/m);
     expect(canvas).toMatch(/onClickCapture=\{handleCanvasClickCapture\}/);
     expect(canvas).toMatch(/!nodeTapTracker\.current\.isTap\(nodeId\)\) event\.stopPropagation\(\)/);
     expect(canvas).toMatch(/requestNodeProperties\(node\.id\)/);
