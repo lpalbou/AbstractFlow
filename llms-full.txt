@@ -418,6 +418,30 @@ monochrome icon from the shared AbstractFramework icon set.
   nodes; minus, divide and a function sign for math. The full set is listed in
   the ui-kit's [Icons](https://github.com/lpalbou/AbstractUIC/blob/main/docs/icons.md) page.
 
+- **Colours.** Each section has one colour: a dot before its name and a tinted
+  count, and every node draws its icon in that colour on a faint tile of it.
+  A node keeps its home section's colour everywhere — in Essentials, in the
+  search results, on its canvas card and in the preview map (On Flow Start is
+  an Events and time node, Agent a Core node, If/Else a Control flow node).
+  Hover the **Nodes** title for the legend: "Colours mark the node's
+  category". Related sections share a colour so the palette stays readable;
+  the section name, the icon and the card's badge always say which one it is,
+  so the colour is never the only cue:
+
+  | Colour | Sections |
+  | --- | --- |
+  | Violet | Core (agents, LLM calls, code, subflows) |
+  | Orange | Control flow |
+  | Aqua | Events and time |
+  | Yellow | Variables, Values and schema |
+  | Magenta | Data and text, Math |
+  | Blue | Files and artifacts, Media |
+  | Green | Memory, Entity mind |
+
+  The light and dark themes each use their own step of the same seven hues,
+  chosen so neighbouring sections stay distinct for colour-blind readers and
+  every label keeps at least 4.5:1 contrast. Red is never a category colour:
+  it means a failed run.
 - **Sections.** Nodes are grouped into sections with a count: Essentials (the
   eight nodes nearly every flow uses), Core, Control flow, Events and time,
   Variables, Data and text, Values and schema, Files and artifacts, Media,
@@ -446,14 +470,22 @@ full title (wrapped, never cut) and a small badge naming its kind (Event,
 Core, Control, Value, Data, Math, File, Memory, Variable, Media, Entity,
 Artifact, Schema), then the input ports on the left and the output ports on
 the right, each labelled and coloured by its type (see **Pin Types**). The
-node's category colour is the band at the top of its header.
+node's category colour (the table above) is the band at the top of its
+header, the header tint and the tile behind its icon; the edges keep the pin
+type colours.
 
 - **Selection and hover.** A selected node has an accent ring; a hovered node
-  lifts with a soft outline.
+  lifts with an outline in its category colour.
+- **Tap, click and drag.** A tap or a click on a node selects it and opens its
+  properties, also when it is already selected. Pressing a node and moving
+  beyond a few pixels (about 10 px with a finger, 4 px with a mouse) drags it:
+  a drag never selects the node or opens the properties panel.
 - **Run status.** While a run is live, the running node pulses in green, a
   node that just finished glows blue for a few seconds, the node a run is
   waiting on has a dashed amber outline, and the node a run failed on is
-  outlined in red. The colours come from your theme.
+  outlined in red. The colours come from your theme, and the header also shows
+  the status as an icon with its name in a tooltip (spinner Running, check
+  Done, pause Waiting, warning Failed), so the colour is never the only cue.
 - **Zoom controls.** The buttons at the bottom left zoom in, zoom out, fit the
   whole flow in view, and **Canvas lock** (pressed = nodes cannot be moved,
   connected or selected), each with its kit icon (magnifier with plus or
@@ -5439,6 +5471,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Requires `@abstractframework/ui-kit` 0.8.6 (`^0.8.6`; the dedicated icons below).
 - **Dedicated node and control icons.** The palette, the canvas cards and the Properties header draw the ui-kit 0.8.6 icon made for each node instead of the nearest stand-in: `image` (generate / edit / image-to-image / upscale), `video`, `camera`, `music`, `database` (stored memory), `branch` (If, Switch), `loop` (Loop, For, While), `variable`, `minus` (Subtract), `divide`, `function` (Modulo, Power, Abs, Round). The canvas controls use the kit's `zoomIn`, `zoomOut`, `fitView` and `lock` (the locally drawn glyphs are gone). A test proves every mapping names an icon in the kit's `ICON_NAMES`. Requires `@abstractframework/ui-kit` ^0.8.6.
+- **Category colours** (see [Web Editor](docs/web-editor.md#node-palette-and-node-cards)): every palette section has one colour — a dot and a tinted count on its header, and each node's icon drawn in that colour on a faint tile, with hover and keyboard focus in the same colour. A node keeps its home section's colour in Essentials, in search results, on its canvas card (header band, header tint and icon tile — no longer the saved `headerColor`, which stays in the file for older clients), in the run view and in the preview map. Seven hues from the dataviz skill's validated categorical palette, one step per theme (light themes use the ui-kit light-theme group), assigned so neighbouring sections stay distinct for colour-blind readers; related sections share one (Variables + Values, Data + Math, Files + Media, Memory + Entity mind); red is reserved for failed runs. All hues live in one token file (`src/styles/categories.css`); text keeps the kit's text tokens (≥ 4.5:1 measured in both themes). The **Nodes** title's tooltip is the legend ("Colours mark the node's category"). The search box, the drag hint and the resize edge use the kit's field and surface styles.
+- **Run status icon on canvas cards**: running, done, waiting and failed also show as an icon with the status name (spinner, check, pause, warning) in the card header, so the status colour is never the only cue.
+- **Tap, click and drag on canvas nodes**: a press that moves beyond the drag threshold (about 10 px for touch, 4 px for a mouse) is a drag — it never selects the node or opens the properties panel (on a phone, the first touch-drag used to open it). A tap or click without movement selects the node and opens its properties, also when it was already selected (closing the panel and tapping the same node used to leave it closed).
 - CI: `npm run check:lock` (also a CI step) fails when `package-lock.json` lags `package.json` or resolves an `@abstractframework/*` dependency below its floor; the lock now resolves `@abstractframework/app-server` 0.1.12. See [CONTRIBUTING](CONTRIBUTING.md#lockfile-check).
 
 ## [0.8.0] - 2026-10-05

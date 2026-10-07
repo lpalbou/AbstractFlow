@@ -74,6 +74,30 @@ monochrome icon from the shared AbstractFramework icon set.
   nodes; minus, divide and a function sign for math. The full set is listed in
   the ui-kit's [Icons](https://github.com/lpalbou/AbstractUIC/blob/main/docs/icons.md) page.
 
+- **Colours.** Each section has one colour: a dot before its name and a tinted
+  count, and every node draws its icon in that colour on a faint tile of it.
+  A node keeps its home section's colour everywhere — in Essentials, in the
+  search results, on its canvas card and in the preview map (On Flow Start is
+  an Events and time node, Agent a Core node, If/Else a Control flow node).
+  Hover the **Nodes** title for the legend: "Colours mark the node's
+  category". Related sections share a colour so the palette stays readable;
+  the section name, the icon and the card's badge always say which one it is,
+  so the colour is never the only cue:
+
+  | Colour | Sections |
+  | --- | --- |
+  | Violet | Core (agents, LLM calls, code, subflows) |
+  | Orange | Control flow |
+  | Aqua | Events and time |
+  | Yellow | Variables, Values and schema |
+  | Magenta | Data and text, Math |
+  | Blue | Files and artifacts, Media |
+  | Green | Memory, Entity mind |
+
+  The light and dark themes each use their own step of the same seven hues,
+  chosen so neighbouring sections stay distinct for colour-blind readers and
+  every label keeps at least 4.5:1 contrast. Red is never a category colour:
+  it means a failed run.
 - **Sections.** Nodes are grouped into sections with a count: Essentials (the
   eight nodes nearly every flow uses), Core, Control flow, Events and time,
   Variables, Data and text, Values and schema, Files and artifacts, Media,
@@ -102,14 +126,22 @@ full title (wrapped, never cut) and a small badge naming its kind (Event,
 Core, Control, Value, Data, Math, File, Memory, Variable, Media, Entity,
 Artifact, Schema), then the input ports on the left and the output ports on
 the right, each labelled and coloured by its type (see **Pin Types**). The
-node's category colour is the band at the top of its header.
+node's category colour (the table above) is the band at the top of its
+header, the header tint and the tile behind its icon; the edges keep the pin
+type colours.
 
 - **Selection and hover.** A selected node has an accent ring; a hovered node
-  lifts with a soft outline.
+  lifts with an outline in its category colour.
+- **Tap, click and drag.** A tap or a click on a node selects it and opens its
+  properties, also when it is already selected. Pressing a node and moving
+  beyond a few pixels (about 10 px with a finger, 4 px with a mouse) drags it:
+  a drag never selects the node or opens the properties panel.
 - **Run status.** While a run is live, the running node pulses in green, a
   node that just finished glows blue for a few seconds, the node a run is
   waiting on has a dashed amber outline, and the node a run failed on is
-  outlined in red. The colours come from your theme.
+  outlined in red. The colours come from your theme, and the header also shows
+  the status as an icon with its name in a tooltip (spinner Running, check
+  Done, pause Waiting, warning Failed), so the colour is never the only cue.
 - **Zoom controls.** The buttons at the bottom left zoom in, zoom out, fit the
   whole flow in view, and **Canvas lock** (pressed = nodes cannot be moved,
   connected or selected), each with its kit icon (magnifier with plus or

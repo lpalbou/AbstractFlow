@@ -89,4 +89,9 @@ describe('Canvas wiring', () => {
     expect(canvas).toMatch(/!nodeTapTracker\.current\.isTap\(nodeId\)\) event\.stopPropagation\(\)/);
     expect(canvas).toMatch(/requestNodeProperties\(node\.id\)/);
   });
+
+  it('App opens the properties on every tap request (not only on a selection change)', () => {
+    const app = readFileSync(resolve(__dirname, '../App.tsx'), 'utf8');
+    expect(app).toMatch(/if \(propertiesRequest\) dispatch_drawers\(\{ type: 'select', nodeId: propertiesRequest\.nodeId \}\);\s*\}, \[propertiesRequest\]\);/);
+  });
 });
