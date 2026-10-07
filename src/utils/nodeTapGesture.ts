@@ -9,7 +9,12 @@
  * (a finger jitters more than a mouse).
  *
  * Pure: Canvas feeds it the capture-phase pointer events of the canvas
- * wrapper and asks it, on the click that follows, whether that click is a tap.
+ * wrapper. The tap is DECIDED AT POINTERUP (`up()` returns the tapped node):
+ * React Flow's d3-drag drops the browser click after any movement at all, so
+ * a 1-3 px trackpad click would never reach onNodeClick. The click that ends
+ * a drag is swallowed (`isTap()` false), and while a press is in progress the
+ * canvas ignores React Flow's drag-start deselection (`pressing`), so a drag
+ * leaves the selection and the panel as they were.
  */
 
 /** Movement (CSS px, screen space) beyond which a press is a drag. */
@@ -58,12 +63,14 @@ export class NodeTapTracker {
     if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > p.threshold) p.dragged = true;
   }
 
-  up(e: GesturePointer): void {
+  /** Pointer up: returns the node id when this press was a TAP on a node, else null. */
+  up(e: GesturePointer): string | null {
     const p = this.press;
-    if (!p || p.pointerId !== e.pointerId) return;
+    if (!p || p.pointerId !== e.pointerId) return null;
     this.move(e);
     this.last = { nodeId: p.nodeId, dragged: p.dragged };
     this.press = null;
+    return p.dragged ? null : p.nodeId;
   }
 
   /** A cancelled press (scroll/pinch took over) is never a tap. */
@@ -85,5 +92,10 @@ export class NodeTapTracker {
   /** Whether the press in progress has become a drag. */
   get dragging(): boolean {
     return Boolean(this.press?.dragged);
+  }
+
+  /** A press on a node is in progress (pointer down, not yet up). */
+  get pressing(): boolean {
+    return this.press !== null;
   }
 }

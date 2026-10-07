@@ -81,6 +81,26 @@ describe('tap vs drag on a node', () => {
   });
 });
 
+describe('the tap is decided at pointerup', () => {
+  it('up() returns the tapped node for a tap and null for a drag; pressing spans down → up', () => {
+    const t = new NodeTapTracker();
+    t.down(ev('mouse', 100, 100), 'n1');
+    expect(t.pressing).toBe(true);
+    t.move(ev('mouse', 102, 101)); // a 1-3 px trackpad click is still a tap
+    expect(t.up(ev('mouse', 103, 100))).toBe('n1');
+    expect(t.pressing).toBe(false);
+    t.down(ev('mouse', 100, 100), 'n1');
+    t.move(ev('mouse', 105, 100));
+    expect(t.up(ev('mouse', 105, 100))).toBe(null);
+    t.down(ev('touch', 100, 100), 'n1');
+    t.move(ev('touch', 113, 100)); // the 11-14 px band: a drag for a finger
+    expect(t.up(ev('touch', 113, 100))).toBe(null);
+    t.down(ev('touch', 100, 100), null); // pane press: no node, not pressing
+    expect(t.pressing).toBe(false);
+    expect(t.up(ev('touch', 100, 100))).toBe(null);
+  });
+});
+
 describe('Canvas wiring', () => {
   const canvas = readFileSync(resolve(__dirname, '../components/Canvas.tsx'), 'utf8');
   it('React Flow never selects on drag and the click that ends a drag is swallowed before React Flow', () => {
@@ -88,6 +108,14 @@ describe('Canvas wiring', () => {
     expect(canvas).toMatch(/onClickCapture=\{handleCanvasClickCapture\}/);
     expect(canvas).toMatch(/!nodeTapTracker\.current\.isTap\(nodeId\)\) event\.stopPropagation\(\)/);
     expect(canvas).toMatch(/requestNodeProperties\(node\.id\)/);
+  });
+
+  it('pointerup selects + opens the tapped node (no dependence on the click); drag-start deselection ignored while pressing', () => {
+    expect(canvas).toMatch(/const tapped = nodeTapTracker\.current\.up\(event\);/);
+    expect(canvas).toMatch(/store\.selectNodeById\(tapped\);\s*store\.requestNodeProperties\(tapped\);/);
+    expect(canvas).toMatch(/onNodesChange=\{handleNodesChange\}/);
+    expect(canvas).toMatch(/if \(!nodeTapTracker\.current\.pressing\) \{/);
+    expect(canvas).toMatch(/nodeTapTracker\.current\.down\(event, nodeEl\?\.getAttribute\('data-id'\) \|\| null\);/);
   });
 
   it('App opens the properties on every tap request (not only on a selection change)', () => {

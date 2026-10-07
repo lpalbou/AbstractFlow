@@ -135,7 +135,8 @@ type colours.
 - **Tap, click and drag.** A tap or a click on a node selects it and opens its
   properties, also when it is already selected. Pressing a node and moving
   beyond a few pixels (about 10 px with a finger, 4 px with a mouse) drags it:
-  a drag never selects the node or opens the properties panel.
+  a drag never selects the node or opens the properties panel, and the node
+  you had selected stays selected with its panel open.
 - **Run status.** While a run is live, the running node pulses in green, a
   node that just finished glows blue for a few seconds, the node a run is
   waiting on has a dashed amber outline, and the node a run failed on is

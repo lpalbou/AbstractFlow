@@ -17,6 +17,7 @@ import ReactFlow, {
   EdgeProps,
   useStore,
   useStoreApi,
+  type NodeChange,
 } from 'reactflow';
 import toast from 'react-hot-toast';
 import { nodeTypes } from './nodes';
@@ -421,7 +422,17 @@ function CanvasBody() {
 
   const handleCanvasPointerReleaseCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.type === 'pointerup') nodeTapTracker.current.up(event);
+      if (event.type === 'pointerup') {
+        // The tap is decided here, not on the click (d3-drag drops the click
+        // after a 1 px move): select the node and open its properties. A
+        // modifier click is left to React Flow (multi-selection).
+        const tapped = nodeTapTracker.current.up(event);
+        if (tapped && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
+          const store = useFlowStore.getState();
+          store.selectNodeById(tapped);
+          store.requestNodeProperties(tapped);
+        }
+      }
       resetCanvasInteraction(event.pointerId);
     },
     [resetCanvasInteraction]
@@ -443,6 +454,21 @@ function CanvasBody() {
       }
     },
     [resetCanvasInteraction]
+  );
+
+  // React Flow deselects everything when a drag starts on an unselected node
+  // (selectNodesOnDrag={false}); during a node press that deselection is
+  // ignored, so dragging A leaves B selected and its panel open (R15.2).
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      if (!nodeTapTracker.current.pressing) {
+        onNodesChange(changes);
+        return;
+      }
+      const kept = changes.filter((c) => !(c.type === 'select' && !c.selected));
+      if (kept.length) onNodesChange(kept);
+    },
+    [onNodesChange]
   );
 
   // The click that ends a node DRAG never reaches React Flow (no select, no
@@ -1053,7 +1079,7 @@ function CanvasBody() {
         <ReactFlow
           nodes={previewNodes}
           edges={decoratedEdges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
           onConnectStart={handleConnectStart}
