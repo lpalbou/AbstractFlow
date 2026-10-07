@@ -64,6 +64,7 @@ function monitor_memory_enabled(): boolean {
 
 function App() {
   const { selectedNode } = useFlowStore();
+  const propertiesRequest = useFlowStore((s) => s.propertiesRequest);
   const deep_link_banner = useDeepLinkBanner((s) => s.text);
   const clear_deep_link_banner = useDeepLinkBanner((s) => s.clear);
   const queryClient = useQueryClient();
@@ -143,6 +144,12 @@ function App() {
   useEffect(() => {
     dispatch_drawers({ type: 'select', nodeId: selected_node_id });
   }, [selected_node_id]);
+
+  // A tap/click on a node (never a drag — Canvas decides, utils/nodeTapGesture)
+  // opens its properties even when it was already selected (R15.2).
+  useEffect(() => {
+    if (propertiesRequest) dispatch_drawers({ type: 'select', nodeId: propertiesRequest.nodeId });
+  }, [propertiesRequest]);
 
   useEffect(() => {
     dispatch_drawers({ type: 'viewport', narrow });

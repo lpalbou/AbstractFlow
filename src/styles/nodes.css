@@ -133,11 +133,11 @@
 }
 
 .react-flow__node:hover .flow-node:not(.selected):not(.executing):not(.recent):not(.waiting):not(.failed) {
-  border-color: color-mix(in srgb, var(--node-accent, #8495b4) 55%, rgba(192, 211, 242, 0.6));
+  border-color: color-mix(in srgb, var(--node-accent) 55%, rgba(192, 211, 242, 0.6));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     0 14px 32px rgba(0, 0, 0, 0.42),
-    0 0 0 1px color-mix(in srgb, var(--node-accent, #5f8bce) 30%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--node-accent) 30%, transparent);
 }
 
 /* Selected: the theme accent ring (reads in every theme, on any header colour). */
@@ -223,16 +223,19 @@
 }
 
 /* Node card header (R13.3): one consistent treatment for every node — the
- * node's category colour (--node-accent, from headerColor) is a top band and a
- * tint, the icon is a monochrome kit glyph, the full title WRAPS (never an
- * ellipsis), and a small type badge names the category. Same contrast on
- * every header colour (no white-on-cyan / white-on-lime). */
+ * node's category colour (--node-accent = var(--flow-cat-<section>), R14-W8,
+ * styles/categories.css; the saved headerColor is no longer painted) is a top
+ * band and a tint, the icon is a kit glyph in the category hue on a tile of
+ * it, the full title WRAPS (never an ellipsis), and a small type badge names
+ * the category. Same contrast on every category (text ≥ 4.5:1, measured in
+ * untracked/round14/w8/contrast.json). Run status never uses the category
+ * hue: it is the frame ring (kit status tokens) + a header status glyph. */
 .node-header {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 7px 10px 7px 10px;
-  border-top: 3px solid var(--node-accent, #8495b4);
+  border-top: 3px solid var(--node-accent);
   border-radius: 4px 4px 0 0;
   font-weight: 600;
   font-size: var(--font-size-md);
@@ -240,7 +243,11 @@
   color: rgba(255, 255, 255, 0.96);
   position: relative;
   min-width: 0;
-  background: color-mix(in srgb, var(--node-accent, #8495b4) 24%, #23253a);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--node-accent) 28%, var(--flow-card-ground)),
+    color-mix(in srgb, var(--node-accent) 18%, var(--flow-card-ground))
+  );
   box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.28);
 }
 
@@ -440,8 +447,43 @@
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--node-accent, #8495b4) 30%, transparent);
-  color: color-mix(in srgb, var(--node-accent, #8495b4) 45%, #ffffff);
+  background: color-mix(in srgb, var(--node-accent) 34%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--node-accent) 45%, transparent);
+  color: color-mix(in oklab, var(--node-accent) 45%, var(--flow-card-ink));
+}
+
+/* Run status glyph (NodeStatusGlyph): the kit status token, lifted toward
+ * white so it reads on the dark card in light themes too (where the kit's
+ * status steps are darkened for light surfaces). */
+.node-status-glyph {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: color-mix(in oklab, var(--node-status-color) 70%, var(--flow-card-ink));
+}
+
+.node-status-glyph--running { --node-status-color: var(--success); }
+.node-status-glyph--done { --node-status-color: var(--info); }
+.node-status-glyph--waiting { --node-status-color: var(--warning); }
+.node-status-glyph--failed { --node-status-color: var(--error); }
+
+.node-status-glyph--running svg {
+  animation: nodeStatusSpin 1.2s linear infinite;
+}
+
+@keyframes nodeStatusSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-status-glyph--running svg {
+    animation: none;
+  }
 }
 
 .node-heading {
@@ -1149,7 +1191,8 @@
 .exec-view-node {
   --exec-family-color: #8898b0;
   /* Defaults to the family color; overridden per node with the same
-     headerColor the full view uses (set inline by ExecViewNode). */
+     category colour the full view uses (var(--flow-cat-<section>), set
+     inline by ExecViewNode — R14-W8). */
   --exec-header-color: var(--exec-family-color);
   position: relative;
   display: flex;
@@ -1167,7 +1210,7 @@
 }
 
 .react-flow__node:hover .exec-view-node:not(.selected):not(.executing):not(.recent) {
-  border-color: color-mix(in srgb, var(--exec-header-color) 70%, #fff);
+  border-color: color-mix(in srgb, var(--exec-header-color) 70%, var(--flow-card-ink));
 }
 
 /* Family shapes (radius cues; color comes from the node header). */
@@ -1213,7 +1256,7 @@
      canvas background so it works on light and dark themes. */
   box-shadow:
     0 0 0 3px var(--bg-primary),
-    0 0 0 4.5px color-mix(in srgb, var(--exec-header-color) 80%, #fff),
+    0 0 0 4.5px color-mix(in srgb, var(--exec-header-color) 80%, var(--flow-card-ink)),
     0 12px 28px rgba(0, 0, 0, 0.34);
 }
 
@@ -1232,8 +1275,10 @@
   min-height: 34px;
   padding: 5px 12px;
   border-radius: inherit;
-  background-color: var(--exec-header-color);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.12));
+  /* R14-W8: the category tint of the full-view header (white text keeps
+     ≥ 4.5:1 on every category; a solid hue did not). */
+  background-color: color-mix(in srgb, var(--exec-header-color) 30%, var(--flow-card-ground));
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.12));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 0 -1px 0 rgba(0, 0, 0, 0.22);

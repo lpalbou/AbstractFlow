@@ -14,6 +14,8 @@ import { createNodeData, getNodeTemplate } from '../../types/nodes';
 import type { FlowNodeData, NodeType } from '../../types/flow';
 import { BaseNode } from './BaseNode';
 import { nodeTypeBadge } from '../../utils/nodeIcons';
+import { NODE_STATUS_GLYPH, NodeStatusGlyph } from './NodeStatusGlyph';
+import { ICON_NAMES } from '@abstractframework/ui-kit';
 
 function renderNode(type: NodeType, patch: Partial<FlowNodeData> = {}, selected = false): string {
   const template = getNodeTemplate(type);
@@ -75,10 +77,12 @@ describe('canvas node card', () => {
     expect(h).not.toMatch(/ellipsis|truncate|nowrap/);
   });
 
-  it('the category colour is a card variable (--node-accent), not a header fill', () => {
+  it('the category colour is a card variable (--node-accent = its category token), not a header fill', () => {
     const html = renderNode('if');
-    const template = getNodeTemplate('if')!;
-    expect(html).toContain(`--node-accent:${template.headerColor}`);
+    // R14-W8: the category token, never the saved headerColor.
+    expect(html).toContain('--node-accent:var(--flow-cat-control)');
+    expect(html).not.toContain(`--node-accent:${getNodeTemplate('if')!.headerColor}`);
+    expect(html).toContain('data-color-section="control"');
     expect(header(html)).not.toMatch(/background-color/);
   });
 
@@ -128,5 +132,46 @@ describe('run status marks', () => {
     const src = readFileSync(resolve(__dirname, '../../hooks/useWebSocket.ts'), 'utf8');
     expect(src).toMatch(/setNodeRunMark\('waiting', info\.nodeId/);
     expect(src).toMatch(/setNodeRunMark\('failed', failedAt/);
+  });
+});
+
+// R14-W8: colour is never the only status signal — each run status draws a kit
+// glyph with the status name in the header, and the frame keeps the theme's
+// status token (never the category hue).
+describe('run status glyph (R14-W8)', () => {
+  // (SSR renders the store's initial state, so the glyph itself is rendered
+  // with each status and BaseNode's wiring is read from its source.)
+  it.each([
+    ['running', 'Running', 'loader'],
+    ['waiting', 'Waiting', 'pause'],
+    ['failed', 'Failed', 'warning'],
+    ['done', 'Done', 'check'],
+  ] as const)('%s → a kit glyph labelled "%s"', (status, label, icon) => {
+    const html = renderToStaticMarkup(createElement(NodeStatusGlyph, { status }));
+    expect(html).toContain(`class="node-status-glyph node-status-glyph--${status}"`);
+    expect(html).toContain(`aria-label="${label}"`);
+    expect(html).toContain('<svg');
+    expect(NODE_STATUS_GLYPH[status].icon).toBe(icon);
+    expect(ICON_NAMES).toContain(icon);
+  });
+
+  it('BaseNode draws the glyph in the header for the card status (running / waiting / failed / done)', () => {
+    const src = readFileSync(resolve(__dirname, 'BaseNode.tsx'), 'utf8');
+    expect(src).toMatch(/<NodeStatusGlyph status=\{runStatus \|\| \(isRecent \? 'done' : undefined\)\} \/>/);
+    const h = src.slice(src.indexOf('<div className="node-header">'), src.indexOf('<div className="node-body">'));
+    expect(h).toContain('<NodeStatusGlyph');
+  });
+
+  it('no status → no glyph', () => {
+    expect(header(renderNode('code'))).not.toContain('node-status-glyph');
+    expect(renderToStaticMarkup(createElement(NodeStatusGlyph, {}))).toBe('');
+  });
+
+  it('the glyph colours are the kit status tokens (same mapping as the frame)', () => {
+    const css = readFileSync(resolve(__dirname, '../../styles/nodes.css'), 'utf8');
+    expect(css).toMatch(/\.node-status-glyph--running\s*\{\s*--node-status-color:\s*var\(--success\)/);
+    expect(css).toMatch(/\.node-status-glyph--done\s*\{\s*--node-status-color:\s*var\(--info\)/);
+    expect(css).toMatch(/\.node-status-glyph--waiting\s*\{\s*--node-status-color:\s*var\(--warning\)/);
+    expect(css).toMatch(/\.node-status-glyph--failed\s*\{\s*--node-status-color:\s*var\(--error\)/);
   });
 });

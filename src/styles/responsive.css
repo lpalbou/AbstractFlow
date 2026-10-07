@@ -664,6 +664,19 @@ body {
     font-size: 14px;
   }
 
+  /* 44 px rows: the icon tile centres on the label (R14-W8). */
+  .palette-node {
+    align-items: center;
+  }
+
+  .palette-node-label {
+    padding-top: 0;
+  }
+
+  .palette-node-status {
+    margin-top: 0;
+  }
+
   .palette-empty-clear,
   .pin-legend-toggle,
   .modal-button,

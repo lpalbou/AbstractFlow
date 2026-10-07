@@ -37,6 +37,8 @@ import {
   type ConnectionDragEndpoint,
 } from '../utils/connectionPreview';
 import { computeExecSubgraph } from '../utils/execView';
+import { nodeColorSection } from '../utils/nodeCategoryColors';
+import { NodeTapTracker } from '../utils/nodeTapGesture';
 import { computeFoldedGetters } from '../utils/foldedGetters';
 import { FoldedGettersContext } from '../hooks/foldedGettersContext';
 
@@ -407,12 +409,19 @@ function CanvasBody() {
     [reactFlowStore, releasePointerCapture, hasActiveReactFlowConnection]
   );
 
+  // R15.2 tap vs drag on a node: a press that moves beyond the threshold is a
+  // drag (never select-and-open); a tap selects and opens (utils/nodeTapGesture).
+  const nodeTapTracker = useRef(new NodeTapTracker());
+
   const handleCanvasPointerDownCapture = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     activeCanvasPointerIds.current.add(event.pointerId);
+    const nodeEl = (event.target as Element | null)?.closest?.('.react-flow__node');
+    nodeTapTracker.current.down(event, nodeEl?.getAttribute('data-id') || null);
   }, []);
 
   const handleCanvasPointerReleaseCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.type === 'pointerup') nodeTapTracker.current.up(event);
       resetCanvasInteraction(event.pointerId);
     },
     [resetCanvasInteraction]
@@ -420,6 +429,7 @@ function CanvasBody() {
 
   const handleCanvasPointerCancelCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      nodeTapTracker.current.cancel(event);
       resetCanvasInteraction(event.pointerId, { forceConnectionCancel: true });
     },
     [resetCanvasInteraction]
@@ -427,12 +437,21 @@ function CanvasBody() {
 
   const handleCanvasPointerMoveCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      nodeTapTracker.current.move(event);
       if (event.buttons === 0 && activeCanvasPointerIds.current.size > 0) {
         resetCanvasInteraction(event.pointerId);
       }
     },
     [resetCanvasInteraction]
   );
+
+  // The click that ends a node DRAG never reaches React Flow (no select, no
+  // onNodeClick, so no properties panel).
+  const handleCanvasClickCapture = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    const nodeEl = (event.target as Element | null)?.closest?.('.react-flow__node');
+    const nodeId = nodeEl?.getAttribute('data-id');
+    if (nodeId && !nodeTapTracker.current.isTap(nodeId)) event.stopPropagation();
+  }, []);
 
   // Map pin handle ids → pin types so we can color data edges by their data type.
   const pinTypesByNodeId = useMemo(() => {
@@ -634,6 +653,8 @@ function CanvasBody() {
     (_event: MouseEvent, node: Node<FlowNodeData>) => {
       const { connectionPreview: _preview, ...cleanData } = node.data;
       setSelectedNode({ ...node, data: cleanData });
+      // A tap opens the properties even when the node was already selected (R15.2).
+      useFlowStore.getState().requestNodeProperties(node.id);
     },
     [setSelectedNode]
   );
@@ -820,7 +841,9 @@ function CanvasBody() {
 
   const minimapNodeClassName = useCallback(
     (node: Node<FlowNodeData>): string => {
-      const classes = ['canvas-preview-node'];
+      // R14-W8: the rectangle takes the node's category colour (styles/categories.css).
+      const data = node.data as FlowNodeData | undefined;
+      const classes = ['canvas-preview-node', `flow-cat--${nodeColorSection(String(data?.nodeType || ''), data?.label)}`];
       if (executingNodeId === node.id) classes.push('is-executing');
       else if (recentNodeIds && recentNodeIds[node.id]) classes.push('is-recent');
       if (node.selected || selectedNode?.id === node.id) classes.push('is-selected');
@@ -1019,6 +1042,7 @@ function CanvasBody() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onPointerDownCapture={handleCanvasPointerDownCapture}
+      onClickCapture={handleCanvasClickCapture}
       onPointerMoveCapture={handleCanvasPointerMoveCapture}
       onPointerUpCapture={handleCanvasPointerReleaseCapture}
       onPointerCancelCapture={handleCanvasPointerCancelCapture}
@@ -1037,6 +1061,10 @@ function CanvasBody() {
           isValidConnection={handleIsValidConnection}
           connectionMode={ConnectionMode.Strict}
           onNodeClick={handleNodeClick}
+          // R15.2: dragging a node does not select it (a drag is never
+          // select-and-open), and a drag only starts once the pointer moves.
+          selectNodesOnDrag={false}
+          nodeDragThreshold={1}
           onEdgeClick={handleEdgeClick}
           onPaneClick={handlePaneClick}
           onInit={handleInit}

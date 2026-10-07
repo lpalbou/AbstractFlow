@@ -1,0 +1,109 @@
+/**
+ * Node category colours (R14-W8): THE token file — the only place in the app
+ * where a category hue is written as a literal. Everything else reads
+ * var(--flow-cat-<section>) (palette rows and headers, canvas card headers,
+ * run-view nodes, the minimap) and mixes it with the kit's theme tokens.
+ *
+ * Hues: the dataviz skill's validated categorical steps (references/palette.md),
+ * one step per mode, assigned to the palette sections in display order so
+ * every ADJACENT pair clears the CVD target (ΔE ≥ 8, OKLab ×100) and the
+ * normal-vision floor (ΔE ≥ 15) in both modes — validate_palette.js run in
+ * untracked/round14/w8/palette-validation.txt. Seven hues for eleven sections:
+ * the skill never generates a 9th hue, so related sections share a family
+ * (Variables + Values, Data + Math, Files + Media, Memory + Entity mind) and
+ * the section name, the icon and the canvas type badge always carry identity
+ * (colour is never the only signal). Red is not used: it is the theme's
+ * "failed" colour (status colours stay the kit's --success/--info/--warning/
+ * --error tokens on the card frame; the category hue only ever touches the
+ * header band, the icon tile and the palette marks).
+ *
+ * Light steps apply to the kit's light theme group (same selector list as
+ * the ui-kit theme.css light block — utils/nodeCategoryColors.test.ts pins
+ * it). Canvas node cards are dark in every theme (Blueprint convention,
+ * index.css), so .flow-node and .exec-view-node always take the dark steps;
+ * the minimap sits on the theme surface and takes the theme's steps.
+ */
+
+:root {
+  --flow-hue-violet: #9085e9;
+  --flow-hue-orange: #d95926;
+  --flow-hue-aqua: #199e70;
+  --flow-hue-yellow: #c98500;
+  --flow-hue-magenta: #d55181;
+  --flow-hue-blue: #3987e5;
+  --flow-hue-green: #008300;
+}
+
+:root.theme-light,
+:root.theme-solarized-light,
+:root.theme-catppuccin-latte,
+:root.theme-rose-pine-dawn,
+:root.theme-one-light,
+:root.theme-everforest-light {
+  --flow-hue-violet: #4a3aa7;
+  --flow-hue-orange: #eb6834;
+  --flow-hue-aqua: #1baf7a;
+  --flow-hue-yellow: #eda100;
+  --flow-hue-magenta: #e87ba4;
+  --flow-hue-blue: #2a78d6;
+  --flow-hue-green: #008300;
+}
+
+/* Dark surfaces inside a light theme: the canvas cards (full and run view). */
+.flow-node,
+.exec-view-node {
+  --flow-hue-violet: #9085e9;
+  --flow-hue-orange: #d95926;
+  --flow-hue-aqua: #199e70;
+  --flow-hue-yellow: #c98500;
+  --flow-hue-magenta: #d55181;
+  --flow-hue-blue: #3987e5;
+  --flow-hue-green: #008300;
+}
+
+/* Section → hue (declared wherever the hues are, so each surface resolves
+ * its own steps). "other" = a node type no section claims: neutral. */
+:root,
+.flow-node,
+.exec-view-node {
+  --flow-cat-core: var(--flow-hue-violet);
+  --flow-cat-control: var(--flow-hue-orange);
+  --flow-cat-events: var(--flow-hue-aqua);
+  --flow-cat-variables: var(--flow-hue-yellow);
+  --flow-cat-values: var(--flow-hue-yellow);
+  --flow-cat-data: var(--flow-hue-magenta);
+  --flow-cat-math: var(--flow-hue-magenta);
+  --flow-cat-files: var(--flow-hue-blue);
+  --flow-cat-media: var(--flow-hue-blue);
+  --flow-cat-memory: var(--flow-hue-green);
+  --flow-cat-entity: var(--flow-hue-green);
+  --flow-cat-other: var(--text-muted);
+}
+
+/* The dark card ground and ink the category tints mix with (canvas cards
+ * are dark in every theme), and the card's accent before BaseNode sets the
+ * node's own category. */
+.flow-node,
+.exec-view-node {
+  --flow-card-ground: #23253a;
+  --flow-card-ink: #ffffff;
+}
+
+.flow-node {
+  --node-accent: var(--flow-cat-other);
+}
+
+/* Minimap: each node rectangle takes its category hue (class from
+ * Canvas.tsx minimapNodeClassName; CSS fill beats the SVG attribute). */
+.react-flow__minimap-node.flow-cat--core { fill: var(--flow-cat-core); }
+.react-flow__minimap-node.flow-cat--control { fill: var(--flow-cat-control); }
+.react-flow__minimap-node.flow-cat--events { fill: var(--flow-cat-events); }
+.react-flow__minimap-node.flow-cat--variables { fill: var(--flow-cat-variables); }
+.react-flow__minimap-node.flow-cat--values { fill: var(--flow-cat-values); }
+.react-flow__minimap-node.flow-cat--data { fill: var(--flow-cat-data); }
+.react-flow__minimap-node.flow-cat--math { fill: var(--flow-cat-math); }
+.react-flow__minimap-node.flow-cat--files { fill: var(--flow-cat-files); }
+.react-flow__minimap-node.flow-cat--media { fill: var(--flow-cat-media); }
+.react-flow__minimap-node.flow-cat--memory { fill: var(--flow-cat-memory); }
+.react-flow__minimap-node.flow-cat--entity { fill: var(--flow-cat-entity); }
+.react-flow__minimap-node.flow-cat--other { fill: var(--flow-cat-other); }

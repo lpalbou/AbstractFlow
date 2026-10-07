@@ -19,6 +19,7 @@ import type { FlowNodeData } from '../../types/flow';
 import { PIN_COLORS } from '../../types/flow';
 import { execNodeFamily, execPins, EXEC_FAMILY_LABELS, type ExecNodeFamily } from '../../utils/execView';
 import { getNodeTemplate } from '../../types/nodes';
+import { categoryColorVar, nodeColorSection } from '../../utils/nodeCategoryColors';
 import { PinShape } from '../pins/PinShape';
 
 function FamilyIcon({ family }: { family: ExecNodeFamily }) {
@@ -126,9 +127,9 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
   // Show the node type as a subtitle only when the user renamed the node;
   // otherwise the family name gives the fastest orientation.
   const subtitle = data.label && data.label !== typeLabel ? typeLabel : EXEC_FAMILY_LABELS[family];
-  // Reuse the full-view header color so a node is instantly recognizable when
-  // switching modes; the family color stays as a fallback for unknown types.
-  const headerColor = data.headerColor || template?.headerColor;
+  // Reuse the full-view header colour (the node's category token, R14-W8) so a
+  // node is instantly recognizable when switching modes.
+  const headerColor = categoryColorVar(nodeColorSection(data.nodeType, data.label));
 
   return (
     <div
@@ -142,7 +143,7 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
         isExecuting && 'executing',
         isRecent && !isExecuting && 'recent'
       )}
-      style={headerColor ? ({ '--exec-header-color': headerColor } as CSSProperties) : undefined}
+      style={{ '--exec-header-color': headerColor } as CSSProperties}
     >
       {execInputs.map((pin) => (
         <Handle

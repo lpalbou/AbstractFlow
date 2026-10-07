@@ -8,6 +8,12 @@
  * Enter adds the node at the centre of the canvas), and a resizable width on
  * wide layouts. Drag-and-drop onto the canvas is unchanged.
  *
+ * Colour (R14-W8): every section has one category hue (styles/categories.css
+ * tokens) — a swatch and a tinted count on its header, and each node row
+ * draws its icon in that hue on a faint tile, hover/focus in the same hue.
+ * Essentials rows keep the hue of their home section. The palette title's
+ * kit tooltip is the legend.
+ *
  * Presentation only — the model (sections, search, storage) lives in
  * utils/paletteModel.ts; NODE_CATEGORIES stays the semantic source of truth.
  */
@@ -18,6 +24,7 @@ import {
   useMemo,
   useRef,
   useEffect,
+  type CSSProperties,
   type DragEvent,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -32,9 +39,11 @@ import {
 } from '../utils/gatewayClient';
 import { paletteTapAddsNode, requestPaletteAdd } from '../utils/paletteAdd';
 import { nodeIconName } from '../utils/nodeIcons';
+import { categoryColorVar, colorSectionForCategory } from '../utils/nodeCategoryColors';
 import {
   buildPaletteSections,
   clampPaletteWidth,
+  ESSENTIALS_KEY,
   filterPaletteSections,
   highlightSegments,
   isSectionExpanded,
@@ -50,6 +59,14 @@ import {
 } from '../utils/paletteModel';
 
 const ITEM_SELECTOR = '[data-palette-item]';
+
+/** The palette legend (kit tooltip on the "Nodes" title). */
+export const PALETTE_COLOR_LEGEND = "Colours mark the node's category";
+
+/** Inline style carrying a section's hue to its header or row (`--cat`). */
+function catStyle(section: string): CSSProperties {
+  return { ['--cat' as string]: categoryColorVar(section) } as CSSProperties;
+}
 
 export function NodePalette() {
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
@@ -212,6 +229,8 @@ export function NodePalette() {
     const description = oneLineDescription(template.description);
     const tooltip = status && (disabled || status.checking) ? `${description} ${status.reason}` : description;
     const id = itemId(sectionKey, template);
+    // Essentials rows keep the colour of their home section.
+    const colorSection = colorSectionForCategory(template.category);
     return (
       <AfTooltip key={id} content={tooltip}>
         <div
@@ -226,6 +245,8 @@ export function NodePalette() {
           data-section={sectionKey}
           data-node-type={template.type}
           data-node-label={template.label}
+          data-color-section={colorSection}
+          style={catStyle(colorSection)}
           data-gateway-capability={template.gatewayCapability || undefined}
           data-gateway-capability-status={
             status ? (status.checking ? 'checking' : status.available ? 'available' : 'unavailable') : undefined
@@ -238,12 +259,14 @@ export function NodePalette() {
             if (!disabled && paletteTapAddsNode()) requestPaletteAdd(template);
           }}
         >
-          <Icon
-            name={nodeIconName(template.type, template.label, template.category)}
-            size={16}
-            className="palette-node-icon"
-            aria-hidden="true"
-          />
+          <span className="palette-node-tile" aria-hidden="true">
+            <Icon
+              name={nodeIconName(template.type, template.label, template.category)}
+              size={16}
+              className="palette-node-icon"
+              aria-hidden="true"
+            />
+          </span>
           <span className="palette-node-label">
             {highlightSegments(template.label, searchTerm).map((seg, i) =>
               seg.match ? <mark key={i}>{seg.text}</mark> : <span key={i}>{seg.text}</span>
@@ -261,7 +284,11 @@ export function NodePalette() {
 
   return (
     <div className="node-palette" ref={rootRef}>
-      <h3 className="palette-title" id="node-palette-title">Nodes</h3>
+      <AfTooltip content={PALETTE_COLOR_LEGEND}>
+        <h3 className="palette-title" id="node-palette-title" aria-description={PALETTE_COLOR_LEGEND}>
+          Nodes
+        </h3>
+      </AfTooltip>
 
       <div className="palette-search">
         <input
@@ -301,7 +328,12 @@ export function NodePalette() {
           const headerId = itemId(section.key);
           const listId = `palette-section-${section.key}`;
           return (
-            <section key={section.key} className={`palette-category palette-category--${section.key}`}>
+            <section
+              key={section.key}
+              className={`palette-category palette-category--${section.key}`}
+              data-color-section={section.key === ESSENTIALS_KEY ? undefined : section.key}
+              style={section.key === ESSENTIALS_KEY ? undefined : catStyle(section.key)}
+            >
               <button
                 type="button"
                 className="category-header"
@@ -317,6 +349,7 @@ export function NodePalette() {
                 }}
               >
                 <Icon name="chevronRight" size={14} className="category-chevron" aria-hidden="true" />
+                <span className="category-swatch" aria-hidden="true" />
                 <span className="category-label">{section.label}</span>
                 <span className="category-count" aria-label={`${section.nodes.length} nodes`}>
                   {section.nodes.length}

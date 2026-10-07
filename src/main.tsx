@@ -9,6 +9,8 @@ import '@abstractframework/ui-kit/theme.css';
 // panel-chat's chat styles (the Docs assistant drawer, round 8).
 import '@abstractframework/panel-chat/panel_chat.css';
 import './styles/index.css';
+// Node category colours (R14-W8): the one token file for category hues.
+import './styles/categories.css';
 import './styles/nodes.css';
 import './styles/palette.css';
 import './styles/tooltip.css';

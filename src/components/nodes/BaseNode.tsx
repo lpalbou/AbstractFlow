@@ -31,6 +31,8 @@ import {
 import { hasSecretLikeValue } from '../../utils/flowAuthoringCommands';
 import { useFlowStore } from '../../hooks/useFlow';
 import { HiddenConnectionsBadge } from './HiddenConnectionsBadge';
+import { NodeStatusGlyph } from './NodeStatusGlyph';
+import { categoryColorVar, colorSectionForCategory, nodeSemanticCategory } from '../../utils/nodeCategoryColors';
 import { useModels, useProviders } from '../../hooks/useProviders';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../../utils/capabilityRoutes';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../../hooks/useGatewayCapabilities';
@@ -750,13 +752,10 @@ export const BaseNode = memo(function BaseNode({
     }
   }, [data.nodeType]);
   // R13.3 card header: a kit icon + a type badge from the node's semantic category.
-  const nodeCategory = useMemo(() => {
-    try {
-      return getNodeTemplate(data.nodeType)?.category;
-    } catch {
-      return undefined;
-    }
-  }, [data.nodeType]);
+  // R14-W8: the header accent is that category's colour token (styles/categories.css),
+  // not the saved headerColor (kept in the file for older clients).
+  const nodeCategory = useMemo(() => nodeSemanticCategory(data.nodeType, data.label), [data.nodeType, data.label]);
+  const colorSection = colorSectionForCategory(nodeCategory);
   const headerIcon = nodeIconName(data.nodeType, data.label, nodeCategory);
   const typeBadge = nodeTypeBadge(nodeCategory);
 
@@ -3910,7 +3909,8 @@ export const BaseNode = memo(function BaseNode({
           connectionPreview?.active && 'connection-preview-active'
         )}
         data-run-status={runStatus || (isRecent ? 'done' : undefined)}
-        style={{ ['--node-accent' as any]: data.headerColor }}
+        data-color-section={colorSection}
+        style={{ ['--node-accent' as any]: categoryColorVar(colorSection) }}
       >
       {/* Header with execution pins */}
       <div className="node-header">
@@ -3946,6 +3946,7 @@ export const BaseNode = memo(function BaseNode({
           <span className="node-type-badge">{typeBadge}</span>
         </span>
         {loopBadge ? <span className="node-progress-badge" title="Loop progress">{loopBadge}</span> : null}
+        <NodeStatusGlyph status={runStatus || (isRecent ? 'done' : undefined)} />
         <HiddenConnectionsBadge nodeId={id} />
 
         {/* Execution output pins (right side of header) */}

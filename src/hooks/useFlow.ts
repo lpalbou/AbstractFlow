@@ -144,6 +144,8 @@ interface FlowState {
   // instance), so they signal through the store; Canvas watches the nonce and
   // fits the view. Nonce lets the same node be re-focused on repeated clicks.
   focusNodeRequest: { nodeId: string; nonce: number } | null;
+  /** A tap/click on a node asks for its properties (R15.2): opens the panel even when the selection did not change. */
+  propertiesRequest: { nodeId: string; nonce: number } | null;
 
   // "Fit the whole flow into view" request (bumped by loadFlow so every
   // freshly loaded flow starts fitted, regardless of the previous camera).
@@ -237,6 +239,7 @@ interface FlowState {
   setSelectedEdge: (edge: Edge | null) => void;
   /** Ask the canvas to pan/zoom to a node (used by the Functions drawer). */
   requestFocusNode: (nodeId: string) => void;
+  requestNodeProperties: (nodeId: string) => void;
   copySelectionToClipboard: () => number;
   pasteClipboard: () => number;
   duplicateSelection: () => number;
@@ -592,6 +595,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   selectedNode: null,
   selectedEdge: null,
   focusNodeRequest: null,
+  propertiesRequest: null,
   fitViewRequest: null,
   executingNodeId: null,
   isRunning: false,
@@ -1088,6 +1092,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
   },
   setSelectedEdge: (edge) => set({ selectedEdge: edge, selectedNode: null }),
+  requestNodeProperties: (nodeId) =>
+    set((state) => ({
+      propertiesRequest: { nodeId, nonce: (state.propertiesRequest?.nonce || 0) + 1 },
+    })),
   requestFocusNode: (nodeId) =>
     set((state) => ({
       focusNodeRequest: { nodeId, nonce: (state.focusNodeRequest?.nonce || 0) + 1 },
