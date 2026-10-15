@@ -364,8 +364,12 @@ branch (the report, for example). The run checks warn when that branch is unwire
 wire starts from something other than an If/Else: the path then simply ends at the limit (inside
 a loop body it returns to the loop; at the top level the run ends). Each pass of an enclosing
 ForEach counts on its own. For a round number or an explicit exit, place a **Loop Limit** node on
-the loop instead (its **count** is the pass number); the badge then shows faint. A wire that jumps
-out of a loop body shows the badge greyed: the runtime cannot limit such a loop yet.
+the loop instead (its **count** is the pass number); the badge then shows faint. A wire that goes
+back out of a loop body (an inner ForEach's If/Else wired back to the outer ForEach) shows the
+badge greyed, the run checks refuse it, and the runtime refuses the flow at compile time with the
+same words: "Wire S.pin -> T goes back out of L's loop body: the run would never end. A path inside
+a loop body can only repeat within the body; to repeat the whole loop, wire the loop-back after
+the loop's done." (backlog 1018).
 
 ## Hidden Connections
 

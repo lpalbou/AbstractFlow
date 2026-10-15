@@ -30,12 +30,12 @@ const review = [
 describe('loop-back wires', () => {
   it('finds the wire from If/Else back to the ForEach, unlimited, and only that one', () => {
     const edges = [...review, wire('e4', 'loop', 'done', 'reviewer')];
-    expect([...loopBackWires(nodes, edges)]).toEqual([['e7', { wireLimit: null, limited: false, leavesLoopBody: false }]]);
+    expect([...loopBackWires(nodes, edges)]).toEqual([['e7', { wireLimit: null, limited: false, leavesLoopBody: false, leavesLoop: null }]]);
   });
 
   it('a Loop Limit anywhere on the loop counts (the assist flow: done → ↺ → Reviewer)', () => {
     const edges = [...review, wire('e4', 'loop', 'done', 'limit'), wire('e8', 'limit', 'again', 'reviewer')];
-    expect(loopBackWires(nodes, edges).get('e7')).toEqual({ wireLimit: null, limited: true, leavesLoopBody: false });
+    expect(loopBackWires(nodes, edges).get('e7')).toEqual({ wireLimit: null, limited: true, leavesLoopBody: false, leavesLoop: null });
   });
 
   it('a second way round that skips the Loop Limit leaves the loop unlimited', () => {
@@ -59,10 +59,37 @@ describe('loop-back wires', () => {
       wire('e4', 'step', 'exec-out', 'if'),
       wire('e5', 'if', 'false', 'outer'),
     ];
-    expect(loopBackWires(ns, edges).get('e5')).toEqual({ wireLimit: null, limited: false, leavesLoopBody: true });
+    expect(loopBackWires(ns, edges).get('e5')).toEqual({ wireLimit: null, limited: false, leavesLoopBody: true, leavesLoop: 'outer' });
     // Back to a step inside the same body: fine.
     const inside = [wire('e1', 'start', 'exec-out', 'outer'), wire('e2', 'outer', 'loop', 'step'), wire('e4', 'step', 'exec-out', 'if'), wire('e5', 'if', 'false', 'step')];
-    expect(loopBackWires(ns, inside).get('e5')).toEqual({ wireLimit: null, limited: false, leavesLoopBody: false });
+    expect(loopBackWires(ns, inside).get('e5')).toEqual({ wireLimit: null, limited: false, leavesLoopBody: false, leavesLoop: null });
+  });
+
+  it('leavesLoop names the loop whose body the wire leaves: the first on the way round from the target, left through its loop pin', () => {
+    const outer = loopNode('outer');
+    const middle = loopNode('middle');
+    const ns = [start, outer, middle, loopNode('inner'), node('step', 'agent'), ifNode('if'), node('after', 'agent')];
+    // outer.loop → middle.loop → inner.loop → step → if; if.false → middle: re-enters middle from inside its own body.
+    const edges = [
+      wire('e1', 'start', 'exec-out', 'outer'),
+      wire('e2', 'outer', 'loop', 'middle'),
+      wire('e3', 'middle', 'loop', 'inner'),
+      wire('e4', 'inner', 'loop', 'step'),
+      wire('e5', 'step', 'exec-out', 'if'),
+      wire('e6', 'if', 'false', 'middle'),
+    ];
+    expect(loopBackWires(ns, edges).get('e6')?.leavesLoop).toBe('middle');
+    // Back to the outermost loop: the loop named is the one re-entered, the first on the way round.
+    expect(loopBackWires(ns, [...edges.filter((e) => e.id !== 'e6'), wire('e6', 'if', 'false', 'outer')]).get('e6')?.leavesLoop).toBe('outer');
+    // A loop passed through its done pin is not a body the wire leaves.
+    const afterDone = [
+      wire('e1', 'start', 'exec-out', 'outer'),
+      wire('e2', 'outer', 'loop', 'step'),
+      wire('e3', 'outer', 'done', 'inner'),
+      wire('e4', 'inner', 'done', 'if'),
+      wire('e5', 'if', 'false', 'outer'),
+    ];
+    expect(loopBackWires(ns, afterDone).get('e5')).toEqual({ wireLimit: null, limited: false, leavesLoopBody: false, leavesLoop: null });
   });
 
   it('no repeating path means none; a loop in a part the entry never reaches is still found', () => {
@@ -83,7 +110,7 @@ describe('a limit on the wire', () => {
     store.loadFlow({ id: 'f', name: 'f', nodes: docNodes, edges } as any);
     useFlowStore.getState().setEdgeLoopLimit('e7', 3);
     let s = useFlowStore.getState();
-    expect(loopBackWires(s.nodes, s.edges).get('e7')).toEqual({ wireLimit: 3, limited: true, leavesLoopBody: false });
+    expect(loopBackWires(s.nodes, s.edges).get('e7')).toEqual({ wireLimit: 3, limited: true, leavesLoopBody: false, leavesLoop: null });
     expect(computeRunPreflightIssues(s.nodes, s.edges).map((i) => i.message)).toContain('wire its true branch: that is where the flow goes on once the 3-times limit is reached');
     s.setEdges([...s.edges, wire('e6', 'if', 'true', 'report')]);
     s = useFlowStore.getState();

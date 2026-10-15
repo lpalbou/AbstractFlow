@@ -411,6 +411,25 @@ export function computeRunPreflightIssues(
   // A limit on a wire resumes on the If/Else's other branch; from any other source, or with that
   // branch unwired, the path just ends at the limit (visual/loop_limit_lowering.py in AbstractRuntime).
   const loopBacks = loopBackWires(nodes, edges);
+  // A loop-back that goes out of a ForEach / For / While body re-enters the outer loop without
+  // leaving the inner one: the runtime refuses such a wire at compile time (backlog 1018), so the
+  // editor refuses the run with the same words.
+  for (const [edgeId, info] of loopBacks) {
+    if (!info.leavesLoop) continue;
+    const e = edges.find((x) => x.id === edgeId)!;
+    const source = nodesById.get(e.source);
+    const target = nodesById.get(e.target);
+    const loop = nodesById.get(info.leavesLoop);
+    if (!source || !target || !loop) continue;
+    const handle = String(e.sourceHandle || '');
+    const pin = source.data.outputs.find((p) => p.id === handle);
+    const fromPin = isNonEmptyString(pin?.label) ? pin!.label : handle;
+    const label = (n: Node<FlowNodeData>) => (isNonEmptyString(n.data.label) ? n.data.label.trim() : n.id);
+    push(
+      source,
+      `its wire from ${fromPin} back to ${label(target)} goes back out of ${label(loop)}'s loop body: the run would never end. A path inside a loop body can only repeat within the body; to repeat the whole loop, wire the loop-back after the loop's done.`
+    );
+  }
   for (const e of edges) {
     const max = wireLoopLimit(e);
     if (max === null) continue;

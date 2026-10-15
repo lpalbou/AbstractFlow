@@ -310,7 +310,17 @@ export function wireLoopGlimpse(
   } else if (state === 'node-limited') {
     sections.push({ title: 'Limit', rows: [{ label: 'At most', value: 'capped elsewhere on the loop · click to cap this wire too', kind: 'empty' }] });
   } else {
-    sections.push({ title: 'Limit', rows: [{ label: 'At most', value: 'cannot be set here: this wire jumps out of a loop body', kind: 'empty' }] });
+    sections.push({
+      title: 'Limit',
+      rows: [
+        {
+          label: 'At most',
+          value:
+            "cannot be set here: this wire goes back out of a loop body and the run would never end. A path inside a loop body can only repeat within the body; to repeat the whole loop, wire the loop-back after the loop's done.",
+          kind: 'empty',
+        },
+      ],
+    });
   }
   return { title: state === 'limited' ? `Repeats ${max}×` : 'Repeating path', subtitle: 'wire', sections };
 }

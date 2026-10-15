@@ -525,3 +525,35 @@ describe('declared interface pins: connection and type', () => {
     ]);
   });
 });
+
+describe('preflight — a loop-back out of a loop body (backlog 1018)', () => {
+  const exec = (id: string, source: string, sourceHandle: string, target: string): Edge => ({ id, source, sourceHandle, target, targetHandle: 'exec-in' });
+  const plain = (id: string, nodeType: string, label: string, outputs: FlowNodeData['outputs'], inputs: FlowNodeData['inputs'] = [{ id: 'exec-in', label: '', type: 'execution' }]): Node<FlowNodeData> =>
+    ({ id, type: 'default', position: { x: 0, y: 0 }, data: { nodeType, label, icon: '', headerColor: '', inputs, outputs } as FlowNodeData });
+  const loop = (id: string, label: string) =>
+    plain(id, 'loop', label, [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }]);
+  const nodes = [
+    startNode(),
+    loop('outer', 'Outer ForEach'),
+    loop('inner', 'Inner ForEach'),
+    plain('step', 'agent', 'Worker', [{ id: 'exec-out', label: '', type: 'execution' }]),
+    plain('if', 'if', 'If/Else', [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }]),
+  ];
+  const wires = [exec('e1', 'start', 'exec-out', 'outer'), exec('e2', 'outer', 'loop', 'inner'), exec('e3', 'inner', 'loop', 'step'), exec('e4', 'step', 'exec-out', 'if')];
+
+  it('refuses the run (a blocking issue on the wire\'s source) with the runtime\'s words', () => {
+    const issues = computeRunPreflightIssues(nodes, [...wires, exec('e5', 'if', 'false', 'outer')]);
+    const found = issues.filter((i) => i.message.includes('loop body'));
+    expect(found).toHaveLength(1);
+    expect(found[0].nodeId).toBe('if');
+    expect(found[0].severity).toBeUndefined();
+    expect(found[0].message).toBe(
+      "its wire from false back to Outer ForEach goes back out of Outer ForEach's loop body: the run would never end. A path inside a loop body can only repeat within the body; to repeat the whole loop, wire the loop-back after the loop's done."
+    );
+  });
+
+  it('a loop-back that stays inside the body is not refused', () => {
+    const issues = computeRunPreflightIssues(nodes, [...wires, exec('e5', 'if', 'false', 'step')]);
+    expect(issues.some((i) => i.message.includes('loop body'))).toBe(false);
+  });
+});

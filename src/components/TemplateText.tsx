@@ -118,7 +118,6 @@ export function TemplateTextEditor({ value, onChange, inputs, variables, onAddIn
     if (!el || value === emitted.current) return;
     render(el, value, inputSet, variableSet);
     emitted.current = value;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   // Chip colours follow the node's inputs and the flow's variables.
@@ -130,7 +129,6 @@ export function TemplateTextEditor({ value, onChange, inputs, variables, onAddIn
       chip.className = `tpl-chip tpl-chip--${kind}`;
       chip.title = chipTitle(kind, chip.textContent || '');
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kindsKey]);
 
   const emit = () => {

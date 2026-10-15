@@ -26,9 +26,12 @@ export interface LoopBackWire {
   limited: boolean;
   /**
    * The wire jumps out of a ForEach / For / While body (the loop is entered through `loop`
-   * between the head and the wire's source). The runtime cannot repeat such a loop today.
+   * between the head and the wire's source). The runtime refuses such a wire at compile time
+   * (backlog 1018): the run would never end.
    */
   leavesLoopBody: boolean;
+  /** The id of the loop node whose body the wire leaves (the first one on the way round), or null. */
+  leavesLoop: string | null;
 }
 
 const LOOP_TYPES = new Set(['loop', 'for', 'while']);
@@ -61,10 +64,9 @@ export function loopBackWires(nodes: Node<FlowNodeData>[], edges: Edge[]): Map<s
       stack[stack.length - 1].handle = String(edge.sourceHandle || '');
       const at = onStack.get(edge.target);
       if (at !== undefined) {
-        const leavesLoopBody = stack
-          .slice(at)
-          .some((entry) => LOOP_TYPES.has(byId.get(entry.id)?.data.nodeType || '') && entry.handle === 'loop');
-        found.set(edge.id, { wireLimit: wireLoopLimit(edge), limited: false, leavesLoopBody });
+        const leavesLoop =
+          stack.slice(at).find((entry) => LOOP_TYPES.has(byId.get(entry.id)?.data.nodeType || '') && entry.handle === 'loop')?.id ?? null;
+        found.set(edge.id, { wireLimit: wireLoopLimit(edge), limited: false, leavesLoopBody: leavesLoop !== null, leavesLoop });
       } else if (!done.has(edge.target)) walk(edge.target);
     }
     stack.pop();
