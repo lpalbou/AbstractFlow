@@ -975,6 +975,9 @@ def folded_getter_ids(flow: dict[str, Any]) -> dict[str, tuple[str, str]]:
         target_handle = edge.get("targetHandle")
         if target not in nodes or not target_handle:
             continue
+        # A relay is a dot with no pin rows: there is nowhere to draw the pill.
+        if ((nodes[target].get("data") or {}).get("nodeType")) == "reroute":
+            continue
         folded[node_id] = (target, str(target_handle))
     return folded
 

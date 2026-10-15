@@ -45,7 +45,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe('Run → File System Access (round 11, run level)', () => {
   it('the run window mounts the run-level chooser and hands its value to the start, never to input_data', () => {
     expect(modal).toContain('<RunWorkspaceFolders');
-    expect(modal).toContain('onRun(withRunSpeculation(inputData, runSpeculation), runWorkspace ? { workspace: runWorkspace } : {})');
+    expect(modal).toContain('onRun(inputData, runWorkspace ? { workspace: runWorkspace } : {})');
     expect(modal).not.toContain('workspace_allowed_paths');
     expect(toolbar).toContain('runFlow(inputData, opts)');
     expect(toolbar).toContain('runPublishedFlow(target, inputData, opts)');

@@ -52,3 +52,7 @@ This makes graph construction faster while keeping pin compatibility centralized
 ## Guidance for future agents
 Keep the first implementation narrow: one menu, candidate filtering from templates, create +
 connect. Avoid adding a second connection validation path.
+
+## Progress (2026-10-11)
+
+See 0128 "Progress": the drop menu exists with Relay and Break Object; the compatible-node list is still open.

@@ -498,6 +498,18 @@ describe('declared interface pins: connection and type', () => {
     expect(messages.some((m) => m.startsWith("'response' is not connected"))).toBe(false);
   });
 
+  it('an optional interface pin may be absent: no warning; a required one still warns', () => {
+    const issues = computeRunPreflightIssues([agentStart(), agentEnd()], wired, { flowInterfaces: ['abstractassistant.agent.v1'] });
+    const messages = issues.map((i) => i.message);
+    expect(messages.some((m) => /image_provider|sound_output|primary_image_artifact/.test(m))).toBe(false);
+    const start = agentStart();
+    start.data.outputs = start.data.outputs.filter((p) => p.id !== 'prompt');
+    const missing = computeRunPreflightIssues([start, agentEnd()], wired, { flowInterfaces: ['abstractassistant.agent.v1'] });
+    expect(missing.map((i) => i.message)).toContain(
+      "'prompt' (string) is required by abstractassistant.agent.v1: hosts send it. Add it to On Flow Start or remove the interface"
+    );
+  });
+
   it('a pin default or a pin expression counts as set', () => {
     const end = agentEnd({ pinDefaults: { success: true }, pinExpressions: { meta: '{}' } } as Partial<FlowNodeData>);
     const issues = computeRunPreflightIssues([agentStart(), end], wired, { flowInterfaces: ['abstractcode.agent.v1'] });

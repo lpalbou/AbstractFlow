@@ -1,6 +1,6 @@
 import type { Connection, Edge, Node } from 'reactflow';
 import type { ConnectionPreviewState, FlowNodeData, PinConnectionFeedback, PinType } from '../types/flow';
-import { getConnectionError, validateConnection } from './validation';
+import { getConnectionError, routeChoicesForConnection, validateConnection } from './validation';
 
 export type ConnectionDragEndpoint = {
   nodeId: string;
@@ -12,6 +12,9 @@ export type ConnectionDragEndpoint = {
 function feedbackForConnection(nodes: Node<FlowNodeData>[], edges: Edge[], connection: Connection): PinConnectionFeedback {
   const valid = validateConnection(nodes, edges, connection);
   if (valid) return { status: 'valid', message: 'Compatible target' };
+  if (routeChoicesForConnection(nodes, edges, connection).length > 0) {
+    return { status: 'valid', message: 'Drop to choose the entry path this value feeds' };
+  }
   return { status: 'invalid', message: getConnectionError(nodes, edges, connection) || 'Invalid connection' };
 }
 

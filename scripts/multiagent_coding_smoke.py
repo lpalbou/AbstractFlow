@@ -753,7 +753,7 @@ def main() -> int:
           f"gating_status: {gs and gs['data'].get('nodeType')}")
     # SMELL 1 (operator: "why don't you use a variable enum and do a switch on
     # gating_mode instead of again, a pure function?"). The switch is REFUSED
-    # (exec-lane fork + one Answer User per case + a duplicated prefix, and it
+    # (exec-lane fork + one Show Message (answer_user) per case + a duplicated prefix, and it
     # fails OPEN on an unenumerated value); what the ask is right about — two
     # cases a human can read and edit — is delivered by the flow's own
     # prose-composer shape. No expression on either node; the two words and the

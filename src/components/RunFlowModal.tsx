@@ -21,10 +21,10 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
 import { RunWorkspaceFolders } from './RunWorkspaceFolders';
 import type { RunStartOptions, RunWorkspace } from '../utils/runWorkspaceChoice';
-import { AF_MEDIA, AfAudioPlayer, AfSwitch, SteerComposer, SpeculationSelect, useAfMedia, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AF_MEDIA, AfAudioPlayer, AfSwitch, SteerComposer, SpeculationSelect, useAfMedia } from '@abstractframework/ui-kit';
 import { ListDisclosure } from './ListDisclosure';
 import { useListOpen } from '../utils/listOpen';
-import { parseSpeculationInput, withRunSpeculation } from '../utils/speculationControls';
+import { parseSpeculationInput } from '../utils/speculationControls';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
@@ -33,7 +33,10 @@ import { thinkingOptionsFromModelCapabilities } from '../utils/thinkingControls'
 import { RESEARCH_EFFORT_OPTIONS, isResearchEffortPin, normalizeResearchEffort } from '../utils/researchEffort';
 import { useTools } from '../hooks/useTools';
 import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
-import { RunSwitcherDropdown } from './RunSwitcherDropdown';
+import { RunSwitcherDropdown, fetchRuns } from './RunSwitcherDropdown';
+import { RunPulseBar } from './RunPulseBar';
+import { computeRunPulse, estimateRemaining } from '../utils/runPulse';
+import { toolCallPreview } from '../utils/toolCallPreview';
 import { JsonViewer } from './JsonViewer';
 import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
 import { ArtifactInputField } from './ArtifactInputField';
@@ -1267,6 +1270,14 @@ function GeneratedImageCard({
 }
 
 /** A generated audio artifact, played in the kit waveform player (ui-kit 0.7.0 AfAudioPlayer). */
+
+/**
+ * Steering a live run from the run window (the SteerComposer under the steps).
+ * Hidden (operator 2026-10-11): the run window is for observing a workflow;
+ * steering is "too much for now". Kept wired: set true to bring it back.
+ */
+const SHOW_STEERING = false;
+
 export function GeneratedAudioCard({
   preview,
   autoPlay = false,
@@ -2054,8 +2065,6 @@ export function RunFlowModal({
 
   // Form state for each input pin
   const [formValues, setFormValues] = useState<Record<string, string>>({});
-  const [runSpeculation, setRunSpeculation] = useState<SpeculationValue>();
-  useEffect(() => setRunSpeculation(undefined), [flowId]);
   const [toolsValues, setToolsValues] = useState<Record<string, string[]>>({});
   const [workspaceRandom, setWorkspaceRandom] = useState(true);
   const [workspaceRoot, setWorkspaceRoot] = useState('');
@@ -2898,12 +2907,11 @@ export function RunFlowModal({
     }
 
     // The run's workspaces ride the start body (absent = Use my default); never input_data.
-    onRun(withRunSpeculation(inputData, runSpeculation), runWorkspace ? { workspace: runWorkspace } : {});
+    onRun(inputData, runWorkspace ? { workspace: runWorkspace } : {});
     if (followUpContext) setFollowUpContext(null);
   }, [
     formInputPins,
     formValues,
-    runSpeculation,
     onRun,
     toolsValues,
     visibleFormInputPins,
@@ -3042,6 +3050,13 @@ export function RunFlowModal({
 
   const runSteps = useMemo(() => {
     const openByNode = new Map<string, number>();
+    // One row per node EXECUTION when the mapper names it (ev.execId,
+    // utils/ledgerEvents.ts executionIdFor): an Agent's start / resume /
+    // structured-output steps, an approved tool call or a retry update the same
+    // row. Without an execId (local events), one open row per node, as before.
+    const rowByExec = new Map<string, number>();
+    const rowKey = (ev: ExecutionEvent, nodeId: string | undefined) =>
+      ev.execId ? `${getActualRunId(ev)}:exec:${ev.execId}` : `${getActualRunId(ev)}:${nodeId || ''}`;
     const terminalIndexByNode = new Map<string, number>();
     const all: Step[] = [];
 
@@ -3263,7 +3278,14 @@ export function RunFlowModal({
       }
 
       if (ev.type === 'node_start') {
-        const key = `${evRunId || ''}:${ev.nodeId || ''}`;
+        const key = rowKey(ev, ev.nodeId);
+        const existing = ev.execId ? rowByExec.get(key) : undefined;
+        if (typeof existing === 'number') {
+          // A later phase of the same execution: the row runs again, keeps its start.
+          all[existing] = { ...all[existing], status: 'running', waiting: undefined };
+          openByNode.set(key, existing);
+          continue;
+        }
         const meta = resolveNodeMeta(ev.nodeId);
         const step: Step = {
           id: `node_start:${ev.nodeId || 'unknown'}:${i}`,
@@ -3279,12 +3301,13 @@ export function RunFlowModal({
         };
         all.push(step);
         if (ev.nodeId) openByNode.set(key, all.length - 1);
+        if (ev.execId) rowByExec.set(key, all.length - 1);
         continue;
       }
 
       if (ev.type === 'node_progress') {
         const nodeId = ev.nodeId;
-        const key = `${evRunId || ''}:${nodeId || ''}`;
+        const key = rowKey(ev, nodeId);
         const idx = nodeId ? openByNode.get(key) : undefined;
         const meta = resolveNodeMeta(nodeId);
         const progress = ev.progress && typeof ev.progress === 'object' && !Array.isArray(ev.progress)
@@ -3323,8 +3346,8 @@ export function RunFlowModal({
 
       if (ev.type === 'node_complete') {
         const nodeId = ev.nodeId;
-        const key = `${evRunId || ''}:${nodeId || ''}`;
-        const idx = nodeId ? openByNode.get(key) : undefined;
+        const key = rowKey(ev, nodeId);
+        const idx = nodeId ? openByNode.get(key) ?? (ev.execId ? rowByExec.get(key) : undefined) : undefined;
         const mi = extractRunModelInfo(ev.result);
         const meta = resolveNodeMeta(nodeId);
         const terminalKey = meta?.type === 'on_flow_end' && nodeId ? `${evRunId || ''}:${nodeId}` : '';
@@ -3346,6 +3369,33 @@ export function RunFlowModal({
               endedAt: typeof ev.ts === 'string' ? ev.ts : prior.endedAt,
             };
           }
+          continue;
+        }
+        if (typeof idx === 'number' && ev.execId) {
+          // A phase of a known execution ends: the row spans first start -> last end,
+          // keeps the output of the phase that produced one (a resume carries none).
+          const prior = all[idx];
+          const endedAt = typeof ev.ts === 'string' ? ev.ts : prior.endedAt;
+          const startMs = prior.startedAt ? Date.parse(prior.startedAt) : NaN;
+          const endMs = endedAt ? Date.parse(endedAt) : NaN;
+          const output = ev.result ?? prior.output;
+          all[idx] = {
+            ...prior,
+            status: 'completed',
+            waiting: undefined,
+            output,
+            summary: summarize(output),
+            metrics: {
+              ...(mergeMetricsPreferLonger(prior.metrics ?? null, ev.meta ?? null) || {}),
+              ...(Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs ? { duration_ms: endMs - startMs } : {}),
+            },
+            provider: mi.provider ?? prior.provider,
+            model: mi.model ?? prior.model,
+            toolApproval: ev.approval ?? prior.toolApproval,
+            endedAt,
+          };
+          openByNode.delete(key);
+          if (terminalKey) terminalIndexByNode.set(terminalKey, idx);
           continue;
         }
         if (typeof idx === 'number') {
@@ -3420,13 +3470,14 @@ export function RunFlowModal({
           endedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
         });
         if (terminalKey) terminalIndexByNode.set(terminalKey, all.length - 1);
+        if (ev.execId) rowByExec.set(key, all.length - 1);
         continue;
       }
 
       if (ev.type === 'flow_waiting') {
         const nodeId = ev.nodeId;
-        const key = `${evRunId || ''}:${nodeId || ''}`;
-        const idx = nodeId ? openByNode.get(key) : undefined;
+        const key = rowKey(ev, nodeId);
+        const idx = nodeId ? openByNode.get(key) ?? (ev.execId ? rowByExec.get(key) : undefined) : undefined;
 
         const reason = typeof ev.reason === 'string' ? ev.reason : undefined;
         const isSubworkflowWait = reason?.toLowerCase() === 'subworkflow';
@@ -3466,13 +3517,14 @@ export function RunFlowModal({
           waiting,
         });
         if (nodeId) openByNode.set(key, all.length - 1);
+        if (ev.execId) rowByExec.set(key, all.length - 1);
         continue;
       }
 
       if (ev.type === 'flow_error') {
         const nodeId = ev.nodeId;
-        const key = `${evRunId || ''}:${nodeId || ''}`;
-        const idx = nodeId ? openByNode.get(key) : undefined;
+        const key = rowKey(ev, nodeId);
+        const idx = nodeId ? openByNode.get(key) ?? (ev.execId ? rowByExec.get(key) : undefined) : undefined;
         if (typeof idx === 'number') {
           all[idx] = {
             ...all[idx],
@@ -5029,6 +5081,42 @@ export function RunFlowModal({
     return { inputTokens, outputTokens, haveTokens, totalMs };
   }, [displayStepById, runSummary?.created_at, runSummary?.updated_at]);
 
+  // Run pulse (utils/runPulse.ts, operator 2026-10-11): while the run goes on,
+  // the time spent, the best estimate of what is left and the totals so far.
+  const runLive = isRunning || isWaiting || isPaused;
+  const pulse = useMemo(() => computeRunPulse(traceEvents, rootRunId || null), [traceEvents, rootRunId]);
+  const runStartMs = useMemo(() => {
+    const created = runSummary?.created_at ? Date.parse(runSummary.created_at) : NaN;
+    if (Number.isFinite(created)) return created;
+    let earliest = Number.POSITIVE_INFINITY;
+    for (const ev of traceEvents) {
+      if (ev.type !== 'trace_update' || ev.runId !== rootRunId) continue;
+      for (const st of Array.isArray(ev.steps) ? ev.steps : []) {
+        const t = Date.parse(String((st as Record<string, unknown>)?.started_at || ''));
+        if (Number.isFinite(t)) earliest = Math.min(earliest, t);
+      }
+    }
+    return Number.isFinite(earliest) ? earliest : null;
+  }, [rootRunId, runSummary?.created_at, traceEvents]);
+  const [pulseNowMs, setPulseNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!runLive) return;
+    setPulseNowMs(Date.now());
+    const timer = window.setInterval(() => setPulseNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [runLive]);
+  const pastRunsQuery = useQuery({
+    queryKey: ['flow-runs-for-estimate', flowId],
+    queryFn: () => fetchRuns(String(flowId), gatewayContracts),
+    enabled: Boolean(isOpen && runLive && flowId),
+    staleTime: 60_000,
+  });
+  const pulseElapsedMs = runStartMs != null ? Math.max(0, pulseNowMs - runStartMs) : 0;
+  const pulseEstimate = useMemo(
+    () => (pastRunsQuery.data ? estimateRemaining(pulseElapsedMs, pastRunsQuery.data.filter((r) => r.run_id !== rootRunId)) : undefined),
+    [pastRunsQuery.data, pulseElapsedMs, rootRunId]
+  );
+
   // Minimized view (run minibar): show current step + status and keep the canvas visible.
   // This uses only local state (isMinimized) so it never affects run execution itself.
   const lastStep = steps.length > 0 ? steps[steps.length - 1] : null;
@@ -6513,6 +6601,9 @@ export function RunFlowModal({
                     </span>
                   ) : null}
                 </div>
+                {runLive && runStartMs != null ? (
+                  <RunPulseBar elapsedMs={pulseElapsedMs} estimate={pulseEstimate} pulse={pulse} />
+                ) : null}
               </div>
 
               {flowWarnings.length > 0 ? (
@@ -6828,7 +6919,7 @@ export function RunFlowModal({
                   root's tick loop is not spinning and guidance lands at its
                   next wake, not "the next loop boundary". key= resets draft
                   text + queued status when the modal follows a different run. */}
-              {isActiveRun && rootRunId ? (
+              {SHOW_STEERING && isActiveRun && rootRunId ? (
                 <SteerComposer
                   key={rootRunId}
                   runId={rootRunId}
@@ -7846,10 +7937,6 @@ export function RunFlowModal({
                         </span>
                       </div>
                       <div className="run-form-section-body">
-                        {nodes.some(node => node.data.nodeType === 'agent' || node.data.nodeType === 'llm_call') ? <SpeculationSelect value={runSpeculation} onChange={setRunSpeculation}
-                          capabilities={speculationCapabilitiesQuery.data} loading={speculationCapabilitiesQuery.isFetching}
-                          disabled={isRunning} inheritLabel="Core / Gateway default"
-                          error={speculationCapabilitiesQuery.isError ? 'MTP capability discovery failed.' : promptCacheGraphAmbiguous ? 'Multiple model routes: configure MTP on individual nodes.' : undefined} /> : null}
                         {visibleFormInputPins.length === 0 ? (
                           <div className="run-form-empty">
                             <span className="run-form-empty-icon"><PlaySolidGlyph /></span>
@@ -8593,14 +8680,17 @@ export function RunFlowModal({
                           ? callObj.args
                           : callObj;
                     const callId = typeof callObj.call_id === 'string' ? callObj.call_id : '';
+                    // Collapsed by default: the name and a one-line preview of what
+                    // the call asks for; a click opens the full arguments.
                     return (
-                      <div key={`${name}-${idx}`} className="run-approval-tool">
-                        <div className="run-approval-tool-title">
-                          {name}
+                      <details key={`${name}-${idx}`} className="run-approval-tool">
+                        <summary className="run-approval-tool-title">
+                          <span className="run-approval-tool-name">{name}</span>
+                          <span className="run-approval-tool-preview">{toolCallPreview(args)}</span>
                           {callId ? <span className="run-approval-tool-id">{callId}</span> : null}
-                        </div>
+                        </summary>
                         <JsonViewer value={args} collapseAfterDepth={6} />
-                      </div>
+                      </details>
                     );
                   })}
                 </div>

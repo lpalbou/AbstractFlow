@@ -9,7 +9,7 @@ JSON in `examples/flows/deep-*.json` and packed as `deep-research@0.1.7.flow`
 kept only so completed runs stay readable.
 
 The root flow declares `abstractcode.agent.v1` and `abstractresearch.deep.v1`,
-so agent hosts such as AbstractCode can run it like any other agent workflow.
+so anything that runs agent workflows can run it like any other agent workflow.
 
 ## User Inputs
 

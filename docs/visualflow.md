@@ -36,14 +36,14 @@ Execution semantics are owned by AbstractRuntime. Flow's job is to author and se
 
 ## Interfaces
 
-A workflow can declare the contracts it implements in its top-level `interfaces` list, for example `"interfaces": ["abstractcode.agent.v1"]`. Hosts use this list to find workflows they can start (AbstractCode lists `abstractcode.agent.v1` workflows as agents) and then send inputs to the `On Flow Start` outputs and read results from the `On Flow End` inputs by pin id.
+A workflow can declare the contracts it implements in its top-level `interfaces` list, for example `"interfaces": ["abstractcode.agent.v1"]`. Callers use this list to find workflows they can start, then send inputs to the `On Flow Start` outputs and read results from the `On Flow End` inputs by pin id.
 
-Each interface requires these boundary pins:
+Each interface requires these boundary pins. Optional pins are added with them when the interface is declared, but Run preflight never asks for them; an empty one means the gateway default.
 
 | Interface | On Flow Start outputs | On Flow End inputs |
 |---|---|---|
 | `abstractcode.agent.v1` | `provider` (provider_text), `model` (model), `prompt` (string) | `response` (string), `success` (boolean), `meta` (object) |
-| `abstractassistant.agent.v1` | `provider` (provider_text), `model` (model), `prompt` (string) | `response` (string), `success` (boolean), `meta` (object) |
+| `abstractassistant.agent.v1` | `provider` (provider_text), `model` (model), `prompt` (string); optional: `image_provider` / `image_edit_provider` / `image_upscale_provider` (provider_image), `video_provider` / `image_to_video_provider` (provider_video), `music_provider` (provider_music), the matching `*_model` (model), `sound_output` (object), `primary_image_artifact` (artifact_image) | `response` (string), `success` (boolean), `meta` (object) |
 | `abstractcode.goal.v1` | `goal` (string), `max_cycles` (number), `provider` (provider_text), `model` (model), `tools` (array) | `result` (string), `success` (boolean), `cycles_used` (number), `stopped_reason` (string) |
 | `abstractcode.coding.v1` | `request` (string) | `report` (string), `passed` (boolean) |
 | `abstractresearch.coscientist.v1` | `research_goal` (string) | `research_overview` (string), `ranked_hypotheses` (array) |
@@ -155,7 +155,7 @@ Walk from the top; stop at the first rung that works.
 |---|---|---|
 | 1 | **an existing node** | anything the catalog ships. Check `docs/workflow-node-catalog.md` before writing a line of Python. |
 | 2 | **a subflow, one input pin per field** | a whole reusable process. `subflow_interface` names the child's pins; wire one edge each. Never a hand-built `input` object. |
-| 3 | **`get_var` / `set_var` / `set_vars`** | reading and writing run state. |
+| 3 | **`get_var` / `get_vars` / `set_var` / `set_vars` / `add_to_list`** | reading and writing run state. Set Variables takes one row per variable (name, type, value, or a wire into its row; an array row also says what it holds): one node initialises several variables. Add to List Variable grows a list variable in one step; Get Variables reads several at once (and folds to a list of names). A String Template reads run variables by name (chips in its text), so a prompt built from run state needs no getter. A review → refine loop is capped with **Loop Limit** (`loop_limit`), whose `count` is the round. |
 | 4 | **a pin expression** | a derivation: `vars.fix_cycles < 3`, `not vars.accepted and vars.revisions < 3`, `to_json(value)`. Never a plain read. |
 | 5 | **a code node** | deterministic glue: external systems, ETL, format/shape transforms, checksums, validation, shell composition. Exec pins when it acts; pure otherwise. Expert territory. |
 | 6 | **a flow function** | the same derivation at 2+ call sites, ≤ 25 lines. |

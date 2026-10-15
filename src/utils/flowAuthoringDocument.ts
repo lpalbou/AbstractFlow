@@ -124,8 +124,8 @@ export interface AuthoringDiffContext {
   currentFlowId?: string | null;
 }
 
-const DYNAMIC_INPUT_NODE_TYPES = new Set<string>(['on_flow_end', 'concat', 'string_template', 'make_object']);
-const DYNAMIC_OUTPUT_NODE_TYPES = new Set<string>(['on_flow_start', 'break_object']);
+const DYNAMIC_INPUT_NODE_TYPES = new Set<string>(['on_flow_end', 'concat', 'string_template', 'make_object', 'set_vars']);
+const DYNAMIC_OUTPUT_NODE_TYPES = new Set<string>(['on_flow_start', 'break_object', 'get_vars']);
 const EVENT_CONFIG_NODE_TYPES = new Set<string>(['on_event', 'on_agent_message', 'on_schedule']);
 const BRANCH_COUNT_NODE_TYPES = new Set<string>(['sequence', 'parallel']);
 

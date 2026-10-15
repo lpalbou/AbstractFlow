@@ -177,3 +177,56 @@ export function inferEntryNode(nodes: Node<FlowNodeData>[], edges: Edge[]): stri
   const fallbackTrigger = nodes.find((n) => isEntryNodeType(n.data.nodeType));
   return fallbackTrigger?.id || nodes[0]?.id;
 }
+
+/**
+ * One way into a node that has several incoming execution wires, named the
+ * way people see it on the canvas: the node the wire comes from, plus the
+ * branch when it is not the plain exec-out ("If/Else / false").
+ */
+export interface EntryRouteChoice {
+  key: string;
+  sourceNodeId: string;
+  sourceHandle: string;
+  label: string;
+}
+
+/** The entries of a multi-entry node, in route-key order; [] when it has fewer than two. */
+export function entryRouteChoices(nodes: Node<FlowNodeData>[], edges: Edge[], nodeId: string): EntryRouteChoice[] {
+  const routes = incomingExecEdges(nodeId, edges).map((edge) => {
+    const sourceNodeId = String(edge.source || '').trim();
+    const sourceHandle = normalizeHandle(edge.sourceHandle);
+    const source = nodes.find((n) => n.id === sourceNodeId);
+    const sourceLabel = source?.data?.label || source?.data?.nodeType || sourceNodeId;
+    return {
+      key: routeKey(sourceNodeId, sourceHandle),
+      sourceNodeId,
+      sourceHandle,
+      label: sourceHandle === 'exec-out' ? sourceLabel : `${sourceLabel} / ${sourceHandle}`,
+    };
+  });
+  return routes.length > 1 ? routes : [];
+}
+
+/** The drawn per-path wire feeding `pinId` of `nodeId` on one entry, if any. */
+export function routeOverrideEdgeFor(edges: Edge[], nodeId: string, pinId: string, route: string): Edge | undefined {
+  return edges.find(
+    (e) =>
+      e.target === nodeId &&
+      e.targetHandle === pinId &&
+      isRouteOverrideEdge(e) &&
+      String((e.data as Record<string, unknown> | undefined)?.routeKey || '') === route
+  );
+}
+
+/**
+ * The same node without its stored per-path values. On load every stored
+ * value becomes a drawn per-path wire, and those wires are the only place the
+ * editor keeps them (saving rebuilds `inputRouteOverrides` from the wires), so
+ * deleting a wire or clearing it in the Properties panel really removes it.
+ */
+export function withoutStoredRouteOverrides(node: Node<FlowNodeData>): Node<FlowNodeData> {
+  if (!(node.data as any)?.inputRouteOverrides) return node;
+  const data = { ...node.data };
+  delete (data as any).inputRouteOverrides;
+  return { ...node, data };
+}

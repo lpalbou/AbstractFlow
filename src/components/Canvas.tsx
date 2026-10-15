@@ -2,7 +2,7 @@
  * Main canvas component with React Flow.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, DragEvent, MouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, DragEvent, MouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import ReactFlow, {
   Background,
   MiniMap,
@@ -14,6 +14,7 @@ import ReactFlow, {
   Edge,
   ConnectionMode,
   BaseEdge,
+  EdgeLabelRenderer,
   EdgeProps,
   useStore,
   useStoreApi,
@@ -23,14 +24,21 @@ import toast from 'react-hot-toast';
 import { nodeTypes } from './nodes';
 import { CanvasControls } from './CanvasControls';
 import { AfTooltip, Icon } from '@abstractframework/ui-kit';
-import { useFlowStore } from '../hooks/useFlow';
-import { getConnectionError, validateConnection } from '../utils/validation';
-import { isRouteOverrideEdge } from '../utils/multiEntryRoutes';
-import { NodeTemplate } from '../types/nodes';
+import { isBlankStartDocument, useFlowStore } from '../hooks/useFlow';
+import { getConnectionError, routeChoicesForConnection, validateConnection } from '../utils/validation';
+import { entryRouteChoices, isRouteOverrideEdge, routeOverrideEdgeFor, type EntryRouteChoice } from '../utils/multiEntryRoutes';
+import { loopBackWires } from '../utils/loopBackEdges';
+import { wireLoopGlimpse } from '../utils/execGlimpse';
+import { GlimpseCard } from './GlimpseCard';
+import { RouteChoiceMenu } from './RouteChoiceMenu';
+import { ConnectionDropMenu } from './ConnectionDropMenu';
+import { dropChoicesFor } from '../utils/relays';
+import { NodeTemplate, getNodeTemplate } from '../types/nodes';
 import { PALETTE_ADD_NODE_EVENT, addPaletteNodeAtCentre } from '../utils/paletteAdd';
 import type { FlowNodeData, PinConnectionFeedback, PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
 import { PinLegend } from './PinLegend';
+import { StartChoice } from './StartChoice';
 import { RunPreflightPanel } from './RunPreflightPanel';
 import {
   buildConnectionPreviewForNode,
@@ -39,11 +47,22 @@ import {
 } from '../utils/connectionPreview';
 import { computeExecSubgraph } from '../utils/execView';
 import { nodeColorSection } from '../utils/nodeCategoryColors';
-import { NodeTapTracker } from '../utils/nodeTapGesture';
+import { NodeTapTracker, isNodeControl } from '../utils/nodeTapGesture';
+import { isCollapsedOperator, isCollapsibleOperator } from '../utils/operatorNodes';
+import { loadRunSpotlight, saveRunSpotlight, spotlightEdges, spotlightNodes, spotlightTrail } from '../utils/runSpotlight';
 import { computeFoldedGetters } from '../utils/foldedGetters';
 import { FoldedGettersContext } from '../hooks/foldedGettersContext';
 
 import { roundedPolylinePath, routeOrthogonal, type RouteRect } from '../utils/edgeRouting';
+
+/** The hover card of a repeating wire's badge (utils/execGlimpse.ts `wireLoopGlimpse`). */
+function WireLoopGlimpse({ edgeId, state, max }: { edgeId: string; state: 'limitable' | 'limited' | 'node-limited' | 'unsupported'; max: number | null }) {
+  const nodes = useFlowStore((s) => s.nodes);
+  const edges = useFlowStore((s) => s.edges);
+  const edge = edges.find((e) => e.id === edgeId);
+  if (!edge) return null;
+  return <GlimpseCard glimpse={wireLoopGlimpse(edge, nodes, edges, state, max)} hue="var(--accent)" placement="below-centred" />;
+}
 
 function WorkflowEdge({
   id,
@@ -56,6 +75,18 @@ function WorkflowEdge({
   data,
 }: EdgeProps) {
   const routeData = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+  // A per-path wire names its path halfway along the drawn wire (measured on
+  // the rendered path, whatever shape the router gave it).
+  const routeLabel = typeof routeData.routeLabel === 'string' ? routeData.routeLabel : '';
+  // A wire that makes execution repeat wears a ↺ badge halfway along (utils/loopBackEdges.ts):
+  // dashed while the loop has no limit, ↺N once the wire carries one; a click sets or changes it.
+  const loopBack = ['limitable', 'limited', 'node-limited', 'unsupported'].includes(String(routeData.loopBack)) ? String(routeData.loopBack) : '';
+  const loopLimitMax = typeof routeData.loopLimitMax === 'number' ? routeData.loopLimitMax : null;
+  const setEdgeLoopLimit = useFlowStore((s) => s.setEdgeLoopLimit);
+  const [limitDraft, setLimitDraft] = useState<string | null>(null);
+  const [badgeHovered, setBadgeHovered] = useState(false);
+  const underlayRef = useRef<SVGPathElement>(null);
+  const [labelAt, setLabelAt] = useState<{ x: number; y: number } | null>(null);
   const routeKind = String(routeData.routeKind || 'data');
   const routeRects = Array.isArray(routeData.routeRects) ? (routeData.routeRects as RouteRect[]) : [];
   const sourceRect = routeData.sourceRect && typeof routeData.sourceRect === 'object' ? (routeData.sourceRect as RouteRect) : null;
@@ -160,10 +191,104 @@ function WorkflowEdge({
     path = `M ${sourceX},${sourceY} C ${c1x},${sourceY} ${c2x},${targetY} ${targetX},${targetY}`;
   }
 
+  useLayoutEffect(() => {
+    const el = underlayRef.current;
+    if ((!routeLabel && !loopBack) || !el) {
+      setLabelAt(null);
+      return;
+    }
+    const point = el.getPointAtLength(el.getTotalLength() / 2);
+    setLabelAt((prev) => (prev && prev.x === point.x && prev.y === point.y ? prev : { x: point.x, y: point.y }));
+  }, [routeLabel, loopBack, path]);
+
   return (
     <>
-      <path className="react-flow__edge-underlay" d={path} />
+      <path ref={underlayRef} className="react-flow__edge-underlay" d={path} />
       <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} interactionWidth={24} />
+      {routeLabel && labelAt ? (
+        <EdgeLabelRenderer>
+          <div
+            className="route-override-label"
+            style={
+              {
+                transform: `translate(-50%, -50%) translate(${labelAt.x}px, ${labelAt.y}px)`,
+                '--route-color': (style as Record<string, unknown> | undefined)?.stroke,
+              } as CSSProperties
+            }
+          >
+            when from {routeLabel}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
+      {loopBack && labelAt ? (
+        <EdgeLabelRenderer>
+          <div
+            className="loop-back-anchor nodrag nopan"
+            style={{ transform: `translate(-50%, -50%) translate(${labelAt.x}px, ${labelAt.y - 22}px)` }}
+            onMouseEnter={() => setBadgeHovered(true)}
+            onMouseLeave={() => setBadgeHovered(false)}
+          >
+            <button
+              type="button"
+              className={`loop-back-badge is-${loopBack}`}
+              aria-label={
+                loopBack === 'limited' ? `Repeats at most ${loopLimitMax} times; click to change` : loopBack === 'limitable' ? 'Limit how many times this path repeats' : 'This repeating path is limited elsewhere or cannot be limited here'
+              }
+              aria-disabled={loopBack === 'unsupported'}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (loopBack !== 'unsupported') setLimitDraft(String(loopLimitMax ?? 3));
+              }}
+            >
+              ↺{loopBack === 'limited' ? loopLimitMax : ''}
+            </button>
+            {badgeHovered && limitDraft === null ? <WireLoopGlimpse edgeId={id} state={loopBack as 'limitable' | 'limited' | 'node-limited' | 'unsupported'} max={loopLimitMax} /> : null}
+            {limitDraft !== null ? (
+              <form
+                className="loop-limit-popover"
+                onMouseDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Escape') setLimitDraft(null);
+                }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const n = Math.floor(Number(limitDraft));
+                  if (Number.isFinite(n) && n >= 0) setEdgeLoopLimit(id, n);
+                  setLimitDraft(null);
+                }}
+              >
+                <label>
+                  Repeat at most
+                  <input type="number" min={0} step={1} autoFocus value={limitDraft} aria-label="Times this path may repeat" onChange={(e) => setLimitDraft(e.target.value)} />
+                  times
+                </label>
+                <span className="loop-limit-popover__actions">
+                  <button type="submit" className="modal-button primary">
+                    Save
+                  </button>
+                  {loopBack === 'limited' ? (
+                    <button
+                      type="button"
+                      className="modal-button"
+                      onClick={() => {
+                        setEdgeLoopLimit(id, null);
+                        setLimitDraft(null);
+                      }}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                  <button type="button" className="modal-button cancel" onClick={() => setLimitDraft(null)}>
+                    Cancel
+                  </button>
+                </span>
+              </form>
+            ) : null}
+          </div>
+        </EdgeLabelRenderer>
+      ) : null}
     </>
   );
 }
@@ -171,6 +296,15 @@ function WorkflowEdge({
 const edgeTypes = {
   workflow: WorkflowEdge,
 };
+
+/** Viewport position of a connection's input pin (where its path menu opens). */
+function inputPinAnchor(connection: Connection): { x: number; y: number } {
+  const handle = Array.from(
+    document.querySelectorAll<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(String(connection.target))}"] .react-flow__handle`)
+  ).find((el) => el.getAttribute('data-handleid') === connection.targetHandle);
+  const rect = handle?.getBoundingClientRect();
+  return rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 3 };
+}
 
 type ReactFlowConnectingHandle = {
   nodeId: string;
@@ -271,6 +405,23 @@ function CanvasBody() {
       window.matchMedia('(max-width: 767.98px), (max-height: 500px)').matches
   );
   const [activeConnection, setActiveConnection] = useState<ConnectionDragEndpoint | null>(null);
+  // A wire released on empty canvas: what to create there (ConnectionDropMenu).
+  const [wireDrop, setWireDrop] = useState<{
+    from: ConnectionDragEndpoint;
+    at: { x: number; y: number };
+  } | null>(null);
+  // The click that ends a wire drag over a node is not a click on that node (it would select it
+  // and open its properties, whose drawer then covers pins).
+  const wireDragRef = useRef(false);
+  const dragStartRef = useRef<ConnectionDragEndpoint | null>(null);
+  const dragConnectedRef = useRef(false);
+  // A data wire dropped on an already-wired input of a multi-entry node waits
+  // here while the author chooses the entry path it feeds.
+  const [routeChoice, setRouteChoice] = useState<{
+    connection: Connection;
+    choices: EntryRouteChoice[];
+    anchor: { x: number; y: number };
+  } | null>(null);
 
   // React Flow uses a multiplicative zoom factor of 1.2 per zoom step.
   // We define our own "zoom positions" relative to max zoom:
@@ -290,6 +441,7 @@ function CanvasBody() {
     edges,
     selectedNode,
     executingNodeId,
+    executionTrail,
     execView,
     foldReads,
     recentNodeIds,
@@ -297,7 +449,9 @@ function CanvasBody() {
     onNodesChange,
     onEdgesChange,
     onConnect,
+    setRouteOverride,
     addNode,
+    addNodeAndConnect,
     setSelectedNode,
     setSelectedEdge,
     copySelectionToClipboard,
@@ -338,9 +492,17 @@ function CanvasBody() {
     if (selectedNode && foldedGetters.byGetter.has(selectedNode.id)) revealed.add(selectedNode.id);
     return revealed;
   }, [nodes, selectedNode, foldedGetters]);
+  // A folded operator draws no read pills: a getter feeding one stays a node.
+  const foldedOperatorIds = useMemo(
+    () => new Set(nodes.filter((node) => isCollapsedOperator(node.data)).map((node) => node.id)),
+    [nodes]
+  );
   const isNodeFoldedAway = useCallback(
-    (nodeId: string) => foldedGetters.byGetter.has(nodeId) && !revealedGetterIds.has(nodeId),
-    [foldedGetters, revealedGetterIds]
+    (nodeId: string) => {
+      const read = foldedGetters.byGetter.get(nodeId);
+      return Boolean(read) && !revealedGetterIds.has(nodeId) && !foldedOperatorIds.has(read!.consumerId);
+    },
+    [foldedGetters, revealedGetterIds, foldedOperatorIds]
   );
 
   // Hidden elements cannot stay selected: the properties panel and delete
@@ -413,6 +575,12 @@ function CanvasBody() {
   // R15.2 tap vs drag on a node: a press that moves beyond the threshold is a
   // drag (never select-and-open); a tap selects and opens (utils/nodeTapGesture).
   const nodeTapTracker = useRef(new NodeTapTracker());
+  // A finger tap that unfolded a folded operator: its click must not then
+  // select the node and open the properties drawer.
+  const tapUnfolded = useRef<string | null>(null);
+  // The pointer of the last press: a double click folds with a mouse or a
+  // trackpad only (on touch the fold button folds and a tap unfolds).
+  const lastPointerType = useRef<string>('mouse');
 
   // The pressed pointer is followed on WINDOW from pointerdown to pointerup /
   // pointercancel: a drag that passes over the properties panel, the palette,
@@ -440,6 +608,13 @@ function CanvasBody() {
         const tapped = nodeTapTracker.current.up(e);
         if (tapped && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
           const store = useFlowStore.getState();
+          const node = store.nodes.find((n) => n.id === tapped);
+          if (e.pointerType === 'touch' && node && isCollapsedOperator(node.data) && reactFlowStore.getState().elementsSelectable) {
+            // A finger tap on a folded operator unfolds it (never the drawer).
+            tapUnfolded.current = tapped;
+            store.updateNodeData(tapped, { collapsed: false });
+            return;
+          }
           store.selectNodeById(tapped);
           store.requestNodeProperties(tapped);
         }
@@ -458,20 +633,42 @@ function CanvasBody() {
         window.removeEventListener('pointercancel', onCancel, true);
       };
     },
-    [stopFollowingPress]
+    [reactFlowStore, stopFollowingPress]
   );
 
   const handleCanvasPointerDownCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       activeCanvasPointerIds.current.add(event.pointerId);
+      wireDragRef.current = false; // a new press: the last wire's click came or never will
+      lastPointerType.current = event.pointerType;
+      tapUnfolded.current = null; // a new press: the last unfold's click came or never will
       const nodeEl = (event.target as Element | null)?.closest?.('.react-flow__node');
-      const nodeId = nodeEl?.getAttribute('data-id') || null;
+      // A press on a node's own control (a pin, an inline editor) is that control's gesture,
+      // never a tap on the node (nodeTapGesture.isNodeControl).
+      const nodeId = nodeEl && !isNodeControl(event.target) ? nodeEl.getAttribute('data-id') || null : null;
       nodeTapTracker.current.down(event, nodeId);
       if (nodeId) followPress(event.pointerId);
       else stopFollowingPress();
     },
     [followPress, stopFollowingPress]
   );
+
+  // A press on the canvas (a pin, a wire, a node's text, the background) never starts a text
+  // selection; only editable fields select text. Safari otherwise starts one: from a pin it lands
+  // in the nearest editable text (a String Template's), which takes focus and the wire never
+  // starts; from a wire it grows across the canvas as a highlighted block while dragging
+  // (operator 2026-10-12: "sometimes, i am extending an edge from a pin, and it doesn't show";
+  // "dragging an edge... sometimes select part of the graph with a rectangle"). React Flow's own
+  // handlers still run. The field being edited still loses focus (saves on blur, Undo goes back
+  // to the canvas).
+  const handleCanvasMouseDownCapture = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as Element | null;
+    const inEditable = target?.closest?.('input, textarea, select, [contenteditable="true"]');
+    if (inEditable) return;
+    event.preventDefault();
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && isEditableTarget(focused)) focused.blur();
+  }, []);
 
   const handleCanvasPointerReleaseCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -514,8 +711,24 @@ function CanvasBody() {
   // The click that ends a node DRAG never reaches React Flow (no select, no
   // onNodeClick, so no properties panel).
   const handleCanvasClickCapture = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    if (wireDragRef.current) {
+      wireDragRef.current = false;
+      // A click on a pin is that pin's own gesture (click a connected pin to disconnect it).
+      if (!(event.target as Element | null)?.closest?.('.react-flow__handle')) {
+        event.stopPropagation();
+        return;
+      }
+    }
     const nodeEl = (event.target as Element | null)?.closest?.('.react-flow__node');
     const nodeId = nodeEl?.getAttribute('data-id');
+    // A node's own control (the fold button, an inline editor) handles its own
+    // click, also one from the keyboard (Enter/Space send a click with no press).
+    if (isNodeControl(event.target)) return;
+    if (nodeId && tapUnfolded.current === nodeId) {
+      tapUnfolded.current = null;
+      event.stopPropagation();
+      return;
+    }
     if (nodeId && !nodeTapTracker.current.isTap(nodeId)) event.stopPropagation();
   }, []);
 
@@ -647,6 +860,12 @@ function CanvasBody() {
         resetCanvasInteraction(undefined, { forceConnectionCancel: true });
       }
     };
+    // The window losing focus (another app, another tab). A capturing listener on window also
+    // receives every element's blur, and pressing a pin blurs a focused text field: that must
+    // not cancel the wire React Flow has just started (2026-10-12 review).
+    const onWindowBlur = (event: FocusEvent) => {
+      if (event.target === window) onForcedMouseRelease();
+    };
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') resetCanvasInteraction(undefined, { forceConnectionCancel: true });
     };
@@ -656,7 +875,7 @@ function CanvasBody() {
     window.addEventListener('pointercancel', onPointerRelease, opts);
     window.addEventListener('pointermove', onPointerMove, opts);
     window.addEventListener('mouseup', onMouseRelease, opts);
-    window.addEventListener('blur', onForcedMouseRelease, opts);
+    window.addEventListener('blur', onWindowBlur, opts);
     window.addEventListener('contextmenu', onForcedMouseRelease, opts);
     document.addEventListener('visibilitychange', onVisibilityChange, opts);
     return () => {
@@ -665,7 +884,7 @@ function CanvasBody() {
       window.removeEventListener('pointercancel', onPointerRelease, opts);
       window.removeEventListener('pointermove', onPointerMove, opts);
       window.removeEventListener('mouseup', onMouseRelease, opts);
-      window.removeEventListener('blur', onForcedMouseRelease, opts);
+      window.removeEventListener('blur', onWindowBlur, opts);
       window.removeEventListener('contextmenu', onForcedMouseRelease, opts);
       document.removeEventListener('visibilitychange', onVisibilityChange, opts);
     };
@@ -674,8 +893,14 @@ function CanvasBody() {
   // Handle connection with validation
   const handleConnect = useCallback(
     (connection: Connection) => {
+      dragConnectedRef.current = true;
       setActiveConnection(null);
       if (!validateConnection(nodes, edges, connection)) {
+        const choices = routeChoicesForConnection(nodes, edges, connection);
+        if (choices.length > 0) {
+          setRouteChoice({ connection, choices, anchor: inputPinAnchor(connection) });
+          return;
+        }
         toast.error(getConnectionError(nodes, edges, connection) || 'Invalid connection');
         return;
       }
@@ -701,22 +926,121 @@ function CanvasBody() {
         resolvedPinType ||
         (handleId === 'exec-in' || handleId === 'exec-out' ? 'execution' : undefined);
       setActiveConnection({ nodeId, handleId, handleType, pinType });
+      dragStartRef.current = { nodeId, handleId, handleType, pinType };
+      wireDragRef.current = true;
+      dragConnectedRef.current = false;
     },
     [pinTypesByNodeId]
   );
 
-  const handleConnectEnd = useCallback(() => {
+  // A wire released on empty canvas (not on a pin, not on a node) opens the
+  // drop menu there: a relay, and for an object a Break Object.
+  const handleConnectEnd = useCallback((event: globalThis.MouseEvent | TouchEvent) => {
     setActiveConnection(null);
+    const from = dragStartRef.current;
+    dragStartRef.current = null;
+    if (!from || dragConnectedRef.current || useFlowStore.getState().execView) return;
+    if (dropChoicesFor(from.pinType, from.handleType).length === 0) return;
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event;
+    if (!point) return;
+    const under = document.elementFromPoint(point.clientX, point.clientY);
+    if (!under?.closest('.react-flow__pane') || under.closest('.react-flow__node')) return;
+    setWireDrop({ from, at: { x: point.clientX, y: point.clientY } });
   }, []);
 
+  const wireDropMenu = useMemo(() => {
+    if (!wireDrop) return null;
+    const { from, at } = wireDrop;
+    const create = (choice: string) => {
+      setWireDrop(null);
+      const template = getNodeTemplate(choice === 'relay' ? 'reroute' : 'break_object');
+      const instance = reactFlowInstance.current;
+      if (!template || !instance) return;
+      const flowPoint = instance.screenToFlowPosition(at);
+      // A relay is centred on the drop point; a node opens from it.
+      const position = choice === 'relay' ? { x: flowPoint.x - 9, y: flowPoint.y - 9 } : flowPoint;
+      const newPin = choice === 'relay' ? (from.handleType === 'source' ? 'in' : 'out') : 'object';
+      const id = addNodeAndConnect(template, position, {
+        from: { nodeId: from.nodeId, handleId: from.handleId, side: from.handleType },
+        newPin,
+      });
+      if (!id) toast.error('That wire cannot be connected here');
+      // Break Object needs its fields chosen: open its properties.
+      else if (choice === 'break_object') useFlowStore.getState().selectNodeById(id);
+    };
+    const labels: Record<string, { label: string; hint: string }> = {
+      relay: { label: 'Relay', hint: 'A dot to route this wire; connect it to as many inputs as needed' },
+      break_object: { label: 'Break Object', hint: 'Expose fields of this object as separate outputs' },
+    };
+    return (
+      <ConnectionDropMenu
+        title={`Create from ${from.handleType === 'source' ? 'this output' : 'this input'}`}
+        choices={dropChoicesFor(from.pinType, from.handleType).map((id) => ({ id, ...labels[id] }))}
+        at={at}
+        onChoose={create}
+        onCancel={() => setWireDrop(null)}
+      />
+    );
+  }, [wireDrop, addNodeAndConnect]);
+
   const handleIsValidConnection = useCallback(
-    (connection: Connection): boolean => validateConnection(nodes, edges, connection),
+    (connection: Connection): boolean =>
+      validateConnection(nodes, edges, connection) || routeChoicesForConnection(nodes, edges, connection).length > 0,
     [nodes, edges]
   );
 
+  const routeChoiceMenu = useMemo(() => {
+    if (!routeChoice) return null;
+    const { connection, choices, anchor } = routeChoice;
+    const label = (nodeId: string | null) => {
+      const node = nodes.find((n) => n.id === nodeId);
+      return node?.data.label || node?.data.nodeType || String(nodeId || '');
+    };
+    const pinLabel = (nodeId: string | null, pinId: string | null, side: 'inputs' | 'outputs') => {
+      const pin = nodes.find((n) => n.id === nodeId)?.data[side].find((p) => p.id === pinId);
+      return pin?.label || String(pinId || '');
+    };
+    const currentByRoute: Record<string, string> = {};
+    for (const choice of choices) {
+      const wire = routeOverrideEdgeFor(edges, String(connection.target), String(connection.targetHandle), choice.key);
+      if (wire) currentByRoute[choice.key] = `${label(wire.source)} · ${pinLabel(wire.source, wire.sourceHandle ?? null, 'outputs')}`;
+    }
+    return (
+      <RouteChoiceMenu
+        nodeLabel={label(connection.target)}
+        pinLabel={pinLabel(connection.target, connection.targetHandle, 'inputs')}
+        sourceLabel={`${label(connection.source)} · ${pinLabel(connection.source, connection.sourceHandle, 'outputs')}`}
+        choices={choices}
+        currentByRoute={currentByRoute}
+        anchor={anchor}
+        onChoose={(route) => {
+          setRouteChoice(null);
+          setRouteOverride(String(connection.target), String(connection.targetHandle), route, {
+            nodeId: String(connection.source),
+            handle: String(connection.sourceHandle),
+          });
+        }}
+        onCancel={() => setRouteChoice(null)}
+      />
+    );
+  }, [routeChoice, nodes, edges, setRouteOverride]);
+
   // Handle node selection
+  // A double click folds an operator node into its small round form, or
+  // unfolds it (utils/operatorNodes.ts). Not on the node's own controls (a pin,
+  // an inline editor): a double click there selects text, it does not fold.
+  const handleNodeDoubleClick = useCallback((event: MouseEvent, node: Node<FlowNodeData>) => {
+    if (lastPointerType.current === 'touch' || !reactFlowStore.getState().elementsSelectable) return;
+    if (isNodeControl(event.target) || !isCollapsibleOperator(node.data.nodeType)) return;
+    event.stopPropagation();
+    useFlowStore.getState().updateNodeData(node.id, { collapsed: !node.data.collapsed });
+  }, [reactFlowStore]);
+
   const handleNodeClick = useCallback(
-    (_event: MouseEvent, node: Node<FlowNodeData>) => {
+    (event: MouseEvent, node: Node<FlowNodeData>) => {
+      // A click on one of the node's own controls (a pin: an unconnected pin's click is not
+      // consumed by the pin) is not a click on the node: no selection, no properties.
+      if (isNodeControl(event.target)) return;
       const { connectionPreview: _preview, ...cleanData } = node.data;
       setSelectedNode({ ...node, data: cleanData });
       // A tap opens the properties even when the node was already selected (R15.2).
@@ -866,6 +1190,7 @@ function CanvasBody() {
   // Honor cross-component focus requests (the Functions drawer's Used-by rows
   // live outside this component and signal through the store — adversary
   // P1-10: a Used-by click must actually bring the consumer into view).
+  const blankStart = useFlowStore(isBlankStartDocument);
   const focusNodeRequest = useFlowStore((s) => s.focusNodeRequest);
   useEffect(() => {
     if (focusNodeRequest?.nodeId) focusNode(focusNodeRequest.nodeId);
@@ -931,6 +1256,9 @@ function CanvasBody() {
   // Highlight only the *taken* execution edges (prev → next) via an afterglow class
   // driven by execution events. Do NOT highlight all outgoing edges of the active node,
   // otherwise conditional/control nodes would light up branches that are not taken.
+  // Also in the execution view: its condensed control flow is where a repeat reads best.
+  const loopBacks = useMemo(() => loopBackWires(nodes, edges), [nodes, edges]);
+
   const baseStyledEdges = useMemo(() => {
     const nodeRectsById = new Map<string, RouteRect>();
     const getterNodeIds = new Set<string>();
@@ -951,6 +1279,15 @@ function CanvasBody() {
         height: Number.isFinite(height) ? height : 220,
       });
     }
+    const entryLabels = new Map<string, Map<string, string>>();
+    const entryLabel = (nodeId: string, route: string): string | undefined => {
+      let labels = entryLabels.get(nodeId);
+      if (!labels) {
+        labels = new Map(entryRouteChoices(nodes, edges, nodeId).map((c) => [c.key, c.label]));
+        entryLabels.set(nodeId, labels);
+      }
+      return labels.get(route);
+    };
 
     return edges.map((e) => {
       // Exec view hides data edges entirely; only execution edges remain.
@@ -1033,7 +1370,20 @@ function CanvasBody() {
       );
       const prevData = e.data && typeof e.data === 'object' ? (e.data as Record<string, unknown>) : {};
       const routeKind = isExecEdge ? 'exec' : isRouteOverride ? 'override' : 'data';
-      const nextData = { ...prevData, routeKind, routeRects, routeHasObstacle, sourceRect, targetRect };
+      // A per-path wire names its path ("If/Else / false") where it meets the input.
+      const routeLabel = isRouteOverride ? entryLabel(e.target, String(prevData.routeKey || '')) : undefined;
+      const loopBackInfo = loopBacks.get(e.id);
+      const loopBack = !loopBackInfo
+        ? undefined
+        : loopBackInfo.wireLimit !== null
+          ? 'limited'
+          : loopBackInfo.leavesLoopBody
+            ? 'unsupported'
+            : loopBackInfo.limited
+              ? 'node-limited'
+              : 'limitable';
+      const loopLimitMax = loopBackInfo?.wireLimit ?? undefined;
+      const nextData = { ...prevData, routeKind, routeRects, routeHasObstacle, sourceRect, targetRect, routeLabel, loopBack, loopLimitMax };
 
       const classChanged = nextClassName !== (e.className || undefined);
       const styleChanged = nextStyle !== e.style;
@@ -1045,11 +1395,14 @@ function CanvasBody() {
         !Array.isArray(prevData.routeRects) ||
         (prevData.routeRects as unknown[]).length !== routeRects.length ||
         prevData.sourceRect !== sourceRect ||
-        prevData.targetRect !== targetRect;
+        prevData.targetRect !== targetRect ||
+        prevData.routeLabel !== routeLabel ||
+        prevData.loopBack !== loopBack ||
+        prevData.loopLimitMax !== loopLimitMax;
       if (!classChanged && !styleChanged && !zIndexChanged && !typeChanged && !dataChanged && !e.hidden) return e;
       return { ...e, className: nextClassName, style: nextStyle, zIndex: nextZIndex, type: nextType, data: nextData, hidden: false };
     });
-  }, [edges, execSubgraph, foldedGetters, isNodeFoldedAway, nodes, pinTypesByNodeId]);
+  }, [edges, execSubgraph, foldedGetters, isNodeFoldedAway, nodes, pinTypesByNodeId, loopBacks]);
 
   const decoratedEdges = useMemo(() => {
     const hasRecent = Boolean(recentEdgeIds && Object.keys(recentEdgeIds).length > 0);
@@ -1095,6 +1448,19 @@ function CanvasBody() {
     }));
   }, [activeConnection, displayNodes, nodes, edges]);
 
+  // Run spotlight (utils/runSpotlight.ts): the node running, or waiting on a
+  // person, stays lit; everything else fades while the run goes on.
+  const [runSpotlight, setRunSpotlight] = useState(loadRunSpotlight);
+  const setRunSpotlightChoice = useCallback((on: boolean) => {
+    setRunSpotlight(on);
+    saveRunSpotlight(on);
+  }, []);
+  const waitingNodeId = useFlowStore((s) => s.waitingNodeId);
+  const spotlitId = runSpotlight ? waitingNodeId || executingNodeId || null : null;
+  const trail = useMemo(() => spotlightTrail(executionTrail, spotlitId), [executionTrail, spotlitId]);
+  const spotlitNodes = useMemo(() => spotlightNodes(previewNodes, spotlitId, trail), [previewNodes, spotlitId, trail]);
+  const spotlitEdges = useMemo(() => spotlightEdges(decoratedEdges, spotlitId, trail), [decoratedEdges, spotlitId, trail]);
+
   const connectionLineStyle = useMemo(() => {
     const sourceType = activeConnection?.pinType;
     const color = sourceType && sourceType !== 'execution' ? PIN_COLORS[sourceType] : '#888';
@@ -1104,10 +1470,11 @@ function CanvasBody() {
   return (
     <div
       ref={reactFlowWrapper}
-      className="canvas-wrapper"
+      className={spotlitId ? 'canvas-wrapper run-spotlight' : 'canvas-wrapper'}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onPointerDownCapture={handleCanvasPointerDownCapture}
+      onMouseDownCapture={handleCanvasMouseDownCapture}
       onClickCapture={handleCanvasClickCapture}
       onPointerMoveCapture={handleCanvasPointerMoveCapture}
       onPointerUpCapture={handleCanvasPointerReleaseCapture}
@@ -1117,8 +1484,8 @@ function CanvasBody() {
     >
         <FoldedGettersContext.Provider value={foldedGetters}>
         <ReactFlow
-          nodes={previewNodes}
-          edges={decoratedEdges}
+          nodes={spotlitNodes}
+          edges={spotlitEdges}
           onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
@@ -1127,6 +1494,7 @@ function CanvasBody() {
           isValidConnection={handleIsValidConnection}
           connectionMode={ConnectionMode.Strict}
           onNodeClick={handleNodeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
           // R15.2: dragging a node does not select it (a drag is never
           // select-and-open), and a drag only starts once the pointer moves.
           selectNodesOnDrag={false}
@@ -1151,7 +1519,7 @@ function CanvasBody() {
           deleteKeyCode={['Backspace', 'Delete']}
           attributionPosition="top-right"
         >
-          <CanvasControls />
+          <CanvasControls runSpotlight={runSpotlight} onRunSpotlightChange={setRunSpotlightChoice} />
           <Background
             variant={BackgroundVariant.Dots}
             gap={16}
@@ -1204,7 +1572,9 @@ function CanvasBody() {
           )}
         </ReactFlow>
         </FoldedGettersContext.Provider>
-        {nodes.length === 0 ? (
+        {blankStart ? (
+          <StartChoice />
+        ) : nodes.length === 0 ? (
           <div className="canvas-empty-state" aria-hidden="true">
             <div className="canvas-empty-title">Start your flow</div>
             <div className="canvas-empty-text">Drag a node from the left palette and drop it here.</div>
@@ -1219,6 +1589,8 @@ function CanvasBody() {
         />
         <RunPreflightPanel onFocusNode={focusNode} />
         <PinLegend />
+        {routeChoiceMenu}
+        {wireDropMenu}
     </div>
   );
 }

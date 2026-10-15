@@ -19,6 +19,7 @@ import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { PinExpressionChip, PinExpressionEditor, maskStringLiterals } from '../pins/PinExpressionControl';
 import { useFoldedReadsForNode } from '../../hooks/foldedGettersContext';
+import { IconSwapVertical } from '../ToolbarIcons';
 import { isFoldedReadActive } from '../../utils/foldedGetters';
 import { collectDeclaredVarNames } from '../../utils/preflight';
 import {
@@ -30,6 +31,7 @@ import {
 } from '../../utils/agentToolsPin';
 import { hasSecretLikeValue } from '../../utils/flowAuthoringCommands';
 import { useFlowStore } from '../../hooks/useFlow';
+import { isCollapsibleOperator } from '../../utils/operatorNodes';
 import { HiddenConnectionsBadge } from './HiddenConnectionsBadge';
 import { NodeStatusGlyph } from './NodeStatusGlyph';
 import { categoryColorVar, colorSectionForCategory, nodeSemanticCategory } from '../../utils/nodeCategoryColors';
@@ -104,6 +106,9 @@ import { AfTooltip } from '../AfTooltip';
 import { CodeEditorModal } from '../CodeEditorModal';
 import { JsonLiteralNodeEditorModal } from '../JsonLiteralNodeEditorModal';
 import { JsonSchemaPinEditorModal } from '../JsonSchemaPinEditorModal';
+import { TemplateTextEditor } from '../TemplateText';
+import { flowVariableMeta } from '../../utils/flowVariables';
+import { templateInputNameProblem, templateInputPins } from '../../utils/textTemplate';
 import { type JsonSchema } from '../../schemas/known_json_schemas';
 import {
   mergeLoRAAdapterSelection,
@@ -784,7 +789,8 @@ export const BaseNode = memo(function BaseNode({
   const pinDefaults = data.pinDefaults || {};
   const isLlmNode = data.nodeType === 'llm_call';
   const isAgentNode = data.nodeType === 'agent';
-  const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var';
+  const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var' || data.nodeType === 'add_to_list';
+  const isTemplateNode = data.nodeType === 'string_template';
   /**
    * A configured Get Variable renders as a compact chip (Blueprint's
    * `CompactNodeTitle` posture): the auto-label already reads `Get <name>`, so
@@ -848,74 +854,8 @@ export const BaseNode = memo(function BaseNode({
     ? `${Math.min(loopProgress.index + 1, loopProgress.total)}/${loopProgress.total}`
     : null;
 
-  const variableMeta = useMemo(() => {
-    // Best-effort list of “flow vars” to help users pick names (Blueprint-style).
-    // This is deliberately heuristic: users can still type/create new names.
-    const vars = new Set<string>();
-    const declaredTypes = new Map<string, Exclude<PinType, 'execution'>>();
-
-    for (const n of allNodes) {
-      const d = n.data;
-      if (!d) continue;
-
-      // On Flow Start parameters are initial vars.
-      if (d.nodeType === 'on_flow_start') {
-        for (const p of d.outputs || []) {
-          if (p.type === 'execution') continue;
-          const pid = typeof p.id === 'string' ? p.id.trim() : '';
-          if (!pid) continue;
-          vars.add(pid);
-          // Prefer explicit declarations (var_decl/bool_var) over entrypoint pins.
-          if (!declaredTypes.has(pid)) declaredTypes.set(pid, p.type as Exclude<PinType, 'execution'>);
-        }
-      }
-
-      const ok = typeof d.outputKey === 'string' ? d.outputKey.trim() : '';
-      if (ok) vars.add(ok);
-
-      const ik = typeof d.inputKey === 'string' ? d.inputKey.trim() : '';
-      if (ik) vars.add(ik);
-
-      if ((d.nodeType === 'get_var' || d.nodeType === 'set_var') && typeof d.pinDefaults?.name === 'string') {
-        const vn = d.pinDefaults.name.trim();
-        if (vn) vars.add(vn);
-      }
-
-      if (d.nodeType === 'bool_var') {
-        const raw = d.literalValue;
-        let vn = '';
-        if (typeof raw === 'string') vn = raw.trim();
-        else if (raw && typeof raw === 'object' && typeof (raw as any).name === 'string') vn = String((raw as any).name).trim();
-        if (vn) {
-          vars.add(vn);
-          declaredTypes.set(vn, 'boolean');
-        }
-      }
-
-      if (d.nodeType === 'var_decl') {
-        const raw = d.literalValue;
-        if (raw && typeof raw === 'object') {
-          const vn = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
-          const t = typeof (raw as any).type === 'string' ? String((raw as any).type).trim() : '';
-          const vt = isVarDeclPinType(t) ? t : 'any';
-          if (vn) {
-            vars.add(vn);
-            declaredTypes.set(vn, vt);
-          }
-        }
-      }
-    }
-
-    const options = Array.from(vars)
-      .filter((v) => v.length > 0)
-      .sort((a, b) => a.localeCompare(b))
-      .map((v) => {
-        const t = declaredTypes.get(v);
-        return { value: v, label: t ? `${v} (${t})` : v };
-      });
-
-    return { options, declaredTypes };
-  }, [allNodes]);
+  // The flow's variables and their declared types (utils/flowVariables.ts).
+  const variableMeta = useMemo(() => flowVariableMeta(allNodes), [allNodes]);
 
   const variableOptions = variableMeta.options;
   const declaredVarTypes = variableMeta.declaredTypes;
@@ -925,8 +865,9 @@ export const BaseNode = memo(function BaseNode({
   const handlesKey = useMemo(() => {
     const inputs = data.inputs.map((p) => p.id).join('|');
     const outputs = data.outputs.map((p) => p.id).join('|');
-    return `${inputs}__${outputs}`;
-  }, [data.inputs, data.outputs]);
+    // Swapping If/Else's branches moves its handles without changing their ids.
+    return `${inputs}__${outputs}__${data.branchesSwapped ? 'swapped' : ''}`;
+  }, [data.inputs, data.outputs, data.branchesSwapped]);
 
   // Node width can change when pin connections toggle inline controls (quick defaults),
   // so nudge ReactFlow to re-measure when connections for this node change.
@@ -3470,6 +3411,11 @@ export const BaseNode = memo(function BaseNode({
     if (!fxEditingPin) return [] as string[];
     return Array.from(collectDeclaredVarNames(allNodes)).sort();
   }, [fxEditingPin, allNodes]);
+  // String Template: the card shows its text with variable chips (components/TemplateText.tsx).
+  const templateVariables = useMemo(
+    () => (isTemplateNode ? Array.from(collectDeclaredVarNames(allNodes)) : ([] as string[])),
+    [isTemplateNode, allNodes]
+  );
   // Flow function library (tier 2): names drive the ƒ-chip rendering and the
   // editor's promote/hint surfaces. Subscribed here (not passed as props) so
   // every card re-renders its chips when the library changes.
@@ -3596,8 +3542,9 @@ export const BaseNode = memo(function BaseNode({
         nextDefaults.name = name;
       }
 
-      const baseLabel = data.nodeType === 'set_var' ? 'Set Variable' : 'Get Variable';
-      const prefix = data.nodeType === 'set_var' ? 'Set ' : 'Get ';
+      const baseLabel =
+        data.nodeType === 'set_var' ? 'Set Variable' : data.nodeType === 'add_to_list' ? 'Add to List Variable' : 'Get Variable';
+      const prefix = data.nodeType === 'set_var' ? 'Set ' : data.nodeType === 'add_to_list' ? 'Add to ' : 'Get ';
 
       // Auto-label for readability, but don't stomp explicit user labels.
       const prevLabel = data.label || baseLabel;
@@ -3948,6 +3895,38 @@ export const BaseNode = memo(function BaseNode({
         {loopBadge ? <span className="node-progress-badge" title="Loop progress">{loopBadge}</span> : null}
         <NodeStatusGlyph status={runStatus || (isRecent ? 'done' : undefined)} />
         <HiddenConnectionsBadge nodeId={id} />
+        {data.nodeType === 'if' ? (
+          // Display only: which branch is drawn on top (the runtime ignores it).
+          <button
+            type="button"
+            className="node-swap-button nodrag"
+            aria-label={data.branchesSwapped ? 'Draw True above False' : 'Draw False above True'}
+            aria-pressed={Boolean(data.branchesSwapped)}
+            title="Swap True and False (display only)"
+            onClick={(e) => {
+              e.stopPropagation();
+              updateNodeData(id, { branchesSwapped: !data.branchesSwapped });
+            }}
+          >
+            <IconSwapVertical />
+          </button>
+        ) : null}
+        {isCollapsibleOperator(data.nodeType) ? (
+          // Fold into the compact round node (utils/operatorNodes.ts): one tap or
+          // click on any device; a control, so it never selects the node.
+          <button
+            type="button"
+            className="node-fold-button nodrag"
+            aria-label="Fold into a compact node"
+            title="Fold"
+            onClick={(e) => {
+              e.stopPropagation();
+              updateNodeData(id, { collapsed: true });
+            }}
+          >
+            <Icon name="minus" size={12} />
+          </button>
+        ) : null}
 
         {/* Execution output pins (right side of header) */}
         {outputExecs.length === 1 && !isSwitchNode && (
@@ -4168,8 +4147,10 @@ export const BaseNode = memo(function BaseNode({
                 );
               }
 
-              // Default: render all execution outputs in order.
-              return outputExecs.map((pin) => (
+              // Default: render all execution outputs in order (If/Else may draw
+              // False first: display only, see FlowNodeData.branchesSwapped).
+              const drawn = data.nodeType === 'if' && data.branchesSwapped ? [...outputExecs].reverse() : outputExecs;
+              return drawn.map((pin) => (
                 <div key={pin.id} className="pin-row output exec-branch nodrag">
                   <span className="pin-label">{pin.label}</span>
                   <span
@@ -4378,12 +4359,15 @@ export const BaseNode = memo(function BaseNode({
                     </button>
                   </AfTooltip>
                 ) : null}
-                <PinExpressionChip
-                  pinLabel={pin.label || pin.id}
-                  expression={pinExpression}
-                  libraryNames={fxLibraryNames}
-                  onOpen={() => setFxEditingPin(pin.id)}
-                />
+                {/* A String Template's text is edited in place with @ variables, not by an expression. */}
+                {isTemplateNode && pin.id === 'template' && !pinExpression ? null : (
+                  <PinExpressionChip
+                    pinLabel={pin.label || pin.id}
+                    expression={pinExpression}
+                    libraryNames={fxLibraryNames}
+                    onOpen={() => setFxEditingPin(pin.id)}
+                  />
+                )}
                 {(() => {
                   const connected = isPinConnected(pin.id, true);
                   const controls: ReactNode[] = [];
@@ -4398,6 +4382,7 @@ export const BaseNode = memo(function BaseNode({
                 const isOnScheduleTimestampPin = isOnScheduleNode && pin.id === 'schedule';
                 const isOnScheduleRecurrentPin = isOnScheduleNode && pin.id === 'recurrent';
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
+                const isTemplateTextPin = isTemplateNode && pin.id === 'template';
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
                 const isStringifyJsonModePin = isStringifyJsonNode && pin.id === 'mode';
                 const isThinkingPin = (isAgentNode || isLlmNode) && pin.id === 'thinking';
@@ -4490,6 +4475,7 @@ export const BaseNode = memo(function BaseNode({
                   isOnScheduleTimestampPin ||
                   isOnScheduleRecurrentPin ||
 	                  isWriteFileContentPin ||
+	                  isTemplateTextPin ||
 	                  isMemoryScopePin ||
 	                  isRecallLevelPin ||
 	                  isSubflowScopePin ||
@@ -4864,6 +4850,31 @@ export const BaseNode = memo(function BaseNode({
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
                       onChange={(e) => setPinDefault('content', e.target.value)}
+                    />
+                  );
+                }
+
+                if (isTemplateTextPin && !connected) {
+                  const raw = pinDefaults.template;
+                  const inputIds = templateInputPins(inputData).map((p) => p.id);
+                  controls.push(
+                    <TemplateTextEditor
+                      key="template-text"
+                      inline
+                      value={typeof raw === 'string' ? raw : ''}
+                      onChange={(next) => setPinDefault('template', next)}
+                      inputs={inputIds}
+                      variables={templateVariables}
+                      onAddInput={(name) => {
+                        const problem = templateInputNameProblem(name, new Set(inputIds));
+                        if (problem) {
+                          toast.error(problem);
+                          return false;
+                        }
+                        updateNodeData(id, { inputs: [...inputData, { id: name, label: name, type: 'any' }] });
+                        return true;
+                      }}
+                      ariaLabel={`Text of ${data.label || 'String Template'}`}
                     />
                   );
                 }

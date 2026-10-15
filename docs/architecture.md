@@ -118,10 +118,9 @@ workflow shows unsaved changes until you save it. See
 
 A workflow's top-level `interfaces` list declares the contracts it implements.
 The known interfaces and their typed boundary pins live in
-`src/utils/flowFamilies.ts`. Eight of them carry pin contracts
-(`abstractcode.agent.v1`, `abstractassistant.agent.v1`,
-`abstractcode.goal.v1`, `abstractcode.coding.v1`,
-`abstractresearch.coscientist.v1`, `abstractreview.adversarial.v1`,
+`src/utils/flowFamilies.ts`. Eight of them carry pin contracts, no two the
+same (`abstractcode.agent.v1`, `abstractassistant.agent.v1`, `abstractcode.goal.v1`,
+`abstractcode.coding.v1`, `abstractresearch.coscientist.v1`, `abstractreview.adversarial.v1`,
 `abstractextract.structured.v1`, `abstractbatch.mapreduce.v1`); two are
 family markers without pins (`abstractresearch.deep.v1`,
 `abstractmeta.intelligence.v1`). Entry-point interfaces make a workflow
@@ -150,7 +149,7 @@ flowchart LR
   Doc["VisualFlow document<br/>automation_defaults"] -->|Save: PUT, validated| Store[(Gateway workflow store)]
   Store -->|Publish| Manifest["Bundle manifest<br/>metadata.automation_defaults[flow id]"]
   Manifest --> Catalog["Workflow catalog and /bundles<br/>automation_defaults by flow id"]
-  App["Observer or Assistant"] -->|POST /api/gateway/automations<br/>trigger or title omitted| Create[Automation creation]
+  App["A gateway client"] -->|POST /api/gateway/automations<br/>trigger or title omitted| Create[Automation creation]
   Manifest -->|missing trigger, context, title, input_data| Create
   Create --> Automation["Automation<br/>runs the workflow per trigger"]
 ```

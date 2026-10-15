@@ -38,7 +38,7 @@ export const EXEC_FAMILY_LABELS: Record<ExecNodeFamily, string> = {
   logic: 'Logic & state',
 };
 
-const CONTROL_TYPES = new Set(['if', 'switch', 'sequence', 'parallel', 'loop', 'while', 'for']);
+const CONTROL_TYPES = new Set(['if', 'switch', 'sequence', 'parallel', 'loop', 'loop_limit', 'while', 'for']);
 const INTERACTION_TYPES = new Set(['ask_user', 'answer_user', 'listen_voice']);
 const GENERATIVE_TYPES = new Set(['llm_call', 'agent']);
 const MEDIA_TYPES = new Set([

@@ -38,17 +38,16 @@ backend belong to these packages:
 
 ## What Does Declaring An Interface Do?
 
-An interface such as `abstractcode.agent.v1` tells hosts (AbstractCode,
-AbstractAssistant, entity phases) that they can start the workflow and which
-pins they send and read. Declaring one in the Flow Library adds the pins it
+An interface such as `abstractcode.agent.v1` tells whoever runs workflows
+that this one can be started that way, and which pins it takes and gives. Declaring one in the Flow Library adds the pins it
 requires to `On Flow Start` and `On Flow End`; you then wire them. See
 [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for every interface
 and its pins.
 
 ## How Do I Run A Workflow Every Few Minutes?
 
-Create an automation from the published workflow in AbstractObserver or the
-Assistant. In the editor, you can store the automation's defaults (trigger,
+Create an automation from the published workflow on the gateway
+(`POST /api/gateway/automations`, or any client that manages automations). In the editor, you can store the automation's defaults (trigger,
 interval, context mode, inputs) in Flow Library > **Automation**; they are
 published with the workflow. The `On Schedule`, `On Event` and `Delay` nodes
 wait inside a run that has already started and do not start runs. See

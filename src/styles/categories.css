@@ -49,8 +49,9 @@
   --flow-hue-green: #008300;
 }
 
-/* Dark surfaces inside a light theme: the canvas cards (full and run view). */
+/* Dark surfaces inside a light theme: the canvas cards (full, folded and run view). */
 .flow-node,
+.collapsed-operator,
 .exec-view-node {
   --flow-hue-violet: #9085e9;
   --flow-hue-orange: #d95926;
@@ -65,6 +66,7 @@
  * its own steps). "other" = a node type no section claims: neutral. */
 :root,
 .flow-node,
+.collapsed-operator,
 .exec-view-node {
   --flow-cat-core: var(--flow-hue-violet);
   --flow-cat-control: var(--flow-hue-orange);
@@ -84,6 +86,7 @@
  * are dark in every theme), and the card's accent before BaseNode sets the
  * node's own category. */
 .flow-node,
+.collapsed-operator,
 .exec-view-node {
   --flow-card-ground: #23253a;
   --flow-card-ink: #ffffff;

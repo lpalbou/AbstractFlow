@@ -70,10 +70,22 @@ describe('state toggles: node settings are switches', () => {
     expect(tag).toContain('>Free text answers<');
   });
 
-  it('Agent: "Structured output" is a switch', () => {
-    const tag = switchMarkup(renderPanel(nodeOf('agent')), 'structured-output');
-    expect(tag).toContain('>Structured output<');
-    expect(tag).toMatch(/aria-checked="(true|false)"/);
+  // Operator 2026-10-11: an Agent's structured response is its resp_schema
+  // input alone; no separate on/off switch that could contradict it.
+  it('Agent: no "Structured output" switch; the Structured response section edits resp_schema', () => {
+    const plain = renderPanel(nodeOf('agent'));
+    expect(plain).not.toContain('data-action="structured-output"');
+    expect(plain).toContain('Structured response');
+    expect(plain).toContain('Add a schema');
+    const agent = nodeOf('agent');
+    agent.data.pinDefaults = {
+      ...(agent.data.pinDefaults || {}),
+      resp_schema: { type: 'object', properties: { success: { type: 'boolean' }, tasks: { type: 'array', items: { type: 'string' } } } },
+    };
+    const withSchema = renderPanel(agent);
+    expect(withSchema).toContain('Edit schema');
+    expect(withSchema).toContain('>success<');
+    expect(withSchema).toContain('array of string');
   });
 });
 

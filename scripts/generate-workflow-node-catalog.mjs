@@ -34,10 +34,10 @@ function defaultConfig(data) {
 
 function dynamicPolicy(type) {
   const parts = [];
-  if (['on_flow_end', 'concat', 'string_template', 'make_object'].includes(type)) {
+  if (['on_flow_end', 'concat', 'string_template', 'make_object', 'set_vars'].includes(type)) {
     parts.push('dynamic inputs via the document `inputs` list');
   }
-  if (['on_flow_start', 'break_object'].includes(type)) {
+  if (['on_flow_start', 'break_object', 'get_vars'].includes(type)) {
     parts.push(type === 'break_object'
       ? 'dynamic outputs via the document `outputs` list (also drives `breakConfig.selectedPaths`)'
       : 'dynamic outputs via the document `outputs` list');

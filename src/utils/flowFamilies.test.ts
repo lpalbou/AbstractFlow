@@ -352,23 +352,19 @@ describe('interface boundary pins', () => {
   });
 });
 
-describe('host interfaces added to the contract', () => {
-  it('abstractassistant.agent.v1 carries the pins AbstractAssistant sends and reads', () => {
-    const pins = interfaceBoundaryPins(['abstractassistant.agent.v1']);
-    expect(pins.start.map((p) => [p.id, p.type])).toEqual([
-      ['provider', 'provider_text'],
-      ['model', 'model'],
-      ['prompt', 'string'],
-    ]);
-    expect(pins.end.map((p) => [p.id, p.type])).toEqual([
-      ['response', 'string'],
-      ['success', 'boolean'],
-      ['meta', 'object'],
-    ]);
-    expect(isExecutableFlow({ interfaces: ['abstractassistant.agent.v1'] })).toBe(true);
+describe('entrypoint interfaces', () => {
+  it('no two interfaces share the same contract (required and optional pins): no duplicates', () => {
+    const signature = (iface: (typeof KNOWN_INTERFACES)[number]) =>
+      JSON.stringify([
+        (iface.requiredStartPins || []).map((p) => [p.id, p.type]),
+        (iface.requiredEndPins || []).map((p) => [p.id, p.type]),
+        (iface.optionalStartPins || []).map((p) => [p.id, p.type]),
+      ]);
+    const withPins = KNOWN_INTERFACES.filter((iface) => (iface.requiredStartPins?.length || 0) + (iface.requiredEndPins?.length || 0) > 0);
+    expect(new Set(withPins.map(signature)).size).toBe(withPins.length);
   });
 
-  it('abstractcode.goal.v1 carries the pins of AbstractCode /goal; goal-agent.json implements it on every end', () => {
+  it('abstractcode.goal.v1 carries the goal-loop pins; goal-agent.json implements it on every end', () => {
     const pins = interfaceBoundaryPins(['abstractcode.goal.v1']);
     expect(pins.start.map((p) => [p.id, p.type])).toEqual([
       ['goal', 'string'],
@@ -401,8 +397,25 @@ describe('host interfaces added to the contract', () => {
     }
   });
 
-  it('both are offered by the interface editor (entrypoint class, not a hidden domain marker)', () => {
+  it('the agent and goal-loop interfaces are offered by the interface editor (entrypoint class, not a hidden domain marker)', () => {
     const offered = KNOWN_INTERFACES.filter((iface) => iface.class !== 'domain').map((iface) => iface.id);
-    expect(offered).toEqual(expect.arrayContaining(['abstractassistant.agent.v1', 'abstractcode.goal.v1']));
+    expect(offered).toEqual(expect.arrayContaining(['abstractcode.agent.v1', 'abstractcode.goal.v1']));
+  });
+
+  it('Assistant (v1): the agent trio required, every generated modality offered as an optional pin', () => {
+    const pins = interfaceBoundaryPins(['abstractassistant.agent.v1']);
+    expect(pins.start.filter((p) => !p.optional).map((p) => p.id)).toEqual(['provider', 'model', 'prompt']);
+    expect(pins.end.map((p) => p.id)).toEqual(['response', 'success', 'meta']);
+    const optional = pins.start.filter((p) => p.optional);
+    for (const id of ['image_provider', 'image_model', 'video_provider', 'music_model', 'sound_output', 'primary_image_artifact']) {
+      expect(optional.map((p) => p.id)).toContain(id);
+    }
+    // Declaring adds the optional pins too, so a caller's value has a pin to land on.
+    const start = boundaryNode('start', 'on_flow_start');
+    const next = applyInterfacePins([start], ['abstractassistant.agent.v1']);
+    expect(next[0].data.outputs.map((p) => p.id)).toEqual(expect.arrayContaining(['prompt', 'image_provider', 'sound_output']));
+    // A pin another declared interface requires stays required.
+    const both = interfaceBoundaryPins(['abstractcode.agent.v1', 'abstractassistant.agent.v1']);
+    expect(both.start.find((p) => p.id === 'prompt')?.optional).toBeUndefined();
   });
 });

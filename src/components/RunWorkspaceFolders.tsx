@@ -1,6 +1,6 @@
 // Run → File System Access (round 11, DESIGN R11.6): the kit WorkspaceChooser
-// at the RUN level, the same model and words as the gateway console,
-// AbstractCode, Observer and the Assistant. The value is this run's own
+// at the RUN level, the same model and words as the gateway console (the
+// kit component is shared). The value is this run's own
 // workspaces (`{posture, default_mode, folders}`, null = "Use my default");
 // it rides the run-start body as `workspace` (RunFlowModal → useWebSocket).
 // What it means is the gateway's dry run (POST api/gateway/workspace/effective/me):

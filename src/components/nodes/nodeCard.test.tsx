@@ -93,10 +93,13 @@ describe('canvas node card', () => {
 
 describe('node card stylesheet', () => {
   const css = readFileSync(resolve(__dirname, '../../styles/nodes.css'), 'utf8');
+  // The rule whose selector list starts with `sel` (a folded operator shares
+  // the status rules: `.flow-node.executing,\n.collapsed-operator.executing {`).
   const rule = (sel: string) => {
-    const i = css.indexOf(`\n${sel} {`);
-    expect(i, `${sel} rule exists`).toBeGreaterThan(-1);
-    return css.slice(i, css.indexOf('}', i));
+    const escaped = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = new RegExp(`\\n${escaped}(?:,[^{]*)? \\{`).exec(css);
+    expect(m, `${sel} rule exists`).not.toBeNull();
+    return css.slice(m!.index, css.indexOf('}', m!.index));
   };
 
   it('titles wrap and are never truncated (no ellipsis, no nowrap)', () => {
@@ -173,5 +176,19 @@ describe('run status glyph (R14-W8)', () => {
     expect(css).toMatch(/\.node-status-glyph--done\s*\{\s*--node-status-color:\s*var\(--info\)/);
     expect(css).toMatch(/\.node-status-glyph--waiting\s*\{\s*--node-status-color:\s*var\(--warning\)/);
     expect(css).toMatch(/\.node-status-glyph--failed\s*\{\s*--node-status-color:\s*var\(--error\)/);
+  });
+
+  // Operator 2026-10-11: up/down arrows at the top right of If/Else swap the
+  // drawn order of True and False, for shorter wires; display only.
+  it('If/Else draws True then False, or False then True once swapped, from its header button', () => {
+    const order = (html: string) => [...html.matchAll(/data-handleid="(true|false)"/g)].map((m) => m[1]);
+    const plain = renderNode('if');
+    expect(order(plain)).toEqual(['true', 'false']);
+    expect(header(plain)).toContain('aria-label="Draw False above True"');
+    const swapped = renderNode('if', { branchesSwapped: true });
+    expect(order(swapped)).toEqual(['false', 'true']);
+    expect(header(swapped)).toContain('aria-pressed="true"');
+    // Only If/Else has it.
+    expect(renderNode('while')).not.toContain('node-swap-button');
   });
 });

@@ -52,8 +52,8 @@ function kitLightGroup(): string[] {
 const LIGHT = kitLightGroup();
 const darkHues = decls(ruleBody(tokenCss, [':root']));
 const lightHues = decls(ruleBody(tokenCss, LIGHT));
-const cardHues = decls(ruleBody(tokenCss, ['.flow-node', '.exec-view-node']));
-const mapping = decls(ruleBody(tokenCss, [':root', '.flow-node', '.exec-view-node']));
+const cardHues = decls(ruleBody(tokenCss, ['.flow-node', '.collapsed-operator', '.exec-view-node']));
+const mapping = decls(ruleBody(tokenCss, [':root', '.flow-node', '.collapsed-operator', '.exec-view-node']));
 
 describe('category → section mapping', () => {
   it('every semantic category is mapped to a palette section (none falls to "other")', () => {

@@ -26,6 +26,18 @@ function ToolbarIcon({ children, spin = false }: { children: ReactNode; spin?: b
   );
 }
 
+/** Up and down arrows side by side: swap the order of two things. */
+export function IconSwapVertical() {
+  return (
+    <ToolbarIcon>
+      <path d="M8 20V4" />
+      <path d="M4 8l4-4 4 4" />
+      <path d="M16 4v16" />
+      <path d="M12 16l4 4 4-4" />
+    </ToolbarIcon>
+  );
+}
+
 export function IconFilePlus() {
   return (
     <ToolbarIcon>

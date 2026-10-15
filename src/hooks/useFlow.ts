@@ -17,7 +17,19 @@ import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, J
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { computeFoldedGetters } from '../utils/foldedGetters';
-import { inferEntryNode, isRouteOverrideEdge, routeKey as buildRouteKey, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
+import { withTrailStep } from '../utils/runSpotlight';
+import { withRelayTypes } from '../utils/relays';
+import { withAgentSchemaOnInput } from '../utils/structuredOutput';
+import { withSetVariableRows } from '../utils/setVariables';
+import { withoutRedundantTemplateVars } from '../utils/textTemplate';
+import {
+  inferEntryNode,
+  isRouteOverrideEdge,
+  routeKey as buildRouteKey,
+  routeOverrideEdgeFor,
+  withMultiEntryRouteData,
+  withoutStoredRouteOverrides,
+} from '../utils/multiEntryRoutes';
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from '../utils/visualFlowCompat';
 import { applyInterfacePins, interfaceBoundaryPins, normalizeInterfaces, withInterfacePins } from '../utils/flowFamilies';
 import {
@@ -69,6 +81,50 @@ export function loadEdgeNotice(report: LoadEdgeReport, limit = 5): string | null
   return parts.length > 0 ? parts.join('. ') : null;
 }
 
+/** The name of the document the editor starts with (and New flow resets to). */
+export const UNTITLED_FLOW_NAME = 'Untitled Flow';
+
+/**
+ * The editor's start document: nothing opened or created yet (no gateway id,
+ * the untitled name, no description, interfaces or nodes). The canvas offers
+ * Create Flow / Open Flow only then.
+ */
+export function isBlankStartDocument(
+  state: Pick<FlowState, 'flowId' | 'flowName' | 'flowDescription' | 'flowInterfaces' | 'nodes'>
+): boolean {
+  return (
+    state.flowId === null &&
+    state.flowName === UNTITLED_FLOW_NAME &&
+    !state.flowDescription &&
+    state.flowInterfaces.length === 0 &&
+    state.nodes.length === 0
+  );
+}
+
+/** The node types a new flow's canvas starts with, for its declared interfaces. */
+export type ScaffoldNodeType = 'on_flow_start' | 'on_flow_end';
+
+/** Where they sit: start on the left, end on the right, room for the steps between. */
+const SCAFFOLD_POSITIONS: Record<ScaffoldNodeType, { x: number; y: number }> = {
+  on_flow_start: { x: 0, y: 0 },
+  on_flow_end: { x: 640, y: 0 },
+};
+
+/**
+ * The nodes a flow declaring these interfaces needs on its canvas: On Flow
+ * Start when an interface requires start pins, On Flow End when one requires
+ * end pins (operator 2026-10-11: creating a flow with an interface puts its
+ * nodes in place, so the author only fills in the steps). An interface that
+ * one day needs another node (a trigger) adds its type here.
+ */
+export function interfaceScaffoldTypes(interfaces: string[]): ScaffoldNodeType[] {
+  const pins = interfaceBoundaryPins(interfaces);
+  const types: ScaffoldNodeType[] = [];
+  if (pins.start.length) types.push('on_flow_start');
+  if (pins.end.length) types.push('on_flow_end');
+  return types;
+}
+
 /**
  * Preserved edges that still belong to the document: both endpoint nodes
  * exist and the canvas does not draw the same connection itself (drawing it
@@ -108,6 +164,8 @@ interface FlowState {
   flowId: string | null;
   draftInstanceId: string;
   flowName: string;
+  /** The flow's description (saved with the flow; set at creation, edited in the library). */
+  flowDescription: string;
   flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
@@ -153,6 +211,8 @@ interface FlowState {
 
   // Execution state
   executingNodeId: string | null;
+  /** Nodes that started running, most recent first (the run spotlight's trail, utils/runSpotlight.ts). */
+  executionTrail: string[];
   isRunning: boolean;
   // Execution observability (visual “afterglow” + progress)
   recentNodeIds: Record<string, true>;
@@ -196,6 +256,7 @@ interface FlowState {
   // Actions
   setFlowId: (id: string | null) => void;
   setFlowName: (name: string) => void;
+  setFlowDescription: (description: string) => void;
   /**
    * Declare the flow's interfaces AND add the pins they require to the
    * On Flow Start / On Flow End nodes — one undo step. Existing pins are kept.
@@ -223,7 +284,30 @@ interface FlowState {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
+  /**
+   * Feed `pinId` of a multi-entry node from `source` on ONE entry path (`routeKey`),
+   * drawn as a per-path wire; `null` removes that path's wire (the normal wire
+   * applies again). Replaces any per-path wire the path already had.
+   */
+  setRouteOverride: (
+    nodeId: string,
+    pinId: string,
+    routeKey: string,
+    source: { nodeId: string; handle: string } | null
+  ) => void;
   addNode: (template: NodeTemplate, position: { x: number; y: number }) => void;
+  /**
+   * Add a node and wire it to an existing pin in one undo step (the canvas
+   * wire-drop menu). `link.from` is the existing pin; `link.newPin` the new
+   * node's pin. Returns the new node id, or null when the wire is refused.
+   */
+  /** Caps how many times a repeating wire is taken (`edge.data.loopLimit`); null removes the cap. */
+  setEdgeLoopLimit: (edgeId: string, max: number | null) => void;
+  addNodeAndConnect: (
+    template: NodeTemplate,
+    position: { x: number; y: number },
+    link: { from: { nodeId: string; handleId: string; side: 'source' | 'target' }; newPin: string }
+  ) => string | null;
   updateNodeData: (nodeId: string, data: Partial<FlowNodeData>) => void;
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
@@ -264,6 +348,12 @@ interface FlowState {
   loadFlow: (flow: VisualFlow) => VisualFlow;
   getFlow: () => VisualFlow;
   clearFlow: () => void;
+  /**
+   * Start a new document: cleared, then named, described, declaring these
+   * interfaces, with the nodes they need already placed (and their pins). The
+   * placed nodes are the document's starting point, not an undo step.
+   */
+  createFlow: (values: { name: string; description: string; interfaces: string[] }) => void;
 }
 
 let nodeIdCounter = 0;
@@ -557,6 +647,38 @@ function withFoldedReadsOfRemoved(
   return cascaded.length === 0 ? removedNodeIds : [...removedNodeIds, ...cascaded];
 }
 
+/**
+ * The wires left after deleting nodes, with a deleted Loop Limit that sat on one wire (one way
+ * in, `again` wired on) healed: the wire it split is drawn back, and the per-path wires that
+ * entered through its `again` are keyed on the healed wire again — the inverse of
+ * `insertLoopLimitOnEdge` (review 2026-10-14: the per-path wire used to be orphaned silently).
+ */
+function edgesAfterRemovingNodes(state: Pick<FlowState, 'nodes' | 'edges'>, removedNodeIds: readonly string[]): Edge[] {
+  const removed = new Set(removedNodeIds);
+  const healed: Edge[] = [];
+  const rekey = new Map<string, string>();
+  for (const id of removed) {
+    const node = state.nodes.find((n) => n.id === id);
+    if (node?.data.nodeType !== 'loop_limit') continue;
+    const ins = state.edges.filter((e) => e.target === id && e.targetHandle === 'exec-in' && !removed.has(e.source));
+    const outs = state.edges.filter((e) => e.source === id && e.sourceHandle === 'again' && !removed.has(e.target));
+    if (ins.length !== 1 || outs.length !== 1) continue;
+    const [inWire] = ins;
+    const [outWire] = outs;
+    healed.push({ id: `edge-${Date.now()}-${healed.length}`, source: inWire.source, sourceHandle: inWire.sourceHandle, target: outWire.target, targetHandle: outWire.targetHandle, animated: outWire.animated });
+    rekey.set(buildRouteKey(id, 'again'), buildRouteKey(inWire.source, String(inWire.sourceHandle || 'exec-out')));
+  }
+  return state.edges
+    .filter((e) => !removed.has(e.source) && !removed.has(e.target))
+    .map((e) => {
+      if (!isRouteOverrideEdge(e)) return e;
+      const data = e.data as Record<string, unknown>;
+      const next = rekey.get(String(data.routeKey || ''));
+      return next ? { ...e, data: { ...data, routeKey: next } } : e;
+    })
+    .concat(healed);
+}
+
 function getSelection(state: Pick<FlowState, 'nodes' | 'selectedNode'>): Node<FlowNodeData>[] {
   const selected = state.nodes.filter(isNodeSelected);
   if (selected.length > 0) return selected;
@@ -583,7 +705,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Initial state
   flowId: null,
   draftInstanceId: newDraftInstanceId(),
-  flowName: 'Untitled Flow',
+  flowName: UNTITLED_FLOW_NAME,
+  flowDescription: '',
   flowInterfaces: [],
   nodes: [],
   edges: [],
@@ -602,6 +725,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   execView: false,
   foldReads: true,
   recentNodeIds: {},
+  executionTrail: [],
   waitingNodeId: null,
   failedNodeId: null,
   recentEdgeIds: {},
@@ -618,6 +742,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Setters
   setFlowId: (id) => set({ flowId: id }),
   setFlowName: (name) => set({ flowName: name }),
+  setFlowDescription: (description) => set({ flowDescription: description }),
   setFlowInterfaces: (interfaces) => {
     const state = get();
     const flowInterfaces = normalizeInterfaces(interfaces);
@@ -840,9 +965,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
 
     const removed = new Set(removedNodeIds);
-    const remainingEdges = state.edges.filter(
-      (e) => !removed.has(e.source) && !removed.has(e.target)
-    );
+    const remainingEdges = edgesAfterRemovingNodes(state, removedNodeIds);
 
     const selectedNode = nextSelectedNode && removed.has(nextSelectedNode.id) ? null : nextSelectedNode;
 
@@ -940,6 +1063,30 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
   },
 
+  setRouteOverride: (nodeId, pinId, route, source) => {
+    const state = get();
+    const current = routeOverrideEdgeFor(state.edges, nodeId, pinId, route);
+    if (!source && !current) return;
+    if (source && current && current.source === source.nodeId && current.sourceHandle === source.handle) return;
+    get()._captureHistory();
+    const kept = state.edges.filter((e) => e !== current);
+    const next: Edge[] = source
+      ? [
+          ...kept,
+          {
+            id: `route-override-${source.nodeId}-${source.handle}-${nodeId}-${pinId}-${route.replace(/[^a-zA-Z0-9_-]+/g, '-')}`,
+            source: source.nodeId,
+            sourceHandle: source.handle,
+            target: nodeId,
+            targetHandle: pinId,
+            animated: false,
+            data: { routeOverride: true, routeKey: route },
+          },
+        ]
+      : kept;
+    set({ edges: next, selectedEdge: state.selectedEdge === current ? null : state.selectedEdge });
+  },
+
   // Add a new node
   addNode: (template, position) => {
     get()._captureHistory();
@@ -958,6 +1105,36 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       nodes: [...get().nodes, newNode],
     });
+  },
+
+  setEdgeLoopLimit: (edgeId, max) => {
+    const state = get();
+    const wire = state.edges.find((e) => e.id === edgeId);
+    if (!wire) return;
+    get()._captureHistory();
+    set({
+      edges: state.edges.map((e) => {
+        if (e.id !== edgeId) return e;
+        const { loopLimit: _old, ...rest } = (e.data || {}) as Record<string, unknown>;
+        const data = max === null ? rest : { ...rest, loopLimit: { max: Math.max(0, Math.floor(max)) } };
+        return { ...e, data: Object.keys(data).length > 0 ? data : undefined };
+      }),
+    });
+  },
+
+  addNodeAndConnect: (template, position, link) => {
+    const id = `node-${nodeIdCounter + 1}`;
+    const node: Node<FlowNodeData> = { id, type: 'custom', position, data: createNodeData(template) };
+    const nodes = [...get().nodes, node];
+    const connection: Connection =
+      link.from.side === 'source'
+        ? { source: link.from.nodeId, sourceHandle: link.from.handleId, target: id, targetHandle: link.newPin }
+        : { source: id, sourceHandle: link.newPin, target: link.from.nodeId, targetHandle: link.from.handleId };
+    if (!validateConnection(nodes, get().edges, connection)) return null;
+    get()._captureHistory();
+    nodeIdCounter += 1;
+    set({ nodes, edges: addEdge({ ...connection, id: `edge-${Date.now()}` }, get().edges) });
+    return id;
   },
 
   // Update node data
@@ -1030,11 +1207,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // withFoldedReadsOfRemoved).
   deleteNode: (nodeId) => {
     const state = get();
-    const removed = new Set(withFoldedReadsOfRemoved(state, [nodeId]));
+    const removedIds = withFoldedReadsOfRemoved(state, [nodeId]);
+    const removed = new Set(removedIds);
     get()._captureHistory();
     set({
       nodes: state.nodes.filter((n) => !removed.has(n.id)),
-      edges: state.edges.filter((e) => !removed.has(e.source) && !removed.has(e.target)),
+      edges: edgesAfterRemovingNodes(state, removedIds),
       selectedNode:
         state.selectedNode && removed.has(state.selectedNode.id) ? null : state.selectedNode,
     });
@@ -1261,11 +1439,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Execution state
   setExecView: (enabled) => set({ execView: Boolean(enabled) }),
   setFoldReads: (enabled) => set({ foldReads: Boolean(enabled) }),
-  setExecutingNodeId: (nodeId) => set({ executingNodeId: nodeId }),
+  setExecutingNodeId: (nodeId) =>
+    set((s) => ({
+      executingNodeId: nodeId,
+      executionTrail: nodeId && s.executionTrail[0] !== nodeId ? withTrailStep(s.executionTrail, nodeId) : s.executionTrail,
+    })),
   setIsRunning: (running) =>
     set({ isRunning: running, executingNodeId: running ? null : null }),
   resetExecutionDecorations: () =>
     set({
+      executionTrail: [],
       recentNodeIds: {},
       waitingNodeId: null,
       failedNodeId: null,
@@ -1343,7 +1526,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       let data: FlowNodeData = template
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
+      // An Agent's schema lives on its resp_schema input only (utils/structuredOutput.ts).
+      data = withAgentSchemaOnInput(data);
+      // Set Variables keeps one row per variable; an older typed-in `updates` object becomes rows.
+      data = withSetVariableRows(
+        data,
+        connectedInputHandlesByNodeId.get(vn.id) || new Set<string>(),
+        connectedOutputHandlesByNodeId.get(vn.id) || new Set<string>()
+      );
+      // String Template placeholders read run variables directly; an older empty `vars` input goes.
+      data = withoutRedundantTemplateVars(data, connectedInputHandlesByNodeId.get(vn.id) || new Set<string>());
 
+      // Renamed defaults (a label the author changed is kept).
+      if (data.nodeType === 'answer_user' && data.label === 'Answer User') {
+        data = { ...data, label: 'Show Message' };
+      }
       if (data.nodeType === 'make_object' && data.label === 'Create JSON') {
         data = { ...data, label: 'Build JSON' };
       }
@@ -2871,6 +3068,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       target: ve.target,
       targetHandle: ve.targetHandle,
       animated: ve.animated ?? ve.sourceHandle === 'exec-out',
+      // A limit on the wire travels with the document (utils/loopBackEdges.ts).
+      ...(ve.data?.loopLimit ? { data: { loopLimit: ve.data.loopLimit } } : {}),
     }));
 
     const nodeById = new Map(nodes.map((n) => [n.id, n]));
@@ -3050,6 +3249,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const loadedFlow: VisualFlow = {
       id: flow.id,
       name: flow.name,
+      ...(typeof flow.description === 'string' && flow.description ? { description: flow.description } : {}),
       interfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes: canonicalFlow.nodes,
       edges: canonicalFlow.edges,
@@ -3062,8 +3262,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowId: flow.id,
       draftInstanceId: newDraftInstanceId(),
       flowName: flow.name,
+      flowDescription: typeof flow.description === 'string' ? flow.description : '',
       flowInterfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
-      nodes,
+      // Per-path values now live only on the drawn per-path wires (displayEdges).
+      nodes: nodes.map(withoutStoredRouteOverrides),
       edges: displayEdges,
       preservedEdges,
       loadEdgeReport: edgeReport,
@@ -3101,19 +3303,24 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     // that the canvas has not since drawn itself.
     const keptPreserved = liveHiddenEdges(state);
     const visualEdges = [...state.edges.filter((e) => !isRouteOverrideEdge(e)), ...keptPreserved]
-      .map((e) => ({
-        id: e.id,
-        source: e.source,
-        sourceHandle: e.sourceHandle || '',
-        target: e.target,
-        targetHandle: e.targetHandle || '',
-        animated: e.animated,
-      }));
+      .map((e) => {
+        const loopLimit = (e.data as Record<string, unknown> | undefined)?.loopLimit as { max: number } | undefined;
+        return {
+          id: e.id,
+          source: e.source,
+          sourceHandle: e.sourceHandle || '',
+          target: e.target,
+          targetHandle: e.targetHandle || '',
+          animated: e.animated,
+          ...(loopLimit ? { data: { loopLimit } } : {}),
+        };
+      });
     const normalizedFlow = normalizeLegacyMusicCompatVisualFlow(visualNodes, visualEdges);
 
     return {
       id: state.flowId || `flow-${Date.now()}`,
       name: state.flowName,
+      ...(state.flowDescription ? { description: state.flowDescription } : {}),
       interfaces: Array.isArray(state.flowInterfaces) ? state.flowInterfaces : [],
       nodes: normalizedFlow.nodes,
       edges: normalizedFlow.edges,
@@ -3128,7 +3335,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       flowId: null,
       draftInstanceId: newDraftInstanceId(),
-      flowName: 'Untitled Flow',
+      flowName: UNTITLED_FLOW_NAME,
+      flowDescription: '',
       flowInterfaces: [],
       nodes: [],
       edges: [],
@@ -3148,4 +3356,36 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     });
     nodeIdCounter = 0;
   },
+
+  createFlow: ({ name, description, interfaces }) => {
+    get().clearFlow();
+    const flowInterfaces = normalizeInterfaces(interfaces);
+    const pins = interfaceBoundaryPins(flowInterfaces);
+    const nodes: Node<FlowNodeData>[] = interfaceScaffoldTypes(flowInterfaces).map((type) => {
+      const template = getNodeTemplate(type);
+      if (!template) throw new Error(`Node template "${type}" is missing`);
+      return {
+        id: `node-${++nodeIdCounter}`,
+        type: 'custom',
+        position: SCAFFOLD_POSITIONS[type],
+        data: withInterfacePins(createNodeData(template), pins),
+      };
+    });
+    set((state) => ({
+      flowName: name,
+      flowDescription: description,
+      flowInterfaces,
+      nodes,
+      fitViewRequest: nodes.length ? { nonce: (state.fitViewRequest?.nonce || 0) + 1 } : state.fitViewRequest,
+    }));
+  },
 }));
+
+// Relays take the type of the wire that feeds them (utils/relays.ts). One
+// subscription keeps that true whatever changed the wiring (connect, delete,
+// undo, the authoring assistant, load); it writes only when a type changes.
+useFlowStore.subscribe((state, previous) => {
+  if (state.nodes === previous.nodes && state.edges === previous.edges) return;
+  const typed = withRelayTypes(state.nodes, state.edges);
+  if (typed !== state.nodes) useFlowStore.setState({ nodes: typed });
+});

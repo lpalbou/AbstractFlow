@@ -93,6 +93,7 @@ export const NODE_ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   loop: 'loop',
   for: 'loop',
   while: 'loop',
+  loop_limit: 'loop',
   if: 'branch', // two outcomes (true / false)
   switch: 'branch',
   sequence: 'list',
@@ -121,6 +122,8 @@ export const NODE_ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   set_var: 'variable',
   set_var_property: 'variable',
   set_vars: 'variable',
+  get_vars: 'variable',
+  add_to_list: 'plus',
   // Math
   add: 'plus',
   subtract: 'minus',
@@ -169,6 +172,7 @@ export const NODE_ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   format_tool_results: 'terminal',
   agent_trace_report: 'activity',
   break_object: 'list',
+  reroute: 'branch',
 };
 
 /**

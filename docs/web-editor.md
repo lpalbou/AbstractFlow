@@ -149,6 +149,28 @@ type colours.
   minus, four corners, padlock) and a tooltip. The preview map in the bottom
   right has its own show/hide button.
 
+### If/Else branch order
+
+The up/down arrows button at the top right of an If/Else node swaps the order in which its True and
+False outputs are drawn, so the branch whose wire goes up can sit on top. It changes only the
+drawing: the runtime ignores it. It is saved with the node.
+
+### Folded operator nodes
+
+Fold an operator node into a small round node with only its sign, its pins and its wires: tap or
+click the fold button in its header (any device), or double-click it (mouse or trackpad). Unfold it
+with a double-click, or with a tap on a touch screen (a tap on a folded node never opens the
+properties drawer). Operators are the math nodes, the
+small text nodes (Concat, Length, Is Empty, Contains, Uppercase, Lowercase, Trim), the array and
+object builders (Make Array, Array Append, Array Concat, Array Length, Build JSON, Merge Objects,
+Break Object), the logic gates, Coalesce and Compare; a Get Variable node folds into a rounded
+rectangle that shows the variable's name. Hovering a folded node shows what it is, what
+feeds each input (an expression, a variable, another node's output or a literal value) and its
+outputs (Break Object: each field with its path, type and schema). The properties panel has a
+**Folded** switch for these nodes, and folding is off while the canvas is locked. Values set on
+the node are kept, and the folded state is saved with the flow. A double click on a pin or an
+inline editor does not fold.
+
 ## Responsive Layout
 
 The editor works on a desktop window, a laptop, a tablet, a phone, and a
@@ -214,7 +236,7 @@ with a mouse, the panels keep their dense layout with text at 12 px or more
 
 On/off settings are switches labelled by what they control; a switch is
 highlighted with a check mark when on and plain when off. The properties
-panel has **Structured output** (Agent), **Recurrent** (On Schedule) and
+panel has **Recurrent** (On Schedule) and
 **Free text answers** (Ask User). The dialogs have **Reload gateway bundles**
 (Publish), **Private workspace per run** (the run window's run workspace),
 **Durable** (sending an event to a waiting run), and **Lock after load** and
@@ -267,11 +289,15 @@ config CLIs; changing a default does not load or unload a model.
 
 ## Flow Interfaces
 
-Open the **Flow Library**, select a workflow and use the edit button next to **Interfaces** to declare the contracts it implements (for example **Runnable agent (v1)** for AbstractCode). The editor lists the typed pins each selected interface requires. Saving adds the missing ones to the `On Flow Start` and `On Flow End` nodes: right away when the workflow is open in the editor (your unsaved edits and undo history are kept, and the flow shows unsaved changes until you **Save**), otherwise the next time you open it. Wire the added pins on the canvas so hosts get real values. See [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for the pins of every interface.
+When AbstractFlow opens on a blank canvas, it offers **Create Flow** (the New flow dialog) and **Open Flow** (the Flow Library) side by side; the toolbar's **New Flow** and **Open Flow** buttons do the same at any time.
+
+**New Flow** asks for the workflow's title, an optional description and the interfaces it declares (the same interface list as the Flow Library, with each interface's pins). When the flow declares interfaces, **Create flow** places the `On Flow Start` and `On Flow End` nodes they need, already carrying their pins; you build the steps between them. **Save Flow** stores the title, description, interfaces and nodes on the gateway. If the open flow has unsaved changes, the dialog says creating a new flow discards them.
+
+To change the interfaces of an existing workflow, open the **Flow Library**, select a workflow and use the edit button next to **Interfaces** to declare the contracts it implements (for example **Runnable agent (v1)**). The interfaces are listed one per line; ticking or inspecting one opens its details beside the list, with the `On Flow Start` and `On Flow End` nodes drawn with the pins it requires. The footer carries **Cancel** and **Save Interfaces**. Saving adds the missing ones to the `On Flow Start` and `On Flow End` nodes: right away when the workflow is open in the editor (your unsaved edits and undo history are kept, and the flow shows unsaved changes until you **Save**), otherwise the next time you open it. Wire the added pins on the canvas so hosts get real values. See [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for the pins of every interface.
 
 ## Automation Defaults
 
-An automation runs a published workflow again and again: on a fixed interval, once at a given time, or only when you ask. You create and manage automations in AbstractObserver or the Assistant. The editor stores what an automation created from a workflow starts with, in the workflow's `automation_defaults` field.
+An automation runs a published workflow again and again: on a fixed interval, once at a given time, or only when you ask. You create and manage automations on the gateway (`POST /api/gateway/automations`, or any client that manages automations). The editor stores what an automation created from a workflow starts with, in the workflow's `automation_defaults` field.
 
 Open the **Flow Library** and select a workflow. The **Automation** row summarizes its defaults (for example `Schedule v1 · every 5m · growing context`). The edit button next to it is offered for runnable workflows, those that declare an entry-point interface; a workflow without one shows "Declare a runnable interface first". The dialog has these fields:
 
@@ -296,6 +322,50 @@ The editor reads the discovery path from the gateway's capabilities (`contracts.
 The editor validates settings with a subset of JSON Schema: `type`, `properties`, `required`, `additionalProperties`, `enum`, `pattern`, `minimum`, `maximum`, `minLength`, `maxLength`, the formats `date-time` and `duration`, and the annotations `title`, `description`, `default`, `examples`, `$schema` and `$comment`. A source whose `config_schema` uses any other keyword or format cannot be checked in the editor: the dialog names each unsupported keyword and its path, and **Save** stays disabled for that source. A defaults object that names an unknown source, an unavailable source, or a version the gateway does not serve is refused with a message. The gateway validates the defaults again when you save and when an automation is created.
 
 `On Schedule`, `On Event` and `Delay` (`wait_until`) are different: they wait inside a run that has already started and never start a workflow. See [Workflow node catalog](workflow-node-catalog.md).
+
+## Relays and the wire-drop menu
+
+Release a dragged wire on empty canvas (away from any pin or node) and a small menu opens there:
+
+- **Relay** adds a dot wired to the pin you dragged from. Drag from the dot's right half to as many
+  inputs as you need: one output then feeds several inputs along a tidy path. A relay takes the type
+  of the wire that feeds it (its colour, and the connection checks, follow it); relays can be
+  chained. It is visual only: when the flow runs, the runtime wires the source straight to each
+  input, as if the dot were not there (AbstractRuntime `reroute_lowering.py`, which must be deployed
+  for a flow with relays to run).
+- **Break Object** (from an object or `any` output) adds a Break Object wired to it and opens its
+  properties, where you pick the fields.
+
+Execution pins get no menu: relays carry data only. The relay and its wire are one undo step. A
+relay is also in the palette (Data and text → Relay).
+
+## Several entry paths into one node
+
+A node can be entered by several execution wires, for example a ForEach entered from the Planner
+and again from a reviewer's If/Else **False** to redo work with new tasks. Each input then takes
+one value per entry path. Its normal wire (or value) feeds every path; a **per-path wire** replaces
+it on one path. To draw one, drag a second wire onto the input: the editor asks "when entered
+from" which path (Planner, If/Else / false, ...), then draws the wire dashed, labelled
+"when from If/Else / false". Dropping another wire on the same path replaces it, and deleting
+the wire puts the normal value back on that path. When the wire comes from the node that runs
+right before the node on one path, that path is chosen without asking. The node's properties
+panel lists the same values under **Multi-entry routing**, one choice per input and path; the
+canvas and the panel edit the same wires. At run time the runtime picks the value for the path
+that arrived (`multi_entry_lowering.py` in AbstractRuntime).
+
+## Paths that repeat
+
+An execution wire that goes back to an earlier node (an If/Else **False** wired back to a
+ForEach, for example) makes that path repeat. The editor finds such wires and shows a **↺** badge
+halfway along each one. Click the badge and say how many times at most the path may repeat: the
+badge then reads **↺3**, and the limit travels with the wire; nothing else to place or wire. When
+the limit is reached the wire is not taken and the flow goes on past the If/Else, on its other
+branch (the report, for example). The run checks warn when that branch is unwired, or when the
+wire starts from something other than an If/Else: the path then simply ends at the limit (inside
+a loop body it returns to the loop; at the top level the run ends). Each pass of an enclosing
+ForEach counts on its own. For a round number or an explicit exit, place a **Loop Limit** node on
+the loop instead (its **count** is the pass number); the badge then shows faint. A wire that jumps
+out of a loop body shows the badge greyed: the runtime cannot limit such a loop yet.
 
 ## Hidden Connections
 
@@ -502,6 +572,37 @@ logic/state. Runtime highlights (executing/recent) still apply in this view.
 The execution view is a reading mode: dropping new palette nodes is blocked
 with a hint, while moving nodes and rewiring execution pins remain available.
 
+A node with branch rows (ForEach, If/Else, Sequence) keeps its way in on the header's middle
+line, so a wire from a single-row node at the same height runs straight; If/Else keeps the
+branch order drawn in the full view (the up/down arrows). Hovering a node shows what it does in a
+glimpse: an LLM call or Agent shows its provider and model and where they come from (a value set
+on the node, a wire, a run variable), what feeds its prompt, whether it returns a structured
+response and which fields, its tools and cycle cap, and the start of its system prompt; Set
+Variables lists its rows; If/Else its condition; ForEach its items; a String Template its text
+with chips; other nodes what feeds their inputs. A value that arrives through a relay names what
+feeds the relay.
+
+
+### Run pulse
+
+While a run goes on, the Execution header shows how long it has run, the best estimate of what is
+left, and running totals over the whole run tree (the root run and every agent or subflow
+sub-run): model calls, tokens in and out, tool calls and failures, file reads, writes and
+searches, web searches, pages fetched, commands, approvals and sub-runs. The estimate is the
+median duration of this flow's finished runs minus the time spent; with no finished run there is
+no estimate, and past the median the header says the run is longer than usual.
+
+### Run spotlight
+
+While a run goes on, the canvas fades every node and wire except the node running (or waiting
+on a person) and its own wires, in the full graph and in the execution view. The trail that
+led there stays visible: the last three nodes that ran before it, each fainter and less vivid
+the further back, with the wires between them. The trail counts the nodes the editor sees
+running (models, tools, messages, subflows); control and variable nodes join it once the runtime
+records them (backlog 1013). The **Run
+spotlight** control under the zoom buttons turns it off or on; the choice is remembered in this
+browser.
+
 ## Structured Output Schemas
 
 LLM Call and Agent nodes expose `resp_schema` as an optional JSON Schema input.
@@ -517,6 +618,13 @@ Connected schema inputs always override the inline default. When a workflow is
 published, Gateway stores and packs the VisualFlow JSON unchanged; Runtime then
 applies unconnected `pinDefaults.resp_schema` values and Core enforces the
 structured output schema.
+
+The `resp_schema` input is the only place a structured response is defined: with a schema there
+the node returns a JSON object matching it on its `data` output; with none it answers in free
+text. There is no separate on/off switch. For an Agent, the properties panel's **Structured
+response** section lists the schema's fields and opens the same editor. An Agent saved with the
+older per-node setting (`agentConfig.outputSchema`) opens with that schema moved into
+`resp_schema`.
 
 For branch routing, define a Choice field such as `choice`, wire the
 LLM/Agent `data` output into Break Object, expose `choice`, and connect it to a
@@ -578,8 +686,7 @@ Flow uses one explicit source model for file-like work:
   `mount_alias/reports`.
 
 **File System Access** in the run window is the kit `WorkspaceChooser` for THIS
-run, the same words as the gateway console, AbstractCode, Observer and the
-AbstractAssistant: the gateway's line on top ("Gateway: …", the eligible
+run, the same words as the gateway console: the gateway's line on top ("Gateway: …", the eligible
 workspaces the admin allows), **Use my default** (on by default: the run uses
 your account's default workspaces), the posture ("Deny everything, allow listed
 workspaces" / "Allow everything, refuse listed workspaces"), each workspace with

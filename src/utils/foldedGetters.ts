@@ -17,7 +17,7 @@ import type { FlowNodeData, JsonValue } from '../types/flow';
  *      is computed — that is graph structure, keep it drawn);
  *   3. EXACTLY ONE edge leaves it, from the `value` pin (2+ consumers is a
  *      shared read — the node is the subject, keep it drawn);
- *   4. the target node exists.
+ *   4. the target node exists and is not a relay (a dot has no pin row for the pill).
  *
  * This predicate is duplicated in Python (`scripts/wf_common.py`,
  * `folded_getter_ids`) for layout and audit. The two implementations are held
@@ -89,6 +89,8 @@ export function computeFoldedGetters(
     if ((edge.sourceHandle || 'value') !== 'value') continue;
     const consumer = nodesById.get(edge.target);
     if (!consumer || !edge.targetHandle) continue;
+    // A relay is a dot with no pin rows: there is nowhere to draw the pill.
+    if (consumer.data?.nodeType === 'reroute') continue;
 
     const read: FoldedRead = {
       getterId: node.id,

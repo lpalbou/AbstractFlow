@@ -17,6 +17,36 @@
  * leaves the selection and the panel as they were.
  */
 
+/**
+ * A node's own controls: its pins (the React Flow handle and the pin shape / row around it),
+ * any `nodrag` area (inline value editors, code editors, branch rows) and form controls.
+ * A press that starts on one is that control's gesture — a tap on a connected pin disconnects
+ * it — never a tap on the node, so it does not select the node nor open its properties
+ * (2026-10-10, iPhone review: a tap on an exec pin opened the properties panel).
+ */
+export const NODE_CONTROL_SELECTOR = [
+  '.react-flow__handle',
+  '.exec-pin',
+  '.pin-shape',
+  '.pin-row',
+  '.nodrag',
+  'input',
+  'textarea',
+  'select',
+  'button',
+  'a[href]',
+  '[contenteditable="true"]',
+  '[contenteditable=""]',
+].join(', ');
+// Not `[role="button"]`: React Flow gives the node wrapper itself that role, so it would
+// make the whole node a control.
+
+/** Whether `target` (an event target inside a node) is one of the node's own controls. */
+export function isNodeControl(target: EventTarget | null): boolean {
+  const el = target as { closest?: (selector: string) => unknown } | null;
+  return Boolean(el && typeof el.closest === 'function' && el.closest(NODE_CONTROL_SELECTOR));
+}
+
 /** Movement (CSS px, screen space) beyond which a press is a drag. */
 export const DRAG_THRESHOLD_PX: Readonly<Record<string, number>> = Object.freeze({
   mouse: 4,

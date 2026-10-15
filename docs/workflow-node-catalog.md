@@ -157,6 +157,22 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `true` execution; `false` execution
 - Default config: none
 
+### control / Loop Limit
+
+- Node type: `loop_limit`
+- Document node: `{"id":"<unique_id>","type":"loop_limit"}`
+- Utility: Put it on the path that repeats: lets execution through again at most max times, then takes limit reached. count is the number of passes so far (1, 2, 3...).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `max` number: How many passes are allowed.
+- Outputs: `again` execution; `limit_reached` execution (limit reached); `count` number: Passes so far, this one included.
+- Default config: {
+  "pinDefaults": {
+    "max": 3
+  }
+}
+
 ### control / ForEach
 
 - Node type: `loop`
@@ -273,11 +289,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
   }
 }
 
-### core / Answer User
+### core / Show Message
 
 - Node type: `answer_user`
 - Document node: `{"id":"<unique_id>","type":"answer_user"}`
-- Utility: Display a message to the user (UI output).
+- Utility: Show a message to the user (level: message, warning or error); the run does not wait.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
@@ -728,6 +744,18 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `result` string
 - Default config: none
 
+### data / Relay
+
+- Node type: `reroute`
+- Document node: `{"id":"<unique_id>","type":"reroute"}`
+- Utility: A dot that passes a value through unchanged so one output can feed several inputs along a tidy path (visual only: the runtime wires the source straight to each input).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `in` any: The value to pass on.
+- Outputs: `out` any: The same value; connect it to as many inputs as needed.
+- Default config: none
+
 ### data / Set Property
 
 - Node type: `set`
@@ -756,11 +784,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `string_template`
 - Document node: `{"id":"<unique_id>","type":"string_template"}`
-- Utility: Render a template like "Hello {{user.name}}" using a vars object (supports filters).
+- Utility: Write a text and insert variables into it: a run variable, or an input of this node for a value that comes from a wire. Lists and objects are written as JSON.
 - Gateway capability: none
 - Dynamic pin policy: dynamic inputs via the document `inputs` list
 - Authorable config: input defaults with `pin_defaults`; template text with `literal` or `pin_defaults.template`
-- Inputs: `template` string; `vars` object
+- Inputs: `template` string (text)
 - Outputs: `result` string
 - Default config: none
 
@@ -1084,7 +1112,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `wait_event`
 - Document node: `{"id":"<unique_id>","type":"wait_event"}`
-- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).
+- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable a durable “ask + wait” prompt for whoever runs the workflow. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
@@ -1888,6 +1916,18 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `schema` json_schema: JSON Schema with added fields.
 - Default config: none
 
+### variables / Add to List Variable
+
+- Node type: `add_to_list`
+- Document node: `{"id":"<unique_id>","type":"add_to_list"}`
+- Utility: Add to a list variable in one step: item adds one element (whatever it is), items adds each element of a list. A variable not set yet starts as an empty list.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `name` string: The list variable to add to.; `item` any: Added as one element.; `items` array: Each element of this list is added.
+- Outputs: `exec-out` execution; `list` array: The list after the addition.
+- Default config: none
+
 ### variables / Bool Variable
 
 - Node type: `bool_var`
@@ -1924,6 +1964,18 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `value` any
 - Default config: none
 
+### variables / Get Variables
+
+- Node type: `get_vars`
+- Document node: `{"id":"<unique_id>","type":"get_vars"}`
+- Utility: Read several variables at once: one output per variable, added as rows in the properties panel (name and type). A variable not set yet reads as empty. Folds to a compact list of names.
+- Gateway capability: none
+- Dynamic pin policy: dynamic outputs via the document `outputs` list
+- Authorable config: no node-specific document config beyond label/pin_defaults
+- Inputs: none
+- Outputs: none
+- Default config: none
+
 ### variables / Set Variable Property
 
 - Node type: `set_var_property`
@@ -1952,12 +2004,12 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `set_vars`
 - Document node: `{"id":"<unique_id>","type":"set_vars"}`
-- Utility: Write multiple variables into workflow state in a single step (updates is an object of name→value).
+- Utility: Write several variables in one step. Add one row per variable in the properties panel (name, type, value; an array also says what it holds): each row is an input on the node, so a value can also be wired in.
 - Gateway capability: none
-- Dynamic pin policy: template pins only
+- Dynamic pin policy: dynamic inputs via the document `inputs` list
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `updates` object
-- Outputs: `exec-out` execution; `updates` object
+- Inputs: `exec-in` execution
+- Outputs: `exec-out` execution
 - Default config: none
 
 ### variables / Variable

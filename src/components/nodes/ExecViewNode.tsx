@@ -11,7 +11,7 @@
  * and the layout matches the full view when switching back and forth.
  */
 
-import { memo, type CSSProperties } from 'react';
+import { memo, useState, type CSSProperties } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import clsx from 'clsx';
 import { useFlowStore } from '../../hooks/useFlow';
@@ -21,6 +21,20 @@ import { execNodeFamily, execPins, EXEC_FAMILY_LABELS, type ExecNodeFamily } fro
 import { getNodeTemplate } from '../../types/nodes';
 import { categoryColorVar, nodeColorSection } from '../../utils/nodeCategoryColors';
 import { PinShape } from '../pins/PinShape';
+import { execGlimpse } from '../../utils/execGlimpse';
+import { templateInputPins } from '../../utils/textTemplate';
+import { collectDeclaredVarNames } from '../../utils/preflight';
+import { GlimpseCard } from '../GlimpseCard';
+
+/** The hover card: what the node does, in a glimpse (utils/execGlimpse.ts). */
+function NodeGlimpse({ id, data }: { id: string; data: FlowNodeData }) {
+  const nodes = useFlowStore((st) => st.nodes);
+  const edges = useFlowStore((st) => st.edges);
+  const node = nodes.find((n) => n.id === id);
+  if (!node) return null;
+  const chips = data.nodeType === 'string_template' ? { inputs: new Set(templateInputPins(data.inputs || []).map((p) => p.id)), variables: collectDeclaredVarNames(nodes) } : undefined;
+  return <GlimpseCard glimpse={execGlimpse(node, nodes, edges)} chips={chips} />;
+}
 
 function FamilyIcon({ family }: { family: ExecNodeFamily }) {
   const common = {
@@ -119,6 +133,7 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
   const isExecuting = executingNodeId === id;
   const isRecent = Boolean(recentNodeIds && recentNodeIds[id]);
 
+  const [hovered, setHovered] = useState(false);
   const family = execNodeFamily(data.nodeType);
   const { inputs: execInputs, outputs: execOutputs } = execPins(data);
   const multiOut = execOutputs.length > 1;
@@ -144,7 +159,10 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
         isRecent && !isExecuting && 'recent'
       )}
       style={{ '--exec-header-color': headerColor } as CSSProperties}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
+      {hovered ? <NodeGlimpse id={id} data={data} /> : null}
       {execInputs.map((pin) => (
         <Handle
           key={pin.id}
@@ -177,7 +195,8 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
 
       {multiOut ? (
         <div className="exec-view-branches">
-          {execOutputs.map((pin) => (
+          {/* If/Else drawn with False above True (display only, like the full view). */}
+          {(data.nodeType === 'if' && data.branchesSwapped ? [...execOutputs].reverse() : execOutputs).map((pin) => (
             <div key={pin.id} className="exec-view-branch">
               <span className="exec-view-branch-label">{pin.label || pin.id}</span>
               <span className="exec-view-branch-shape" style={{ color: PIN_COLORS.execution }}>

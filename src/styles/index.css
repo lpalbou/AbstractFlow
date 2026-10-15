@@ -2402,60 +2402,6 @@ button.primary:hover:not(:disabled) {
   border-radius: 7px;
 }
 
-.flow-library-interfaces-editor {
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 10px;
-  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
-  display: grid;
-  gap: 10px;
-}
-
-.flow-library-interface-option {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-}
-
-.flow-library-interface-option input[type='checkbox'] {
-  margin-top: 3px;
-}
-
-.flow-library-interface-copy {
-  display: grid;
-  gap: 2px;
-}
-
-.flow-library-interface-label {
-  font-weight: 700;
-}
-
-.flow-library-interface-desc {
-  color: var(--text-muted);
-  font-size: var(--font-size-sm);
-  line-height: 1.35;
-}
-
-.flow-library-interfaces-hint {
-  border-top: 1px solid var(--bg-tertiary);
-  padding-top: 10px;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.flow-library-interfaces-hint-title {
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 6px;
-}
-
-.flow-library-interfaces-hint-body code {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-}
-
 .flow-library-preview-desc {
   position: relative;
   padding-top: 2px;
@@ -2518,13 +2464,17 @@ button.primary:hover:not(:disabled) {
   right: 0;
 }
 
-.flow-library-preview-actions {
-  margin-top: auto;
-  padding-top: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+/* While a name / description / interfaces edit is open, the footer bar says
+   what is being edited and carries its Cancel / Save. */
+.flow-library-actions-context {
+  margin-right: auto;
+  align-self: center;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+.flow-library-actions-context strong {
+  color: var(--text-primary);
 }
 
 /* Footer action bar hosts the delete used-by warning (flex-basis: 100%),
@@ -3045,12 +2995,18 @@ button.primary:hover:not(:disabled) {
 }
 
 /* Tool approval is a decision point: warning-tinted frame + pulsing dot. */
+/* Never more than half the window's height: the tool list scrolls inside. */
 .run-approval-panel {
   border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
   border-radius: 12px;
   padding: 12px;
   background: color-mix(in srgb, var(--warning) 6%, transparent);
   margin-bottom: 12px;
+  max-height: 50vh;
+  max-height: 50dvh;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .run-approval-header {
@@ -3104,30 +3060,66 @@ button.primary:hover:not(:disabled) {
   margin-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 320px;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 
+/* One tool call: collapsed to its name and a one-line preview; a click opens it. */
 .run-approval-tool {
+  flex: none;
   border: 1px solid var(--ui-border-1);
   border-radius: 10px;
-  padding: 10px;
+  padding: 8px 10px;
   background: var(--ui-surface-1);
 }
 
 .run-approval-tool-title {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
+  min-width: 0;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+.run-approval-tool-title::-webkit-details-marker {
+  display: none;
+}
+.run-approval-tool-title::before {
+  content: '▸';
+  flex: none;
+  color: var(--text-muted);
+  transition: transform 120ms ease;
+}
+.run-approval-tool[open] > .run-approval-tool-title::before {
+  transform: rotate(90deg);
+}
+.run-approval-tool[open] > .run-approval-tool-title {
+  margin-bottom: 8px;
+}
+.run-approval-tool-name {
+  flex: none;
+}
+.run-approval-tool-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
 }
 
 .run-approval-tool-id {
+  flex: none;
   font-size: var(--font-size-xxs);
-  color: var(--text-secondary);
+  font-weight: 400;
+  color: var(--text-muted);
 }
 
 .run-approval-empty {
@@ -6946,7 +6938,7 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   margin-bottom: 6px;
 }
 
-/* Markdown rendering (Ask User / Answer User) */
+/* Markdown rendering (Ask User / Show Message) */
 .run-details-markdown {
   border: 1px solid var(--ui-border-1);
   border-radius: 10px;
@@ -7155,7 +7147,7 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   font-size: var(--font-size-sm);
 }
 
-/* Inline messages emitted by Answer User effect */
+/* Inline messages emitted by the Show Message (answer_user) effect */
 .run-execution-user-message {
   margin-top: 8px;
   padding: 10px 12px;
@@ -7730,4 +7722,899 @@ body.af-schema-editor-open .af-tooltip-bubble {
 @media (max-width: 479.98px) {
   .flow-loading__card { flex-wrap: wrap; }
   .flow-loading__cancel { width: 100%; }
+}
+
+/* New flow dialog (2026-10-11): title, optional description, optional interfaces. */
+/* New flow: the Flow Library's window (.flow-library-modal sets the size).
+   Details | Interfaces side by side; the body scrolls, the actions stay. */
+.new-flow-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.new-flow-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.new-flow-header-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: var(--flow-hue-aqua);
+  color: #fff;
+}
+.new-flow-header-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.new-flow-subtitle {
+  margin: 3px 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+.new-flow-warning {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+.new-flow-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.new-flow-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  margin-top: 6px;
+}
+.new-flow-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.new-flow-optional {
+  margin-left: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.new-flow-dialog .run-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.new-flow-dialog textarea.run-form-input {
+  resize: vertical;
+  min-height: 72px;
+}
+
+/* Interface picker (New flow dialog, Flow Library edit): one-line list |
+   details panel, which opens on tick / inspect and collapses back. */
+.iface-picker {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+.iface-picker.has-detail {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+}
+.iface-picker-main {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.iface-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.iface-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.iface-list-title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.iface-list-count {
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+.iface-list-hint {
+  margin: 0 0 4px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+.iface-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.iface-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 14px;
+  transition: background 120ms ease;
+}
+.iface-row + .iface-row {
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+.iface-row:hover {
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+.iface-row.is-selected {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.iface-row.is-open {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.iface-row input[type='checkbox'] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.iface-row-main,
+.iface-row-main:hover:not(:disabled) {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px 11px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.iface-row-main:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: -2px;
+}
+.iface-row-name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.iface-row-desc {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+.iface-row-chevron {
+  color: var(--text-muted);
+}
+.iface-row.is-open .iface-row-chevron {
+  color: var(--accent);
+}
+
+.iface-detail {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-primary) 35%, transparent);
+  animation: iface-detail-in 160ms ease-out;
+}
+@keyframes iface-detail-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .iface-detail {
+    animation: none;
+  }
+}
+.iface-detail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.iface-detail-title {
+  flex: 1;
+  min-width: 0;
+}
+.iface-detail-title h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.iface-detail-kind {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 15%, transparent);
+  border-radius: 999px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+.iface-detail-close,
+.iface-detail-close:hover:not(:disabled) {
+  order: 3;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+}
+.iface-detail-close:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+}
+.iface-detail-back-icon {
+  display: none;
+  transform: rotate(180deg);
+}
+.iface-detail-desc {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.iface-detail-section {
+  margin-top: 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.iface-detail-note {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+/* The two boundary nodes, drawn like canvas cards: header in the node's
+   category hue, pins on the wired edge in the canvas pin colours. */
+.contract-diagram {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) 56px minmax(0, 1fr);
+  align-items: start;
+  padding: 6px 4px;
+}
+.contract-node {
+  border: 1px solid color-mix(in srgb, var(--node-hue) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-primary) 60%, var(--bg-secondary));
+  box-shadow: 0 6px 18px color-mix(in srgb, black 25%, transparent);
+}
+.contract-node-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--node-hue) 35%, transparent);
+  border-radius: 9px 9px 0 0;
+  background: color-mix(in srgb, var(--node-hue) 22%, transparent);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.contract-node-head svg {
+  color: var(--node-hue);
+}
+.contract-node-pins {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+.contract-pin {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  padding: 2px 10px;
+  font-size: var(--font-size-xs);
+}
+.contract-node--out .contract-pin {
+  justify-content: flex-end;
+}
+.contract-node--out .contract-pin-shape {
+  order: 2;
+  margin-right: -15px;
+}
+.contract-node--in .contract-pin-shape {
+  margin-left: -15px;
+}
+.contract-pin-shape {
+  display: inline-flex;
+  flex: none;
+}
+.contract-pin-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.contract-pin-type {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.contract-pin--optional .contract-pin-label {
+  color: var(--text-secondary);
+}
+.contract-pin-optional {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.contract-flow {
+  /* The dashed link joins the two exec pins (first pin row): header ~33 px
+     + list padding 6 + half a 22 px row = 50 px; label above it. */
+  align-self: start;
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.contract-flow::after {
+  content: '';
+  width: 100%;
+  border-top: 2px dashed color-mix(in srgb, var(--text-primary) 22%, transparent);
+}
+
+/* Library: while editing interfaces the picker takes the body. */
+.flow-library-interfaces-edit {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+@media (max-width: 767.98px) {
+  /* Phones: names only in the list (a few truncated letters of description
+     said nothing); the details cover the list, with a back button. */
+  .iface-row-desc {
+    display: none;
+  }
+  .iface-row-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .iface-row-chevron {
+    grid-column: 3;
+  }
+  .iface-picker.has-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .iface-picker.has-detail .iface-picker-main {
+    display: none;
+  }
+  .iface-detail {
+    padding: 14px;
+  }
+  .iface-detail-close,
+  .iface-detail-close:hover:not(:disabled) {
+    order: 0;
+    margin-left: -6px;
+  }
+  .iface-detail-back-icon {
+    display: inline;
+  }
+  .iface-detail-close-icon {
+    display: none;
+  }
+  .contract-diagram {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 12px;
+  }
+  .contract-flow {
+    height: 34px;
+    margin-top: 0;
+    flex-direction: row;
+  }
+  .contract-flow::after {
+    content: none;
+  }
+  .contract-flow::before {
+    content: '';
+    height: 100%;
+    border-left: 2px dashed color-mix(in srgb, var(--text-primary) 22%, transparent);
+  }
+}
+
+/* The canvas start screen (blank document): Create Flow | Open Flow. */
+.canvas-start-choice {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  display: flex;
+  gap: 16px;
+  width: min(520px, calc(100% - 32px));
+}
+.canvas-start-button {
+  --start-hue: var(--flow-hue-aqua);
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 16px 20px;
+  border: 1px solid color-mix(in srgb, var(--start-hue) 60%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--start-hue) 16%, var(--bg-secondary));
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.canvas-start-button--open {
+  --start-hue: var(--flow-hue-blue);
+}
+.canvas-start-button:hover {
+  background: color-mix(in srgb, var(--start-hue) 26%, var(--bg-secondary));
+  border-color: var(--start-hue);
+}
+.canvas-start-button:active {
+  transform: translateY(1px);
+}
+.canvas-start-button:focus-visible {
+  outline: 2px solid var(--start-hue);
+  outline-offset: 2px;
+}
+.canvas-start-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--start-hue);
+  color: #fff;
+}
+.canvas-start-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.canvas-start-label {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.canvas-start-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+/* Run spotlight (utils/runSpotlight.ts; optional, a canvas control): while a
+   node runs or waits, the other nodes and wires fade. */
+.run-spotlight .react-flow__node,
+.run-spotlight .react-flow__edge {
+  transition: opacity 220ms ease;
+}
+.run-spotlight .react-flow__node:not(.is-spotlit) {
+  opacity: 0.22;
+}
+.run-spotlight .react-flow__edge:not(.is-spotlit) {
+  opacity: 0.12;
+}
+/* The trail that led to the spotlit node: the three nodes that ran before it,
+   fainter and less vivid the further back (and the wires between them). */
+.run-spotlight .react-flow__node.is-trail-1 {
+  opacity: 0.78;
+  filter: saturate(0.8);
+}
+.run-spotlight .react-flow__node.is-trail-2 {
+  opacity: 0.58;
+  filter: saturate(0.6);
+}
+.run-spotlight .react-flow__node.is-trail-3 {
+  opacity: 0.46;
+  filter: saturate(0.4);
+}
+.run-spotlight .react-flow__edge.is-trail-2 {
+  opacity: 0.6;
+}
+.run-spotlight .react-flow__edge.is-trail-3 {
+  opacity: 0.4;
+}
+@media (prefers-reduced-motion: reduce) {
+  .run-spotlight .react-flow__node,
+  .run-spotlight .react-flow__edge {
+    transition: none;
+  }
+}
+
+/* Which entry path a dropped wire feeds (multi-entry nodes). */
+.route-choice-menu {
+  position: fixed;
+  z-index: 2100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  box-shadow: 0 14px 36px color-mix(in srgb, black 45%, transparent);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.route-choice-title {
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.route-choice-title strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.route-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.route-choice-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.route-choice-option:hover,
+.route-choice-option:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.route-choice-label {
+  font-weight: 600;
+}
+
+.route-choice-current {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.route-choice-cancel {
+  align-self: flex-end;
+  padding: 4px 10px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.route-choice-cancel:hover,
+.route-choice-cancel:focus-visible {
+  color: var(--text-primary);
+}
+
+/* What to create where a dragged wire was released (ConnectionDropMenu). */
+.drop-menu {
+  position: fixed;
+  z-index: 2100;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  box-shadow: 0 14px 36px color-mix(in srgb, black 45%, transparent);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.drop-menu-title {
+  padding: 0 2px 2px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.drop-menu-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drop-menu-option:hover,
+.drop-menu-option:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.drop-menu-label {
+  font-weight: 600;
+}
+
+.drop-menu-hint {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* Run pulse (RunPulseBar): elapsed time, the estimate, and the totals so far. */
+.run-steps-header {
+  flex-wrap: wrap;
+}
+.run-pulse {
+  flex: 1 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.run-pulse-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.run-pulse-elapsed {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.run-pulse-estimate {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+.run-pulse-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.run-pulse-chips li {
+  padding: 2px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Set Variables rows (PropertiesPanel): name, type, value, remove on one line. */
+.array-item.set-variable-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name name remove'
+    'type value value';
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+.set-variable-row .io-pin-name {
+  grid-area: name;
+}
+.set-variable-row .io-pin-type {
+  grid-area: type;
+}
+.set-variable-row .set-variable-value,
+.set-variable-row .set-variable-wired,
+.set-variable-row input[type='checkbox'] {
+  grid-area: value;
+}
+.set-variable-row .array-item-remove {
+  grid-area: remove;
+}
+/* Get Variables: name, type, remove on one line. */
+.array-item.get-variable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px auto;
+  align-items: center;
+  gap: 6px;
+}
+.get-variable-row .io-pin-name,
+.get-variable-row .io-pin-type {
+  width: 100%;
+  min-width: 0;
+}
+/* An array row: its type, what it holds, then its value on a line of its own. */
+.array-item.set-variable-row.is-array {
+  grid-template-areas:
+    'name name remove'
+    'type items items'
+    'value value value';
+}
+.set-variable-row .set-variable-items {
+  grid-area: items;
+  width: 100%;
+  min-width: 0;
+}
+.set-variable-row .io-pin-name,
+.set-variable-row .io-pin-type,
+.set-variable-row .set-variable-value {
+  width: 100%;
+  min-width: 0;
+}
+.set-variable-row .set-variable-wired {
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* String Template text with variable chips (components/TemplateText.tsx). */
+.tpl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 1px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.92em;
+  line-height: 1.5;
+  white-space: nowrap;
+  border: 1px solid var(--tpl-chip-color);
+  background: color-mix(in srgb, var(--tpl-chip-color) 18%, transparent);
+  color: inherit;
+  user-select: all;
+}
+.tpl-chip--variable {
+  --tpl-chip-color: var(--pin-array);
+}
+.tpl-chip--input {
+  --tpl-chip-color: var(--accent);
+}
+.tpl-chip--unknown {
+  --tpl-chip-color: var(--error);
+  border-style: dashed;
+}
+.tpl-chip__remove {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.template-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.template-text-editor {
+  min-height: 96px;
+  max-height: 320px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.7;
+  cursor: text;
+  text-align: left;
+}
+.template-text-editor:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.5;
+  pointer-events: none;
+}
+/* On the node card: a compact box the canvas does not drag or zoom through. */
+.template-text--inline {
+  width: 300px;
+  max-width: 100%;
+}
+.template-text--inline .template-text-editor {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-primary) 55%, transparent);
+  min-height: 44px;
+  max-height: 180px;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: text;
+}
+.template-mention {
+  position: fixed;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  box-shadow: 0 8px 24px color-mix(in srgb, black 35%, transparent);
+}
+.template-mention__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.template-mention__item.is-active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.template-mention__kind {
+  font-size: 11px;
+  opacity: 0.65;
+}
+.template-text-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }

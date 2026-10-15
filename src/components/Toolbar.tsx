@@ -8,7 +8,9 @@ import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { copyWithFeedback } from '../lib/copy_feedback';
-import { loadEdgeNotice, useFlowStore } from '../hooks/useFlow';
+import { loadEdgeNotice, UNTITLED_FLOW_NAME, useFlowStore } from '../hooks/useFlow';
+import { NEW_FLOW_EVENT, OPEN_FLOW_EVENT } from '../utils/flowStart';
+import { NewFlowDialog, type NewFlowValues } from './NewFlowDialog';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
 import { RunHistoryModal } from './RunHistoryModal';
@@ -47,6 +49,7 @@ import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../uti
 import { INTERFACE_PINS_ADDED_NOTICE } from '../utils/flowFamilies';
 import {
   interfacesFromPutResponse,
+  descriptionFromPutResponse,
   putAutomationDefaults,
   updateOpenFlowMetadata,
 } from '../hooks/openFlowMetadata';
@@ -412,7 +415,6 @@ export function Toolbar() {
     setFlowId,
     getFlow,
     loadFlow,
-    clearFlow,
     isRunning,
     setIsRunning,
     nodes,
@@ -957,14 +959,21 @@ export function Toolbar() {
         toast.error('Bundled flows are read-only. Load or duplicate first.');
         return;
       }
-      // The description lives only in the saved flow (the editor document has
-      // no description field), so the open document needs no update — and
-      // must not be reloaded, which would discard unsaved edits.
-      await updateFlowDescription(id, nextDescription, gatewayContracts);
+      // The open document carries the description too (it is saved with the
+      // flow): patch it in place when this flow is still open, so the next Save
+      // sends the new description instead of the old one. Never a reload,
+      // which would discard unsaved edits.
+      const { baseline } = await updateOpenFlowMetadata({
+        id,
+        hasUnsavedChanges,
+        request: () => updateFlowDescription(id, nextDescription, gatewayContracts),
+        patchFrom: (updated) => ({ description: descriptionFromPutResponse(updated) }),
+      });
+      if (baseline) setSavedFlowSignature(flowSignatureFor(baseline));
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Description updated');
     },
-    [bundledFlowIdSet, gatewayContracts, queryClient]
+    [bundledFlowIdSet, gatewayContracts, hasUnsavedChanges, queryClient]
   );
 
   const handleUpdateInterfaces = useCallback(
@@ -1733,23 +1742,45 @@ export function Toolbar() {
     doImport();
   }, [doImport, hasUnsavedChanges]);
 
-  const createNewFlow = useCallback(() => {
-    setShowNewFlowModal(false);
-    clearRunState();
-    clearFlow();
-    resetLoadedDocument();
-    setSavedFlowSignature(flowSignatureFor({ name: 'Untitled Flow', description: '', interfaces: [], nodes: [], edges: [] }));
-    toast.success('Created new flow');
-  }, [clearFlow, clearRunState, resetLoadedDocument]);
+  // Create a new flow from the New flow dialog: title, optional description and
+  // interfaces, plus the On Flow Start / End nodes those interfaces need. The
+  // baseline stays the EMPTY untitled document (as before the dialog existed),
+  // so the new flow reads as unsaved and Save is available at once: its first
+  // Save creates it on the gateway with these values.
+  const createNewFlow = useCallback(
+    (values: NewFlowValues) => {
+      setShowNewFlowModal(false);
+      clearRunState();
+      resetLoadedDocument();
+      // Name, description, interfaces and the nodes those interfaces need.
+      useFlowStore.getState().createFlow(values);
+      setSavedFlowSignature(flowSignatureFor({ name: UNTITLED_FLOW_NAME, description: '', interfaces: [], nodes: [], edges: [] }));
+      toast.success(`Created ${values.name}: save it to store it on the gateway`);
+    },
+    [clearRunState, resetLoadedDocument]
+  );
 
-  // Handle new flow — only ask for confirmation when there is something to lose.
+  // New flow: always the dialog (title, description, interfaces); it warns when
+  // the open flow has unsaved changes.
   const handleNew = useCallback(() => {
-    if (!hasUnsavedChanges) {
-      createNewFlow();
-      return;
-    }
     setShowNewFlowModal(true);
-  }, [createNewFlow, hasUnsavedChanges]);
+  }, []);
+
+  // The canvas start screen's Create Flow / Open Flow (utils/flowStart.ts):
+  // the same dialogs, under the same rule, as the toolbar's own buttons.
+  useEffect(() => {
+    const openNew = () => setShowNewFlowModal(true);
+    const openLibrary = () => {
+      if (visualflowCrudUnavailable) toast.error(saveUnavailableReason);
+      else setShowFlowLibrary(true);
+    };
+    window.addEventListener(NEW_FLOW_EVENT, openNew);
+    window.addEventListener(OPEN_FLOW_EVENT, openLibrary);
+    return () => {
+      window.removeEventListener(NEW_FLOW_EVENT, openNew);
+      window.removeEventListener(OPEN_FLOW_EVENT, openLibrary);
+    };
+  }, [saveUnavailableReason, visualflowCrudUnavailable]);
 
   // Duplicate the current flow in-place (keeps current editor state as the source).
   const handleDuplicateCurrent = useCallback(() => {
@@ -2023,8 +2054,11 @@ export function Toolbar() {
             label="Publish WorkflowBundle"
             onClick={handlePublish}
             disabled={isRunning || !flowId || Boolean(loadedBundledRunTarget) || visualflowPublishUnavailable}
+            iconOnly={false}
+            className="primary publish-button"
           >
             <IconPackage />
+            <span>Publish</span>
           </ToolbarAction>
           <ToolbarAction
             tooltip={lifecycleTooltip}
@@ -2089,20 +2123,11 @@ export function Toolbar() {
       {createPortal(
         <>
         {showNewFlowModal ? (
-          <div className="modal-overlay" onClick={() => setShowNewFlowModal(false)} role="presentation">
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3>New flow</h3>
-              <p>Create a new flow? Any unsaved changes will be lost.</p>
-              <div className="modal-actions">
-                <button className="modal-button cancel" onClick={() => setShowNewFlowModal(false)}>
-                  Cancel
-                </button>
-                <button className="modal-button danger" onClick={createNewFlow}>
-                  Create new flow
-                </button>
-              </div>
-            </div>
-          </div>
+          <NewFlowDialog
+            unsavedChanges={hasUnsavedChanges}
+            onCreate={createNewFlow}
+            onCancel={() => setShowNewFlowModal(false)}
+          />
         ) : null}
 
 

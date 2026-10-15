@@ -14,9 +14,17 @@ export const CANVAS_CONTROL_ICONS = {
   zoomOut: 'zoomOut',
   fitView: 'fitView',
   lock: 'lock',
+  runSpotlight: 'activity',
 } as const satisfies Record<string, IconName>;
 
-export function CanvasControls() {
+export function CanvasControls({
+  runSpotlight,
+  onRunSpotlightChange,
+}: {
+  /** Run spotlight (utils/runSpotlight.ts): fade all but the running node while a run goes on. */
+  runSpotlight: boolean;
+  onRunSpotlightChange: (on: boolean) => void;
+}) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const store = useStoreApi();
   const locked = useStore((s) => !(s.nodesDraggable || s.nodesConnectable || s.elementsSelectable));
@@ -50,6 +58,23 @@ export function CanvasControls() {
           onClick={toggleLock}
         >
           <Icon name={CANVAS_CONTROL_ICONS.lock} size={16} />
+        </button>
+      </AfTooltip>
+      <AfTooltip
+        content={
+          runSpotlight
+            ? 'Run spotlight is on: while a run goes on, everything but the running node fades'
+            : 'Run spotlight: while a run goes on, fade everything but the running node'
+        }
+      >
+        <button
+          type="button"
+          className={`react-flow__controls-button af-topbar__btn${runSpotlight ? ' is-active' : ''}`}
+          aria-label="Run spotlight"
+          aria-pressed={runSpotlight}
+          onClick={() => onRunSpotlightChange(!runSpotlight)}
+        >
+          <Icon name={CANVAS_CONTROL_ICONS.runSpotlight} size={16} />
         </button>
       </AfTooltip>
     </Panel>

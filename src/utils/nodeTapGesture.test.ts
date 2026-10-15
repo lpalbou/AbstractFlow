@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { DRAG_THRESHOLD_PX, NodeTapTracker } from './nodeTapGesture';
+import { isNodeControl, NODE_CONTROL_SELECTOR, DRAG_THRESHOLD_PX, NodeTapTracker } from './nodeTapGesture';
 import { drawerReducer, initialDrawerState, type DrawerState } from './drawerLayout';
 
 type Kind = 'touch' | 'mouse' | 'pen';
@@ -125,5 +125,33 @@ describe('Canvas wiring', () => {
   it('App opens the properties on every tap request (not only on a selection change)', () => {
     const app = readFileSync(resolve(__dirname, '../App.tsx'), 'utf8');
     expect(app).toMatch(/if \(propertiesRequest\) dispatch_drawers\(\{ type: 'select', nodeId: propertiesRequest\.nodeId \}\);\s*\}, \[propertiesRequest\]\);/);
+  });
+});
+
+// 2026-10-10 iPhone review: a tap on a pin (or any of the node's own controls) is that control's
+// gesture — never a tap on the node that opens its properties.
+describe('isNodeControl', () => {
+  // A fake element whose ancestors carry the given selectors.
+  const el = (...matches: string[]) => ({
+    closest: (selector: string) => (selector.split(', ').some((s) => matches.includes(s)) ? {} : null),
+  });
+  it('pins, nodrag areas and form controls are the node\'s own controls', () => {
+    for (const m of ['.react-flow__handle', '.exec-pin', '.pin-shape', '.pin-row', '.nodrag', 'input', 'textarea', 'select', 'button']) {
+      expect(isNodeControl(el(m) as unknown as EventTarget)).toBe(true);
+    }
+  });
+  it('the node body is not, and neither is the node wrapper\'s role="button"', () => {
+    expect(isNodeControl(el() as unknown as EventTarget)).toBe(false);
+    expect(isNodeControl(el('[role="button"]') as unknown as EventTarget)).toBe(false);
+    expect(NODE_CONTROL_SELECTOR).not.toContain('role="button"');
+    expect(isNodeControl(null)).toBe(false);
+  });
+});
+
+describe('Canvas applies the rule to both paths that open the properties', () => {
+  it('the tap decided at pointerup and React Flow\'s onNodeClick both skip node controls', () => {
+    const canvas = readFileSync(new URL('../components/Canvas.tsx', import.meta.url), 'utf8');
+    expect(canvas).toContain("const nodeId = nodeEl && !isNodeControl(event.target)");
+    expect(canvas).toContain('if (isNodeControl(event.target)) return;');
   });
 });

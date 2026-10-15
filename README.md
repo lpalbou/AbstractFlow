@@ -37,8 +37,8 @@ set/pin values such as `off`, `low`, `medium`, `high`, or `xhigh` for reasoning
 models that support explicit effort controls.
 
 LLM Call and Agent nodes also expose an **MTP depth** setting (inherit, Off, or
-a depth the selected provider/model advertises), with a run-scoped override in
-the Run dialog. See [Getting started](docs/getting-started.md) for precedence.
+a depth the selected provider/model advertises), set per node. See
+[Getting started](docs/getting-started.md) for precedence.
 
 Data input pins can carry small sandboxed Python expressions over run variables,
 and flows can define a library of named helper functions used by those
@@ -90,10 +90,9 @@ create or refine common workflows such as internet research, deep research, news
 digests, and job searches; Save, Publish, and Run remain explicit user actions.
 
 Workflows can declare the interfaces they implement (for example
-`abstractcode.agent.v1`, so AbstractCode and AbstractAssistant can run them as
-agents). Declaring an interface adds its typed pins to `On Flow Start` and
-`On Flow End`, and Run preflight warns about missing, unconnected, or mistyped
-interface pins. See [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
+`abstractcode.agent.v1`, so they can be run as agents). Declaring an interface
+adds its typed pins to `On Flow Start` and `On Flow End`, and Run preflight
+warns about missing, unconnected, or mistyped interface pins. See [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
 
 A runnable workflow can also store automation defaults (Flow Library >
 **Automation**): the trigger source and settings discovered from the Gateway,

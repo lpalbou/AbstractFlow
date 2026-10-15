@@ -37,9 +37,9 @@ Use the canvas to create VisualFlow graphs. The editor sends VisualFlow JSON to 
 Provider and model selectors come from Gateway discovery. Configure providers, endpoint profiles, API keys, and default models in the Gateway console.
 
 Agent and LLM Call nodes expose **MTP depth** in Properties: inherit, Off, or a depth
-advertised by that provider/model's execution capability. The Run dialog also offers a
-run-scoped override. A connected `speculation` pin wins over a node setting, then the run
-override, then the execution host's Core default. Inheritance sends no override; Off sends
+advertised by that provider/model's execution capability. It is set per node; the Run
+dialog asks only for the flow's own inputs. A connected `speculation` pin wins over the node
+setting, then the execution host's Core default. Inheritance sends no override; Off sends
 `false`. Explicit depths require native MTP and fail honestly if the host cannot honor them.
 
 Discovery is read-only: these controls do not download heads or load models. Unknown support,

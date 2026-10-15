@@ -9,6 +9,7 @@ export interface LedgerRecord {
   step_id?: string;
   node_id?: string;
   status?: string;
+  idempotency_key?: string | null;
   started_at?: string;
   ended_at?: string;
   effect?: Record<string, unknown> | null;
@@ -16,12 +17,75 @@ export interface LedgerRecord {
   error?: string | null;
 }
 
+interface RunExecutions {
+  byStep: Map<string, string>;
+  byWaitKey: Map<string, string>;
+  latestByNode: Map<string, string>;
+  idemByExec: Map<string, Set<string>>;
+}
+
 export interface LedgerMappingState {
-  openNodesByRun: Map<string, Map<string, string>>;
+  /** Open executions per run: execId -> { nodeId, started ts }. */
+  openNodesByRun: Map<string, Map<string, { nodeId: string; ts: string }>>;
+  executionsByRun: Map<string, RunExecutions>;
 }
 
 export function createLedgerMappingState(): LedgerMappingState {
-  return { openNodesByRun: new Map() };
+  return { openNodesByRun: new Map(), executionsByRun: new Map() };
+}
+
+/**
+ * Which execution of its node a ledger record belongs to (one run-window row
+ * per execution). The runtime writes several steps for one execution and
+ * states no execution id (root backlog 1016), so the phases are recognised
+ * from what the records do carry, in this order:
+ * 1. a step already seen belongs to its execution;
+ * 2. a resume belongs to the execution whose wait it answers (same wait key);
+ * 3. a record whose idempotency key is already in the node's latest execution
+ *    belongs to it (an approved tool call's execution, a retry, a crash replay);
+ * 4. an Agent's structured-output call (`_temp.agent.<node>.structured`) and
+ *    the run's terminal record belong to the node's latest execution;
+ * 5. anything else starts a new execution.
+ * "Same node, nothing recorded in between" is NOT a rule: loops, If/Else and
+ * Set Variable write no records, so a node run twice in a row would merge.
+ * Checked over every ledger of the operator's gateway (2026-10-11): 1,668 rows
+ * removed, none added.
+ */
+export function executionIdFor(rec: LedgerRecord, state: LedgerMappingState): string | undefined {
+  const runId = normalizeString(rec.run_id);
+  const nodeId = normalizeString(rec.node_id);
+  const stepId = normalizeString(rec.step_id);
+  if (!runId || !nodeId || !stepId) return undefined;
+  let ex = state.executionsByRun.get(runId);
+  if (!ex) {
+    ex = { byStep: new Map(), byWaitKey: new Map(), latestByNode: new Map(), idemByExec: new Map() };
+    state.executionsByRun.set(runId, ex);
+  }
+  const effect = (rec.effect || {}) as Record<string, unknown>;
+  const payload = (effect.payload || {}) as Record<string, unknown>;
+  const idem = normalizeString(rec.idempotency_key);
+  const latest = ex.latestByNode.get(nodeId);
+
+  let execId = ex.byStep.get(stepId);
+  if (!execId && effect.type === 'resume') execId = ex.byWaitKey.get(normalizeString(payload.wait_key));
+  if (!execId && idem && latest && ex.idemByExec.get(latest)?.has(idem)) execId = latest;
+  if (!execId && latest) {
+    const resultKey = normalizeString(effect.result_key);
+    if (resultKey === `_temp.agent.${nodeId}.structured` || idem.startsWith('system:completion:')) execId = latest;
+  }
+  if (!execId) execId = stepId;
+
+  ex.byStep.set(stepId, execId);
+  ex.latestByNode.set(nodeId, execId);
+  if (idem) {
+    const idems = ex.idemByExec.get(execId) || new Set<string>();
+    idems.add(idem);
+    ex.idemByExec.set(execId, idems);
+  }
+  const wait = ((rec.result || {}) as Record<string, unknown>).wait as Record<string, unknown> | undefined;
+  const waitKey = normalizeString(wait?.wait_key);
+  if (normalizeString(rec.status).toLowerCase() === 'waiting' && waitKey) ex.byWaitKey.set(waitKey, execId);
+  return execId;
 }
 
 function durationMs(startIso?: string | null, endIso?: string | null): number | undefined {
@@ -184,6 +248,8 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
   const nodeId = normalizeString(rec.node_id);
   if (!runId || !nodeId) return [];
   const stepId = normalizeString(rec.step_id) || undefined;
+  const execId = executionIdFor(rec, state);
+  const openKey = execId || nodeId;
 
   const effType = normalizeString(rec.effect?.type);
   const resObj = rec.result && typeof rec.result === 'object' ? (rec.result as Record<string, unknown>) : null;
@@ -204,20 +270,23 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
 
   if (status === 'started') {
     const ts = startedAt || endedAt;
-    for (const [openNodeId, openTs] of Array.from(openNodes.entries())) {
-      if (openNodeId === nodeId) continue;
-      const dur = durationMs(openTs, ts);
+    // A new execution closes every other open one of the run (the runtime runs
+    // one node at a time); a later phase of the same execution does not.
+    for (const [key, open] of Array.from(openNodes.entries())) {
+      if (key === openKey) continue;
+      const dur = durationMs(open.ts, ts);
       events.push({
         type: 'node_complete',
         runId,
-        nodeId: openNodeId,
+        nodeId: open.nodeId,
+        execId: key === open.nodeId ? undefined : key,
         ts,
         meta: dur !== undefined ? { duration_ms: Math.round(dur * 100) / 100 } : undefined,
       });
-      openNodes.delete(openNodeId);
+      openNodes.delete(key);
     }
-    events.push({ type: 'node_start', runId, stepId, nodeId, ts });
-    if (ts) openNodes.set(nodeId, ts);
+    events.push({ type: 'node_start', runId, stepId, execId, nodeId, ts });
+    if (ts && !openNodes.has(openKey)) openNodes.set(openKey, { nodeId, ts });
   } else if (status === 'completed') {
     if (isAbstractStatusResult(rec.result)) {
       events.push(traceUpdateEvent(rec, nodeId, runId));
@@ -230,6 +299,7 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
       events.push({
         type: 'node_progress',
         runId,
+        execId,
         stepId: normalizeString(progressPayload.step_id) || stepId,
         nodeId: normalizeString(progressPayload.node_id) || nodeId,
         ts,
@@ -250,33 +320,36 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
       type: 'node_complete',
       runId,
       stepId,
+      execId,
       nodeId,
       ts,
       result: visibleResumeResult ?? (suppressResult ? undefined : rec.result),
       meta: dur !== undefined ? { duration_ms: Math.round(dur * 100) / 100 } : undefined,
       approval: approvalMarker ?? undefined,
     });
-    openNodes.delete(nodeId);
+    openNodes.delete(openKey);
   } else if (status === 'failed') {
     const ts = endedAt || startedAt;
     events.push({
       type: 'flow_error',
       runId,
       stepId,
+      execId,
       nodeId,
       ts,
       error: normalizeString(rec.error) || 'Step failed',
     });
-    openNodes.delete(nodeId);
+    openNodes.delete(openKey);
   } else if (status === 'waiting') {
     const waitInfo = extractWaitInfo(rec);
     if (waitInfo?.isPause) {
-      events.push({ type: 'flow_paused', runId, stepId, nodeId, ts: endedAt || startedAt });
+      events.push({ type: 'flow_paused', runId, stepId, execId, nodeId, ts: endedAt || startedAt });
     } else if (waitInfo) {
       events.push({
         type: 'flow_waiting',
         runId,
         stepId,
+        execId,
         nodeId,
         ts: endedAt || startedAt,
         prompt: waitInfo.prompt,
@@ -292,19 +365,20 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
           type: 'subworkflow_update',
           runId,
           stepId,
+          execId,
           nodeId,
           sub_run_id: waitInfo.subRunId,
         });
       }
     }
-    if (!openNodes.has(nodeId)) {
-      openNodes.set(nodeId, startedAt || endedAt || '');
+    if (!openNodes.has(openKey)) {
+      openNodes.set(openKey, { nodeId, ts: startedAt || endedAt || '' });
     }
   }
 
   const subRunId = normalizeString((rec.result as Record<string, unknown> | null)?.sub_run_id);
   if (effType === 'start_subworkflow' && subRunId) {
-    events.push({ type: 'subworkflow_update', runId, stepId, nodeId, sub_run_id: subRunId });
+    events.push({ type: 'subworkflow_update', runId, stepId, execId, nodeId, sub_run_id: subRunId });
   }
 
   events.push(traceUpdateEvent(rec, nodeId, runId));
@@ -323,12 +397,14 @@ export function closeOpenNodes({
   const openNodes = state.openNodesByRun.get(runId);
   if (!openNodes || openNodes.size === 0) return [];
   const out: ExecutionEvent[] = [];
-  for (const [nodeId, openTs] of Array.from(openNodes.entries())) {
-    const dur = durationMs(openTs, ts);
+  for (const [key, open] of Array.from(openNodes.entries())) {
+    const nodeId = open.nodeId;
+    const dur = durationMs(open.ts, ts);
     out.push({
       type: 'node_complete',
       runId,
       nodeId,
+      execId: key === nodeId ? undefined : key,
       ts,
       meta: dur !== undefined ? { duration_ms: Math.round(dur * 100) / 100 } : undefined,
     });

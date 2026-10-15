@@ -1824,7 +1824,7 @@ def build_root() -> dict:
     #
     # THE SWITCH IS REFUSED, and the reason is worth stating plainly because it
     # is not "too much work". `switch` is an EXEC-LANE node: it costs a switch,
-    # one Answer User per case, and a re-join — three nodes and a fork to emit
+    # one Show Message (answer_user) per case, and a re-join — three nodes and a fork to emit
     # ONE line. Each case then carries its OWN copy of the "gating: " prefix,
     # which is a drift surface in the one node whose entire job is to state a
     # fact consistently. And a switch fails OPEN on a value nobody enumerated:

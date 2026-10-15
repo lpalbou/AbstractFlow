@@ -169,7 +169,7 @@ export type NodeType =
   | 'concat' | 'split' | 'join' | 'format' | 'string_template' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
   | 'is_empty_string' | 'contains' | 'replace'
   // Control - if/loop/while have exec, logic gates are pure
-  | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or' | 'coalesce'
+  | 'if' | 'switch' | 'loop' | 'loop_limit' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or' | 'coalesce'
   | 'for'
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'make_array' | 'array_map' | 'array_filter' | 'array_concat' | 'array_length' | 'array_append' | 'array_dedup'
@@ -181,8 +181,8 @@ export type NodeType =
   | 'add_message'
   | 'has_tools'
   | 'get_context'
-  | 'get_var' | 'set_var' | 'set_vars' | 'set_var_property'
-  | 'parse_json' | 'stringify_json' | 'format_tool_results' | 'agent_trace_report' | 'break_object' | 'system_datetime'
+  | 'get_var' | 'get_vars' | 'set_var' | 'set_vars' | 'add_to_list' | 'set_var_property'
+  | 'parse_json' | 'stringify_json' | 'format_tool_results' | 'agent_trace_report' | 'break_object' | 'reroute' | 'system_datetime'
   | 'provider_catalog' | 'provider_models'
   // Backward-compat: deprecated
   | 'model_catalog'
@@ -358,6 +358,13 @@ export interface FlowNodeData {
   breakConfig?: {
     selectedPaths?: string[];
   };
+  /** Operator nodes only: drawn as a small round node (operator sign, pins, wires); a double click toggles it. */
+  /**
+   * If/Else only, display only: draw False above True (the runtime ignores it).
+   * Lets the branch whose wire goes up sit on top, so wires cross less.
+   */
+  branchesSwapped?: boolean;
+  collapsed?: boolean;
   // Concat node configuration
   concatConfig?: {
     separator?: string; // Default: " "
@@ -550,6 +557,8 @@ export interface VisualEdge {
   target: string;
   targetHandle: string;
   animated?: boolean;
+  /** Authoring data on the wire: `loopLimit` caps how many times a repeating wire is taken (utils/loopBackEdges.ts). */
+  data?: { loopLimit?: { max: number } };
 }
 
 // Execution events from WebSocket
@@ -573,6 +582,13 @@ export interface ExecutionEvent {
   threadRunId?: string;
   // Durable ledger step id (when sourced from the gateway ledger stream).
   stepId?: string;
+  /**
+   * One execution of a node, across the several ledger steps it may write
+   * (an Agent: start sub-run, resume, structured-output call; an approved tool
+   * call; a retry). Rows in the run window are one per execution
+   * (utils/ledgerEvents.ts `executionIdFor`).
+   */
+  execId?: string;
   nodeId?: string;
   result?: unknown;
   progress?: Record<string, unknown>;

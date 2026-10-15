@@ -1,12 +1,17 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-09-27
+- Updated: 2026-10-11
 - Planned: 0
-- Proposed: 49 (on disk, recursive; the 2026-09-26 snapshot said 46 and had
-  drifted again — not reconciled item by item in this pass)
+- Proposed: 50 (on disk, recursive; 0159 added 2026-10-11)
 - Completed: 54
 - Deprecated: 0
+
+## 2026-10-11 One fold for getters (0159), PROPOSED
+Item 0159 (`proposed/0159_one_fold_for_getters.md`): the operator dislikes the automatic read pill
+(0156 Stage 1) changing a getter's shape without their control, and two fold mechanisms. Removing it
+leaves 344 of 366 docked getters overlapping in the 36 example flows, so the operator asked for a
+proposal to discuss (remove + relayout / remove only / default off; stored folded or full cards).
 
 ## 2026-09-27 Automations v1 completed (0158), UNRELEASED
 Item 0158 moved to `completed/`: trigger-source discovery, the Automation

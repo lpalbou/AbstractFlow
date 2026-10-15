@@ -233,12 +233,14 @@ describe('node icons', () => {
     expect(src).not.toMatch(/closest|stand-?in|gap/i);
   });
 
-  it('the canvas controls draw the kit zoomIn / zoomOut / fitView / lock icons, nothing local', () => {
+  it('the canvas controls draw the kit zoomIn / zoomOut / fitView / lock / activity (run spotlight) icons, nothing local', () => {
     expect(Object.values(CANVAS_CONTROL_ICONS).every((n) => KIT.has(n))).toBe(true);
-    const html = renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasControls)));
+    const html = renderToStaticMarkup(
+      createElement(ReactFlowProvider, null, createElement(CanvasControls, { runSpotlight: true, onRunSpotlightChange: () => {} }))
+    );
     const svgs = html.match(/<svg[\s\S]*?<\/svg>/g) ?? [];
     expect(svgs).toEqual(
-      (['zoomIn', 'zoomOut', 'fitView', 'lock'] as const).map((name) => renderToStaticMarkup(createElement(Icon, { name, size: 16 }))),
+      (['zoomIn', 'zoomOut', 'fitView', 'lock', 'activity'] as const).map((name) => renderToStaticMarkup(createElement(Icon, { name, size: 16 }))),
     );
     const controlsSrc = readFileSync(resolve(__dirname, './CanvasControls.tsx'), 'utf8');
     expect(controlsSrc).not.toMatch(/<svg|<path/);

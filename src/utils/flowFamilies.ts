@@ -43,6 +43,12 @@ export interface KnownInterface {
   requiredStartPins?: InterfacePinSpec[];
   /** On Flow End inputs the contract requires (added to the node when the interface is declared). */
   requiredEndPins?: InterfacePinSpec[];
+  /**
+   * On Flow Start outputs the contract OFFERS: added with the required pins, so a
+   * caller's value always has a pin to land on, but never demanded (an empty or
+   * absent value means the gateway default).
+   */
+  optionalStartPins?: InterfacePinSpec[];
 }
 
 /**
@@ -54,14 +60,14 @@ export const KNOWN_INTERFACES: KnownInterface[] = [
     id: 'abstractcode.agent.v1',
     label: 'Runnable agent (v1)',
     description:
-      'Executable as a specialized workflow by chat-like hosts (AbstractCode, entity phases, gateway agency loops). Contract: provider/model/prompt inputs on On Flow Start; response/success/meta outputs on On Flow End.',
+      'Runs as an agent: takes provider, model and prompt on On Flow Start and returns response, success and meta on On Flow End.',
     class: 'entrypoint',
-    // Types: what AbstractCode sends (prompt/provider/model at the top level
-    // of input_data) and the typed pins of the shipped agent flows.
+    // Types: what a caller sends (prompt/provider/model at the top level of
+    // input_data) and the typed pins of the shipped agent flows.
     requiredStartPins: [
-      { id: 'provider', label: 'provider', type: 'provider_text', description: 'LLM provider chosen by the host (empty = gateway default).' },
-      { id: 'model', label: 'model', type: 'model', description: 'Model chosen by the host (empty = gateway default).' },
-      { id: 'prompt', label: 'prompt', type: 'string', description: 'The user message the host sends to this workflow.' },
+      { id: 'provider', label: 'provider', type: 'provider_text', description: 'LLM provider chosen by the caller (empty = gateway default).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Model chosen by the caller (empty = gateway default).' },
+      { id: 'prompt', label: 'prompt', type: 'string', description: 'The message the caller sends to this workflow.' },
     ],
     requiredEndPins: [
       { id: 'response', label: 'response', type: 'string', description: 'The answer shown to the user.' },
@@ -71,38 +77,50 @@ export const KNOWN_INTERFACES: KnownInterface[] = [
   },
   {
     id: 'abstractassistant.agent.v1',
-    label: 'Assistant orchestrator (v1)',
+    label: 'Assistant (v1)',
     description:
-      'Executable as the AbstractAssistant orchestrator: the assistant sends provider/model/prompt to On Flow Start and reads response/success/meta from On Flow End (every end branch, chat and media alike).',
+      'Runs as an assistant: takes a prompt with provider and model and returns response, success and meta, like an agent; optional pins choose the provider and model of each generated modality (image, image edit, upscale, video, image to video, music, sound) and pass the image a request refers to. An empty optional pin uses the gateway default.',
     class: 'entrypoint',
-    // Types: AbstractAssistant's run input (gateway/run_input.py: prompt, and
-    // provider/model when overridden) and its managed orchestrator flow
-    // (assistant_workflow.py), whose every On Flow End carries this trio.
     requiredStartPins: [
-      { id: 'provider', label: 'provider', type: 'provider_text', description: 'LLM provider chosen by the assistant (empty = gateway default).' },
-      { id: 'model', label: 'model', type: 'model', description: 'Model chosen by the assistant (empty = gateway default).' },
-      { id: 'prompt', label: 'prompt', type: 'string', description: 'The user message the assistant sends to this workflow.' },
+      { id: 'provider', label: 'provider', type: 'provider_text', description: 'LLM provider chosen by the caller (empty = gateway default).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Model chosen by the caller (empty = gateway default).' },
+      { id: 'prompt', label: 'prompt', type: 'string', description: 'The message the caller sends to this workflow.' },
     ],
     requiredEndPins: [
       { id: 'response', label: 'response', type: 'string', description: 'The reply shown to the user.' },
       { id: 'success', label: 'success', type: 'boolean', description: 'True when the workflow completed its task.' },
       { id: 'meta', label: 'meta', type: 'object', description: 'Run metadata (provider, model, ...).' },
     ],
+    optionalStartPins: [
+      { id: 'image_provider', label: 'image_provider', type: 'provider_image', description: 'Image generation provider (empty = gateway default).' },
+      { id: 'image_model', label: 'image_model', type: 'model', description: 'Image generation model (empty = gateway default).' },
+      { id: 'image_edit_provider', label: 'image_edit_provider', type: 'provider_image', description: 'Image editing provider (empty = gateway default).' },
+      { id: 'image_edit_model', label: 'image_edit_model', type: 'model', description: 'Image editing model (empty = gateway default).' },
+      { id: 'image_upscale_provider', label: 'image_upscale_provider', type: 'provider_image', description: 'Image restore / upscale provider (empty = gateway default).' },
+      { id: 'image_upscale_model', label: 'image_upscale_model', type: 'model', description: 'Image restore / upscale model (empty = gateway default).' },
+      { id: 'video_provider', label: 'video_provider', type: 'provider_video', description: 'Video generation provider (empty = gateway default).' },
+      { id: 'video_model', label: 'video_model', type: 'model', description: 'Video generation model (empty = gateway default).' },
+      { id: 'image_to_video_provider', label: 'image_to_video_provider', type: 'provider_video', description: 'Image-to-video provider (empty = gateway default).' },
+      { id: 'image_to_video_model', label: 'image_to_video_model', type: 'model', description: 'Image-to-video model (empty = gateway default).' },
+      { id: 'music_provider', label: 'music_provider', type: 'provider_music', description: 'Music generation provider (empty = gateway default).' },
+      { id: 'music_model', label: 'music_model', type: 'model', description: 'Music generation model (empty = gateway default).' },
+      { id: 'sound_output', label: 'sound_output', type: 'object', description: 'Sound-effect output spec (provider and model ride inside it; empty = gateway default).' },
+      { id: 'primary_image_artifact', label: 'primary_image_artifact', type: 'artifact_image', description: 'The image a request refers to (to edit, upscale or animate).' },
+    ],
   },
   {
     id: 'abstractcode.goal.v1',
     label: 'Goal loop (v1)',
     description:
-      'Runnable goal loop for AbstractCode /goal: works toward a goal cycle by cycle until it is verified done or max_cycles is reached. AbstractCode sends goal, max_cycles, provider/model and an explicit tools list.',
+      'Works toward a goal cycle by cycle until it is verified done or max_cycles is reached. Takes the goal, max_cycles, provider/model and an explicit tools list.',
     class: 'entrypoint',
-    // Types: AbstractCode TUI run input (tui/src/run_input.rs: goal,
-    // max_cycles, provider, model, tools) and goal-agent.json, the flow that
-    // implements the contract (both of its On Flow End nodes).
+    // Types: goal-agent.json, the flow that implements the contract (its
+    // On Flow Start and both of its On Flow End nodes).
     requiredStartPins: [
       { id: 'goal', label: 'goal', type: 'string', description: 'The goal to reach.' },
       { id: 'max_cycles', label: 'max_cycles', type: 'number', description: 'Upper bound on work cycles.' },
-      { id: 'provider', label: 'provider', type: 'provider_text', description: 'LLM provider chosen by the host (empty = gateway default).' },
-      { id: 'model', label: 'model', type: 'model', description: 'Model chosen by the host (empty = gateway default).' },
+      { id: 'provider', label: 'provider', type: 'provider_text', description: 'LLM provider chosen by the caller (empty = gateway default).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Model chosen by the caller (empty = gateway default).' },
       { id: 'tools', label: 'tools', type: 'array', description: 'Tool names the loop may use.' },
     ],
     requiredEndPins: [
@@ -122,7 +140,7 @@ export const KNOWN_INTERFACES: KnownInterface[] = [
     id: 'abstractmeta.intelligence.v1',
     label: 'Meta-intelligence',
     description:
-      'Domain marker for co-orchestrated deliberation patterns (consensus, debate, introspection, multi-angle, plan-verify). Each flow also conforms to abstractcode.agent.v1 so it benchmarks 1:1 against an isolated LLM call.',
+      'Domain marker for co-orchestrated deliberation patterns (consensus, debate, introspection, multi-angle, plan-verify). Each flow also declares Runnable agent (v1), so it benchmarks 1:1 against an isolated LLM call.',
     class: 'domain',
   },
   {
@@ -218,15 +236,18 @@ export function normalizeInterfaces(value: unknown): string[] {
 /** One-line notice shown when opening a flow adds missing interface pins. */
 export const INTERFACE_PINS_ADDED_NOTICE = 'Interface pins were added to On Flow Start/End; save to store them';
 
-/** A required boundary pin together with the interface that requires it. */
+/** A boundary pin together with the interface that requires (or offers) it. */
 export interface InterfaceBoundaryPin extends InterfacePinSpec {
   interfaceId: string;
+  /** Offered, not required: added like the others, never demanded by preflight. */
+  optional?: true;
 }
 
 /**
- * Required On Flow Start outputs / On Flow End inputs for a list of declared
- * interfaces. Declaration order, then contract order; when two interfaces
- * require the same pin id the first declaration wins. Unknown ids add nothing.
+ * On Flow Start outputs / On Flow End inputs for a list of declared interfaces:
+ * the required ones, then the optional ones (flagged `optional`). Declaration
+ * order, then contract order; when two interfaces name the same pin id the first
+ * wins, and a pin any interface requires is required. Unknown ids add nothing.
  */
 export function interfaceBoundaryPins(interfaces: unknown): { start: InterfaceBoundaryPin[]; end: InterfaceBoundaryPin[] } {
   const start: InterfaceBoundaryPin[] = [];
@@ -239,6 +260,11 @@ export function interfaceBoundaryPins(interfaces: unknown): { start: InterfaceBo
     }
     for (const spec of known.requiredEndPins || []) {
       if (!end.some((pin) => pin.id === spec.id)) end.push({ ...spec, interfaceId: id });
+    }
+  }
+  for (const id of normalizeInterfaces(interfaces)) {
+    for (const spec of knownInterface(id)?.optionalStartPins || []) {
+      if (!start.some((pin) => pin.id === spec.id)) start.push({ ...spec, interfaceId: id, optional: true });
     }
   }
   return { start, end };

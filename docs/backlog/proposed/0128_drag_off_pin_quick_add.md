@@ -49,3 +49,12 @@ No AI-suggested next node in v1 (separate idea); no palette redesign.
 ## Guidance for future agents
 Check 0089 first and fold its decisions in; ReactFlow's onConnectEnd provides
 the release point.
+
+## Progress (2026-10-11, unreleased)
+
+A first wire-drop menu exists (`src/components/ConnectionDropMenu.tsx`, opened by `Canvas.tsx`
+`handleConnectEnd` when a dragged wire is released on empty canvas): **Relay** (a visual-only
+dot, `reroute` node lowered by AbstractRuntime `reroute_lowering.py`) for any data pin, and
+**Break Object** from object/any outputs; one undo step (`addNodeAndConnect`). Still open here: the
+searchable, type-filtered node list (this item and 0089), and relays on execution wires (refused by
+the runtime lowering today: entry routes are keyed by the execution wire's source).

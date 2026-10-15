@@ -9,7 +9,8 @@ import { copyWithFeedback } from '../lib/copy_feedback';
 import { filterRunSummariesByFlowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
 import { endpointFromDescriptor, gatewayJson, type GatewayContracts } from '../utils/gatewayClient';
 
-async function fetchRuns(workflowId: string, gatewayContracts?: GatewayContracts | null): Promise<RunSummary[]> {
+/** This flow's root runs, newest first (also the run window's estimate source). */
+export async function fetchRuns(workflowId: string, gatewayContracts?: GatewayContracts | null): Promise<RunSummary[]> {
   const runsListDescriptor = gatewayContracts?.common?.runs?.list || gatewayContracts?.flow_editor?.runs?.list;
   const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
     endpointFromDescriptor(runsListDescriptor, 'api/gateway/runs', {}, { limit: 500, root_only: true, include_drafts: true })

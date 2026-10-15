@@ -102,8 +102,8 @@ export function isCanonicalPinType(value: unknown): value is PinType {
   return typeof value === 'string' && PIN_TYPES.includes(value as PinType);
 }
 
-const DYNAMIC_INPUT_NODE_TYPES = new Set<NodeType>(['on_flow_end', 'concat', 'string_template', 'make_object']);
-const DYNAMIC_OUTPUT_NODE_TYPES = new Set<NodeType>(['on_flow_start', 'break_object']);
+const DYNAMIC_INPUT_NODE_TYPES = new Set<NodeType>(['on_flow_end', 'concat', 'string_template', 'make_object', 'set_vars']);
+const DYNAMIC_OUTPUT_NODE_TYPES = new Set<NodeType>(['on_flow_start', 'break_object', 'get_vars']);
 const SECRET_KEY_PATTERN = /(api[_-]?key|token|password|secret|credential|bearer|authorization)/i;
 const SECRET_VALUE_PATTERN = /(sk-[A-Za-z0-9_-]{16,}|agw_[A-Za-z0-9_-]{16,}|Bearer\s+[A-Za-z0-9._-]{16,})/i;
 

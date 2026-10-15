@@ -389,7 +389,8 @@ Common rejected-edge mistakes (avoid them in the FIRST emitted document):
 - Multi-entry exception: when a node has 2+ incoming execution edges, a data
   input may carry the base edge plus at most one route override per execution
   path; connecting the data pin from a direct execution predecessor creates
-  the override automatically.
+  the override automatically. In the editor, a wire from any other node asks
+  which entry path it feeds and is drawn dashed with its path's name.
 
 ## Execution Model
 
@@ -772,7 +773,7 @@ On Flow End; optional Markdown/CSV file outputs.
 ### Human-In-The-Loop
 
 Ask User only when the workflow must pause mid-execution; On Flow Start inputs
-for normal parameters; Answer User for host-visible messages; Wait Event for
+for normal parameters; Show Message (`answer_user`) for host-visible messages; Wait Event for
 durable external waits.
 
 ### Composing Workflows (Subflow)

@@ -9,10 +9,26 @@ import toast from 'react-hot-toast';
 import { AfSwitch, Icon, SpeculationSelect, normalizeSpeculationValue, randomId, type SpeculationValue } from '@abstractframework/ui-kit';
 import { nodeIconName } from '../utils/nodeIcons';
 import { categoryColorVar, nodeColorSection } from '../utils/nodeCategoryColors';
-import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
+import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin, PinType } from '../types/flow';
 import { getBundledFlow } from '../utils/bundledFlows';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import { useFlowStore } from '../hooks/useFlow';
+import { TemplateTextEditor } from './TemplateText';
+import { templateInputNameProblem, templateInputPins } from '../utils/textTemplate';
+import { collectDeclaredVarNames } from '../utils/preflight';
+import { flowVariableMeta } from '../utils/flowVariables';
+import { entryRouteChoices, routeOverrideEdgeFor } from '../utils/multiEntryRoutes';
+import { schemaTopFields } from '../utils/structuredOutput';
+import {
+  SET_VARIABLE_ITEM_TYPES,
+  SET_VARIABLE_TYPES,
+  defaultForVariableType,
+  setVariableItemType,
+  setVariableRows,
+  setVariableValueProblem,
+  variableNameProblem,
+} from '../utils/setVariables';
+import { isCollapsibleOperator } from '../utils/operatorNodes';
 import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import { useVisionAdapterCatalog } from '../hooks/useVisionAdapterCatalog';
@@ -232,16 +248,6 @@ interface ToolSpec {
   examples?: unknown[];
 }
 
-type AgentSchemaFieldType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'any';
-
-interface AgentSchemaField {
-  id: string;
-  name: string;
-  type: AgentSchemaFieldType;
-  required: boolean;
-  itemsType?: Exclude<AgentSchemaFieldType, 'any'>;
-}
-
 function isTextProviderPin(pin: Pin): boolean {
   return providerCatalogScopeForPin(pin) === 'text';
 }
@@ -269,10 +275,6 @@ function uniquePinId(base: string, used: Set<string>): string {
   return `${candidateBase}_${idx}`;
 }
 
-function newOpaqueId(prefix = 'id'): string {
-  return `${prefix}-${Math.random().toString(16).slice(2)}`;
-}
-
 function switchCaseIdFromValue(value: string, used: Set<string>): string {
   const normalized = value.trim().replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
   const base = normalized || 'case';
@@ -282,87 +284,7 @@ function switchCaseIdFromValue(value: string, used: Set<string>): string {
   return `${base}_${idx}`;
 }
 
-function schemaFieldsFromJsonSchema(schema: unknown): AgentSchemaField[] {
-  if (!schema || typeof schema !== 'object') return [];
-  const root = schema as Record<string, any>;
-  if (root.type !== 'object') return [];
-  const props = root.properties;
-  if (!props || typeof props !== 'object') return [];
 
-  const required = new Set<string>(
-    Array.isArray(root.required) ? root.required.filter((x): x is string => typeof x === 'string') : []
-  );
-
-  const out: AgentSchemaField[] = [];
-  for (const [name, spec] of Object.entries(props as Record<string, any>)) {
-    if (!name) continue;
-    const specObj = spec && typeof spec === 'object' ? (spec as Record<string, any>) : {};
-    const rawType = typeof specObj.type === 'string' ? specObj.type : undefined;
-    const type: AgentSchemaFieldType =
-      rawType === 'string' || rawType === 'number' || rawType === 'integer' || rawType === 'boolean' || rawType === 'object' || rawType === 'array'
-        ? rawType
-        : 'any';
-
-    let itemsType: Exclude<AgentSchemaFieldType, 'any'> | undefined = undefined;
-    if (type === 'array') {
-      const items = specObj.items;
-      if (items && typeof items === 'object') {
-        const itemsTypeRaw = (items as Record<string, any>).type;
-        if (
-          itemsTypeRaw === 'string' ||
-          itemsTypeRaw === 'number' ||
-          itemsTypeRaw === 'integer' ||
-          itemsTypeRaw === 'boolean' ||
-          itemsTypeRaw === 'object' ||
-          itemsTypeRaw === 'array'
-        ) {
-          itemsType = itemsTypeRaw;
-        }
-      }
-    }
-
-    out.push({
-      id: newOpaqueId('field'),
-      name,
-      type,
-      required: required.has(name),
-      itemsType,
-    });
-  }
-  return out;
-}
-
-function jsonSchemaFromAgentFields(fields: AgentSchemaField[]): Record<string, any> {
-  const properties: Record<string, any> = {};
-  const required: string[] = [];
-
-  for (const field of fields) {
-    const name = field.name.trim();
-    if (!name) continue;
-
-    const t = field.type;
-    if (t === 'any') {
-      properties[name] = {};
-    } else if (t === 'array') {
-      const itemsType = field.itemsType;
-      properties[name] = {
-        type: 'array',
-        items: itemsType ? { type: itemsType } : {},
-      };
-    } else {
-      properties[name] = { type: t };
-    }
-
-    if (field.required) required.push(name);
-  }
-
-  const schema: Record<string, any> = {
-    type: 'object',
-    properties,
-  };
-  if (required.length > 0) schema.required = required;
-  return schema;
-}
 
 type ArtifactLiteralKind = 'text' | 'image' | 'voice' | 'music' | 'video';
 
@@ -563,6 +485,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     edges,
     copySelectionToClipboard,
     duplicateSelection,
+    setRouteOverride,
   } = useFlowStore();
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
@@ -695,12 +618,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [ioPinDefaultDrafts, setIoPinDefaultDrafts] = useState<Record<string, string>>({});
   const [ioSchemaDefaultEditorPinId, setIoSchemaDefaultEditorPinId] = useState<string | null>(null);
 
-  const [agentSchemaEnabled, setAgentSchemaEnabled] = useState(false);
-  const [agentSchemaMode, setAgentSchemaMode] = useState<'fields' | 'json'>('fields');
-  const [agentSchemaFields, setAgentSchemaFields] = useState<AgentSchemaField[]>([]);
-  const [agentSchemaJsonDraft, setAgentSchemaJsonDraft] = useState('');
-  const [agentSchemaJsonDirty, setAgentSchemaJsonDirty] = useState(false);
-  const [agentSchemaJsonError, setAgentSchemaJsonError] = useState<string | null>(null);
+  const [respSchemaEditorOpen, setRespSchemaEditorOpen] = useState(false);
 
   // Track last fetched provider to prevent duplicate fetches
   const lastFetchedProvider = useRef<string | null>(null);
@@ -823,37 +741,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     setIoSchemaDefaultEditorPinId(null);
   }, [node?.id]);
 
-  useEffect(() => {
-    if (!node || node.data.nodeType !== 'agent') return;
-
-    const outputSchema = node.data.agentConfig?.outputSchema;
-    const enabled = Boolean(outputSchema?.enabled);
-    const schema = outputSchema?.jsonSchema;
-    const mode = outputSchema?.mode === 'json' ? 'json' : 'fields';
-
-    setAgentSchemaEnabled(enabled);
-    setAgentSchemaMode(mode);
-
-    const parsed = schemaFieldsFromJsonSchema(schema);
-    const nextFields =
-      parsed.length > 0
-        ? parsed
-        : [
-            {
-              id: newOpaqueId('field'),
-              name: 'output',
-              type: 'string' as const,
-              required: true,
-            },
-          ];
-    setAgentSchemaFields(nextFields);
-
-    const effectiveSchema =
-      schema && typeof schema === 'object' ? (schema as Record<string, any>) : jsonSchemaFromAgentFields(nextFields);
-    setAgentSchemaJsonDraft(JSON.stringify(effectiveSchema, null, 2));
-    setAgentSchemaJsonDirty(false);
-    setAgentSchemaJsonError(null);
-  }, [node?.id]);
 
   // Fetch provider catalogs only after Gateway advertises the discovery route.
   useEffect(() => {
@@ -1826,35 +1713,18 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     return typeof raw === 'string' ? raw : '';
   };
 
-  const normalizeRouteHandle = (handle: unknown): string => {
-    const value = typeof handle === 'string' ? handle.trim() : '';
-    return value || 'exec-out';
-  };
-  const routeKeyFor = (sourceNodeId: string, sourceHandle: string): string =>
-    `${sourceNodeId}::${normalizeRouteHandle(sourceHandle)}`;
-  const entryRoutes = edges
-    .filter((e) => e.target === node.id && e.targetHandle === 'exec-in')
-    .map((edge, index) => {
-      const sourceNodeId = String(edge.source || '').trim();
-      const sourceHandle = normalizeRouteHandle(edge.sourceHandle);
-      const source = nodes.find((n) => n.id === sourceNodeId);
-      const sourceLabel = source?.data?.label || source?.data?.nodeType || sourceNodeId;
-      const existing = Array.isArray((data as any).entryRoutes)
-        ? (data as any).entryRoutes.find((route: any) => route?.sourceNodeId === sourceNodeId && normalizeRouteHandle(route?.sourceHandle) === sourceHandle)
-        : undefined;
-      return {
-        key: routeKeyFor(sourceNodeId, sourceHandle),
-        sourceNodeId,
-        sourceHandle,
-        label: String(existing?.label || (sourceHandle === 'exec-out' ? sourceLabel : `${sourceLabel} / ${sourceHandle}`) || `Entry ${index + 1}`),
-      };
-    })
-    .sort((a, b) => a.key.localeCompare(b.key));
-  const multiEntryRoutes = entryRoutes.length > 1 ? entryRoutes : [];
+  const multiEntryRoutes = entryRouteChoices(nodes, edges, node.id);
+  // An Agent's structured response is its `resp_schema` input (a schema set on
+  // the node, or a wire): the one place it is defined and edited (operator
+  // 2026-10-11: no separate switch).
+  const respSchemaValue = (data.pinDefaults as Record<string, unknown> | undefined)?.resp_schema;
+  const respSchemaWired = edges.some((e) => e.target === node.id && e.targetHandle === 'resp_schema');
+  const respSchemaFields = schemaTopFields(respSchemaValue);
 
   const outputOptionsForPin = (pin: Pin) => {
-    const options: Array<{ value: string; label: string }> = [{ value: '', label: 'Use normal/default input' }];
+    const options: Array<{ value: string; label: string }> = [{ value: '', label: 'Same as the normal wire or value' }];
     for (const source of nodes) {
+      if (source.id === node.id) continue; // a node never feeds its own input
       for (const output of source.data.outputs || []) {
         if (!output || output.type === 'execution') continue;
         if (!areTypesCompatible(output.type, pin.type)) continue;
@@ -1868,33 +1738,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     return options;
   };
 
+  // A per-path value IS its drawn per-path wire: the panel reads and edits
+  // that wire, so the canvas and this list can never disagree.
   const routeOverrideValue = (pinId: string, routeKey: string): string => {
-    const raw = (data as any).inputRouteOverrides;
-    const ref = raw && typeof raw === 'object' ? raw?.[pinId]?.[routeKey] : undefined;
-    const sourceNodeId = typeof ref?.sourceNodeId === 'string' ? ref.sourceNodeId.trim() : '';
-    const sourceHandle = typeof ref?.sourceHandle === 'string' ? ref.sourceHandle.trim() : '';
-    return sourceNodeId && sourceHandle ? `${sourceNodeId}::${sourceHandle}` : '';
+    const wire = routeOverrideEdgeFor(edges, node.id, pinId, routeKey);
+    return wire ? `${wire.source}::${wire.sourceHandle || ''}` : '';
   };
 
   const setRouteInputOverride = (pinId: string, routeKey: string, value: string) => {
-    const raw = (data as any).inputRouteOverrides;
-    const next: Record<string, Record<string, { sourceNodeId: string; sourceHandle: string }>> =
-      raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...(raw as any) } : {};
-    const perPin = next[pinId] && typeof next[pinId] === 'object' ? { ...next[pinId] } : {};
-
-    if (!value) {
-      delete perPin[routeKey];
-    } else {
-      const [sourceNodeId, sourceHandle] = value.split('::');
-      if (sourceNodeId && sourceHandle) perPin[routeKey] = { sourceNodeId, sourceHandle };
-    }
-
-    if (Object.keys(perPin).length > 0) next[pinId] = perPin;
-    else delete next[pinId];
-
-    updateNodeData(node.id, {
-      inputRouteOverrides: Object.keys(next).length > 0 ? (next as any) : undefined,
-    } as any);
+    const [sourceNodeId, sourceHandle] = value.split('::');
+    setRouteOverride(node.id, pinId, routeKey, sourceNodeId && sourceHandle ? { nodeId: sourceNodeId, handle: sourceHandle } : null);
   };
 
   const updateAgentConfig = (patch: Partial<NonNullable<FlowNodeData['agentConfig']>>) => {
@@ -1981,26 +1834,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     return out;
   })();
 
-  const commitAgentSchema = (
-    nextEnabled: boolean,
-    nextFields: AgentSchemaField[],
-    nextMode: 'fields' | 'json' = agentSchemaMode
-  ) => {
-    const schema = jsonSchemaFromAgentFields(nextFields);
-    updateAgentConfig({
-      outputSchema: {
-        ...(data.agentConfig?.outputSchema || {}),
-        enabled: nextEnabled,
-        mode: nextMode,
-        jsonSchema: schema,
-      },
-    });
-
-    if (nextMode === 'fields' && !agentSchemaJsonDirty) {
-      setAgentSchemaJsonDraft(JSON.stringify(schema, null, 2));
-      setAgentSchemaJsonError(null);
-    }
-  };
 
   const residencyTarget = (() => {
     const first = (...values: unknown[]) => {
@@ -2164,6 +1997,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </span>
           <span className="node-type">{data.nodeType}</span>
         </div>
+        {isCollapsibleOperator(data.nodeType) ? (
+          // The keyboard path to fold / unfold an operator (the canvas has the
+          // fold button, a double click and a tap).
+          <AfSwitch
+            label="Folded"
+            checked={data.collapsed === true}
+            onChange={(next) => updateNodeData(node.id, { collapsed: next })}
+            hint="Draw this operator as a small round node with only its sign, pins and wires"
+            variant="row"
+          />
+        ) : null}
       </div>
 
       <div className="property-section">
@@ -2284,7 +2128,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         <div className="property-section">
           <label className="property-label">Multi-entry routing</label>
           <span className="property-hint">
-            This node has multiple incoming execution paths. Defaults and normal data wires apply to every path; use route overrides for per-path values like A to X and B to X without wiring duplicate data inputs.
+            This node has several incoming execution paths. An input can take its own value on one path: drag a second wire onto the input and choose the path, or pick the value below. The normal wire or value feeds every path without one of its own.
           </span>
           <div className="property-group">
             <label className="property-sublabel">Entries</label>
@@ -2335,6 +2179,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const mediaNode = MEDIA_NODE_TYPES.has(data.nodeType);
 
         const editable = inputPins.filter((p) => {
+          // A String Template's text has its own editor (variable chips) below.
+          if (data.nodeType === 'string_template' && p.id === 'template') return false;
           if (mediaNode && MEDIA_PIN_DEFAULT_IDS.has(p.id)) return true;
           if (p.type === 'boolean' || p.type === 'number' || p.type === 'string') return true;
           // Known "string-select" pins that have inline dropdowns in the node UI.
@@ -3920,6 +3766,357 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
+      {/* Loop Limit: how many passes it lets through (components/nodes/LoopLimitNode.tsx) */}
+      {data.nodeType === 'loop_limit' && (
+        <div className="property-section">
+          <label className="property-label" htmlFor={`loop-limit-max-${node.id}`}>
+            Passes allowed
+          </label>
+          {edges.some((e) => e.target === node.id && e.targetHandle === 'max') ? (
+            <span className="property-hint">The limit comes from its wire.</span>
+          ) : (
+            <input
+              id={`loop-limit-max-${node.id}`}
+              type="number"
+              min={0}
+              step={1}
+              className="property-input"
+              value={typeof data.pinDefaults?.max === 'number' ? data.pinDefaults.max : 3}
+              onChange={(e) => {
+                const n = Math.max(0, Math.floor(Number(e.target.value)));
+                if (Number.isFinite(n)) updateNodeData(node.id, { pinDefaults: { ...(data.pinDefaults || {}), max: n } });
+              }}
+            />
+          )}
+          <span className="property-hint">
+            Execution goes on through <b>again</b> this many times, then through <b>limit reached</b>. <b>count</b> is the
+            pass number (1, 2, 3...). Inside a ForEach, For or While, each iteration counts on its own.
+          </span>
+        </div>
+      )}
+
+      {/* String Template: a text with variable chips (utils/textTemplate.ts) */}
+      {data.nodeType === 'string_template' && (
+        <div className="property-section">
+          <label className="property-label">Text</label>
+          {(() => {
+            const wiredText = edges.some((e) => e.target === node.id && e.targetHandle === 'template');
+            if (wiredText) return <span className="property-hint">The text comes from its wire.</span>;
+            const inputs = templateInputPins(data.inputs || []);
+            const inputIds = inputs.map((p) => p.id);
+            const variables = Array.from(collectDeclaredVarNames(nodes)).sort();
+            const text = typeof data.pinDefaults?.template === 'string' ? data.pinDefaults.template : '';
+            const addInput = (name: string) => {
+              const problem = templateInputNameProblem(name, new Set(inputIds));
+              if (problem) {
+                toast.error(problem);
+                return false;
+              }
+              updateNodeData(node.id, { inputs: [...(data.inputs || []), { id: name, label: name, type: 'any' }] });
+              return true;
+            };
+            const removeInput = (id: string) => {
+              setEdges(edges.filter((e) => !(e.target === node.id && e.targetHandle === id)));
+              updateNodeData(node.id, { inputs: (data.inputs || []).filter((p) => p.id !== id) });
+            };
+            return (
+              <div className="property-group">
+                <TemplateTextEditor
+                  value={text}
+                  onChange={(next) => updateNodeData(node.id, { pinDefaults: { ...(data.pinDefaults || {}), template: next } })}
+                  inputs={inputIds}
+                  variables={variables}
+                  onAddInput={addInput}
+                  ariaLabel={`Text of ${data.label || 'String Template'}`}
+                />
+                {inputs.length > 0 && (
+                  <div className="template-text-inputs">
+                    <span className="property-hint">Inputs (wire a value into each on the node):</span>
+                    {inputs.map((p) => (
+                      <span key={p.id} className="tpl-chip tpl-chip--input">
+                        {p.id}
+                        <button type="button" className="tpl-chip__remove" aria-label={`Remove input ${p.id}`} onClick={() => removeInput(p.id)}>
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <span className="property-hint">
+                  Type the text; <b>@</b> lists the variables of the run and the inputs of this node. A name that is
+                  neither becomes a new input, to wire on the node. Lists and objects are written as JSON.
+                </span>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Set Variables: one row per variable (utils/setVariables.ts) */}
+      {data.nodeType === 'set_vars' && (
+        <div className="property-section">
+          <label className="property-label">Variables</label>
+          {(() => {
+            const rows = setVariableRows(data.inputs || []);
+            const defaults = (data.pinDefaults || {}) as Record<string, unknown>;
+            const writeRows = (nextRows: Pin[], nextDefaults: Record<string, unknown>) => {
+              const fixed = (data.inputs || []).filter((p) => p.type === 'execution' || p.id === 'updates');
+              updateNodeData(node.id, { inputs: [...fixed, ...nextRows], pinDefaults: nextDefaults as any });
+            };
+            const addRow = () => {
+              const taken = new Set(rows.map((r) => r.id));
+              let n = 1;
+              while (taken.has(`variable${n}`)) n++;
+              const id = `variable${n}`;
+              writeRows([...rows, { id, label: id, type: 'string' }], { ...defaults, [id]: defaultForVariableType('string') });
+            };
+            const removeRow = (id: string) => {
+              const nextEdges = edges.filter((e) => !(e.target === node.id && e.targetHandle === id));
+              if (nextEdges.length !== edges.length) setEdges(nextEdges);
+              const { [id]: _removed, ...rest } = defaults;
+              writeRows(rows.filter((r) => r.id !== id), rest);
+            };
+            const renameRow = (id: string) => {
+              const draft = ioPinNameDrafts[id];
+              const clear = () =>
+                setIoPinNameDrafts((prev) => {
+                  const { [id]: _d, ...rest } = prev;
+                  return rest;
+                });
+              if (draft === undefined || draft.trim() === id) return clear();
+              const next = draft.trim();
+              const problem = variableNameProblem(next, new Set(rows.filter((r) => r.id !== id).map((r) => r.id)));
+              if (problem) {
+                toast.error(problem);
+                return clear();
+              }
+              setEdges(edges.map((e) => (e.target === node.id && e.targetHandle === id ? { ...e, targetHandle: next } : e)));
+              const { [id]: value, ...rest } = defaults;
+              writeRows(
+                rows.map((r) => (r.id === id ? { ...r, id: next, label: next } : r)),
+                id in defaults ? { ...rest, [next]: value } : rest
+              );
+              clear();
+            };
+            const retype = (id: string, type: PinType) =>
+              writeRows(
+                rows.map((r) => (r.id === id ? { id: r.id, label: r.label, type } : r)),
+                { ...defaults, [id]: defaultForVariableType(type) }
+              );
+            // An array row says what it holds; a value that no longer fits starts empty.
+            const setItemType = (id: string, itemType: FlowIoArrayItemType) => {
+              const nextRows = rows.map((r) => (r.id === id ? { ...r, ...flowIoPinPatchForArrayItem(r, itemType) } : r));
+              const row = nextRows.find((r) => r.id === id);
+              const fits = row ? setVariableValueProblem(row, defaults[id]) === null : true;
+              writeRows(nextRows, fits ? defaults : { ...defaults, [id]: [] });
+            };
+            const setDefault = (id: string, value: unknown) => writeRows(rows, { ...defaults, [id]: value });
+            const wired = (id: string) => edges.some((e) => e.target === node.id && e.targetHandle === id);
+            return (
+              <div className="property-group">
+                <div className="array-editor">
+                  {rows.map((row) => {
+                    const value = defaults[row.id];
+                    return (
+                      <div key={row.id} className={`array-item set-variable-row${row.type === 'array' ? ' is-array' : ''}`}>
+                        <input
+                          type="text"
+                          className="property-input array-item-input io-pin-name"
+                          aria-label="Variable name"
+                          value={ioPinNameDrafts[row.id] ?? row.id}
+                          onChange={(e) => setIoPinNameDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                          onBlur={() => renameRow(row.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                        />
+                        <select
+                          className="property-select io-pin-type"
+                          aria-label={`Type of ${row.id}`}
+                          value={row.type}
+                          onChange={(e) => retype(row.id, e.target.value as PinType)}
+                        >
+                          {SET_VARIABLE_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {dataPinTypeLabel(t)}
+                            </option>
+                          ))}
+                        </select>
+                        {row.type === 'array' && (
+                          <select
+                            className="property-select set-variable-items"
+                            aria-label={`What ${row.id} holds`}
+                            value={setVariableItemType(row)}
+                            onChange={(e) => setItemType(row.id, e.target.value as FlowIoArrayItemType)}
+                          >
+                            {SET_VARIABLE_ITEM_TYPES.map((t) => (
+                              <option key={t} value={t}>
+                                of {flowIoArrayItemTypeLabel(t)}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {wired(row.id) ? (
+                          <span className="property-hint set-variable-wired">from its wire</span>
+                        ) : row.type === 'boolean' ? (
+                          <input
+                            type="checkbox"
+                            aria-label={`Value of ${row.id}`}
+                            checked={value === true}
+                            onChange={(e) => setDefault(row.id, e.target.checked)}
+                          />
+                        ) : row.type === 'number' ? (
+                          <input
+                            type="number"
+                            className="property-input set-variable-value"
+                            aria-label={`Value of ${row.id}`}
+                            value={typeof value === 'number' ? value : 0}
+                            onChange={(e) => setDefault(row.id, Number(e.target.value))}
+                          />
+                        ) : row.type === 'string' ? (
+                          <input
+                            type="text"
+                            className="property-input set-variable-value"
+                            aria-label={`Value of ${row.id}`}
+                            placeholder="empty text"
+                            value={typeof value === 'string' ? value : ''}
+                            onChange={(e) => setDefault(row.id, e.target.value)}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            className="property-input set-variable-value"
+                            aria-label={`Value of ${row.id} (JSON)`}
+                            key={JSON.stringify(value ?? null)}
+                            defaultValue={JSON.stringify(value ?? defaultForVariableType(row.type))}
+                            onBlur={(e) => {
+                              let parsed: unknown;
+                              try {
+                                parsed = JSON.parse(e.target.value);
+                              } catch {
+                                toast.error(`The value of ${row.id} is not valid JSON`);
+                                return;
+                              }
+                              const problem = setVariableValueProblem(row, parsed);
+                              if (problem) toast.error(problem);
+                              else setDefault(row.id, parsed);
+                            }}
+                          />
+                        )}
+                        <button className="array-item-remove" onClick={() => removeRow(row.id)} title="Remove variable">
+                          &times;
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button className="array-add-button" onClick={addRow}>
+                    + Add variable
+                  </button>
+                </div>
+                <span className="property-hint">
+                  Each row sets one variable when the node runs: the value shown, or what its pin on the node is wired
+                  to. Rows set in one step.
+                </span>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Get Variables: one output per variable read (operator 2026-10-12) */}
+      {data.nodeType === 'get_vars' && (
+        <div className="property-section">
+          <label className="property-label">Variables</label>
+          {(() => {
+            const rows = (data.outputs || []).filter((p) => p.type !== 'execution');
+            const meta = flowVariableMeta(nodes);
+            const typeOf = (name: string): PinType => meta.declaredTypes.get(name) ?? 'any';
+            const listId = `get-vars-known-${node.id}`;
+            const writeRows = (next: Pin[]) => updateNodeData(node.id, { outputs: next });
+            const addRow = () => {
+              const taken = new Set(rows.map((r) => r.id));
+              const known = meta.options.map((o) => o.value).find((v) => !taken.has(v));
+              let id = known || 'variable1';
+              for (let n = 2; taken.has(id); n++) id = `variable${n}`;
+              writeRows([...rows, { id, label: id, type: typeOf(id) }]);
+            };
+            const removeRow = (id: string) => {
+              setEdges(edges.filter((e) => !(e.source === node.id && e.sourceHandle === id)));
+              writeRows(rows.filter((r) => r.id !== id));
+            };
+            const renameRow = (id: string) => {
+              const draft = ioPinNameDrafts[id];
+              const clear = () =>
+                setIoPinNameDrafts((prev) => {
+                  const { [id]: _d, ...rest } = prev;
+                  return rest;
+                });
+              if (draft === undefined || draft.trim() === id) return clear();
+              const next = draft.trim();
+              const problem = variableNameProblem(next, new Set(rows.filter((r) => r.id !== id).map((r) => r.id)), 'read');
+              if (problem) {
+                toast.error(problem);
+                return clear();
+              }
+              setEdges(edges.map((e) => (e.source === node.id && e.sourceHandle === id ? { ...e, sourceHandle: next } : e)));
+              writeRows(rows.map((r) => (r.id === id ? { id: next, label: next, type: typeOf(next) } : r)));
+              clear();
+            };
+            return (
+              <div className="property-group">
+                <datalist id={listId}>
+                  {meta.options.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </datalist>
+                <div className="array-editor">
+                  {rows.map((row) => (
+                    <div key={row.id} className="array-item get-variable-row">
+                      <input
+                        type="text"
+                        className="property-input array-item-input io-pin-name"
+                        aria-label="Variable name"
+                        list={listId}
+                        value={ioPinNameDrafts[row.id] ?? row.id}
+                        onChange={(e) => setIoPinNameDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                        onBlur={() => renameRow(row.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                        }}
+                      />
+                      <select
+                        className="property-select io-pin-type"
+                        aria-label={`Type of ${row.id}`}
+                        value={row.type}
+                        onChange={(e) => writeRows(rows.map((r) => (r.id === row.id ? { ...r, type: e.target.value as PinType } : r)))}
+                      >
+                        {SET_VARIABLE_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {dataPinTypeLabel(t)}
+                          </option>
+                        ))}
+                      </select>
+                      <button className="array-item-remove" onClick={() => removeRow(row.id)} title="Remove variable">
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                  <button className="array-add-button" onClick={addRow}>
+                    + Add variable
+                  </button>
+                </div>
+                <span className="property-hint">
+                  Each row is an output on the node with the variable's current value (empty when it is not set yet).
+                  Double-click the node to fold it into a compact list of names.
+                </span>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Build JSON (Make Object) node properties */}
       {data.nodeType === 'make_object' && (
         <div className="property-section">
@@ -4333,293 +4530,52 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </div>
 
           <div className="property-group">
-            <AfSwitch
-              variant="row"
-              className="property-switch"
-              label="Structured output"
-              description="Return a JSON result that matches a schema."
-              action="structured-output"
-              checked={agentSchemaEnabled}
-              onChange={(enabled) => {
-                  setAgentSchemaEnabled(enabled);
-                  if (agentSchemaMode === 'fields') {
-                    commitAgentSchema(enabled, agentSchemaFields, 'fields');
-                    return;
-                  }
-
-                  let schema: unknown = data.agentConfig?.outputSchema?.jsonSchema;
-                  if (!schema && agentSchemaJsonDraft.trim()) {
-                    try {
-                      const parsed = JSON.parse(agentSchemaJsonDraft);
-                      if (parsed && typeof parsed === 'object') schema = parsed;
-                    } catch {
-                      // Ignore parse errors here; user can fix in JSON editor.
-                    }
-                  }
-
-                  updateAgentConfig({
-                    outputSchema: {
-                      ...(data.agentConfig?.outputSchema || {}),
-                      enabled,
-                      mode: 'json',
-                      jsonSchema:
-                        schema && typeof schema === 'object'
-                          ? (schema as Record<string, any>)
-                          : jsonSchemaFromAgentFields(agentSchemaFields),
-                    },
-                  });
-                }}
-            />
-
-            {agentSchemaEnabled && (
+            <label className="property-label">Structured response</label>
+            {respSchemaWired ? (
+              <span className="property-hint">
+                The schema comes from the wire into <code>resp_schema</code>: the Agent answers with a JSON object
+                matching it, on its <code>data</code> output.
+              </span>
+            ) : respSchemaFields ? (
               <>
-                <div className="property-group schema-mode">
-                  <label className="property-sublabel">Schema Editor</label>
-                  <select
-                    className="property-select"
-                    value={agentSchemaMode}
-                    onChange={(e) => {
-                      const mode = e.target.value === 'json' ? 'json' : 'fields';
-                      const existingSchema =
-                        data.agentConfig?.outputSchema?.jsonSchema ?? jsonSchemaFromAgentFields(agentSchemaFields);
-
-                      setAgentSchemaMode(mode);
-                      updateAgentConfig({
-                        outputSchema: {
-                          ...(data.agentConfig?.outputSchema || {}),
-                          enabled: agentSchemaEnabled,
-                          mode,
-                          jsonSchema: existingSchema,
-                        },
-                      });
-
-                      if (mode === 'json') {
-                        setAgentSchemaJsonDraft(JSON.stringify(existingSchema, null, 2));
-                        setAgentSchemaJsonDirty(false);
-                        setAgentSchemaJsonError(null);
-                      } else {
-                        const parsedFields = schemaFieldsFromJsonSchema(existingSchema);
-                        if (parsedFields.length > 0) setAgentSchemaFields(parsedFields);
-                        setAgentSchemaJsonDirty(false);
-                        setAgentSchemaJsonError(null);
-                      }
-                    }}
-                  >
-                    <option value="fields">Fields (recommended)</option>
-                    <option value="json">JSON Schema (advanced)</option>
-                  </select>
-                </div>
-
-                {agentSchemaMode === 'fields' && (
-                  <div className="schema-fields">
-                    {agentSchemaFields.map((field) => (
-                      <div key={field.id} className="schema-field-row">
-                        <div className="schema-field-top">
-                          <input
-                            className="property-input schema-field-name"
-                            value={field.name}
-                            placeholder="field_name"
-                            onChange={(e) => {
-                              const next = agentSchemaFields.map((f) =>
-                                f.id === field.id ? { ...f, name: e.target.value } : f
-                              );
-                              setAgentSchemaFields(next);
-                              commitAgentSchema(agentSchemaEnabled, next, 'fields');
-                            }}
-                            onBlur={() => {
-                              const used = new Set(agentSchemaFields.filter((f) => f.id !== field.id).map((f) => f.name));
-                              const sanitized = uniquePinId(sanitizePythonIdentifier(field.name), used);
-                              if (sanitized === field.name) return;
-                              const next = agentSchemaFields.map((f) =>
-                                f.id === field.id ? { ...f, name: sanitized } : f
-                              );
-                              setAgentSchemaFields(next);
-                              commitAgentSchema(agentSchemaEnabled, next, 'fields');
-                            }}
-                          />
-
-                          <button
-                            type="button"
-                            className="array-item-remove"
-                            onClick={() => {
-                              const next = agentSchemaFields.filter((f) => f.id !== field.id);
-                              setAgentSchemaFields(next);
-                              commitAgentSchema(agentSchemaEnabled, next, 'fields');
-                            }}
-                            title="Remove field"
-                          >
-                            ×
-                          </button>
-                        </div>
-
-                        <div className="schema-field-bottom">
-                          <select
-                            className="property-select schema-field-type"
-                            value={field.type}
-                            onChange={(e) => {
-                              const nextType = (e.target.value || 'string') as AgentSchemaFieldType;
-                              const next = agentSchemaFields.map((f) => {
-                                if (f.id !== field.id) return f;
-                                if (nextType === 'array') {
-                                  return { ...f, type: 'array', itemsType: f.itemsType ?? 'string' } as AgentSchemaField;
-                                }
-                                return { ...f, type: nextType, itemsType: undefined } as AgentSchemaField;
-                              });
-                              setAgentSchemaFields(next);
-                              setAgentSchemaMode('fields');
-                              commitAgentSchema(agentSchemaEnabled, next, 'fields');
-                            }}
-                          >
-                            <option value="string">string</option>
-                            <option value="number">number</option>
-                            <option value="integer">integer</option>
-                            <option value="boolean">boolean</option>
-                            <option value="object">object</option>
-                            <option value="array">array</option>
-                            <option value="any">any</option>
-                          </select>
-
-                          {field.type === 'array' && (
-                            <select
-                              className="property-select schema-field-items"
-                              value={field.itemsType ?? 'string'}
-                              onChange={(e) => {
-                                const itemsType = (e.target.value || 'string') as Exclude<AgentSchemaFieldType, 'any'>;
-                                const next = agentSchemaFields.map((f) =>
-                                  f.id === field.id ? { ...f, itemsType } : f
-                                );
-                                setAgentSchemaFields(next);
-                                commitAgentSchema(agentSchemaEnabled, next, 'fields');
-                              }}
-                            >
-                              <option value="string">items: string</option>
-                              <option value="number">items: number</option>
-                              <option value="integer">items: integer</option>
-                              <option value="boolean">items: boolean</option>
-                              <option value="object">items: object</option>
-                              <option value="array">items: array</option>
-                            </select>
-                          )}
-
-                          <label className="schema-optional" title="When enabled, this field may be omitted from the result.">
-                            <input
-                              type="checkbox"
-                              checked={!field.required}
-                              onChange={(e) => {
-                                const optional = e.target.checked;
-                                const next = agentSchemaFields.map((f) =>
-                                  f.id === field.id ? { ...f, required: !optional } : f
-                                );
-                                setAgentSchemaFields(next);
-                                commitAgentSchema(agentSchemaEnabled, next, 'fields');
-                              }}
-                            />
-                            <span>optional</span>
-                          </label>
-                        </div>
-                      </div>
-                    ))}
-
-                    <button
-                      type="button"
-                      className="array-add-button"
-                      onClick={() => {
-                        const used = new Set(agentSchemaFields.map((f) => f.name));
-                        const nextName = uniquePinId('field', used);
-                        const next = [
-                          ...agentSchemaFields,
-                          {
-                            id: newOpaqueId('field'),
-                            name: nextName,
-                            type: 'string' as const,
-                            required: true,
-                          },
-                        ];
-                        setAgentSchemaFields(next);
-                        setAgentSchemaMode('fields');
-                        commitAgentSchema(agentSchemaEnabled, next, 'fields');
-                      }}
-                    >
-                      + Add field
-                    </button>
-                  </div>
-                )}
-
-                {agentSchemaMode === 'json' && (
-                  <div className="schema-json">
-                    <textarea
-                      className="property-input property-textarea code"
-                      value={agentSchemaJsonDraft}
-                      onChange={(e) => {
-                        setAgentSchemaJsonDraft(e.target.value);
-                        setAgentSchemaJsonDirty(true);
-                      }}
-                      rows={10}
-                      placeholder='{"type":"object","properties":{...}}'
-                    />
-
-                    {agentSchemaJsonError && <span className="property-error">{agentSchemaJsonError}</span>}
-
-                    <div className="schema-actions">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          try {
-                            const parsed = JSON.parse(agentSchemaJsonDraft);
-                            if (!parsed || typeof parsed !== 'object') {
-                              setAgentSchemaJsonError('Schema must be a JSON object.');
-                              return;
-                            }
-                            updateAgentConfig({
-                              outputSchema: {
-                                ...(data.agentConfig?.outputSchema || {}),
-                                enabled: agentSchemaEnabled,
-                                mode: 'json',
-                                jsonSchema: parsed,
-                              },
-                            });
-                            setAgentSchemaJsonError(null);
-                            setAgentSchemaJsonDirty(false);
-                            setAgentSchemaFields(schemaFieldsFromJsonSchema(parsed));
-                          } catch (e) {
-                            setAgentSchemaJsonError(String(e));
-                          }
-                        }}
-                        disabled={!agentSchemaJsonDirty}
-                      >
-                        Apply JSON Schema
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const schema = data.agentConfig?.outputSchema?.jsonSchema ?? jsonSchemaFromAgentFields(agentSchemaFields);
-                          setAgentSchemaJsonDraft(JSON.stringify(schema, null, 2));
-                          setAgentSchemaJsonDirty(false);
-                          setAgentSchemaJsonError(null);
-                        }}
-                      >
-                        Reset
-                      </button>
-                    </div>
-
-                    <span className="property-hint">
-                      Property names must be identifier-style (<code>snake_case</code>) for structured output validation.
-                    </span>
-                  </div>
-                )}
-
-	                <span className="property-hint">
-	                  While Structured output is on, the Agent&apos;s <code>response</code> output is a JSON string matching this schema.
-	                </span>
+                <span className="property-hint">
+                  The Agent answers with a JSON object on its <code>data</code> output:
+                </span>
+                <ul className="pins-list">
+                  {respSchemaFields.map((field) => (
+                    <li key={field.name} className="pin-info">
+                      <span className="pin-name">{field.name}</span>
+                      <span className="pin-type">{field.type}</span>
+                    </li>
+                  ))}
+                </ul>
               </>
+            ) : (
+              <span className="property-hint">
+                None: the Agent answers in free text. Add a schema to get a JSON object on its <code>data</code> output.
+              </span>
             )}
-
-	            {!agentSchemaEnabled && (
-	              <span className="property-hint">
-	                Off: the Agent returns a free-form response string.
-	              </span>
-	            )}
+            {!respSchemaWired ? (
+              <div className="property-actions-row">
+                <button type="button" className="property-button" onClick={() => setRespSchemaEditorOpen(true)}>
+                  {respSchemaFields ? 'Edit schema' : 'Add a schema'}
+                </button>
+                {respSchemaFields ? (
+                  <button type="button" className="property-button secondary" onClick={() => setPinDefault('resp_schema', undefined)}>
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            <JsonSchemaPinEditorModal
+              isOpen={respSchemaEditorOpen}
+              nodeLabel={data.label || ''}
+              pin={data.inputs.find((pin) => pin.id === 'resp_schema') || null}
+              schema={respSchemaValue}
+              onClose={() => setRespSchemaEditorOpen(false)}
+              onSave={(next) => setPinDefault('resp_schema', next)}
+              onClear={() => setPinDefault('resp_schema', undefined)}
+            />
           </div>
         </div>
       )}

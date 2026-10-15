@@ -6,6 +6,7 @@ import type { Node, Connection, Edge } from 'reactflow';
 import type { FlowNodeData, PinType } from '../types/flow';
 import { artifactPinTypesCompatible, getArtifactConnectionError } from './mediaArtifacts';
 import { computeFoldedGetters } from './foldedGetters';
+import { entryRouteChoices, type EntryRouteChoice } from './multiEntryRoutes';
 
 function routeKey(sourceNodeId: string, sourceHandle: string): string {
   return `${sourceNodeId}::${sourceHandle || 'exec-out'}`;
@@ -71,6 +72,41 @@ export function inferRouteOverrideRouteKey(
     );
   });
   return routeAlreadyOverridden ? null : key;
+}
+
+/**
+ * The entry paths a dropped data wire could feed, when the editor must ask.
+ *
+ * A node with several incoming execution wires takes one value per path: its
+ * normal wire feeds every path, and a per-path wire replaces it on one path
+ * (lowered by the runtime into join_exec + path_mux). When the dropped wire
+ * comes from the node that executes right before on exactly one path, that path
+ * is known (`inferRouteOverrideRouteKey`); otherwise, e.g. a Break Object fed
+ * by a reviewer that runs two nodes earlier, only the author knows, so the
+ * canvas asks. Returns [] when there is nothing to ask: not a data wire, a type
+ * mismatch, a free pin, a single-entry node, or a path already known.
+ */
+export function routeChoicesForConnection(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  connection: Connection
+): EntryRouteChoice[] {
+  if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return [];
+  if (connection.source === connection.target) return [];
+  const sourceNode = nodes.find((n) => n.id === connection.source);
+  const targetNode = nodes.find((n) => n.id === connection.target);
+  const sourcePin = sourceNode?.data.outputs.find((p) => p.id === connection.sourceHandle);
+  const targetPin = targetNode?.data.inputs.find((p) => p.id === connection.targetHandle);
+  if (!sourceNode || !targetNode || !sourcePin || !targetPin) return [];
+  if (sourcePin.type === 'execution' || targetPin.type === 'execution') return [];
+  if (!areTypesCompatible(sourcePin.type, targetPin.type)) return [];
+  if (getArtifactConnectionError(sourceNode.data, sourcePin, targetNode.data, targetPin)) return [];
+  const pinHasWire = edges.some(
+    (e) => e.target === connection.target && e.targetHandle === connection.targetHandle && edgeData(e).routeOverride !== true
+  );
+  if (!pinHasWire) return [];
+  if (inferRouteOverrideRouteKey(nodes, edges, connection)) return [];
+  return entryRouteChoices(nodes, edges, connection.target);
 }
 
 /**
@@ -349,7 +385,7 @@ export function getConnectionError(
       if (inferRouteOverrideRouteKey(nodes, edges, connection)) return null;
       const incomingExecCount = edges.filter((e) => e.target === connection.target && e.targetHandle === 'exec-in').length;
       if (incomingExecCount > 1) {
-        return `Input pin '${connection.targetHandle}' already has a default value. For multi-entry nodes, connect from a direct execution predecessor or use route overrides for per-path values.`;
+        return `Input pin '${connection.targetHandle}' already has a wire, and this multi-entry node has several entry paths: drop the new wire on the canvas and choose the path it feeds, or set it under Multi-entry routing in Properties.`;
       }
       // Naming the current source lets authors (and the authoring assistant)
       // decide whether the existing wiring is already correct instead of

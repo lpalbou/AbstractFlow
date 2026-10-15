@@ -61,6 +61,7 @@
 /* A collapsed list is gone: `hidden` must win over the lists' own display
    (.run-steps-list is display: flex, which beat the UA [hidden] rule). */
 .flow-library-list[hidden],
+.flow-library-body[hidden],
 .run-steps-list[hidden] {
   display: none;
 }

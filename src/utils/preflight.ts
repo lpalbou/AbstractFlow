@@ -1,4 +1,7 @@
 import type { Edge, Node } from 'reactflow';
+import { setVariableRows } from './setVariables';
+import { loopBackWires, wireLoopLimit } from './loopBackEdges';
+import { isRouteOverrideEdge } from './multiEntryRoutes';
 import type { FlowFunction, FlowNodeData, Pin } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import type { GatewayFlowEditorReadiness } from './gatewayClient';
@@ -227,7 +230,7 @@ export function collectDeclaredVarNames(nodes: Node<FlowNodeData>[]): Set<string
   const names = new Set<string>();
   for (const n of nodes) {
     const d = n.data;
-    if (d.nodeType === 'set_var' || d.nodeType === 'get_var') {
+    if (d.nodeType === 'set_var' || d.nodeType === 'get_var' || d.nodeType === 'add_to_list') {
       const nm = d.pinDefaults?.name;
       if (typeof nm === 'string' && nm.trim()) names.add(nm.trim());
     }
@@ -244,9 +247,10 @@ export function collectDeclaredVarNames(nodes: Node<FlowNodeData>[]): Set<string
         for (const key of Object.keys(seed as Record<string, unknown>)) {
           if (key.trim()) names.add(key.trim());
         }
-      }
+      }      // Its rows (one input per variable) are declarations too.
+      for (const pin of setVariableRows(d.inputs || [])) names.add(pin.id);
     }
-    if (d.nodeType === 'on_flow_start') {
+    if (d.nodeType === 'on_flow_start' || d.nodeType === 'get_vars') {
       for (const p of d.outputs || []) {
         if (p.type !== 'execution' && p.id) names.add(p.id);
       }
@@ -369,11 +373,15 @@ export function codeProseShare(body: string): number {
  * two literal forms only. */
 function varReadsInExpression(expression: string): string[] {
   const out = new Set<string>();
-  const attr = /\bvars\.([A-Za-z_][A-Za-z0-9_]*)/g;
+  // vars.name, vars["name"], vars.get("name", default): the documented read forms.
+  // `vars.get(...)` reads the name it is given, not a variable called "get".
+  const attr = /\bvars\.(?!get\s*\()([A-Za-z_][A-Za-z0-9_]*)/g;
   const subs = /\bvars\[\s*["']([^"']+)["']\s*\]/g;
+  const getter = /\bvars\.get\(\s*["']([^"']+)["']/g;
   let m: RegExpExecArray | null;
   while ((m = attr.exec(expression))) out.add(m[1]);
   while ((m = subs.exec(expression))) out.add(m[1]);
+  while ((m = getter.exec(expression))) out.add(m[1]);
   return Array.from(out);
 }
 
@@ -399,6 +407,48 @@ export function computeRunPreflightIssues(
       ...(severity ? { severity } : {}),
     });
   };
+
+  // A limit on a wire resumes on the If/Else's other branch; from any other source, or with that
+  // branch unwired, the path just ends at the limit (visual/loop_limit_lowering.py in AbstractRuntime).
+  const loopBacks = loopBackWires(nodes, edges);
+  for (const e of edges) {
+    const max = wireLoopLimit(e);
+    if (max === null) continue;
+    const source = nodesById.get(e.source);
+    if (!source || !reachable.has(source.id)) continue;
+    if (source.data.nodeType !== 'if') {
+      push(source, `the ${max}-times limit on its wire has nowhere to go: at the limit the path ends (only an If/Else resumes on its other branch)`, 'warning');
+      continue;
+    }
+    const other = e.sourceHandle === 'false' ? 'true' : 'false';
+    const otherWire = edges.find((x) => x.source === e.source && x.sourceHandle === other && x.targetHandle === 'exec-in');
+    if (!otherWire) {
+      push(source, `wire its ${other} branch: that is where the flow goes on once the ${max}-times limit is reached`, 'warning');
+      continue;
+    }
+    if (wireLoopLimit(otherWire) !== null) {
+      // Both branches loop back with a limit: no way forward, the runtime ends the path at the limit.
+      push(source, `both of its branches repeat with a limit: at the ${max}-times limit this path just ends`, 'warning');
+      continue;
+    }
+    if (loopBacks.has(otherWire.id)) {
+      push(source, `its ${other} branch repeats without a limit: at the ${max}-times limit the flow goes on through it`, 'warning');
+    }
+    // The resume path enters the other branch's target through a way in the document never names,
+    // so that node's per-path values (dashed wires) do not apply on it.
+    const resumeAt = nodesById.get(otherWire.target);
+    if (resumeAt && edges.some((x) => x.target === resumeAt.id && isRouteOverrideEdge(x))) {
+      push(resumeAt, `its per-path values do not apply when it is reached from the ${max}-times limit on ${source.data.label || source.id}'s wire (that way in takes the normal values)`, 'warning');
+    }
+  }
+
+  // A Loop Limit whose `limit reached` goes nowhere: at the limit the path just ends, and at the
+  // top level of the flow that ends the run (review 2026-10-14).
+  for (const n of nodes) {
+    if (n.data.nodeType !== 'loop_limit' || !reachable.has(n.id)) continue;
+    const wired = edges.some((e) => e.source === n.id && e.sourceHandle === 'limit_reached');
+    if (!wired) push(n, "'limit reached' is not wired: when the limit is hit, this path ends (at the top level that ends the run; inside a loop body it returns to the loop)", 'warning');
+  }
 
   // Flow function library checks (tier 2): the runtime refuses these at
   // build — catching them pre-run turns a failed start into an editable
@@ -431,6 +481,7 @@ export function computeRunPreflightIssues(
       if (!isStart && n.data.nodeType !== 'on_flow_end') continue;
       const nodeName = isStart ? 'On Flow Start' : 'On Flow End';
       for (const pin of missingInterfacePins(n.data, interfacePins)) {
+        if (pin.optional) continue; // offered, never demanded
         push(
           n,
           `'${pin.id}' (${pin.type}) is required by ${pin.interfaceId}: hosts ${isStart ? 'send' : 'read'} it. Add it to ${nodeName} or remove the interface`,

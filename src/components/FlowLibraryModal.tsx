@@ -6,13 +6,10 @@ import { describeAutomationDefaults } from '../utils/triggerBindings';
 import { AutomationDefaultsModal } from './AutomationDefaultsModal';
 import { BUNDLED_COMPOSED_ONLY_IDS } from '../utils/bundledFlows';
 import {
-  KNOWN_INTERFACES,
   buildFlowFamilyIndex,
   isExecutableFlow,
   knownInterface,
   normalizeInterfaces,
-  type InterfacePinSpec,
-  type KnownInterface,
 } from '../utils/flowFamilies';
 import {
   buildLibraryRows,
@@ -21,6 +18,7 @@ import {
 } from '../utils/flowLibraryRows';
 import { FlowLibraryList } from './FlowLibraryList';
 import { ListDisclosure } from './ListDisclosure';
+import { InterfacePicker } from './InterfacePicker';
 import { LIBRARY_STACKED_QUERY, useListOpen } from '../utils/listOpen';
 
 export interface FlowLibraryModalProps {
@@ -54,14 +52,6 @@ function renderInterfaces(interfaces: string[]): string {
   return interfaces.map((iid) => knownInterface(iid)?.label || iid).join(', ');
 }
 
-function renderPinSpecs(pins: InterfacePinSpec[]) {
-  return pins.map((pin, index) => (
-    <span key={pin.id}>
-      {index > 0 ? ', ' : null}
-      <code>{pin.id}</code> ({pin.type})
-    </span>
-  ));
-}
 
 function formatDateTime(value: unknown): string {
   if (typeof value !== 'string' || !value) return '';
@@ -531,6 +521,21 @@ export function FlowLibraryModal({
 
   /** Any inline editor open (rename / description / interfaces). */
   const isEditing = isRenaming || isEditingDescription || isEditingInterfaces || isEditingAutomation;
+  // Starting an interfaces edit brings the picker into view (on phones the
+  // preview sits below the list in one scrolling sheet).
+  const interfacesEditRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (isEditingInterfaces) interfacesEditRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [isEditingInterfaces]);
+
+  /** The inline edit the bottom bar commits (the automation editor has its own buttons). */
+  const inlineEdit: 'name' | 'description' | 'interfaces' | null = isRenaming
+    ? 'name'
+    : isEditingDescription
+      ? 'description'
+      : isEditingInterfaces
+        ? 'interfaces'
+        : null;
 
   const cancelEdits = useCallback(() => {
     setIsRenaming(false);
@@ -633,7 +638,24 @@ export function FlowLibraryModal({
           </div>
         </div>
 
-        <div className="flow-library-body">
+        {/* Editing interfaces takes the whole body: interface list | details
+            (the footer carries Cancel / Save Interfaces). The library body stays
+            mounted, hidden, so the list keeps its place. */}
+        {isEditingInterfaces && selectedFlow ? (
+          <div className="flow-library-interfaces-edit" ref={interfacesEditRef}>
+            <InterfacePicker
+              value={interfacesDraft}
+              onChange={setInterfacesDraft}
+              title={
+                <>
+                  Interfaces of <strong>{selectedFlow.name || selectedFlow.id}</strong>
+                </>
+              }
+              pinNote="Save adds the missing pins to On Flow Start and On Flow End (right away when the flow is open in the editor, otherwise when it is next opened); existing pins are kept."
+            />
+          </div>
+        ) : null}
+        <div className="flow-library-body" hidden={isEditingInterfaces && Boolean(selectedFlow)}>
           {stacked ? (
             <ListDisclosure
               open={listOpen}
@@ -798,66 +820,6 @@ export function FlowLibraryModal({
                     </span>
                   </div>
 
-                  {isEditingInterfaces ? (
-                    <div className="flow-library-interfaces-editor">
-                      {KNOWN_INTERFACES.filter((iface) => iface.class !== 'domain' || interfacesDraft.includes(iface.id)).map(
-                        (iface) => {
-                          const checked = interfacesDraft.includes(iface.id);
-                          return (
-                            <label key={iface.id} className="flow-library-interface-option">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) => {
-                                  const on = e.target.checked;
-                                  setInterfacesDraft((prev) => {
-                                    const base = normalizeInterfaces(prev);
-                                    if (on) {
-                                      if (!base.includes(iface.id)) base.push(iface.id);
-                                      return base;
-                                    }
-                                    return base.filter((x) => x !== iface.id);
-                                  });
-                                }}
-                              />
-                              <div className="flow-library-interface-copy">
-                                <div className="flow-library-interface-label">{iface.label}</div>
-                                <div className="flow-library-interface-desc">{iface.description}</div>
-                              </div>
-                            </label>
-                          );
-                        }
-                      )}
-
-                      {interfacesDraft.map((id) => knownInterface(id))
-                        .filter((iface): iface is KnownInterface =>
-                          Boolean(iface && ((iface.requiredStartPins?.length || 0) + (iface.requiredEndPins?.length || 0)) > 0)
-                        )
-                        .map((iface) => (
-                          <div key={iface.id} className="flow-library-interfaces-hint">
-                            <div className="flow-library-interfaces-hint-title">{iface.label} pins</div>
-                            <div className="flow-library-interfaces-hint-body">
-                              {iface.requiredStartPins?.length ? (
-                                <div>
-                                  On Flow Start outputs: {renderPinSpecs(iface.requiredStartPins)}
-                                </div>
-                              ) : null}
-                              {iface.requiredEndPins?.length ? (
-                                <div>
-                                  On Flow End inputs: {renderPinSpecs(iface.requiredEndPins)}
-                                </div>
-                              ) : null}
-                              <div style={{ marginTop: 6 }}>
-                                Saving adds any missing pin to the flow's On Flow Start and On Flow End nodes (right
-                                away when the flow is open in the editor, otherwise when it is next opened); existing
-                                pins are kept. Wire them on the canvas so hosts that start this workflow get real
-                                values.
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  ) : null}
                 </div>
 
                 {selectedUses.length > 0 || selectedUsedBy.length > 0 ? (
@@ -953,27 +915,6 @@ export function FlowLibraryModal({
                     </>
                   )}
                 </div>
-
-                {isEditing ? (
-                  <div className="flow-library-preview-actions">
-                    {isRenaming ? (
-                      <button type="button" className="modal-button primary" onClick={commitRename}>
-                        Save Name
-                      </button>
-                    ) : isEditingDescription ? (
-                      <button type="button" className="modal-button primary" onClick={commitDescription}>
-                        Save Description
-                      </button>
-                    ) : (
-                      <button type="button" className="modal-button primary" onClick={commitInterfaces}>
-                        Save Interfaces
-                      </button>
-                    )}
-                    <button type="button" className="modal-button cancel" onClick={cancelEdits}>
-                      Cancel
-                    </button>
-                  </div>
-                ) : null}
               </>
             ) : (
               <div className="flow-library-empty">Select a flow to preview.</div>
@@ -992,85 +933,108 @@ export function FlowLibraryModal({
               fail to run or publish until re-wired.
             </div>
           ) : null}
-          <button type="button" className="modal-button cancel" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="modal-button"
-            onClick={beginRename}
-            disabled={!selectedFlow || isEditing}
-            title={
-              !selectedFlow
-                ? 'Select a workflow first'
-                : isEditing
-                  ? 'Finish the current edit first'
-                  : selectedFlowReadonly
-                    ? 'Bundled workflows are read-only — renaming creates an editable copy under the new name'
-                    : 'Rename workflow'
-            }
-          >
-            Rename
-          </button>
-          <button
-            type="button"
-            className="modal-button"
-            onClick={handleDuplicate}
-            disabled={!selectedFlow || isEditing}
-            title={
-              !selectedFlow
-                ? 'Select a workflow first'
-                : isEditing
-                  ? 'Finish the current edit first'
-                  : selectedFlowReadonly
-                    ? 'Copies the workflow (and its bundled subflows) into editable storage'
-                    : selectedUses.length > 0
-                      ? 'Duplicate workflow (references shared subflows — they are not copied)'
-                      : 'Duplicate workflow'
-            }
-          >
-            Duplicate
-          </button>
-          <button
-            type="button"
-            className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
-            onClick={handleDelete}
-            disabled={!selectedFlow || isEditing || selectedFlowReadonly}
-            title={
-              !selectedFlow
-                ? 'Select a workflow first'
-                : isEditing
-                  ? 'Finish the current edit first'
-                  : selectedFlowReadonly
-                    ? 'Bundled workflows are read-only and cannot be deleted'
-                    : isDeleteConfirm
-                      ? 'Click again to confirm delete'
-                      : selectedUsedBy.length > 0
-                        ? `Delete flow — used by ${selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}`
-                        : 'Delete flow'
-            }
-          >
-            {isDeleteConfirm
-              ? selectedUsedBy.length > 0
-                ? `Confirm — breaks ${selectedUsedBy.length} parent${selectedUsedBy.length === 1 ? '' : 's'}`
-                : 'Confirm Delete'
-              : 'Delete'}
-          </button>
-          <button
-            type="button"
-            className="modal-button primary"
-            onClick={() => selectedFlow && onLoadFlow(selectedFlow.id)}
-            disabled={!selectedFlow || isEditing}
-            title={
-              !selectedFlow
-                ? 'Select a workflow first'
-                : isEditing
-                  ? 'Finish the current edit first'
-                  : 'Load workflow into the editor'
-            }
-          >
-            Load
-          </button>
+          {inlineEdit && selectedFlow ? (
+            <>
+              <span className="flow-library-actions-context">
+                Editing the {inlineEdit} of <strong>{selectedFlow.name || selectedFlow.id}</strong>
+              </span>
+              {/* Own keys: fresh buttons, not the Rename/Duplicate elements
+                  re-classed (their colour transition showed a wrong colour). */}
+              <button key="edit-cancel" type="button" className="modal-button cancel" onClick={cancelEdits}>
+                Cancel
+              </button>
+              <button
+                key="edit-save"
+                type="button"
+                className="modal-button primary"
+                onClick={inlineEdit === 'name' ? commitRename : inlineEdit === 'description' ? commitDescription : commitInterfaces}
+              >
+                Save {inlineEdit === 'name' ? 'Name' : inlineEdit === 'description' ? 'Description' : 'Interfaces'}
+              </button>
+            </>
+          ) : (
+            <>
+            <button type="button" className="modal-button cancel" onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="modal-button"
+              onClick={beginRename}
+              disabled={!selectedFlow || isEditing}
+              title={
+                !selectedFlow
+                  ? 'Select a workflow first'
+                  : isEditing
+                    ? 'Finish the current edit first'
+                    : selectedFlowReadonly
+                      ? 'Bundled workflows are read-only — renaming creates an editable copy under the new name'
+                      : 'Rename workflow'
+              }
+            >
+              Rename
+            </button>
+            <button
+              type="button"
+              className="modal-button"
+              onClick={handleDuplicate}
+              disabled={!selectedFlow || isEditing}
+              title={
+                !selectedFlow
+                  ? 'Select a workflow first'
+                  : isEditing
+                    ? 'Finish the current edit first'
+                    : selectedFlowReadonly
+                      ? 'Copies the workflow (and its bundled subflows) into editable storage'
+                      : selectedUses.length > 0
+                        ? 'Duplicate workflow (references shared subflows — they are not copied)'
+                        : 'Duplicate workflow'
+              }
+            >
+              Duplicate
+            </button>
+            <button
+              type="button"
+              className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
+              onClick={handleDelete}
+              disabled={!selectedFlow || isEditing || selectedFlowReadonly}
+              title={
+                !selectedFlow
+                  ? 'Select a workflow first'
+                  : isEditing
+                    ? 'Finish the current edit first'
+                    : selectedFlowReadonly
+                      ? 'Bundled workflows are read-only and cannot be deleted'
+                      : isDeleteConfirm
+                        ? 'Click again to confirm delete'
+                        : selectedUsedBy.length > 0
+                          ? `Delete flow — used by ${selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}`
+                          : 'Delete flow'
+              }
+            >
+              {isDeleteConfirm
+                ? selectedUsedBy.length > 0
+                  ? `Confirm — breaks ${selectedUsedBy.length} parent${selectedUsedBy.length === 1 ? '' : 's'}`
+                  : 'Confirm Delete'
+                : 'Delete'}
+            </button>
+            <button
+              type="button"
+              className="modal-button primary"
+              onClick={() => selectedFlow && onLoadFlow(selectedFlow.id)}
+              disabled={!selectedFlow || isEditing}
+              title={
+                !selectedFlow
+                  ? 'Select a workflow first'
+                  : isEditing
+                    ? 'Finish the current edit first'
+                    : 'Load workflow into the editor'
+              }
+            >
+              Load
+            </button>
+            </>
+          )}
         </div>
       </div>
       {isEditingAutomation && selectedFlow ? (

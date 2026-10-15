@@ -1,5 +1,5 @@
 /**
- * Metadata PUTs (name, interfaces, automation defaults) against a flow that may be open in the
+ * Metadata PUTs (name, description, interfaces, automation defaults) against a flow that may be open in the
  * editor. The request is async: by the time it returns the user may have
  * opened another flow, re-opened this one, or started a new document. The
  * result is applied to the editor ONLY when the same document instance is
@@ -12,6 +12,7 @@ import { useFlowStore } from './useFlow';
 
 export interface OpenFlowMetadataPatch {
   name?: string;
+  description?: string;
   interfaces?: string[];
   /** Null clears the defaults. */
   automation_defaults?: AutomationDefaults | null;
@@ -62,6 +63,7 @@ export async function updateOpenFlowMetadata(options: {
   }
   const patch = options.patchFrom(updated);
   if (patch.name !== undefined) now.setFlowName(patch.name);
+  if (patch.description !== undefined) now.setFlowDescription(patch.description);
   if (patch.interfaces !== undefined) now.setFlowInterfaces(patch.interfaces);
   if (patch.automation_defaults !== undefined) now.setFlowAutomationDefaults(patch.automation_defaults);
   return {
@@ -69,6 +71,14 @@ export async function updateOpenFlowMetadata(options: {
     applied: true,
     baseline: ticket.cleanBefore ? baselineWith(ticket.cleanBefore, patch) : null,
   };
+}
+
+/** The description a PUT stored — the server's text, never a local guess. */
+export function descriptionFromPutResponse(updated: VisualFlow): string {
+  if (!updated || typeof updated.description !== 'string') {
+    throw new Error('Gateway answered the description update without a description');
+  }
+  return updated.description;
 }
 
 /** The interfaces a PUT stored — the server's list, never a local guess. */

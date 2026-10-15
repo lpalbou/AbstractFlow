@@ -147,7 +147,7 @@ const EVENT_NODES: NodeTemplate[] = [
     icon: '&#x1F514;', // Bell
     label: 'Wait Event',
     description:
-      'Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).',
+      'Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable a durable “ask + wait” prompt for whoever runs the workflow. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).',
     headerColor: '#C0392B',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -912,8 +912,8 @@ const CORE_NODES: NodeTemplate[] = [
   {
     type: 'answer_user',
     icon: '&#x1F4AC;', // Speech bubble
-    label: 'Answer User',
-    description: 'Display a message to the user (UI output).',
+    label: 'Show Message',
+    description: 'Show a message to the user (level: message, warning or error); the run does not wait.',
     headerColor: '#9B59B6', // Purple - human interaction
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -1447,7 +1447,9 @@ const STRING_NODES: NodeTemplate[] = [
   { type: 'split', icon: '&#x2702;', label: 'Split', description: 'Split text by a delimiter into an array (with trimming/drop-empty defaults).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'string' },
   { type: 'join', icon: '&#x1F517;', label: 'Join', description: 'Join array items into a string using a delimiter.', headerColor: '#E74C3C', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'format', icon: '&#x1F4DD;', label: 'Format', description: 'Python-style string format: template.format(**values).', headerColor: '#E74C3C', inputs: [{ id: 'template', label: 'template', type: 'string' }, { id: 'values', label: 'values', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'string_template', icon: '&#x1F9FE;', label: 'String Template', description: 'Render a template like \"Hello {{user.name}}\" using a vars object (supports filters).', headerColor: '#E74C3C', inputs: [{ id: 'template', label: 'template', type: 'string' }, { id: 'vars', label: 'vars', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  // Text with variables: the properties panel edits the text with variable chips (run variables, or
+  // an input of the node for a value that comes from a wire); stored as `{{name}}` placeholders.
+  { type: 'string_template', icon: '&#x1F9FE;', label: 'String Template', description: 'Write a text and insert variables into it: a run variable, or an input of this node for a value that comes from a wire. Lists and objects are written as JSON.', headerColor: '#E74C3C', inputs: [{ id: 'template', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'uppercase', icon: 'AA', label: 'Uppercase', description: 'Convert text to UPPERCASE.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'lowercase', icon: 'aa', label: 'Lowercase', description: 'Convert text to lowercase.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'trim', icon: '&#x2702;', label: 'Trim', description: 'Trim whitespace from both ends of a string.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
@@ -1467,6 +1469,25 @@ const CONTROL_NODES: NodeTemplate[] = [
   { type: 'loop', icon: '&#x1F501;', label: 'ForEach', description: 'Iterate over an array. Outputs current item and 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   { type: 'for', icon: '&#x1F522;', label: 'For', description: 'Numeric loop from start to end with step. Outputs i and a 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }, { id: 'step', label: 'step', type: 'number' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'i', label: 'i', type: 'number' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   { type: 'while', icon: '&#x267B;', label: 'While', description: 'Loop while condition is true. Outputs a pass-through item and a 0-based iteration index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+
+  {
+    type: 'loop_limit',
+    icon: '&#x21BA;',
+    label: 'Loop Limit',
+    description:
+      'Put it on the path that repeats: lets execution through again at most max times, then takes limit reached. count is the number of passes so far (1, 2, 3...).',
+    headerColor: '#F39C12',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'max', label: 'max', type: 'number', description: 'How many passes are allowed.' },
+    ],
+    outputs: [
+      { id: 'again', label: 'again', type: 'execution' },
+      { id: 'limit_reached', label: 'limit reached', type: 'execution' },
+      { id: 'count', label: 'count', type: 'number', description: 'Passes so far, this one included.' },
+    ],
+    category: 'control',
+  },
 
   // Branching
   { type: 'if', icon: '&#x2753;', label: 'If/Else', description: 'Branch execution based on a boolean condition.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
@@ -1706,6 +1727,21 @@ const DATA_NODES: NodeTemplate[] = [
     outputs: [], // Dynamic pins based on selected paths
     category: 'data',
   },
+  {
+    // Visual only (operator 2026-10-11): a dot that lets one output feed several
+    // inputs along a tidy path. The runtime rewires every chain source -> target
+    // before compiling (abstractruntime visual/reroute_lowering.py), as if the
+    // relay had never been drawn. Its pins take the type of the wire feeding it
+    // (utils/relays.ts). Data wires only.
+    type: 'reroute',
+    icon: '&#x25CF;', // Black circle
+    label: 'Relay',
+    description: 'A dot that passes a value through unchanged so one output can feed several inputs along a tidy path (visual only: the runtime wires the source straight to each input).',
+    headerColor: '#3498DB',
+    inputs: [{ id: 'in', label: 'in', type: 'any', description: 'The value to pass on.' }],
+    outputs: [{ id: 'out', label: 'out', type: 'any', description: 'The same value; connect it to as many inputs as needed.' }],
+    category: 'data',
+  },
 ];
 
 // Variable nodes (Blueprint-style)
@@ -1754,6 +1790,17 @@ const VARIABLE_NODES: NodeTemplate[] = [
       { id: 'default', label: 'default', type: 'any', description: 'Value used when the path is missing.' },
     ],
     outputs: [{ id: 'value', label: 'value', type: 'any' }],
+    category: 'variables',
+  },
+  {
+    type: 'get_vars',
+    icon: '&#x1F4E5;',
+    label: 'Get Variables',
+    description:
+      'Read several variables at once: one output per variable, added as rows in the properties panel (name and type). A variable not set yet reads as empty. Folds to a compact list of names.',
+    headerColor: '#16A085',
+    inputs: [],
+    outputs: [],
     category: 'variables',
   },
   {
@@ -1809,15 +1856,31 @@ const VARIABLE_NODES: NodeTemplate[] = [
     type: 'set_vars',
     icon: '&#x1F4E4;&#xFE0F;', // Outbox tray (plural setter)
     label: 'Set Variables',
-    description: 'Write multiple variables into workflow state in a single step (updates is an object of name→value).',
+    description:
+      'Write several variables in one step. Add one row per variable in the properties panel (name, type, value; an array also says what it holds): each row is an input on the node, so a value can also be wired in.',
+    headerColor: '#16A085',
+    // One input per variable, added as rows in the properties panel. (Older flows may
+    // still carry a whole-object `updates` input; the runtime still reads it.)
+    inputs: [{ id: 'exec-in', label: '', type: 'execution' }],
+    outputs: [{ id: 'exec-out', label: '', type: 'execution' }],
+    category: 'variables',
+  },
+  {
+    type: 'add_to_list',
+    icon: '&#x2795;',
+    label: 'Add to List Variable',
+    description:
+      'Add to a list variable in one step: item adds one element (whatever it is), items adds each element of a list. A variable not set yet starts as an empty list.',
     headerColor: '#16A085',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'updates', label: 'updates', type: 'object' },
+      { id: 'name', label: 'name', type: 'string', description: 'The list variable to add to.' },
+      { id: 'item', label: 'item', type: 'any', description: 'Added as one element.' },
+      { id: 'items', label: 'items', type: 'array', description: 'Each element of this list is added.' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'updates', label: 'updates', type: 'object' },
+      { id: 'list', label: 'list', type: 'array', description: 'The list after the addition.' },
     ],
     category: 'variables',
   },
@@ -2698,6 +2761,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     // decides — an explicit pin is authoritative design; 20 is only the seed
     // when the author has not chosen).
     ...(template.type === 'agent' && { pinDefaults: { max_iterations: 20 } }),
+    ...(template.type === 'loop_limit' && { pinDefaults: { max: 3 } }),
     ...(template.type === 'model_residency' && {
       pinDefaults: {
         operation: 'load',
