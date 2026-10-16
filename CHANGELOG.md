@@ -19,6 +19,10 @@ Requires AbstractGateway 0.15.0 over AbstractRuntime 0.10.2 for the sandbox's st
 - **Code node sandbox imports** (AbstractRuntime 0.10.2): the Code node and **Test code** accept `import json`, `re`, `datetime`, `math`… and refuse the modules that reach the machine, naming the reason. The `permissions` pin description, the authoring skill and the node catalog say so.
 - **A non-JSON return is a sandbox error, not an HTTP 500**: `return _input, "…", time` (the module) is reported as `transform returned a value that cannot be sent as JSON: module 'time' at output[2]`.
 
+### Fixed
+
+- **A Code node body with an indented block compiles.** The editor's wrapper measured the body's common indentation on indented lines only, so a body holding an `if:`/`for:` block lost four characters off every unindented line (`# Available variables:` became `ailable variables:`, "Syntax error: invalid syntax (<unknown>, line 3)" on Test code and at run time). The wrapper now dedents by the common indentation of every line.
+
 ## [0.9.0] - 2026-10-15
 
 ### Added

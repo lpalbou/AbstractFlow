@@ -13,10 +13,10 @@ function dedent(text: string): string {
   const nonEmpty = lines.filter((l) => l.trim().length > 0);
   if (nonEmpty.length === 0) return '';
 
-  const indents = nonEmpty
-    .map((l) => l.match(/^\s*/)?.[0].length ?? 0)
-    .filter((n) => n > 0);
-  const minIndent = indents.length > 0 ? Math.min(...indents) : 0;
+  // The common indentation of EVERY non-empty line (textwrap.dedent semantics).
+  // Counting only indented lines made a body with an `if:` block lose four
+  // characters off its unindented lines (`# Available variables:` → `ailable…`).
+  const minIndent = Math.min(...nonEmpty.map((l) => l.match(/^\s*/)?.[0].length ?? 0));
 
   return lines.map((l) => l.slice(minIndent)).join('\n').trimEnd();
 }
