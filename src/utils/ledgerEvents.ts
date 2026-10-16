@@ -51,6 +51,16 @@ export function createLedgerMappingState(): LedgerMappingState {
  * Checked over every ledger of the operator's gateway (2026-10-11): 1,668 rows
  * removed, none added.
  */
+function isProgressRecord(rec: LedgerRecord): boolean {
+  const res = rec.result && typeof rec.result === 'object' ? (rec.result as Record<string, unknown>) : null;
+  if (normalizeString(res?.name) === 'abstract.progress') return true;
+  const effectPayload = rec.effect?.payload;
+  const payload = effectPayload && typeof effectPayload === 'object' && !Array.isArray(effectPayload)
+    ? (effectPayload as Record<string, unknown>)
+    : null;
+  return normalizeString(payload?.name) === 'abstract.progress';
+}
+
 export function executionIdFor(rec: LedgerRecord, state: LedgerMappingState): string | undefined {
   const runId = normalizeString(rec.run_id);
   const nodeId = normalizeString(rec.node_id);
@@ -73,10 +83,20 @@ export function executionIdFor(rec: LedgerRecord, state: LedgerMappingState): st
     const resultKey = normalizeString(effect.result_key);
     if (resultKey === `_temp.agent.${nodeId}.structured` || idem.startsWith('system:completion:')) execId = latest;
   }
+  // A progress tick (abstract.progress, its own step_id per tick) belongs to the
+  // node's CURRENT execution: it must update that row, never open one of its own
+  // (operator 2026-10-16 17:35: one RUNNING card per denoise step, never closed).
+  const progressTick = isProgressRecord(rec);
+  if (!execId && progressTick) {
+    // The runtime keys a tick `system:progress:<step id of the running node>:<uniquifier>`.
+    const m = /^system:progress:([^:]+):/.exec(idem);
+    const parent = m ? ex.byStep.get(m[1]) : undefined;
+    execId = parent || latest;
+  }
   if (!execId) execId = stepId;
 
   ex.byStep.set(stepId, execId);
-  ex.latestByNode.set(nodeId, execId);
+  if (!progressTick) ex.latestByNode.set(nodeId, execId);
   if (idem) {
     const idems = ex.idemByExec.get(execId) || new Set<string>();
     idems.add(idem);

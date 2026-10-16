@@ -21,6 +21,8 @@ Requires AbstractGateway 0.15.0 over AbstractRuntime 0.10.2 for the sandbox's st
 
 ### Fixed
 
+- **One execution card per media node, updated in place.** Every progress tick of Generate Image (and the other media nodes) arrives as its own ledger record; the execution view opened a new RUNNING card per tick and never closed them. Ticks now join the node's running card (through the running step the runtime names in the tick, or the node's latest execution) and the card completes with the node.
+- **Image nodes no longer pin 20 steps.** Generate Image, Edit Image and Image to Image leave `steps` to the model's own default (a distilled FLUX.2 klein runs 4), unless you set the pin; the generic default text-to-image route already picks the configured klein model.
 - **A Code node body with an indented block compiles.** The editor's wrapper measured the body's common indentation on indented lines only, so a body holding an `if:`/`for:` block lost four characters off every unindented line (`# Available variables:` became `ailable variables:`, "Syntax error: invalid syntax (<unknown>, line 3)" on Test code and at run time). The wrapper now dedents by the common indentation of every line.
 
 ## [0.9.0] - 2026-10-15

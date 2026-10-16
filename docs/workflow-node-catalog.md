@@ -1645,8 +1645,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the edited image.; `image_artifacts` artifacts_image: Ordered artifact refs for batched image editing.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
 - Default config: {
   "pinDefaults": {
-    "format": "png",
-    "steps": 20
+    "format": "png"
   }
 }
 
@@ -1662,8 +1661,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the generated image.; `image_artifacts` artifacts_image: Ordered artifact refs for batched image generation.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
 - Default config: {
   "pinDefaults": {
-    "format": "png",
-    "steps": 20
+    "format": "png"
   }
 }
 

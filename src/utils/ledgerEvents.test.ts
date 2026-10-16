@@ -294,3 +294,36 @@ describe('mapLedgerRecordToEvents — node anchoring (0013 addendum ruling)', ()
     expect(events[0].result).toEqual({ granted: ['read_file'] });
   });
 });
+
+describe('mapLedgerRecordToEvents — progress ticks join the running execution (operator 2026-10-16 17:35: one RUNNING card per denoise step)', () => {
+  const base = { run_id: 'run-1', node_id: 'node-3', started_at: '2026-10-16T15:32:40Z' };
+  const started: LedgerRecord = { ...base, step_id: 'step-A', status: 'started' } as LedgerRecord;
+  const tick = (id: string, step: number): LedgerRecord =>
+    ({ ...base, step_id: id, status: 'completed', ended_at: `2026-10-16T15:32:${40 + step}Z`, idempotency_key: `system:progress:step-A:${id}`, result: { name: 'abstract.progress', payload: { phase: 'denoise', step, total: 20, percent: step * 5 } } }) as LedgerRecord;
+  const done: LedgerRecord = { ...base, step_id: 'step-A', status: 'completed', ended_at: '2026-10-16T15:33:00Z', result: { image_artifact: 'art-1' } } as LedgerRecord;
+
+  it('every tick carries the execution id of the started step, and the completion closes that same execution', () => {
+    const state = createLedgerMappingState();
+    const kinds = (events: ReturnType<typeof mapLedgerRecordToEvents>) => events.filter((e) => e.type !== 'trace_update');
+    const start = kinds(mapLedgerRecordToEvents(started, state));
+    expect(start.map((e) => e.type)).toEqual(['node_start']);
+    const execId = start[0].execId;
+    expect(execId).toBe('step-A');
+    const t1 = kinds(mapLedgerRecordToEvents(tick('tick-1', 1), state));
+    const t2 = kinds(mapLedgerRecordToEvents(tick('tick-2', 2), state));
+    for (const events of [t1, t2]) {
+      expect(events.map((e) => e.type)).toEqual(['node_progress']);
+      expect(events[0].execId).toBe(execId);
+      expect(events[0].nodeId).toBe('node-3');
+    }
+    expect((t2[0].progress as Record<string, unknown>).step).toBe(2);
+    // A tick that lost its idempotency key still joins the node's latest execution.
+    const bare = { ...tick('tick-3', 3) } as LedgerRecord;
+    delete (bare as Record<string, unknown>).idempotency_key;
+    expect(kinds(mapLedgerRecordToEvents(bare, state))[0].execId).toBe(execId);
+    // No tick opened an execution of its own: the completion still closes step-A.
+    const end = kinds(mapLedgerRecordToEvents(done, state));
+    expect(end.map((e) => e.type)).toEqual(['node_complete']);
+    expect(end[0].execId).toBe(execId);
+  });
+});

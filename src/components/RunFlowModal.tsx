@@ -3308,7 +3308,21 @@ export function RunFlowModal({
       if (ev.type === 'node_progress') {
         const nodeId = ev.nodeId;
         const key = rowKey(ev, nodeId);
-        const idx = nodeId ? openByNode.get(key) : undefined;
+        let idx = nodeId ? openByNode.get(key) : undefined;
+        if (typeof idx !== 'number' && nodeId) {
+          // The tick names an execution we have no row for: it is a progress
+          // report of the node's running row (the ledger stream gives each
+          // tick its own step id). Join that row rather than opening one.
+          const runKey = evRunId || ev.runId;
+          for (let j = all.length - 1; j >= 0; j--) {
+            const s = all[j];
+            if (s.nodeId === nodeId && (s.runId || '') === (runKey || '') && s.status === 'running') {
+              idx = j;
+              openByNode.set(key, j);
+              break;
+            }
+          }
+        }
         const meta = resolveNodeMeta(nodeId);
         const progress = ev.progress && typeof ev.progress === 'object' && !Array.isArray(ev.progress)
           ? ev.progress

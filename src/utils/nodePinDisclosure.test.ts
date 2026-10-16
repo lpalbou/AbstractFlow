@@ -68,8 +68,12 @@ describe('node pin disclosure policy', () => {
   it('does not treat materialized template defaults as authored values', () => {
     const data = nodeData('generate_image');
 
-    expect(data.pinDefaults?.steps).toBe(20);
-    expect(hasNonDefaultConfiguredPinValue(data, 'steps')).toBe(false);
+    // The image node pins no step count (the model's own default applies); its
+    // materialized default is the format.
+    expect(data.pinDefaults?.steps).toBeUndefined();
+    expect(data.pinDefaults?.format).toBe('png');
+    expect(hasNonDefaultConfiguredPinValue(data, 'format')).toBe(false);
+    expect(ids(disclosure(data).inputPins)).not.toContain('format');
     expect(ids(disclosure(data).inputPins)).not.toContain('steps');
   });
 

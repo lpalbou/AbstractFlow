@@ -2772,16 +2772,17 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
         task: 'text_generation',
       },
     }),
+    // No `steps` default: the image backend knows its model's step count (a
+    // distilled FLUX.2 klein wants 4, a base model 20–50); a pinned 20 ran every
+    // klein image five times longer than needed (operator 2026-10-16 17:35).
     ...(template.type === 'generate_image' && {
       pinDefaults: {
         format: 'png',
-        steps: 20,
       },
     }),
     ...((template.type === 'edit_image' || template.type === 'image_to_image') && {
       pinDefaults: {
         format: 'png',
-        steps: 20,
       },
     }),
     ...(template.type === 'upscale_image' && {
