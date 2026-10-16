@@ -12,6 +12,7 @@ import {
   type CodeAssistantTurn,
 } from '../utils/codeAssistant';
 import { gatewayCapabilityDefaults, type GatewayCapabilityDefaultsResponse, type GatewayContracts } from '../utils/gatewayClient';
+import { gatewayContractsFromCapabilities, useGatewayCapabilities } from '../hooks/useGatewayCapabilities';
 
 interface CodeAssistantPanelProps {
   context: CodeAssistantContext;
@@ -29,7 +30,11 @@ const SUGGESTIONS = ['Add the current date and time to the output', 'Validate th
  * editor body) and Copy. One basic-agent run per question; Stop cancels the
  * wait (the run finishes on its own on the gateway).
  */
-export function CodeAssistantPanel({ context, contracts, onInsert }: CodeAssistantPanelProps) {
+export function CodeAssistantPanel({ context, contracts: givenContracts, onInsert }: CodeAssistantPanelProps) {
+  // The node card opens the editor without gateway contracts in hand: resolve them here
+  // (the shared capabilities query, cached) so the assistant works from either entry.
+  const ownCapabilities = useGatewayCapabilities(!givenContracts);
+  const contracts = givenContracts || gatewayContractsFromCapabilities(ownCapabilities.data);
   const [turns, setTurns] = useState<CodeAssistantTurn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -53,7 +58,7 @@ export function CodeAssistantPanel({ context, contracts, onInsert }: CodeAssista
       .catch((error: unknown) => {
         if (!alive) return;
         setModel(null);
-        setModelError(error instanceof Error ? error.message : String(error));
+        setModelError((error instanceof Error && error.message) || String(error) || 'The gateway did not answer.');
       });
     return () => {
       alive = false;

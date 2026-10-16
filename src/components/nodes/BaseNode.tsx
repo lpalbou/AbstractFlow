@@ -768,6 +768,7 @@ export const BaseNode = memo(function BaseNode({
   // Render-fold (0156 Stage 1): reads folded onto this node's pin rows.
   const foldedReads = useFoldedReadsForNode(id);
   const flowId = useFlowStore((s) => s.flowId);
+  const flowName = useFlowStore((s) => s.flowName);
   const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
   const isWaitingHere = useFlowStore((s) => s.waitingNodeId === id);
@@ -5949,6 +5950,9 @@ export const BaseNode = memo(function BaseNode({
           params={codeParams}
           permissions={codePermissions}
           permissionsUnavailableReason={codeTestUnavailableReason}
+          flowName={flowName}
+          nodeLabel={data.label || ''}
+          contracts={gatewayContracts}
           onClose={() => setShowCodeEditor(false)}
           onSave={(nextBody) => {
             const nextWithHeader = upsertPythonAvailableVariablesComments(nextBody, codeParams);

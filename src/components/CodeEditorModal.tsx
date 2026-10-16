@@ -495,7 +495,9 @@ export function CodeEditorModal({
                   {isTesting ? 'Testing...' : 'Test code'}
                 </button>
               </div>
+            </aside>
 
+            <aside className="code-assistant-column">
               <CodeAssistantPanel context={assistantContext} contracts={contracts} onInsert={insertAssistantCode} />
             </aside>
           </div>

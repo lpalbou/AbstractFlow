@@ -7359,7 +7359,7 @@ body.af-schema-editor-open .af-tooltip-bubble {
 
 .code-editor-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) 320px 380px;
   gap: 14px;
   min-height: 0;
   overflow: hidden;
@@ -7385,9 +7385,7 @@ body.af-schema-editor-open .af-tooltip-bubble {
   min-width: 0;
   min-height: 0;
   display: grid;
-  /* Variables (as tall as they need, scrolling past ~1/4), Test input, then the
-     assistant takes what is left. */
-  grid-template-rows: minmax(72px, auto) max-content minmax(200px, 1fr);
+  grid-template-rows: minmax(140px, 1fr) max-content;
   gap: 10px;
   overflow: hidden;
 }
@@ -7404,11 +7402,17 @@ body.af-schema-editor-open .af-tooltip-bubble {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-  max-height: 26vh;
 }
 
-/* The Code assistant (CodeAssistantPanel): head, scrolling thread, composer. */
+/* The Code assistant (CodeAssistantPanel): its own column — head, scrolling thread, composer. */
+.code-assistant-column {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
 .code-assistant-section {
+  width: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 8px;
@@ -7568,6 +7572,7 @@ body.af-schema-editor-open .af-tooltip-bubble {
 }
 
 .code-variable-list {
+  align-content: start;
   display: grid;
   gap: 8px;
   flex: 1 1 auto;
