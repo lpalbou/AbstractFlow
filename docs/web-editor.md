@@ -375,6 +375,29 @@ the loop's done." (backlog 1018).
 
 Some workflows wire pins the editor cannot draw: a code node's returned keys and a subflow's `child_output` are resolved by name when the workflow runs, but they are not declared pins, and a few connections (for example a model into a plain string pin) are refused by the editor's connection rules. AbstractFlow keeps these connections exactly as stored and saves them back. A node that has any shows an **N hidden** badge in its header; hover it to list the connections (`source.pin -> target.pin`). They disappear from the saved workflow only when you delete one of their nodes. Opening or importing such a workflow also shows a notice listing them. Only a connection to a node that does not exist is removed, and the notice says so. Drawing these connections as editable pins is planned (backlog 0157).
 
+## Code Node Editor
+
+A Code node's **Code** field opens the editor modal: you edit only the body of
+`transform(_input)` (the `def` line and the "Available variables" header are kept
+for you), the right column lists the variables the body can read (`_input`, then
+one variable per input pin with its access expression), and **Test code** runs the
+body on the JSON test input through the gateway's sandbox and shows the result or
+the sandbox's refusal. The sandbox imports Python's standard library (`import json`,
+`re`, `datetime`, `math`…) and refuses the modules that reach the machine; the
+returned value must be JSON data (a module or a function in the return is reported
+with its place).
+
+Below the test input sits the **Code assistant**: a chat with the gateway's default
+text model (the `output.text` capability default, shown in its head) that knows this
+node — the workflow and node names, the variables, the current body, the test input
+and the sandbox's import rule — and answers in Python. Describe what you need
+("add the current date to the output", "validate the input and return an error
+when a field is missing"); every reply that carries code offers **Insert into
+editor** (replaces the body; Save keeps it) and **Copy**. Each question is one
+`basic-agent` run on the gateway; **Stop** abandons the wait. The assistant needs a
+configured default text model; without one its head says so and the composer stays
+disabled.
+
 ## Docs Assistant
 
 The book icon in the top bar opens the **Docs assistant**: the same chat as the Gateway console and the other apps, separate from the Authoring assistant below. It answers questions about AbstractFlow from its llms.txt (the editor serves it at `/llms.txt`; the Gateway reads it at `GET /api/gateway/docs/corpus?app=flow`) through the Gateway's docs-qa workflow, in its own Gateway session. Questions sit on the right and answers on the left with Markdown, code and links; you can attach files, each message has **Copy**, the answer streams when the Gateway's **Streamed replies** setting is on, and the icon in its header starts a new conversation.

@@ -7359,7 +7359,7 @@ body.af-schema-editor-open .af-tooltip-bubble {
 
 .code-editor-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 14px;
   min-height: 0;
   overflow: hidden;
@@ -7385,7 +7385,9 @@ body.af-schema-editor-open .af-tooltip-bubble {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(140px, 1fr) max-content;
+  /* Variables (as tall as they need, scrolling past ~1/4), Test input, then the
+     assistant takes what is left. */
+  grid-template-rows: minmax(72px, auto) max-content minmax(200px, 1fr);
   gap: 10px;
   overflow: hidden;
 }
@@ -7402,6 +7404,157 @@ body.af-schema-editor-open .af-tooltip-bubble {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+  max-height: 26vh;
+}
+
+/* The Code assistant (CodeAssistantPanel): head, scrolling thread, composer. */
+.code-assistant-section {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.code-assistant-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.code-assistant-head .code-side-title {
+  margin-bottom: 0;
+}
+
+.code-assistant-model {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.code-assistant-thread {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 2px;
+}
+
+.code-assistant-empty p {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
+.code-assistant-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.code-assistant-suggestion {
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.code-assistant-suggestion:hover:not(:disabled) {
+  border-color: var(--accent, #3b82f6);
+}
+
+.code-assistant-msg {
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.code-assistant-msg.user {
+  align-self: flex-end;
+  max-width: 92%;
+  background: color-mix(in srgb, var(--accent, #3b82f6) 18%, var(--bg-primary));
+}
+
+.code-assistant-msg.assistant {
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+}
+
+.code-assistant-msg.error {
+  border-color: color-mix(in srgb, var(--error, #ef4444) 50%, transparent);
+  color: var(--error, #ef4444);
+}
+
+.code-assistant-msg.pending {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.code-assistant-code {
+  margin-top: 8px;
+}
+
+.code-assistant-code pre {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.code-assistant-code-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.code-assistant-code-actions .modal-button {
+  padding: 4px 10px;
+  font-size: var(--font-size-xs);
+}
+
+.code-assistant-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: end;
+}
+
+.code-assistant-input {
+  width: 100%;
+  min-height: 0;
+  resize: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--bg-tertiary);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.code-assistant-input:focus {
+  outline: none;
+  border-color: var(--accent, #3b82f6);
 }
 
 .code-side-title {

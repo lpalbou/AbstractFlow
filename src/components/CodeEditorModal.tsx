@@ -13,7 +13,8 @@ import {
   getPythonVarNameForPin,
   upsertPythonAvailableVariablesComments,
 } from '../utils/codegen';
-import { gatewayJson, gatewayPath, jsonRequest } from '../utils/gatewayClient';
+import { gatewayJson, gatewayPath, getCodeExecutionContract, jsonRequest, type GatewayContracts } from '../utils/gatewayClient';
+import { CodeAssistantPanel } from './CodeAssistantPanel';
 
 interface CodeEditorModalProps {
   isOpen: boolean;
@@ -22,6 +23,10 @@ interface CodeEditorModalProps {
   params: Pin[];
   permissions?: string;
   permissionsUnavailableReason?: string;
+  /** Context for the Code assistant: where this node lives, and the gateway contracts it talks through. */
+  flowName?: string;
+  nodeLabel?: string;
+  contracts?: GatewayContracts | null;
   onClose: () => void;
   onSave: (body: string) => void;
 }
@@ -160,6 +165,9 @@ export function CodeEditorModal({
   params,
   permissions = 'sandbox',
   permissionsUnavailableReason = '',
+  flowName = '',
+  nodeLabel = '',
+  contracts = null,
   onClose,
   onSave,
 }: CodeEditorModalProps) {
@@ -374,6 +382,17 @@ export function CodeEditorModal({
     }
   }, [parameterSignature, params, permissions, permissionsUnavailableReason, sampleInput, value]);
 
+  const assistantContext = useMemo(
+    () => ({ flowName, nodeLabel, params, currentBody: value, sampleInput, permissions, policy: getCodeExecutionContract(contracts) }),
+    [flowName, nodeLabel, params, value, sampleInput, permissions, contracts]
+  );
+  const insertAssistantCode = useCallback(
+    (code: string) => {
+      setValue(upsertPythonAvailableVariablesComments(code, params));
+    },
+    [params]
+  );
+
   if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 
@@ -476,6 +495,8 @@ export function CodeEditorModal({
                   {isTesting ? 'Testing...' : 'Test code'}
                 </button>
               </div>
+
+              <CodeAssistantPanel context={assistantContext} contracts={contracts} onInsert={insertAssistantCode} />
             </aside>
           </div>
 

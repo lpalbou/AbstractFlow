@@ -476,6 +476,7 @@ function ArtifactLiteralPanel({
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const {
+    flowName,
     updateNodeData,
     deleteNode,
     setNodes,
@@ -4755,6 +4756,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   params={params}
                   permissions={codePermissions}
                   permissionsUnavailableReason={codeTestUnavailableReason}
+                  flowName={flowName}
+                  nodeLabel={data.label || ''}
+                  contracts={gatewayContracts}
                   onClose={() => setShowCodeEditor(false)}
                   onSave={(nextBody) => {
                     const nextWithHeader = upsertPythonAvailableVariablesComments(nextBody, params);
