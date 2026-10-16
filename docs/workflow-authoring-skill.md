@@ -551,8 +551,10 @@ Image To Video.source_image).
 it. Input pin `input` is the payload; outputs are `output`, `success`,
 `execution`; every key of the returned dict is also a pullable source handle.
 Keep permissions `sandbox`; never `full_access` (the validator rejects it and
-secret-looking code). The sandbox rejects imports, network, subprocesses, and
-filesystem access.
+secret-looking code). The sandbox imports Python's standard library (`import json`,
+`re`, `datetime`, `math`, `collections`, `urllib.parse`…) and rejects third-party
+packages and the modules that reach the machine (`os`, `subprocess`, `pathlib`, `io`,
+`socket`, `http`, `importlib`, `sys`…), plus `exec`/`eval` and dunder access.
 
 Legitimate: format/shape transforms, parsing, checksums, filenames, validation,
 composing a shell command (use `shq` on every interpolated value), pulling text

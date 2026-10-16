@@ -945,7 +945,7 @@ const CORE_NODES: NodeTemplate[] = [
         label: 'permissions',
         type: 'string',
         description:
-          'Execution policy for this Code node. sandbox is the protected default. full_access requires explicit Runtime/Gateway policy and otherwise fails closed.',
+          'Execution policy for this Code node. sandbox is the protected default: Python\'s standard library is importable, except the modules that reach processes, files, the network or code loading. full_access imports anything; it requires explicit Runtime/Gateway policy and otherwise fails closed.',
       },
     ],
     outputs: [

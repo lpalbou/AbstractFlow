@@ -321,7 +321,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`; body/function with `code`/`function_name`; permissions must remain `sandbox`
-- Inputs: `exec-in` execution; `input` any; `permissions` string: Execution policy for this Code node. sandbox is the protected default. full_access requires explicit Runtime/Gateway policy and otherwise fails closed.
+- Inputs: `exec-in` execution; `input` any; `permissions` string: Execution policy for this Code node. sandbox is the protected default: Python's standard library is importable, except the modules that reach processes, files, the network or code loading. full_access imports anything; it requires explicit Runtime/Gateway policy and otherwise fails closed.
 - Outputs: `exec-out` execution; `output` any: Value returned by transform(_input).; `success` boolean: True when the transform ran without error.; `execution` object: Execution metrics such as duration_ms, cpu_time_ms, cpu_percent, memory_rss_mb, and memory_rss_delta_mb.
 - Default config: {
   "pinDefaults": {
