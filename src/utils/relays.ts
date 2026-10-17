@@ -55,14 +55,18 @@ export function withRelayTypes(nodes: Node<FlowNodeData>[], edges: Edge[]): Node
   return changed ? next : nodes;
 }
 
+export type DropChoice = 'if' | 'relay' | 'break_object';
+
 /**
  * What the wire-drop menu offers for a pin a drag started from and released on
- * empty canvas: a relay for any data pin; from an object (or any) output, a
- * Break Object too. Execution pins get nothing (relays carry data only).
+ * empty canvas: from a boolean output, an If/Else on that condition first (the
+ * usual next step, operator 2026-10-17); a relay for any data pin; from an
+ * object (or any) output, a Break Object too. Execution pins get nothing
+ * (relays carry data only).
  */
-export function dropChoicesFor(pinType: PinType | undefined, side: 'source' | 'target'): Array<'relay' | 'break_object'> {
+export function dropChoicesFor(pinType: PinType | undefined, side: 'source' | 'target'): DropChoice[] {
   if (!pinType || pinType === 'execution') return [];
-  const choices: Array<'relay' | 'break_object'> = ['relay'];
+  const choices: DropChoice[] = side === 'source' && pinType === 'boolean' ? ['if', 'relay'] : ['relay'];
   if (side === 'source' && (pinType === 'object' || pinType === 'any')) choices.push('break_object');
   return choices;
 }

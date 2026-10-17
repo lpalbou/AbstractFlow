@@ -676,6 +676,8 @@ Release a dragged wire on empty canvas (away from any pin or node) and a small m
   chained. It is visual only: when the flow runs, the runtime wires the source straight to each
   input, as if the dot were not there (AbstractRuntime `reroute_lowering.py`, which must be deployed
   for a flow with relays to run).
+- **If/Else** (from a boolean output, listed first) adds an If/Else whose `condition` is that
+  output; wire its execution input and its `true` / `false` outputs to the steps around it.
 - **Break Object** (from an object or `any` output) adds a Break Object wired to it and opens its
   properties, where you pick the fields.
 
@@ -5650,6 +5652,12 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [Unreleased]
+
+### Added
+
+- **If/Else from a dropped boolean wire.** Release a wire dragged from a boolean output on empty canvas and the menu now offers **If/Else** first: it arrives with that output wired to its `condition`.
 
 ## [0.10.0] - 2026-10-16
 

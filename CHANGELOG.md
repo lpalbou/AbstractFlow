@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Added
+
+- **If/Else from a dropped boolean wire.** Release a wire dragged from a boolean output on empty canvas and the menu now offers **If/Else** first: it arrives with that output wired to its `condition`.
+
 ## [0.10.0] - 2026-10-16
 
 Requires AbstractGateway 0.15.0 over AbstractRuntime 0.10.2 for the sandbox's standard-library imports and the JSON-return rule; the editor itself runs against any 0.14+ gateway.

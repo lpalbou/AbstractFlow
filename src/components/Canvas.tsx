@@ -934,7 +934,7 @@ function CanvasBody() {
   );
 
   // A wire released on empty canvas (not on a pin, not on a node) opens the
-  // drop menu there: a relay, and for an object a Break Object.
+  // drop menu there: an If/Else for a boolean, a relay, and for an object a Break Object.
   const handleConnectEnd = useCallback((event: globalThis.MouseEvent | TouchEvent) => {
     setActiveConnection(null);
     const from = dragStartRef.current;
@@ -953,13 +953,13 @@ function CanvasBody() {
     const { from, at } = wireDrop;
     const create = (choice: string) => {
       setWireDrop(null);
-      const template = getNodeTemplate(choice === 'relay' ? 'reroute' : 'break_object');
+      const template = getNodeTemplate(choice === 'relay' ? 'reroute' : choice === 'if' ? 'if' : 'break_object');
       const instance = reactFlowInstance.current;
       if (!template || !instance) return;
       const flowPoint = instance.screenToFlowPosition(at);
       // A relay is centred on the drop point; a node opens from it.
       const position = choice === 'relay' ? { x: flowPoint.x - 9, y: flowPoint.y - 9 } : flowPoint;
-      const newPin = choice === 'relay' ? (from.handleType === 'source' ? 'in' : 'out') : 'object';
+      const newPin = choice === 'relay' ? (from.handleType === 'source' ? 'in' : 'out') : choice === 'if' ? 'condition' : 'object';
       const id = addNodeAndConnect(template, position, {
         from: { nodeId: from.nodeId, handleId: from.handleId, side: from.handleType },
         newPin,
@@ -969,6 +969,7 @@ function CanvasBody() {
       else if (choice === 'break_object') useFlowStore.getState().selectNodeById(id);
     };
     const labels: Record<string, { label: string; hint: string }> = {
+      if: { label: 'If/Else', hint: 'Branch on this condition: wire its true and false outputs to the next steps' },
       relay: { label: 'Relay', hint: 'A dot to route this wire; connect it to as many inputs as needed' },
       break_object: { label: 'Break Object', hint: 'Expose fields of this object as separate outputs' },
     };

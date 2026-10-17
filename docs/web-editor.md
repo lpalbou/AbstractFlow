@@ -333,6 +333,8 @@ Release a dragged wire on empty canvas (away from any pin or node) and a small m
   chained. It is visual only: when the flow runs, the runtime wires the source straight to each
   input, as if the dot were not there (AbstractRuntime `reroute_lowering.py`, which must be deployed
   for a flow with relays to run).
+- **If/Else** (from a boolean output, listed first) adds an If/Else whose `condition` is that
+  output; wire its execution input and its `true` / `false` outputs to the steps around it.
 - **Break Object** (from an object or `any` output) adds a Break Object wired to it and opens its
   properties, where you pick the fields.
 

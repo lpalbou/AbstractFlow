@@ -41,6 +41,9 @@ describe('relays', () => {
     expect(dropChoicesFor('string', 'source')).toEqual(['relay']);
     expect(dropChoicesFor('object', 'target')).toEqual(['relay']);
     expect(dropChoicesFor('execution', 'source')).toEqual([]);
+    // A boolean output suggests branching on it first (operator 2026-10-17); a boolean INPUT does not.
+    expect(dropChoicesFor('boolean', 'source')).toEqual(['if', 'relay']);
+    expect(dropChoicesFor('boolean', 'target')).toEqual(['relay']);
   });
 
   it('a node created from a dropped wire arrives wired, in one undo step; a refused wire creates nothing', () => {
@@ -69,6 +72,22 @@ describe('relays', () => {
       })
     ).toBeNull();
     expect(useFlowStore.getState().nodes.map((n) => n.id)).toEqual(['node-1']);
+  });
+
+  it('an If/Else created from a dropped boolean arrives with that wire on its condition', () => {
+    useFlowStore.getState().loadFlow({
+      id: 'f',
+      name: 'f',
+      nodes: [{ id: 'node-1', type: 'is_empty_string', position: { x: 0, y: 0 }, data: createNodeData(getNodeTemplate('is_empty_string')!) }],
+      edges: [],
+    } as unknown as VisualFlow);
+    const id = useFlowStore.getState().addNodeAndConnect(getNodeTemplate('if')!, { x: 300, y: 0 }, {
+      from: { nodeId: 'node-1', handleId: 'result', side: 'source' },
+      newPin: 'condition',
+    });
+    const s = useFlowStore.getState();
+    expect(s.nodes.find((n) => n.id === id)?.data.nodeType).toBe('if');
+    expect(s.edges.map((e) => [e.source, e.sourceHandle, e.target, e.targetHandle])).toEqual([['node-1', 'result', id, 'condition']]);
   });
 
   it('the store retypes a relay when its feeding wire is connected or removed, and saves relays as nodes', () => {
