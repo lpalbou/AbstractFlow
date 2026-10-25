@@ -199,8 +199,10 @@ flowchart LR
   `metadata.automation_defaults[<flow id>]`, and fills a creation request's
   missing trigger, context, title and `input_data` from it.
 
-The `On Schedule`, `On Event` and `Delay` nodes are unrelated to this path:
-they wait inside a run that has already started. See
+The **Wait Until** (`on_schedule`), **Wait for Event** (`on_event` /
+`wait_event`) and **Delay** nodes are unrelated to this path: they pause a run
+that has already started ([Web editor > Waits inside a
+flow](web-editor.md#waits-inside-a-flow)). See
 [Web editor > Automations](web-editor.md#automations) and
 [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults).
 

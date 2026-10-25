@@ -99,7 +99,7 @@ monochrome icon from the shared AbstractFramework icon set.
   | --- | --- |
   | Violet | Core (agents, LLM calls, code, subflows) |
   | Orange | Control flow |
-  | Aqua | Events and time |
+  | Aqua | Events and time, Waits |
   | Yellow | Variables, Values and schema |
   | Magenta | Data and text, Math |
   | Blue | Files and artifacts, Media |
@@ -111,12 +111,13 @@ monochrome icon from the shared AbstractFramework icon set.
   it means a failed run.
 - **Sections.** Nodes are grouped into sections with a count: Essentials (the
   eight nodes nearly every flow uses), Core, Control flow, Events and time,
-  Variables, Data and text, Values and schema, Files and artifacts, Media,
+  Waits (see [Waits inside a flow](#waits-inside-a-flow)), Variables, Data and text, Values and schema, Files and artifacts, Media,
   Memory, Entity mind and Math. Essentials is open and the others are closed
   the first time; click a section header to open or close it. Your browser
   remembers which sections are open.
 - **Search.** Type in **Search nodes** to filter every section at once by name,
-  type or description. Sections with a match open and the matching part of
+  type or description (a renamed node is also found by its earlier name:
+  "On Schedule" finds Wait Until). Sections with a match open and the matching part of
   each name is highlighted. Esc clears the search.
 - **Descriptions.** Hover or focus a node to see its one-line description in a
   tooltip. A node that needs a gateway feature your gateway does not offer is
@@ -134,7 +135,7 @@ monochrome icon from the shared AbstractFramework icon set.
 
 Every node on the canvas is the same card: a header with the node's icon, its
 full title (wrapped, never cut) and a small badge naming its kind (Event,
-Core, Control, Value, Data, Math, File, Memory, Variable, Media, Entity,
+Waits, Core, Control, Value, Data, Math, File, Memory, Variable, Media, Entity,
 Artifact, Schema), then the input ports on the left and the output ports on
 the right, each labelled and coloured by its type (see **Pin Types**). The
 node's category colour (the table above) is the band at the top of its
@@ -253,7 +254,7 @@ with a mouse, the panels keep their dense layout with text at 12 px or more
 
 On/off settings are switches labelled by what they control; a switch is
 highlighted with a check mark when on and plain when off. The properties
-panel has **Recurrent** (On Schedule) and
+panel has **Recurrent** (Wait Until) and
 **Free text answers** (Ask User). The dialogs have **Load it into the gateway now**
 (Make it available, under Details), **Private workspace per run** (the run window's run workspace),
 **Durable** (sending an event to a waiting run), and **Lock after load** and
@@ -362,6 +363,37 @@ A flow has one automation. Once it is on, the dialog and the header badge's menu
 **Make it available** (the toolbar, and part of Turn it on) makes the saved workflow available to Observer and the Assistant: "Release digest is ready for Observer and the Assistant." Each time adds a new version and keeps the earlier ones; the gateway name, the version and **Load it into the gateway now** are under **Details**.
 
 The dialog does not set tool approval. When an automation is created, the gateway applies its default policy, in which creating the automation counts as consent for the tools the workflow uses; a creation request that sets `policy.tool_approval` to `ask` makes every run wait for approval instead. Questions from `Ask User` nodes always wait for a person.
+
+### Waits inside a flow
+
+A trigger starts a run; a wait pauses a run that is already running. The
+**Waits** section of the palette holds the nodes that pause a run, under a
+**Waits** badge: none of them starts a flow (an automation does, from
+[What starts it?](#automations)), and only a run already waiting is woken.
+
+- **Wait Until** (`on_schedule`) pauses this run until a time (an ISO
+  timestamp) or for an interval (`15s`, `5m`, `2h`, `1d`; no cron), then runs
+  its branch. With **Recurrent** on it waits again after the branch ends, and
+  its header says so: "Wait Until · every 15s".
+- **Wait for Event** pauses this run until a named event arrives. By default
+  (`on_event`) it waits on its own branch for an event picked by **Name** and
+  **Scope** (an empty name takes any event), runs the branch with the event and
+  its payload, and waits again. Under **Advanced**, **How it waits** switches
+  the node to *At this step, for an event key* (`wait_event`): the run stops at
+  that step until the key arrives and goes on with `event_data`, with an
+  optional question and choices for whoever runs it, a deadline (`until`) and
+  wait details. Switching back and forth is one undo step; wires to pins the
+  other form does not have are removed, and the panel says how many first.
+- **Emit Event** (`emit_event`) sends a named event (name, scope, payload) that
+  wakes the runs waiting for it in a Wait for Event.
+
+These were named On Schedule, On Event and Wait Event, and sat under Events
+with an Event badge. The node types did not change, so a saved flow or bundle
+compiles exactly as before: a saved node keeps its saved label in the file,
+and the card shows the current name while the label is still the old default
+("On Event" reads "Wait for Event"); a label you typed is shown as typed. A
+saved `wait_event` node loads as a Wait for Event in its step form; the
+palette and the authoring assistant offer only the one Wait for Event.
 
 ### Trigger-Source Discovery
 

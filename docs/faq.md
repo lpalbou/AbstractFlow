@@ -63,9 +63,11 @@ not of the workflow: Flow designs and tests workflows and never sets one. In
 the editor, design the workflow, pick what else starts it if anything (mail, a
 feed, a webhook, or by hand) and press **Turn it on** in the Automation dialog;
 then set the schedule in Observer or the Assistant. A flow saved earlier with a
-schedule keeps it and shows it in words. The `On Schedule`, `On Event` and
-`Delay` nodes wait inside a run that has already started and do not start
-runs. See [Web editor > Automations](web-editor.md#automations).
+schedule keeps it and shows it in words. The **Wait Until**, **Wait for
+Event** and **Delay** nodes pause a run that has already started and do not
+start runs (see [Web editor > Waits inside a
+flow](web-editor.md#waits-inside-a-flow)). See [Web editor >
+Automations](web-editor.md#automations).
 
 ## How Does A Workflow Read The Event That Started It?
 

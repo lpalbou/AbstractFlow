@@ -403,8 +403,9 @@ Entry and terminal:
 
 - `on_flow_start`: standard run entry; add runtime input outputs here.
 - `on_user_request`: chat entry (user `message` and `context`).
-- `on_schedule`, `on_event`, `on_agent_message`: waits inside a running flow
-  (they do not start it; recurring runs are automations).
+- `on_schedule` (Wait Until), `on_event` (Wait for Event), `on_agent_message`:
+  waits inside a running flow (they do not start it; recurring runs are
+  automations).
 - `on_flow_end`: terminal; add an input for every output the run exposes.
 
 Common chains:
@@ -435,13 +436,17 @@ The catalog gives exact pins; this section explains usage.
 ### Events And Timing
 
 `on_flow_start` (default manual entry), `on_flow_end` (final boundary),
-`on_user_request` (chat), `on_agent_message`, `on_schedule` (configure
+`on_user_request` (chat), `on_agent_message`, `wait_until` (Delay), and the
+Waits: `on_schedule` (Wait Until; configure
 `event.schedule` as an interval such as `5m` or an ISO timestamp, never cron,
-and `event.recurrent`), `on_event` (durable custom events),
-`wait_event` (pause for event), `emit_event`, `wait_until` (delay),
-`system_datetime` (pure current-time metadata for prompts/filenames/digests).
+and `event.recurrent`), `on_event` (Wait for Event: a named durable event,
+`event.name` + `event.scope`), `emit_event` (Emit Event: wakes the runs
+waiting for that event). `wait_event` (Wait for Event's step form: a raw
+`event_key`, prompt, choices, `until`, `details`) loads and runs in existing
+flows but is not offered for new ones: `add_node` refuses it.
+`system_datetime` is pure current-time metadata for prompts/filenames/digests.
 
-`on_schedule`, `on_event` and `wait_until` wait INSIDE a run that is already
+`on_schedule`, `on_event` and `wait_until` pause a run that is already
 started; they never start a flow and are not how automations are scheduled.
 To run a flow every N minutes, give it a runnable interface, publish it, and
 create an automation from it (its trigger defaults live in the flow's
@@ -775,8 +780,8 @@ On Flow End; optional Markdown/CSV file outputs.
 ### Human-In-The-Loop
 
 Ask User only when the workflow must pause mid-execution; On Flow Start inputs
-for normal parameters; Show Message (`answer_user`) for host-visible messages; Wait Event for
-durable external waits.
+for normal parameters; Show Message (`answer_user`) for host-visible messages; Wait for Event
+(`on_event`) for durable named events another run sends with Emit Event.
 
 ### Composing Workflows (Subflow)
 

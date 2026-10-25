@@ -136,7 +136,7 @@ When an app creates an automation from the published workflow (`POST /api/gatewa
 
 See [Architecture > Automation Defaults](architecture.md#automation-defaults) for the path from the document to an automation.
 
-`On Schedule`, `On Event` and `Delay` (`wait_until`) nodes wait inside a run that has already started. They are not how automations are scheduled.
+The Waits nodes, **Wait Until** (`on_schedule`) and **Wait for Event** (`on_event`, or `wait_event` in its step form), and **Delay** (`wait_until`) pause a run that has already started. They are not how automations are scheduled. Their node types and saved fields are unchanged from when they were named On Schedule, On Event and Wait Event; see [Web editor > Waits inside a flow](web-editor.md#waits-inside-a-flow).
 
 ## Authoring Rules
 

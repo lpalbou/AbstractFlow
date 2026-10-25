@@ -1029,24 +1029,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `applied` array: Elections applied.; `refused` array: Refusals — data, never a failure.; `result` object; `success` boolean
 - Default config: none
 
-### events / Emit Event
-
-- Node type: `emit_event`
-- Document node: `{"id":"<unique_id>","type":"emit_event"}`
-- Utility: Emit a durable event (scope/session) with payload. Useful for cross-node or cross-agent signaling.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `name` string; `scope` string; `payload` any; `session_id` string
-- Outputs: `exec-out` execution; `delivered` number; `delivered_to` array; `wait_key` string
-- Default config: {
-  "effectConfig": {
-    "name": "my_event",
-    "scope": "session",
-    "sessionId": ""
-  }
-}
-
 ### events / On Agent Message
 
 - Node type: `on_agent_message`
@@ -1058,23 +1040,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Inputs: none
 - Outputs: `exec-out` execution; `sender` agent; `message` string; `channel` string
 - Default config: none
-
-### events / On Event
-
-- Node type: `on_event`
-- Document node: `{"id":"<unique_id>","type":"on_event"}`
-- Utility: Waits inside a running flow for a durable custom event, then continues. It does not start the flow: only runs already waiting receive the event. Outputs event metadata + payload.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`; event settings with `event`
-- Inputs: `scope` string
-- Outputs: `exec-out` execution; `event` object; `payload` any
-- Default config: {
-  "eventConfig": {
-    "name": "my_event",
-    "scope": "session"
-  }
-}
 
 ### events / On Flow End
 
@@ -1100,23 +1065,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution
 - Default config: none
 
-### events / On Schedule
-
-- Node type: `on_schedule`
-- Document node: `{"id":"<unique_id>","type":"on_schedule"}`
-- Utility: Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Automation…: the editor header badge or the Flow Library). Outputs the fire time.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`; event settings with `event`
-- Inputs: `schedule` string (timestamp); `recurrent` boolean
-- Outputs: `exec-out` execution; `timestamp` string (time)
-- Default config: {
-  "eventConfig": {
-    "schedule": "15s",
-    "recurrent": true
-  }
-}
-
 ### events / On User Request
 
 - Node type: `on_user_request`
@@ -1139,18 +1087,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Authorable config: no node-specific document config beyond label/pin_defaults
 - Inputs: none
 - Outputs: `iso` string; `timezone` string; `utc_offset_minutes` number; `locale` string
-- Default config: none
-
-### events / Wait Event
-
-- Node type: `wait_event`
-- Document node: `{"id":"<unique_id>","type":"wait_event"}`
-- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable a durable “ask + wait” prompt for whoever runs the workflow. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `event_key` string; `prompt` string; `choices` array; `allow_free_text` boolean; `until` string: Optional idle deadline (ISO timestamp; runtime-normalized to UTC). Past-deadline resume carries {"timed_out": true}.; `details` object: Optional wait metadata carried into the ledger wait record (e.g. {"kind": "visitor_message"}); lets clients render the park honestly.
-- Outputs: `exec-out` execution; `event_data` object
 - Default config: none
 
 ### events / Delay
@@ -2330,8 +2266,61 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `name` string; `value` any
 - Default config: none
 
+### waits / Emit Event
+
+- Node type: `emit_event`
+- Document node: `{"id":"<unique_id>","type":"emit_event"}`
+- Utility: Sends a named event (name and scope, with a payload) that wakes the runs waiting for it in a Wait for Event; it does not start a flow (an automation does). Outputs how many waiting runs received it.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `name` string; `scope` string; `payload` any; `session_id` string
+- Outputs: `exec-out` execution; `delivered` number; `delivered_to` array; `wait_key` string
+- Default config: {
+  "effectConfig": {
+    "name": "my_event",
+    "scope": "session",
+    "sessionId": ""
+  }
+}
+
+### waits / Wait for Event
+
+- Node type: `on_event`
+- Document node: `{"id":"<unique_id>","type":"on_event"}`
+- Utility: Pauses this run until a named event arrives (an Emit Event in this or another run, or a host sending it); it does not start the flow (an automation does): only a run already waiting receives the event. Its branch then runs with the event and its payload, and it waits again when the branch ends. Name and scope pick the event (an empty name takes any event); Advanced switches it to waiting at a step for an event key, with an optional question, choices and deadline.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`; event settings with `event`
+- Inputs: `scope` string
+- Outputs: `exec-out` execution; `event` object; `payload` any
+- Default config: {
+  "eventConfig": {
+    "name": "my_event",
+    "scope": "session"
+  }
+}
+
+### waits / Wait Until
+
+- Node type: `on_schedule`
+- Document node: `{"id":"<unique_id>","type":"on_schedule"}`
+- Utility: Pauses this run until a time (ISO timestamp) or for an interval (15s, 5m, 2h, 1d; no cron); it does not start the flow (an automation does: Automation… in the editor header or the Flow Library). Its branch runs when the time comes; with recurrent on it waits again after the branch ends (the header reads "Wait Until · every 15s"). Outputs the fire time.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`; event settings with `event`
+- Inputs: `schedule` string (timestamp); `recurrent` boolean
+- Outputs: `exec-out` execution; `timestamp` string (time)
+- Default config: {
+  "eventConfig": {
+    "schedule": "15s",
+    "recurrent": true
+  }
+}
+
 ## Hidden Or Deprecated Templates
 
 - `call_tool` / Call Tool: rejected by the authoring validator (hidden, deprecated).
 - `image_to_image` / Image To Image: rejected by the authoring validator (hidden).
 - `text_to_video` / Text To Video: rejected by the authoring validator (hidden).
+- `wait_event` / Wait for Event: rejected by the authoring validator (hidden).

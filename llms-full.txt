@@ -451,7 +451,7 @@ monochrome icon from the shared AbstractFramework icon set.
   | --- | --- |
   | Violet | Core (agents, LLM calls, code, subflows) |
   | Orange | Control flow |
-  | Aqua | Events and time |
+  | Aqua | Events and time, Waits |
   | Yellow | Variables, Values and schema |
   | Magenta | Data and text, Math |
   | Blue | Files and artifacts, Media |
@@ -463,12 +463,13 @@ monochrome icon from the shared AbstractFramework icon set.
   it means a failed run.
 - **Sections.** Nodes are grouped into sections with a count: Essentials (the
   eight nodes nearly every flow uses), Core, Control flow, Events and time,
-  Variables, Data and text, Values and schema, Files and artifacts, Media,
+  Waits (see [Waits inside a flow](#waits-inside-a-flow)), Variables, Data and text, Values and schema, Files and artifacts, Media,
   Memory, Entity mind and Math. Essentials is open and the others are closed
   the first time; click a section header to open or close it. Your browser
   remembers which sections are open.
 - **Search.** Type in **Search nodes** to filter every section at once by name,
-  type or description. Sections with a match open and the matching part of
+  type or description (a renamed node is also found by its earlier name:
+  "On Schedule" finds Wait Until). Sections with a match open and the matching part of
   each name is highlighted. Esc clears the search.
 - **Descriptions.** Hover or focus a node to see its one-line description in a
   tooltip. A node that needs a gateway feature your gateway does not offer is
@@ -486,7 +487,7 @@ monochrome icon from the shared AbstractFramework icon set.
 
 Every node on the canvas is the same card: a header with the node's icon, its
 full title (wrapped, never cut) and a small badge naming its kind (Event,
-Core, Control, Value, Data, Math, File, Memory, Variable, Media, Entity,
+Waits, Core, Control, Value, Data, Math, File, Memory, Variable, Media, Entity,
 Artifact, Schema), then the input ports on the left and the output ports on
 the right, each labelled and coloured by its type (see **Pin Types**). The
 node's category colour (the table above) is the band at the top of its
@@ -605,7 +606,7 @@ with a mouse, the panels keep their dense layout with text at 12 px or more
 
 On/off settings are switches labelled by what they control; a switch is
 highlighted with a check mark when on and plain when off. The properties
-panel has **Recurrent** (On Schedule) and
+panel has **Recurrent** (Wait Until) and
 **Free text answers** (Ask User). The dialogs have **Load it into the gateway now**
 (Make it available, under Details), **Private workspace per run** (the run window's run workspace),
 **Durable** (sending an event to a waiting run), and **Lock after load** and
@@ -714,6 +715,37 @@ A flow has one automation. Once it is on, the dialog and the header badge's menu
 **Make it available** (the toolbar, and part of Turn it on) makes the saved workflow available to Observer and the Assistant: "Release digest is ready for Observer and the Assistant." Each time adds a new version and keeps the earlier ones; the gateway name, the version and **Load it into the gateway now** are under **Details**.
 
 The dialog does not set tool approval. When an automation is created, the gateway applies its default policy, in which creating the automation counts as consent for the tools the workflow uses; a creation request that sets `policy.tool_approval` to `ask` makes every run wait for approval instead. Questions from `Ask User` nodes always wait for a person.
+
+### Waits inside a flow
+
+A trigger starts a run; a wait pauses a run that is already running. The
+**Waits** section of the palette holds the nodes that pause a run, under a
+**Waits** badge: none of them starts a flow (an automation does, from
+[What starts it?](#automations)), and only a run already waiting is woken.
+
+- **Wait Until** (`on_schedule`) pauses this run until a time (an ISO
+  timestamp) or for an interval (`15s`, `5m`, `2h`, `1d`; no cron), then runs
+  its branch. With **Recurrent** on it waits again after the branch ends, and
+  its header says so: "Wait Until · every 15s".
+- **Wait for Event** pauses this run until a named event arrives. By default
+  (`on_event`) it waits on its own branch for an event picked by **Name** and
+  **Scope** (an empty name takes any event), runs the branch with the event and
+  its payload, and waits again. Under **Advanced**, **How it waits** switches
+  the node to *At this step, for an event key* (`wait_event`): the run stops at
+  that step until the key arrives and goes on with `event_data`, with an
+  optional question and choices for whoever runs it, a deadline (`until`) and
+  wait details. Switching back and forth is one undo step; wires to pins the
+  other form does not have are removed, and the panel says how many first.
+- **Emit Event** (`emit_event`) sends a named event (name, scope, payload) that
+  wakes the runs waiting for it in a Wait for Event.
+
+These were named On Schedule, On Event and Wait Event, and sat under Events
+with an Event badge. The node types did not change, so a saved flow or bundle
+compiles exactly as before: a saved node keeps its saved label in the file,
+and the card shows the current name while the label is still the old default
+("On Event" reads "Wait for Event"); a label you typed is shown as typed. A
+saved `wait_event` node loads as a Wait for Event in its step form; the
+palette and the authoring assistant offer only the one Wait for Event.
 
 ### Trigger-Source Discovery
 
@@ -1659,8 +1691,9 @@ Entry and terminal:
 
 - `on_flow_start`: standard run entry; add runtime input outputs here.
 - `on_user_request`: chat entry (user `message` and `context`).
-- `on_schedule`, `on_event`, `on_agent_message`: waits inside a running flow
-  (they do not start it; recurring runs are automations).
+- `on_schedule` (Wait Until), `on_event` (Wait for Event), `on_agent_message`:
+  waits inside a running flow (they do not start it; recurring runs are
+  automations).
 - `on_flow_end`: terminal; add an input for every output the run exposes.
 
 Common chains:
@@ -1691,13 +1724,17 @@ The catalog gives exact pins; this section explains usage.
 ### Events And Timing
 
 `on_flow_start` (default manual entry), `on_flow_end` (final boundary),
-`on_user_request` (chat), `on_agent_message`, `on_schedule` (configure
+`on_user_request` (chat), `on_agent_message`, `wait_until` (Delay), and the
+Waits: `on_schedule` (Wait Until; configure
 `event.schedule` as an interval such as `5m` or an ISO timestamp, never cron,
-and `event.recurrent`), `on_event` (durable custom events),
-`wait_event` (pause for event), `emit_event`, `wait_until` (delay),
-`system_datetime` (pure current-time metadata for prompts/filenames/digests).
+and `event.recurrent`), `on_event` (Wait for Event: a named durable event,
+`event.name` + `event.scope`), `emit_event` (Emit Event: wakes the runs
+waiting for that event). `wait_event` (Wait for Event's step form: a raw
+`event_key`, prompt, choices, `until`, `details`) loads and runs in existing
+flows but is not offered for new ones: `add_node` refuses it.
+`system_datetime` is pure current-time metadata for prompts/filenames/digests.
 
-`on_schedule`, `on_event` and `wait_until` wait INSIDE a run that is already
+`on_schedule`, `on_event` and `wait_until` pause a run that is already
 started; they never start a flow and are not how automations are scheduled.
 To run a flow every N minutes, give it a runnable interface, publish it, and
 create an automation from it (its trigger defaults live in the flow's
@@ -2031,8 +2068,8 @@ On Flow End; optional Markdown/CSV file outputs.
 ### Human-In-The-Loop
 
 Ask User only when the workflow must pause mid-execution; On Flow Start inputs
-for normal parameters; Show Message (`answer_user`) for host-visible messages; Wait Event for
-durable external waits.
+for normal parameters; Show Message (`answer_user`) for host-visible messages; Wait for Event
+(`on_event`) for durable named events another run sends with Emit Event.
 
 ### Composing Workflows (Subflow)
 
@@ -3231,24 +3268,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `applied` array: Elections applied.; `refused` array: Refusals — data, never a failure.; `result` object; `success` boolean
 - Default config: none
 
-### events / Emit Event
-
-- Node type: `emit_event`
-- Document node: `{"id":"<unique_id>","type":"emit_event"}`
-- Utility: Emit a durable event (scope/session) with payload. Useful for cross-node or cross-agent signaling.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `name` string; `scope` string; `payload` any; `session_id` string
-- Outputs: `exec-out` execution; `delivered` number; `delivered_to` array; `wait_key` string
-- Default config: {
-  "effectConfig": {
-    "name": "my_event",
-    "scope": "session",
-    "sessionId": ""
-  }
-}
-
 ### events / On Agent Message
 
 - Node type: `on_agent_message`
@@ -3260,23 +3279,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Inputs: none
 - Outputs: `exec-out` execution; `sender` agent; `message` string; `channel` string
 - Default config: none
-
-### events / On Event
-
-- Node type: `on_event`
-- Document node: `{"id":"<unique_id>","type":"on_event"}`
-- Utility: Waits inside a running flow for a durable custom event, then continues. It does not start the flow: only runs already waiting receive the event. Outputs event metadata + payload.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`; event settings with `event`
-- Inputs: `scope` string
-- Outputs: `exec-out` execution; `event` object; `payload` any
-- Default config: {
-  "eventConfig": {
-    "name": "my_event",
-    "scope": "session"
-  }
-}
 
 ### events / On Flow End
 
@@ -3302,23 +3304,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution
 - Default config: none
 
-### events / On Schedule
-
-- Node type: `on_schedule`
-- Document node: `{"id":"<unique_id>","type":"on_schedule"}`
-- Utility: Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Automation…: the editor header badge or the Flow Library). Outputs the fire time.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`; event settings with `event`
-- Inputs: `schedule` string (timestamp); `recurrent` boolean
-- Outputs: `exec-out` execution; `timestamp` string (time)
-- Default config: {
-  "eventConfig": {
-    "schedule": "15s",
-    "recurrent": true
-  }
-}
-
 ### events / On User Request
 
 - Node type: `on_user_request`
@@ -3341,18 +3326,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Authorable config: no node-specific document config beyond label/pin_defaults
 - Inputs: none
 - Outputs: `iso` string; `timezone` string; `utc_offset_minutes` number; `locale` string
-- Default config: none
-
-### events / Wait Event
-
-- Node type: `wait_event`
-- Document node: `{"id":"<unique_id>","type":"wait_event"}`
-- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable a durable “ask + wait” prompt for whoever runs the workflow. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `event_key` string; `prompt` string; `choices` array; `allow_free_text` boolean; `until` string: Optional idle deadline (ISO timestamp; runtime-normalized to UTC). Past-deadline resume carries {"timed_out": true}.; `details` object: Optional wait metadata carried into the ledger wait record (e.g. {"kind": "visitor_message"}); lets clients render the park honestly.
-- Outputs: `exec-out` execution; `event_data` object
 - Default config: none
 
 ### events / Delay
@@ -4532,11 +4505,64 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `name` string; `value` any
 - Default config: none
 
+### waits / Emit Event
+
+- Node type: `emit_event`
+- Document node: `{"id":"<unique_id>","type":"emit_event"}`
+- Utility: Sends a named event (name and scope, with a payload) that wakes the runs waiting for it in a Wait for Event; it does not start a flow (an automation does). Outputs how many waiting runs received it.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `name` string; `scope` string; `payload` any; `session_id` string
+- Outputs: `exec-out` execution; `delivered` number; `delivered_to` array; `wait_key` string
+- Default config: {
+  "effectConfig": {
+    "name": "my_event",
+    "scope": "session",
+    "sessionId": ""
+  }
+}
+
+### waits / Wait for Event
+
+- Node type: `on_event`
+- Document node: `{"id":"<unique_id>","type":"on_event"}`
+- Utility: Pauses this run until a named event arrives (an Emit Event in this or another run, or a host sending it); it does not start the flow (an automation does): only a run already waiting receives the event. Its branch then runs with the event and its payload, and it waits again when the branch ends. Name and scope pick the event (an empty name takes any event); Advanced switches it to waiting at a step for an event key, with an optional question, choices and deadline.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`; event settings with `event`
+- Inputs: `scope` string
+- Outputs: `exec-out` execution; `event` object; `payload` any
+- Default config: {
+  "eventConfig": {
+    "name": "my_event",
+    "scope": "session"
+  }
+}
+
+### waits / Wait Until
+
+- Node type: `on_schedule`
+- Document node: `{"id":"<unique_id>","type":"on_schedule"}`
+- Utility: Pauses this run until a time (ISO timestamp) or for an interval (15s, 5m, 2h, 1d; no cron); it does not start the flow (an automation does: Automation… in the editor header or the Flow Library). Its branch runs when the time comes; with recurrent on it waits again after the branch ends (the header reads "Wait Until · every 15s"). Outputs the fire time.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`; event settings with `event`
+- Inputs: `schedule` string (timestamp); `recurrent` boolean
+- Outputs: `exec-out` execution; `timestamp` string (time)
+- Default config: {
+  "eventConfig": {
+    "schedule": "15s",
+    "recurrent": true
+  }
+}
+
 ## Hidden Or Deprecated Templates
 
 - `call_tool` / Call Tool: rejected by the authoring validator (hidden, deprecated).
 - `image_to_image` / Image To Image: rejected by the authoring validator (hidden).
 - `text_to_video` / Text To Video: rejected by the authoring validator (hidden).
+- `wait_event` / Wait for Event: rejected by the authoring validator (hidden).
 
 ## docs/architecture.md
 
@@ -4741,8 +4767,10 @@ flowchart LR
   `metadata.automation_defaults[<flow id>]`, and fills a creation request's
   missing trigger, context, title and `input_data` from it.
 
-The `On Schedule`, `On Event` and `Delay` nodes are unrelated to this path:
-they wait inside a run that has already started. See
+The **Wait Until** (`on_schedule`), **Wait for Event** (`on_event` /
+`wait_event`) and **Delay** nodes are unrelated to this path: they pause a run
+that has already started ([Web editor > Waits inside a
+flow](web-editor.md#waits-inside-a-flow)). See
 [Web editor > Automations](web-editor.md#automations) and
 [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults).
 
@@ -5141,7 +5169,7 @@ When an app creates an automation from the published workflow (`POST /api/gatewa
 
 See [Architecture > Automation Defaults](architecture.md#automation-defaults) for the path from the document to an automation.
 
-`On Schedule`, `On Event` and `Delay` (`wait_until`) nodes wait inside a run that has already started. They are not how automations are scheduled.
+The Waits nodes, **Wait Until** (`on_schedule`) and **Wait for Event** (`on_event`, or `wait_event` in its step form), and **Delay** (`wait_until`) pause a run that has already started. They are not how automations are scheduled. Their node types and saved fields are unchanged from when they were named On Schedule, On Event and Wait Event; see [Web editor > Waits inside a flow](web-editor.md#waits-inside-a-flow).
 
 ## Authoring Rules
 
@@ -5956,9 +5984,11 @@ not of the workflow: Flow designs and tests workflows and never sets one. In
 the editor, design the workflow, pick what else starts it if anything (mail, a
 feed, a webhook, or by hand) and press **Turn it on** in the Automation dialog;
 then set the schedule in Observer or the Assistant. A flow saved earlier with a
-schedule keeps it and shows it in words. The `On Schedule`, `On Event` and
-`Delay` nodes wait inside a run that has already started and do not start
-runs. See [Web editor > Automations](web-editor.md#automations).
+schedule keeps it and shows it in words. The **Wait Until**, **Wait for
+Event** and **Delay** nodes pause a run that has already started and do not
+start runs (see [Web editor > Waits inside a
+flow](web-editor.md#waits-inside-a-flow)). See [Web editor >
+Automations](web-editor.md#automations).
 
 ## How Does A Workflow Read The Event That Started It?
 
@@ -6242,6 +6272,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Waits: names that say what the nodes do.** Operator decision: a trigger starts a run, a wait pauses one that is already running. *On Schedule* is now **Wait Until** (recurrent: "Wait Until · every 15s" in its header), *On Event* is **Wait for Event**, **Emit Event** keeps its name; the three sit together in a new **Waits** palette section with a **Waits** badge (no longer under Events with an Event badge), and each description says it pauses this run and does not start the flow (an automation does). *Wait Event* (`wait_event`) folds into Wait for Event: the palette offers one Wait for Event (`on_event`: name and scope, its own branch), whose **Advanced > How it waits** switches a node to the step form (`wait_event`: event key, question and choices, `until`, `details`) and back, one undo step, saying first how many wires the other form has no pin for. Node types and saved fields are unchanged, so every saved flow and bundle compiles as before and loads and saves byte for byte: a saved node keeps its label in the file and its card shows the new name while that label is still the old default (a typed label stays); a saved `wait_event` renders as Wait for Event and is no longer offered to new flows (the authoring assistant's `add_node` refuses it). The palette search still finds the old names. Docs: [Web editor > Waits inside a flow](docs/web-editor.md#waits-inside-a-flow), FAQ, VisualFlow JSON, architecture, authoring skill, node catalog.
 - **New, Open and Save stand out in the toolbar.** Each has its own colour from the app's palette, apart from Run (the theme accent) and Make it available (green): **New** violet, **Open** blue, **Save** amber (the colour the unsaved dot always had). On a wide window each carries its word ("New", "Open", "Save"); when the toolbar row is short of room, and always below 1440 px, they are icons with their tooltips. **Save** reads at a glance: filled amber with a dot when there are unsaved changes, a spinner while it saves ("Saving…"), quiet once saved; Ctrl/⌘+S is unchanged. Docs: [Web editor > Flow Interfaces](docs/web-editor.md#flow-interfaces).
 - **A folded node shows only its wired pins.** Folded, a node draws the pins that carry a wire (inputs and outputs, plus any execution pin), one row each, and is only as tall as those rows: a Break Email with 16 fields and two of them wired is a small circle with its input and two outputs, no longer a pill as tall as the open card; with nothing wired it is just its sign (Get Variables: the names of the variables it wires out). The other pins keep their handles, invisible and not connectable, at the node's edge middle, so every wire stays attached; unfold to wire them. Docs: [Web editor > Folded operator nodes](docs/web-editor.md#folded-operator-nodes).
 - **Flow does not set schedules.** Operator ruling: a schedule is a property of an automation, set in Observer or the Assistant (and the coding agents); Flow designs and tests workflows. *On a schedule* is gone from New Flow's *What starts it?* and from the Automation dialog (both say "On a schedule? Schedules are set in Observer or the Assistant."), and the Flow Library has no Scheduled kind. A flow saved earlier with a schedule trigger (schedule@1 or @2) still loads: it is listed under **Triggered** with its schedule in words ("Every day at 08:00 (Paris)"), the Automation dialog shows it ("Now: … · a schedule from an earlier save, kept as it is") and keeps it until another start is picked, and Turn it on and Run as if triggered still work for it. Removed with it: the schedule editor (repeat, day chips, day of the month, every N minutes or hours, once on a date, the 24-hour time selects), the time-zone picker and its city list, and the account time-zone reads (`GET /api/gateway/accounts/me/preferences`). Docs: [Web editor > Kinds of flows](docs/web-editor.md#kinds-of-flows), [FAQ](docs/faq.md).
