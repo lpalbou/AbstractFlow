@@ -44,6 +44,16 @@ requires to `On Flow Start` and `On Flow End`; you then wire them. See
 [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for every interface
 and its pins.
 
+## What Is The Difference Between A Runnable Flow, A Scheduled Flow And A Triggered Flow?
+
+What starts it. A runnable (chat) flow declares an interface and runs when a
+person or an app asks; a scheduled flow runs by itself on a clock; a triggered
+flow runs by itself when mail, a feed item or a webhook call arrives, with
+typed `On Flow Start` pins for it. There is no separate automation kind: an
+automation is a published flow plus what starts it. The Flow Library groups
+flows this way (Chat, Scheduled, Triggered, Other). See [Web editor > Kinds of
+flows](web-editor.md#kinds-of-flows).
+
 ## How Do I Run A Workflow Every Few Minutes?
 
 Create an automation from the published workflow on the gateway

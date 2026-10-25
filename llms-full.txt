@@ -238,7 +238,7 @@ The canvas reflects that split:
 Start here:
 
 - [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
-- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, flow interfaces, automations (What starts it?, context budget, inputs form), trigger-source discovery, trigger connections and the trigger event, mail (Email fields, Break Email), the wire-drop menu (Relay, If/Else, Break Object, Break Email, ForEach), paths that repeat, a loop whose body ends the run (Fix the loop), hidden connections, the authoring assistant, media and file nodes.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, the Flow Library and the kinds of flows (Chat, Scheduled, Triggered, Other), flow interfaces, automations (What starts it?, context budget, inputs form), trigger-source discovery, trigger connections and the trigger event, mail (Email fields, Break Email), the wire-drop menu (Relay, If/Else, Break Object, Break Email, ForEach), paths that repeat, a loop whose body ends the run (Fix the loop), hidden connections, the authoring assistant, media and file nodes.
 - [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
 - [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
@@ -557,7 +557,8 @@ the window width:
   landscape), and the run window shows the execution steps above the step
   details. Each sheet scrolls as one page; the lists do not scroll inside
   their own box. Sections are flat, with a thin line between items. The
-  list's header (**Flows**, **Execution**) hides or shows the list with a
+  list's header (**Flows**, or the chosen kind such as **Chat flows**;
+  **Execution**) hides or shows the list with a
   tap, a click, Enter or Space; lists start open and the editor remembers
   your choice in this browser. On phones the run window uses the width of
   the screen with a 12 px margin, and label and value share a line when they
@@ -638,6 +639,21 @@ The panel manages loaded models; it does not edit capability defaults.
 Configure capability defaults in Gateway Console or with the Gateway/Core
 config CLIs; changing a default does not load or unload a model.
 
+## Flow Library
+
+**Open Flow** (the toolbar, or the start screen) opens the Flow Library: your saved flows and the bundled examples, with search (`/`), a sort (Recent, Name) and **Load**, **Rename**, **Duplicate** and **Delete** at the bottom. The header says the counts in words ("147 flows: 32 chat, 1 triggered and 114 other"). Under it, one row of pills filters by [kind](#kinds-of-flows), each with its count: **All**, **Chat**, **Scheduled**, **Triggered**, **Other**. **All** groups the flows under one heading per kind (click a heading to fold it); a kind lists every flow of that kind, subflows included, and says so plainly when there is none ("No triggered flows yet. Press New flow and choose what starts it."). Each row starts with the kind's icon and colour and says what starts the flow ("Runs when you ask", "Every day at 08:00 (Paris)", "When mail arrives in me@example.org", "Runs inside deep-research"), then its description and when it last changed. A flow that uses subflows shows "2 subflows": click it or the chevron to unfold them under it. The preview starts with the name, the kind and what starts it, then the description, the interfaces (chat flows) or the automation and its edit button (scheduled and triggered flows), the flows it uses and is used by, and last its dates and size. Arrow keys move through the list, → and ← unfold and fold, Enter loads.
+
+### Kinds of flows
+
+There is no separate "automation workflow" kind: an automation is a published flow plus what starts it. A flow's kind is what starts it:
+
+- **Chat**: a person or an app runs it when they ask, in a conversation (the Assistant, Code, another app). It declares an interface such as **Runnable agent (v1)**. Create one with **New Flow** > **A person, in a chat**, or declare an interface on an existing flow in the Flow Library.
+- **Scheduled**: it runs by itself on a clock ("Every day at 08:00 (Paris)"). `On Flow Start` carries when the run was due (`scheduled_at`) and which run it is (`occurrence`). Create one with **New Flow** > **On a schedule**.
+- **Triggered**: it runs by itself when something arrives (mail, a feed item, a webhook call) and is tailored to it: `On Flow Start` has typed pins for what arrived (`messages`, `items`, `calls`; see [What arrives, what the person sees](#what-arrives-what-the-person-sees)). Create one with **New Flow** > **When something arrives**. A **By hand (Run now only)** flow is listed here too: it is an automation without an interface, started with Run now in Observer or the Assistant, never from a chat.
+- **Other**: nothing starts it by itself. It is a part of other flows (it runs as a step of the flows that use it: "Runs inside deep-research"), or it has no way to start yet and you run it from the editor. Declaring an interface makes it a chat flow; **Automation…** in the editor header gives it a trigger.
+
+A flow with both an interface and a trigger is listed by its trigger. You design every kind here in Flow; Observer and the Assistant turn automations on and off and show their runs (**Turn it on** in the Automation dialog creates or updates the automation there).
+
 ## Flow Interfaces
 
 When AbstractFlow opens on a blank canvas, it offers **Create Flow** (the New flow dialog) and **Open Flow** (the Flow Library) side by side; the toolbar's **New Flow** and **Open Flow** buttons do the same at any time.
@@ -649,17 +665,19 @@ When AbstractFlow opens on a blank canvas, it offers **Create Flow** (the New fl
 - **When something arrives**: grouped as **Your mailboxes** (by address: "When mail arrives in me@example.org"), **Your feeds** and **Your webhooks** (by name: "When Release notes has a new item", "When CI hook is called"). A paused, switched-off or failing one is listed with its state ("paused", "not working: The feed answered HTTP 404. Check the feed address."). **Add a mailbox…** opens the gateway console's account page and **Add a feed or webhook…** its Triggers page; **Refresh** reads the lists again.
 - **By hand (Run now only)**: the automation runs only when someone presses Run now.
 
+The answer is the flow's kind in the Flow Library (Chat, Scheduled, Triggered; see [Kinds of flows](#kinds-of-flows)).
+
 Each choice shows one line saying what it does. Once a trigger is chosen the dialog says "Runs by itself when its trigger fires: what arrives is on On Flow Start, build the steps on the canvas." and has no Interfaces section. A triggered flow is your own workflow: **Create automation flow** opens it with only `On Flow Start` and `On Flow End`, nothing between them, and a note over the canvas: "What arrives is on On Flow Start; put what the person should see on On Flow End's response (and notify for an alert)." (dismiss it with ×; **Automation…** opens the dialog). See [What arrives, what the person sees](#what-arrives-what-the-person-sees). Otherwise **Create flow** places the `On Flow Start` and `On Flow End` nodes the declared interfaces need, already carrying their pins; you build the steps between them. **Save Flow** stores the title, description, interfaces, automation and nodes on the gateway. If the open flow has unsaved changes, the dialog says creating a new flow discards them.
 
-The header shows what the open flow is, next to its name: **Automation · Every day at 08:00 (Europe/Paris)** or **Automation · When mail arrives in me@example.org** for an automation, **Chat** for a runnable flow without one, and a dashed **Automation…** otherwise. Click it for **Automation…** (the dialog on the open flow; its changes are saved with the flow) and **Turn it on**. The badge keeps the word "Automation" and shortens the sentence when the header is narrow. The Flow Library shows the same line under each workflow's name; flows with the same name are told apart by their size ("3 nodes · 1 edge").
+The header shows what the open flow is, next to its name: **Automation · Every day at 08:00 (Europe/Paris)** or **Automation · When mail arrives in me@example.org** for an automation, **Chat** for a runnable flow without one, and a dashed **Automation…** otherwise. Click it for **Automation…** (the dialog on the open flow; its changes are saved with the flow) and **Turn it on**. The badge keeps the word "Automation" and shortens the sentence when the header is narrow. The Flow Library sorts flows by the same answer: see [Kinds of flows](#kinds-of-flows). Flows with the same name are told apart by their size ("3 nodes · 1 edge").
 
 To change the interfaces of an existing workflow, open the **Flow Library**, select a workflow and use the edit button next to **Interfaces** to declare the contracts it implements (for example **Runnable agent (v1)**). The interfaces are listed one per line; ticking or inspecting one opens its details beside the list, with the `On Flow Start` and `On Flow End` nodes drawn with the pins it requires. The footer carries **Cancel** and **Save Interfaces**. Saving adds the missing ones to the `On Flow Start` and `On Flow End` nodes: right away when the workflow is open in the editor (your unsaved edits and undo history are kept, and the flow shows unsaved changes until you **Save**), otherwise the next time you open it. Wire the added pins on the canvas so hosts get real values. See [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for the pins of every interface.
 
 ## Automations
 
-An automation runs a published workflow again and again: on a schedule, when mail or a feed item or a webhook call arrives, or only when someone presses Run now. You create, pause and delete automations in Observer or the Assistant (or with `POST /api/gateway/automations`). The editor stores what an automation made from a workflow starts with, in the workflow's `automation_defaults` field.
+An automation runs a published workflow again and again: on a schedule, when mail or a feed item or a webhook call arrives, or only when someone presses Run now. It is not a separate kind of workflow: it is a published flow plus what starts it ([Kinds of flows](#kinds-of-flows)). You create, pause and delete automations in Observer or the Assistant (or with `POST /api/gateway/automations`). The editor stores what an automation made from a workflow starts with, in the workflow's `automation_defaults` field.
 
-Open the **Automation** dialog from the header badge of the open flow, from **New Flow** (a trigger choice opens the flow with it already set), or from the **Flow Library**: select a workflow and use the edit button (**Automation…**) next to its **Automation** row, which reads the trigger back ("Every 15 minutes", "When CI hook is called"). The dialog says, in one sentence, what happens: when the trigger fires, the flow runs with these inputs. It has four parts:
+Open the **Automation** dialog from the header badge of the open flow, from **New Flow** (a trigger choice opens the flow with it already set), or from the **Flow Library**: select a scheduled or triggered workflow and use the edit button (**Automation…**) next to **Automation** (its trigger is read back above it: "Every 15 minutes", "When CI hook is called"), or **Make it an automation…** under a chat flow's interfaces. The dialog says, in one sentence, what happens: when the trigger fires, the flow runs with these inputs. It has four parts:
 
 - **What starts it?** The same choices as New Flow, without chat: **On a schedule**, **When something arrives** (your mailboxes by address, your feeds and webhooks by name) or **By hand (Run now only)**. A schedule is saved as `schedule` version 2 (calendar rules in your time zone); a workflow saved with an older fixed-interval schedule shows it ("Now: Every 5 minutes · an older schedule") and keeps it until you change the schedule. A mailbox is saved as `trigger.config.account`; a feed or webhook as `trigger.connection_id`. **More settings** shows the chosen trigger's other settings in plain words, built from its schema: for mail, the folder, how often new mail is gathered into one run, how many messages per run, automatic messages, and **Only mail that…** (comes from, comes from the domain, is sent to: one address or domain per line; has in its subject; has an attachment). Empty settings use the trigger's defaults.
 - **Context.** **Independent** (every run starts fresh) or **Growing** (every run continues the same conversation). Growing shows **Remembers up to N tokens of earlier runs**, filled with the gateway's one default (`GET /api/gateway/automations/defaults`, `growing_max_tokens`). Keep it to follow that default wherever it changes; a different number is saved as `context.growing.max_tokens`. A larger budget lets each run build on more of the earlier runs and costs more tokens and time per run.
@@ -5896,6 +5914,16 @@ requires to `On Flow Start` and `On Flow End`; you then wire them. See
 [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for every interface
 and its pins.
 
+## What Is The Difference Between A Runnable Flow, A Scheduled Flow And A Triggered Flow?
+
+What starts it. A runnable (chat) flow declares an interface and runs when a
+person or an app asks; a scheduled flow runs by itself on a clock; a triggered
+flow runs by itself when mail, a feed item or a webhook call arrives, with
+typed `On Flow Start` pins for it. There is no separate automation kind: an
+automation is a published flow plus what starts it. The Flow Library groups
+flows this way (Chat, Scheduled, Triggered, Other). See [Web editor > Kinds of
+flows](web-editor.md#kinds-of-flows).
+
 ## How Do I Run A Workflow Every Few Minutes?
 
 Create an automation from the published workflow on the gateway
@@ -6181,7 +6209,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Automations start from New Flow.** The dialog asks **What starts it?** first: *A person, in a chat* (the default), *On a schedule*, *When something arrives* or *By hand (Run now only)*. A trigger choice creates the flow with `On Flow Start`, the wired **Trigger event** node and its automation, and ticks **Runnable agent (v1)** when no interface is ticked. The header shows the open flow's nature (**Automation · When mail arrives in me@example.org**, **Chat**) and opens the Automation dialog on it; Flow Library rows show the same line, and the library's action is **Automation…**.
+- **The Flow Library sorts flows by what starts them.** Four kinds, in the New flow question's words: **Chat** (declares an interface: runs when a person or an app asks), **Scheduled**, **Triggered** (mail, a feed, a webhook, or Run now only) and **Other** (parts of other flows, and flows nothing starts yet). One row of pills with counts (**All · Chat · Scheduled · Triggered · Other**) replaces *All | Runnable*; the header says the counts in words; **All** groups the rows under foldable kind headings; a kind lists every flow of that kind, subflows included, with a plain empty state. Each row leads with the kind's icon and colour and what starts it ("Runs when you ask", "Every day at 08:00 (Paris)", "When mail arrives in …", "Runs inside deep-research"), then the description and a quiet date (no more *runnable* badge or monospace). The preview leads with the name, the kind and its start sentence; then the description, the interfaces (Chat; **Make it an automation…**) or the automation and its edit button (Scheduled / Triggered), the family, and the dates and size last. Docs: [Web editor > Kinds of flows](docs/web-editor.md#kinds-of-flows).
+- **Automations start from New Flow.** The dialog asks **What starts it?** first: *A person, in a chat* (the default), *On a schedule*, *When something arrives* or *By hand (Run now only)*. A trigger choice creates the flow with `On Flow Start`, the wired **Trigger event** node and its automation, and ticks **Runnable agent (v1)** when no interface is ticked. The header shows the open flow's nature (**Automation · When mail arrives in me@example.org**, **Chat**) and opens the Automation dialog on it; the Flow Library sorts flows by the same answer (Chat, Scheduled, Triggered, Other: above), and the library's action is **Automation…**.
 - **The Automation dialog speaks in human words.** Title **Automation**, one intro sentence, no source ids or versions. *What starts it?*: a schedule editor (every day / week with day chips / month, every few minutes or hours, once on a date, at a time) shown with your account's time zone and saved as `schedule` version 2 (an older fixed-interval schedule is shown and kept until changed); your mailboxes by address, saved as `trigger.config.account` (never a connection); your feeds and webhooks by name, saved as `trigger.connection_id`; Run now only. Each choice says what it does in one line. The trigger's other settings sit under **More settings** with plain labels (email: folder, batching, automatic messages, **Only mail that…**).
 - **Context with a budget.** *Independent* or *Growing*; Growing shows **Remembers up to N tokens of earlier runs**, prefilled from the gateway's one default (`GET /api/gateway/automations/defaults`); a different budget is saved as `context.growing.max_tokens` (needs a Gateway that accepts it).
 - **Inputs as a form.** One field per `On Flow Start` input (`prompt` = *What each run is asked to do*; text, number, yes/no; a JSON field only for object/list inputs; `event` never asked), with **Advanced: raw JSON** for anything else. Problems are named in words, above the buttons.

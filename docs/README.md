@@ -41,7 +41,7 @@ The canvas reflects that split:
 Start here:
 
 - [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
-- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, flow interfaces, automations (What starts it?, context budget, inputs form), trigger-source discovery, trigger connections and the trigger event, mail (Email fields, Break Email), the wire-drop menu (Relay, If/Else, Break Object, Break Email, ForEach), paths that repeat, a loop whose body ends the run (Fix the loop), hidden connections, the authoring assistant, media and file nodes.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, the Flow Library and the kinds of flows (Chat, Scheduled, Triggered, Other), flow interfaces, automations (What starts it?, context budget, inputs form), trigger-source discovery, trigger connections and the trigger event, mail (Email fields, Break Email), the wire-drop menu (Relay, If/Else, Break Object, Break Email, ForEach), paths that repeat, a loop whose body ends the run (Fix the loop), hidden connections, the authoring assistant, media and file nodes.
 - [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
 - [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
