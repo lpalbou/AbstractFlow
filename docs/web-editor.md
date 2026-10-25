@@ -324,7 +324,7 @@ There is no scheduled kind: Flow is not where automations are scheduled. A sched
 
 When AbstractFlow opens on a blank canvas, it offers **Create Flow** (the New flow dialog) and **Open Flow** (the Flow Library) side by side; the toolbar's **New Flow** and **Open Flow** buttons do the same at any time.
 
-In the toolbar, **New** (violet), **Open** (blue) and **Save** (amber) each have their own colour, and on a wide window the word next to the icon; when the row is short of room (always below 1440 px) they are icons, and hovering one says what it does. **Save** shows the state of the flow: filled amber with a dot when there are unsaved changes, a spinner while it saves, and quiet once everything is saved. Ctrl/⌘+S saves too; with nothing to save it says "No unsaved changes".
+In the toolbar, **New** (violet), **Open** (blue) and **Save** (amber) each have their own colour, and on a wide window the word next to the icon; when the row is short of room (always below 1440 px) they are icons, and hovering one says what it does. **Save** shows the state of the flow: filled amber with a dot when there are unsaved changes, a spinner while it saves, and quiet once everything is saved. Ctrl/⌘+S saves too; with nothing to save it says "No unsaved changes". With the focus on the canvas (or nowhere in particular), **C** opens New flow and **O** opens the Flow Library (the tooltips say "New (C)" and "Open (O)"); the letters do nothing while you type in a field or while a dialog is open.
 
 **New Flow** first asks **What starts it?**, then the workflow's title, an optional description and the interfaces it declares (the same interface list as the Flow Library, with each interface's pins). The three answers are:
 

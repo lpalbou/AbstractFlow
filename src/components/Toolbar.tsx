@@ -75,6 +75,7 @@ import {
   type BundleManifestView,
 } from '../utils/bundleDeepLink';
 import { parseTriggerLink, withoutTriggerParam, type TriggerLink } from '../utils/triggerDeepLink';
+import { fileShortcutFromEvent } from '../utils/fileShortcuts';
 import { useDeepLinkBanner } from '../hooks/deepLinkBanner';
 import { deepLinkLoadingName, isAbortError, useFlowLoading } from '../hooks/flowLoading';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
@@ -1971,17 +1972,28 @@ export function Toolbar() {
 
   // The canvas start screen's Create Flow / Open Flow (utils/flowStart.ts):
   // the same dialogs, under the same rule, as the toolbar's own buttons.
+  // C and O (utils/fileShortcuts.ts): only with focus on the canvas or the
+  // page body, never while typing or with a dialog open.
   useEffect(() => {
     const openNew = () => handleNew();
     const openLibrary = () => {
       if (visualflowCrudUnavailable) toast.error(saveUnavailableReason);
       else setShowFlowLibrary(true);
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      const shortcut = fileShortcutFromEvent(e);
+      if (!shortcut) return;
+      e.preventDefault();
+      if (shortcut === 'new') openNew();
+      else openLibrary();
+    };
     window.addEventListener(NEW_FLOW_EVENT, openNew);
     window.addEventListener(OPEN_FLOW_EVENT, openLibrary);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener(NEW_FLOW_EVENT, openNew);
       window.removeEventListener(OPEN_FLOW_EVENT, openLibrary);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, [handleNew, saveUnavailableReason, visualflowCrudUnavailable]);
 
@@ -2173,12 +2185,12 @@ export function Toolbar() {
             unsaved = filled amber with a dot, saving = a spinner, saved =
             quiet. */}
         <div className="toolbar-group" role="group" aria-label="Flow file actions">
-          <ToolbarAction tooltip="New flow" label="New Flow" onClick={handleNew} className="file-action new-button">
+          <ToolbarAction tooltip="New (C)" label="New Flow" onClick={handleNew} className="file-action new-button">
             <IconFilePlus />
             <span className="file-action-label" aria-hidden="true">New</span>
           </ToolbarAction>
           <ToolbarAction
-            tooltip={visualflowCrudUnavailable ? saveUnavailableReason : 'Open a saved flow'}
+            tooltip={visualflowCrudUnavailable ? saveUnavailableReason : 'Open (O)'}
             label="Open Flow"
             onClick={() => setShowFlowLibrary(true)}
             disabled={visualflowCrudUnavailable}
