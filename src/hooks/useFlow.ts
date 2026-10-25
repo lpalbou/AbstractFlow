@@ -14,7 +14,7 @@ import {
   EdgeChange,
 } from 'reactflow';
 import { withTriggerEvent } from '../utils/triggerEvent';
-import { arrivalKindOf, automationNextNote, withAutomationAgent } from '../utils/automationScaffold';
+import { AUTOMATION_CANVAS_NOTE, triggerPinKind, withTriggerPins, type TriggerPinKind } from '../utils/triggerPins';
 import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
@@ -321,6 +321,8 @@ interface FlowState {
    * already wired); throws `TriggerEventError` with the reason otherwise.
    */
   addTriggerEvent: () => string | null;
+  /** On Flow Start gets a trigger's typed pins, On Flow End the automation's (utils/triggerPins.ts); one undo step. */
+  addTriggerPins: (kind: TriggerPinKind) => boolean;
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
   disconnectPin: (nodeId: string, handleId: string, isInput: boolean) => void;
@@ -1149,6 +1151,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     nodeIdCounter += 1;
     set({ nodes, edges: addEdge({ ...connection, id: `edge-${Date.now()}` }, get().edges) });
     return id;
+  },
+
+  addTriggerPins: (kind) => {
+    const state = get();
+    const nodes = withTriggerPins(state.nodes, kind);
+    if (nodes === state.nodes) return false;
+    get()._captureHistory();
+    set({ nodes });
+    return true;
   },
 
   addTriggerEvent: () => {
@@ -3399,26 +3410,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
     };
     let nodes: Node<FlowNodeData>[] = interfaceScaffoldTypes(flowInterfaces).map(scaffold);
-    let edges: Edge[] = [];
+    const edges: Edge[] = [];
     let note: string | null = null;
     if (automation) {
-      // An automation flow (operator 2026-10-25): On Flow Start with the
-      // trigger event wired in, so the run's event is there from the start.
+      // A triggered flow is the person's own workflow (operator ruling
+      // 2026-10-25): ONLY On Flow Start (what arrives, as typed pins) and On
+      // Flow End (response, notify, success), nothing between, no prompt.
       if (!nodes.some((n) => n.data.nodeType === 'on_flow_start')) nodes = [scaffold('on_flow_start'), ...nodes];
-      const next = withTriggerEvent(nodes, edges, { breakNodeId: `node-${nodeIdCounter + 1}`, edgeId: `edge-trigger-event-${nodeIdCounter + 1}` });
-      if (next.breakNodeId) nodeIdCounter += 1;
-      // ...and an Agent between start and end, given the task and what
-      // arrived, so the new flow runs as is (UX review #20).
-      const kind = arrivalKindOf(automation.trigger.source_id, Boolean(automation.trigger.connection_id));
-      const wired = withAutomationAgent(next.nodes, next.edges, kind, (type, position) => {
-        const template = getNodeTemplate(type as never);
-        if (!template) throw new Error(`Node template "${type}" is missing`);
-        const data = createNodeData(template);
-        return { id: `node-${++nodeIdCounter}`, type: 'custom', position, data: type === 'on_flow_end' ? withInterfacePins(data, pins) : data };
-      });
-      nodes = wired.nodes;
-      edges = wired.edges;
-      note = automationNextNote(kind);
+      if (!nodes.some((n) => n.data.nodeType === 'on_flow_end')) nodes = [...nodes, scaffold('on_flow_end')];
+      nodes = withTriggerPins(nodes, triggerPinKind(automation.trigger));
+      note = AUTOMATION_CANVAS_NOTE;
     }
     set((state) => ({
       flowName: name,

@@ -21,8 +21,6 @@ export interface NewFlowValues {
   automation?: AutomationDefaults;
 }
 
-/** The interface an automation flow starts with when none is ticked: it gives On Flow Start its `prompt`. */
-export const AUTOMATION_DEFAULT_INTERFACE = 'abstractcode.agent.v1';
 
 /** The values a New flow dialog creates with, or the reason Create is unavailable. */
 export function newFlowValues(
@@ -67,9 +65,9 @@ export function NewFlowDialog({
   const facts = useAutomationFacts(gatewayContracts, { enabled: isAutomation });
   const support = pickerSupport(facts);
   const start = automationStart(picker, support);
-  // An automation flow takes the runnable agent contract (prompt, provider,
-  // model on On Flow Start); the Interfaces section is not shown for it.
-  const result = newFlowValues(name, description, isAutomation ? [AUTOMATION_DEFAULT_INTERFACE] : interfaces, start);
+  // An automation flow is the person's own workflow: no interface, no
+  // prompt; On Flow Start carries what arrives (operator ruling 2026-10-25).
+  const result = newFlowValues(name, description, isAutomation ? [] : interfaces, start);
   const error = 'error' in result ? result.error : '';
   const create = () => {
     if (!('error' in result)) onCreate(result);
@@ -97,7 +95,7 @@ export function NewFlowDialog({
             <h3 id="new-flow-title">New flow</h3>
             <p className="new-flow-subtitle">
               {isAutomation
-                ? 'Runs by itself when its trigger fires; set its task under Automation.'
+                ? 'Runs by itself when its trigger fires: what arrives is on On Flow Start, build the steps on the canvas.'
                 : 'A flow for chat. Name it now; the description and interfaces can wait.'}
             </p>
           </div>
@@ -116,8 +114,8 @@ export function NewFlowDialog({
         >
           <div className="new-flow-body">
             {isAutomation ? (
-              // An automation flow: no interfaces to choose (it gets the runnable
-              // agent contract on its own: On Flow Start's prompt, provider, model).
+              // An automation flow: no interfaces to choose (On Flow Start carries
+              // what arrives, On Flow End the result).
               <div className="new-flow-automation-body">
                 <section className="new-flow-details" aria-label="Details">
                   <div className="run-form-field">

@@ -30,7 +30,7 @@ import {
   type ConfigFormField,
   type ConfigFormValues,
 } from '../utils/triggerBindings';
-import { TriggerEventError, isTriggerableFlow, withTriggerEvent } from '../utils/triggerEvent';
+import { triggerPinKind, withTriggerPins } from '../utils/triggerPins';
 import {
   AutomationChoiceError,
   budgetText,
@@ -168,7 +168,7 @@ export function InputsForm({
   const set = (id: string, value: string) => onValues({ ...values, [id]: value });
   return (
     <div className="automation-inputs">
-      {fields.length ? null : <p className="automation-help">This flow’s On Flow Start takes no inputs: each run gets only the trigger’s event.</p>}
+      {fields.length ? null : <p className="automation-help">This flow takes no inputs besides what arrives.</p>}
       {fields.map((field) => {
         const id = `automation-input-${field.id.replace(/\W+/g, '-')}`;
         const value = values[field.id] ?? '';
@@ -422,13 +422,6 @@ export function issueText(issue: AutomationDefaultsIssue, fields: ConfigFormFiel
   return issue.message;
 }
 
-function nextNodeId(nodes: VisualFlow['nodes']): string {
-  const max = nodes.reduce((m, n) => {
-    const hit = /^node-(\d+)$/.exec(n.id);
-    return hit ? Math.max(m, Number(hit[1])) : m;
-  }, 0);
-  return `node-${max + 1}`;
-}
 
 /**
  * What Save stores, from the dialog's state (pure, tested): the validated
@@ -474,14 +467,16 @@ export function automationDraft(input: {
     // The picker owns its settings (mailbox, schedule); the form adds the rest.
     trigger = { ...trigger, config: { ...built.config, ...trigger.config } };
   }
+  // What arrives goes on On Flow Start as the trigger's typed pins (and On
+  // Flow End gets response / notify / success): added here, never asked for.
   let graph: AutomationGraph | undefined;
-  if (trigger && !isTriggerableFlow(flow)) {
-    try {
-      const next = withTriggerEvent(flow.nodes as never, flow.edges as never, { breakNodeId: nextNodeId(flow.nodes), edgeId: `edge-trigger-event-${nextNodeId(flow.nodes)}` });
-      graph = { nodes: next.nodes as never, edges: next.edges as never };
-    } catch (error) {
-      if (!(error instanceof TriggerEventError)) throw error;
-      found.push(error.message);
+  if (trigger) {
+    const starts = flow.nodes.filter((n) => n.type === 'on_flow_start' || n.data?.nodeType === 'on_flow_start');
+    if (starts.length !== 1) {
+      found.push(starts.length ? 'The flow has several On Flow Start nodes: keep one, then save again.' : 'The flow has no On Flow Start node: add one, then save again.');
+    } else {
+      const nodes = withTriggerPins(flow.nodes as never, triggerPinKind(trigger));
+      if (nodes !== (flow.nodes as never)) graph = { nodes: nodes as never, edges: flow.edges };
     }
   }
   if (!trigger && !found.length) found.push('Choose what starts it.');

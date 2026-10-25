@@ -13,7 +13,8 @@ import { parseMailboxes } from '../utils/automationGateway';
 import { parseTriggerSourcesResponse, type AvailableTriggerSource } from '../utils/triggerSources';
 import { parseTriggerConnectionsResponse } from '../utils/triggerConnections';
 import { CONNECTIONS_RESPONSE, LIVE_SOURCES_RESPONSE, ME_EMAIL_RESPONSE } from '../utils/triggerSources.fixtures';
-import { isTriggerableFlow, withTriggerEvent } from '../utils/triggerEvent';
+import { isTriggerableFlow } from '../utils/triggerEvent';
+import { withTriggerPins } from '../utils/triggerPins';
 import type { VisualFlow } from '../types/flow';
 
 const SOURCES = parseTriggerSourcesResponse(LIVE_SOURCES_RESPONSE);
@@ -36,8 +37,7 @@ function flow(withEvent: boolean): VisualFlow {
   };
   const base = { id: 'f1', name: 'Mail triage', nodes: [start], edges: [] } as unknown as VisualFlow;
   if (!withEvent) return base;
-  const next = withTriggerEvent(base.nodes as never, [], { breakNodeId: 'node-2', edgeId: 'e1' });
-  return { ...base, nodes: next.nodes as never, edges: next.edges as never };
+  return { ...base, nodes: withTriggerPins(base.nodes as never, 'email') as never };
 }
 
 function draft(picker: PickerState, extra: Partial<Parameters<typeof automationDraft>[0]> = {}) {
@@ -92,7 +92,7 @@ describe('the email settings form (defect 3)', () => {
 });
 
 describe('Save (defects 1 and 2)', () => {
-  it('a mailbox is saved as config.account with the settings; the Trigger event node is added, never asked for', () => {
+  it('a mailbox is saved as config.account with the settings; the trigger\'s typed pins are added, never asked for', () => {
     const out = draft(
       { ...emptyPicker('arrives'), arrival: 'mail:work' },
       { formSource: EMAIL, formOptions: EMAIL_OPTIONS, values: { 'filter.subject_contains': 'invoice' } }
@@ -100,8 +100,9 @@ describe('Save (defects 1 and 2)', () => {
     if (!('next' in out)) throw new Error(out.problems.join('; '));
     expect(out.next.trigger).toEqual({ source_id: 'email.received', source_version: 1, config: { account: 'work', filter: { subject_contains: 'invoice' } } });
     expect(out.graph && isTriggerableFlow({ nodes: out.graph.nodes })).toBe(true);
-    expect(out.graph?.nodes.find((n) => n.data.label === 'Trigger event')?.id).toBe('node-2');
-    // A flow that already receives the event keeps its graph.
+    expect(out.graph?.nodes[0].data.outputs.map((p) => p.id)).toEqual(['exec-out', 'prompt', 'messages', 'mailbox', 'event']);
+    expect(out.graph?.nodes).toHaveLength(1); // no node is added, only pins
+    // A flow that already has them keeps its graph.
     const again = draft({ ...emptyPicker('arrives'), arrival: 'mail:work' }, { flow: flow(true) });
     expect('next' in again && again.graph).toBeUndefined();
   });
@@ -133,8 +134,8 @@ describe('Save (defects 1 and 2)', () => {
   });
 });
 
-describe('the library save of an OPEN flow adds the Trigger event to its canvas too', () => {
-  it('putAutomationDefaults with addTriggerEvent patches the open document and keeps a clean editor clean', async () => {
+describe('the library save of an OPEN flow adds the trigger pins to its canvas too', () => {
+  it('putAutomationDefaults with triggerPins patches the open document and keeps a clean editor clean', async () => {
     const { useFlowStore } = await import('../hooks/useFlow');
     const { putAutomationDefaults } = await import('../hooks/openFlowMetadata');
     const store = useFlowStore.getState();
@@ -145,7 +146,7 @@ describe('the library save of an OPEN flow adds the Trigger event to its canvas 
       id: 'f1',
       next,
       hasUnsavedChanges: false,
-      addTriggerEvent: true,
+      triggerPins: 'manual',
       put: async () => ({ ...flow(true), automation_defaults: next }) as VisualFlow,
     });
     expect(out.applied).toBe(true);
@@ -271,12 +272,12 @@ describe('Turn it on (UX review #1)', () => {
 });
 
 describe('UX review #23, #24', () => {
-  it('an automation flow is created with the runnable agent contract and no Interfaces section', async () => {
+  it('an automation flow is created with no interface (no prompt-centred contract) and no Interfaces section', async () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(new URL('./NewFlowDialog.tsx', import.meta.url), 'utf8');
     expect(src).toMatch(/\{isAutomation \? \(\s*\/\/[^\n]*\n[^\n]*\n\s*<div className="new-flow-automation-body">/);
-    expect(src).toContain("'Runs by itself when its trigger fires; set its task under Automation.'");
-    expect(src).toContain('isAutomation ? [AUTOMATION_DEFAULT_INTERFACE] : interfaces');
+    expect(src).toContain("'Runs by itself when its trigger fires: what arrives is on On Flow Start, build the steps on the canvas.'");
+    expect(src).toContain('isAutomation ? [] : interfaces');
     expect(src).not.toContain('Elo');
   });
 

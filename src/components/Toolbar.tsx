@@ -53,6 +53,7 @@ import { AutomationDefaultsModal, type AutomationGraph } from './AutomationDefau
 import { FlowNatureBadge, useTriggerWords } from './automation/FlowNatureBadge';
 import { OPEN_AUTOMATION_EVENT } from './automation/CanvasNote';
 import { triggerSentence } from '../utils/automationChoice';
+import { automationSaveWarning, triggerPinKind } from '../utils/triggerPins';
 import {
   interfacesFromPutResponse,
   descriptionFromPutResponse,
@@ -1037,7 +1038,7 @@ export function Toolbar() {
         id,
         next,
         hasUnsavedChanges,
-        addTriggerEvent: Boolean(graph),
+        ...(graph && next ? { triggerPins: triggerPinKind(next.trigger) } : {}),
         put: () => updateFlowAutomationDefaults(id, next, gatewayContracts, graph),
       });
       if (baseline) setSavedFlowSignature(flowSignatureFor(baseline));
@@ -1150,7 +1151,10 @@ export function Toolbar() {
       // is neither set nor left stranded.
       if (savedId && savedId !== variables.existingFlowId) saveJustSucceededRef.current = true;
       queryClient.invalidateQueries({ queryKey: ['flows'] });
-      toast.success('Flow saved!');
+      // A triggered flow with nothing on On Flow End's response is saved, with a word on it.
+      const warning = automationSaveWarning(variables.flow);
+      if (warning) toast(warning, { duration: 8000 });
+      else toast.success('Flow saved!');
     },
     onError: (error) => {
       // An expired browser session is the single most common save failure and
@@ -2234,11 +2238,11 @@ export function Toolbar() {
             gatewayContracts={gatewayContracts}
             onTurnOn={(next) => turnOn({ kind: 'open' }, next)}
             onClose={() => setShowOpenFlowAutomation(false)}
-            onSave={(next, extra) => {
+            onSave={(next) => {
               // The open document: saved with the flow (Save), like any edit;
-              // the Trigger event node is added to the canvas the same way.
+              // the trigger's pins are added to the canvas the same way.
               setFlowAutomationDefaults(next);
-              if (extra?.graph) useFlowStore.getState().addTriggerEvent();
+              if (next) useFlowStore.getState().addTriggerPins(triggerPinKind(next.trigger));
             }}
           />
         ) : null}

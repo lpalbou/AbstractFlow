@@ -9,6 +9,7 @@
 import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import { normalizeInterfaces } from '../utils/flowFamilies';
 import { useFlowStore } from './useFlow';
+import type { TriggerPinKind } from '../utils/triggerPins';
 
 export interface OpenFlowMetadataPatch {
   name?: string;
@@ -16,8 +17,8 @@ export interface OpenFlowMetadataPatch {
   interfaces?: string[];
   /** Null clears the defaults. */
   automation_defaults?: AutomationDefaults | null;
-  /** The PUT also stored the Trigger event node: add it to the open canvas too. */
-  addTriggerEvent?: boolean;
+  /** The PUT also stored the trigger's pins on On Flow Start / End: add them to the open canvas too. */
+  triggerPins?: TriggerPinKind;
 }
 
 export interface OpenFlowMetadataResult {
@@ -68,13 +69,13 @@ export async function updateOpenFlowMetadata(options: {
   if (patch.description !== undefined) now.setFlowDescription(patch.description);
   if (patch.interfaces !== undefined) now.setFlowInterfaces(patch.interfaces);
   if (patch.automation_defaults !== undefined) now.setFlowAutomationDefaults(patch.automation_defaults);
-  if (patch.addTriggerEvent) now.addTriggerEvent();
+  if (patch.triggerPins) now.addTriggerPins(patch.triggerPins);
   return {
     updated,
     applied: true,
     // A canvas change makes the open document itself the new baseline (the
     // gateway holds the same graph): a clean editor stays clean.
-    baseline: ticket.cleanBefore ? (patch.addTriggerEvent ? useFlowStore.getState().getFlow() : baselineWith(ticket.cleanBefore, patch)) : null,
+    baseline: ticket.cleanBefore ? (patch.triggerPins ? useFlowStore.getState().getFlow() : baselineWith(ticket.cleanBefore, patch)) : null,
   };
 }
 
@@ -95,7 +96,7 @@ export function interfacesFromPutResponse(updated: VisualFlow): string[] {
 }
 
 function baselineWith(flow: VisualFlow, patch: OpenFlowMetadataPatch): VisualFlow {
-  const { automation_defaults, addTriggerEvent: _added, ...rest } = patch;
+  const { automation_defaults, triggerPins: _pins, ...rest } = patch;
   const next: VisualFlow = { ...flow, ...rest };
   if (automation_defaults === null) delete next.automation_defaults;
   else if (automation_defaults !== undefined) next.automation_defaults = automation_defaults;
@@ -111,8 +112,8 @@ export async function putAutomationDefaults(options: {
   id: string;
   next: AutomationDefaults | null;
   hasUnsavedChanges: boolean;
-  /** The PUT carries the Trigger event node (the Automation dialog added it). */
-  addTriggerEvent?: boolean;
+  /** The PUT carries the trigger's pins (the Automation dialog added them). */
+  triggerPins?: TriggerPinKind;
   put: () => Promise<VisualFlow>;
 }): Promise<OpenFlowMetadataResult> {
   return updateOpenFlowMetadata({
@@ -125,7 +126,7 @@ export async function putAutomationDefaults(options: {
     },
     patchFrom: (updated) => ({
       automation_defaults: automationDefaultsFromPutResponse(updated, options.next),
-      ...(options.addTriggerEvent ? { addTriggerEvent: true } : {}),
+      ...(options.triggerPins ? { triggerPins: options.triggerPins } : {}),
     }),
   });
 }

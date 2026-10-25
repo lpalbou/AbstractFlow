@@ -10,6 +10,7 @@
 import type { JsonValue, VisualFlow } from '../types/flow';
 import { humanizeKey } from './triggerBindings';
 import { TRIGGER_EVENT_PIN_ID } from './triggerEvent';
+import { TRIGGER_FILLED_PIN_IDS } from './triggerPins';
 
 export type InputFieldKind = 'prompt' | 'text' | 'provider' | 'model' | 'number' | 'boolean' | 'json';
 
@@ -57,7 +58,9 @@ export function inputFields(flow: Pick<VisualFlow, 'nodes'>): InputField[] {
   // What each run is asked to do comes first: it is the one input most automations need.
   const ordered = [...pins].sort((a, b) => Number(b.id === 'prompt') - Number(a.id === 'prompt'));
   return ordered
-    .filter((pin) => pin.type !== 'execution' && pin.id !== TRIGGER_EVENT_PIN_ID)
+    // Only the flow's OWN inputs: what the trigger fills (event, messages,
+    // items, calls, scheduled_at, …: utils/triggerPins.ts) is never asked.
+    .filter((pin) => pin.type !== 'execution' && !TRIGGER_FILLED_PIN_IDS.has(pin.id))
     .map((pin) => {
       if (pin.id === 'prompt') {
         return { id: pin.id, label: 'What each run is asked to do', help: 'The trigger’s details are added automatically.', kind: 'prompt' as const };

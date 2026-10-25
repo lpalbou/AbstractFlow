@@ -199,19 +199,22 @@ describe('New flow: "What starts it?"', () => {
     expect(newFlowValues('X', '', [], automationStart(emptyPicker('arrives'), support))).toEqual({ error: 'Choose what it listens to.' });
   });
 
-  it('Create with a trigger: On Flow Start + the wired Trigger event + the defaults, in the open editor', () => {
-    const automation = automationFromChoice({ kind: 'schedule', rule: { repeat: 'daily', at: '08:00' }, timeZone: 'Europe/Paris' }, SOURCES);
-    useFlowStore.getState().createFlow({ name: 'Morning digest', description: '', interfaces: ['abstractcode.agent.v1'], automation });
+  it('Create with a trigger: ONLY On Flow Start (what arrives, typed) and On Flow End (response, notify, success), nothing between', () => {
+    const automation = automationFromChoice({ kind: 'mail', account: 'default' }, SOURCES);
+    useFlowStore.getState().createFlow({ name: 'Mail judge', description: '', interfaces: [], automation });
     const st = useFlowStore.getState();
     const flow = st.getFlow();
+    expect(flow.nodes.map((n) => n.data.nodeType).sort()).toEqual(['on_flow_end', 'on_flow_start']);
+    expect(flow.edges).toEqual([]);
     expect(isTriggerableFlow(flow)).toBe(true);
     const start = flow.nodes.find((n) => n.data.nodeType === 'on_flow_start')!;
-    const breakNode = flow.nodes.find((n) => n.data.label === 'Trigger event')!;
-    expect(flow.edges).toContainEqual(expect.objectContaining({ source: start.id, sourceHandle: 'event', target: breakNode.id }));
+    const end = flow.nodes.find((n) => n.data.nodeType === 'on_flow_end')!;
+    expect(start.data.outputs.map((p) => `${p.id}:${p.type}`)).toEqual(['exec-out:execution', 'messages:array', 'mailbox:string', 'event:object']);
+    expect(start.data.outputs.every((p) => p.type === 'execution' || Boolean(p.description))).toBe(true);
+    expect(end.data.inputs.map((p) => p.id)).toEqual(['exec-in', 'response', 'notify', 'success']);
+    expect(flow.nodes.some((n) => n.data.nodeType === 'agent' || n.data.label === 'Trigger event')).toBe(false);
     expect(flow.automation_defaults).toEqual(automation);
-    // No interface ticked: On Flow Start is still created for the trigger.
-    useFlowStore.getState().createFlow({ name: 'Bare', description: '', interfaces: [], automation });
-    expect(isTriggerableFlow(useFlowStore.getState().getFlow())).toBe(true);
+    expect(st.canvasNote).toBe('What arrives is on On Flow Start; put what the person should see on On Flow End’s response (and notify for an alert).');
     // Chat: no trigger node, no defaults.
     useFlowStore.getState().createFlow({ name: 'Chat', description: '', interfaces: ['abstractcode.agent.v1'] });
     expect(useFlowStore.getState().getFlow().automation_defaults).toBeUndefined();
