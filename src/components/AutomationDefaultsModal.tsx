@@ -469,7 +469,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
                 style={{ marginTop: 8, color: triggerable ? undefined : eventRequirement === 'required' ? 'var(--error, #e74c3c)' : 'var(--warning)' }}
               >
                 {triggerable
-                  ? 'Triggerable: each run receives the event on On Flow Start → event (type, subject, time, data).'
+                  ? 'Triggerable: each run receives the event on On Flow Start → event (type, subject, time, data; a feed or webhook batch in data.events).'
                   : eventRequirement === 'required'
                     ? 'This flow cannot receive the event yet: open it, select On Flow Start and use "Add trigger event", then save the flow.'
                     : 'Tip: open the flow, select On Flow Start and use "Add trigger event" to read the event (type, subject, time, data).'}

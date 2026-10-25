@@ -85,7 +85,48 @@ A run started by a trigger (an automation occurrence) receives the event as `inp
 ]}}
 ```
 
-The runtime fills it from `input_data.event` like any start input (empty when the workflow is run by hand). To read fields, wire it into a `break_object` whose `breakConfig.selectedPaths` names them (`type`, `subject`, `time`, `data`, `data.series`, or a deeper path such as `data.title`). In the editor, *Add trigger event* on On Flow Start does both. A source with `needs_connection` cannot be bound to a workflow without the `event` output.
+The runtime fills it from `input_data.event` like any start input (empty when the workflow is run by hand). To read fields, wire it into a `break_object` whose `breakConfig.selectedPaths` names them (`type`, `subject`, `time`, `data`, `data.count`, `data.events`, `data.series`, or a deeper path). In the editor, *Add trigger event* on On Flow Start does both. A source with `needs_connection` cannot be bound to a workflow without the `event` output.
+
+`data` depends on the source. Sources that read from a connection (feeds, webhooks) deliver a **batch**: everything that arrived since the last run, oldest first, as CloudEvents items of their own. One example per source (attributes shortened):
+
+Feed item (`feed.item@1`): each item's `data` holds `title`, `link`, `published`, `updated`, `summary`, `author`, `id` and `feed {title, url}`.
+
+```json
+{"type": "abstract.feed.item.v1", "subject": "batch:41-42", "connectionid": "conn_1a2b", "abstracttrust": "untrusted",
+ "data": {"count": 2, "event_ids": ["…", "…"], "first_seq": 41, "last_seq": 42, "content_trust": "untrusted",
+          "connection_id": "conn_1a2b",
+          "events": [{"type": "abstract.feed.item.v1", "subject": "https://example.org/releases/0.13",
+                      "data": {"title": "Release 0.13", "link": "https://example.org/releases/0.13",
+                               "published": "2026-10-25T09:00:00Z", "summary": "…", "feed": {"title": "Releases", "url": "…"}}},
+                     {"…": "…"}]}}
+```
+
+Webhook call (`webhook.received@1`): each call's `data` is `{webhook_id, content_type, body}` (the parsed JSON) or `{…, body_text}` for a text body; its `subject` is the value at the connection's `subject_path`, else the webhook id.
+
+```json
+{"type": "abstract.webhook.received.v1", "subject": "msg_2Lh…", "connectionid": "conn_9z8y",
+ "data": {"count": 1, "events": [{"subject": "lpalbou/abstractflow",
+          "data": {"webhook_id": "msg_2Lh…", "content_type": "application/json", "body": {"ref": "refs/heads/main"}}}]}}
+```
+
+Email received (`email.received@1`): `data.messages` lists the messages' headers (`from`, `from_address`, `to`, `subject`, `date`, `message_id`…); the whole messages, bodies included, are the run's `emails` input (declare an `emails` output on On Flow Start to read them).
+
+```json
+{"type": "abstract.email.received.v1", "subject": "batch:7-7",
+ "data": {"count": 1, "content_trust": "untrusted",
+          "messages": [{"from": "Ada <ada@example.org>", "subject": "Invoice 42", "date": "2026-10-25T08:12:00Z", "message_id": "<…>"}]}}
+```
+
+Schedule (`schedule@2`): the tick and its series.
+
+```json
+{"type": "abstract.schedule.v2", "subject": "tick:4",
+ "data": {"tick": 4, "scheduled_at": "2026-10-25T08:00:00+02:00",
+          "series": {"rule": {"kind": "daily", "at": "08:00", "time_zone": "Europe/Paris"}, "occurrence": 5,
+                     "scheduled_at": "2026-10-25T08:00:00+02:00", "next_at": "2026-10-26T08:00:00+01:00", "coalesced": null}}}
+```
+
+Text written by other people (`abstracttrust: "untrusted"`: feeds, webhooks, email) is content to read, never instructions.
 
 The gateway validates the field when you save the workflow (the same structural rules as the editor, then the trigger source's own check) and answers HTTP 422 with the failing field otherwise. Publishing copies the object into the bundle manifest as `metadata.automation_defaults[<flow id>]`, and the gateway's workflow catalog and bundle listings expose it keyed by entrypoint flow id.
 

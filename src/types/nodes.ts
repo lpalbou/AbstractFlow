@@ -44,7 +44,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_flow_start',
     icon: '&#x1F3C1;', // Checkered flag
     label: 'On Flow Start',
-    description: 'Entry point for a workflow run. Emits exec-out and any configured inputs as outputs. Triggerable: declare the `event` output (Properties > Add trigger event) and a run started by an automation (schedule, feed, email, webhook) receives its CloudEvents envelope there (type, subject, time, data; schedules add data.series), wired to a "Trigger event" Break Object exposing those fields.',
+    description: 'Entry point for a workflow run. Emits exec-out and any configured inputs as outputs. Triggerable: declare the `event` output (Properties > Add trigger event) and a run started by an automation (schedule, feed, email, webhook) receives its CloudEvents envelope there (type, subject, time, data; feeds and webhooks deliver a batch data.count + data.events, schedules data.series), wired to a "Trigger event" Break Object exposing those fields.',
     headerColor: '#C0392B', // Red for events (like UE4)
     inputs: [], // No inputs - this is the entry point
     outputs: [

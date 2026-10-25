@@ -40,7 +40,7 @@ describe('triggerable flows', () => {
 });
 
 describe('withTriggerEvent', () => {
-  it('adds the event output and a wired "Trigger event" Break Object exposing type, subject, time, data, series', () => {
+  it('adds the event output and a wired "Trigger event" Break Object exposing type, subject, time, data, count, events, series', () => {
     const start = node('start', 'on_flow_start', 100, 50);
     const out = withTriggerEvent([start], [], { breakNodeId: 'b1', edgeId: 'e1' });
     const s = out.nodes.find((n) => n.id === 'start')!;
@@ -53,17 +53,23 @@ describe('withTriggerEvent', () => {
     expect(b.data.nodeType).toBe('break_object');
     expect(b.data.label).toBe(TRIGGER_EVENT_NODE_LABEL);
     // The runtime's break_object reads `breakConfig.selectedPaths` (dotted paths into the object).
-    expect(b.data.breakConfig?.selectedPaths).toEqual(['type', 'subject', 'time', 'data', 'data.series']);
+    expect(b.data.breakConfig?.selectedPaths).toEqual(['type', 'subject', 'time', 'data', 'data.count', 'data.events', 'data.series']);
     expect(b.data.outputs.map((p) => `${p.id}:${p.label}:${p.type}`)).toEqual([
       'type:type:string',
       'subject:subject:string',
       'time:time:string',
       'data:data:object',
+      'data.count:count:number',
+      'data.events:events:array',
       'data.series:series:object',
     ]);
+    // A feed item's title is typed for path pickers: data.events[i].data.title.
+    const events = b.data.outputs.find((p) => p.id === 'data.events')!;
+    const item = (events.schema as { items: { properties: { data: { properties: Record<string, unknown> } } } }).items;
+    expect(Object.keys(item.properties.data.properties)).toEqual(['title', 'link', 'published', 'summary', 'body', 'body_text']);
     expect(out.edges).toEqual([{ id: 'e1', source: 'start', sourceHandle: 'event', target: 'b1', targetHandle: 'object' }]);
     expect(out.breakNodeId).toBe('b1');
-    expect(TRIGGER_EVENT_FIELDS).toHaveLength(5);
+    expect(TRIGGER_EVENT_FIELDS).toHaveLength(7);
   });
 
   it('is idempotent once wired, and refuses ambiguous graphs with the reason', () => {

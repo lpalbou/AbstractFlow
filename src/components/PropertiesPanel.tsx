@@ -4995,8 +4995,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           {startHasTriggerEvent(data) ? (
             <span className="property-hint">
               Triggerable: a run started by an automation (schedule, feed, email, webhook) receives its event on the{' '}
-              <code>event</code> output — <code>type</code>, <code>subject</code>, <code>time</code>, <code>data</code>{' '}
-              (schedules add <code>data.series</code>). Empty when the flow is run by hand.
+              <code>event</code> output — <code>type</code>, <code>subject</code>, <code>time</code>, <code>data</code>;
+              feeds and webhooks deliver a batch (<code>data.count</code>, <code>data.events</code>), schedules{' '}
+              <code>data.series</code>. Empty when the flow is run by hand.
             </span>
           ) : (
             <>

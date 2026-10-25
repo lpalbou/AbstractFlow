@@ -8,7 +8,14 @@
  *   { id, type, source, subject, time, datacontenttype, data,
  *     bindingid, connectionid, correlationid, dedupekey, sequence, abstracttrust }
  *
- * and schedules add `data.series {rule, occurrence, scheduled_at, next_at, coalesced}`.
+ * `data` is the source's payload. Connection sources (feeds, webhooks) deliver a
+ * BATCH: `data = {count, events: [<CloudEvents item>...], event_ids, first_seq,
+ * last_seq, content_trust, connection_id}` — a feed item is
+ * `events[i].data.{title, link, published, summary}`, a webhook call
+ * `events[i].data.body` (or `body_text`). `email.received@1` delivers
+ * `data = {count, messages: [{from, subject, date, ...}], ...}` (bodies ride
+ * `input_data.emails`). Schedules add
+ * `data.series {rule, occurrence, scheduled_at, next_at, coalesced}`.
  *
  * The flow's entry is On Flow Start (every host keys on it; its other inputs
  * still take the automation's `input_data`). A flow is TRIGGERABLE when On
@@ -16,7 +23,8 @@
  * `input_data.event` onto it like any start input. "Add trigger event" adds
  * that output (with the envelope's JSON Schema, so path pickers know its
  * fields) and a Break Object named "Trigger event" wired to it, exposing
- * `type`, `subject`, `time`, `data` and `series` (`data.series`) as outputs.
+ * `type`, `subject`, `time`, `data`, `count` (`data.count`), `events`
+ * (`data.events`) and `series` (`data.series`) as outputs.
  * Both are existing node types: nothing new to compile on the runtime.
  */
 import type { Edge, Node } from 'reactflow';
@@ -25,7 +33,7 @@ import type { FlowNodeData, Pin, VisualFlow } from '../types/flow';
 export const TRIGGER_EVENT_PIN_ID = 'event';
 export const TRIGGER_EVENT_NODE_LABEL = 'Trigger event';
 /** The Break Object paths "Add trigger event" selects (`data.series` shows as `series`). */
-export const TRIGGER_EVENT_FIELDS = ['type', 'subject', 'time', 'data', 'data.series'] as const;
+export const TRIGGER_EVENT_FIELDS = ['type', 'subject', 'time', 'data', 'data.count', 'data.events', 'data.series'] as const;
 
 const SERIES_SCHEMA = {
   type: 'object',
@@ -36,6 +44,30 @@ const SERIES_SCHEMA = {
     scheduled_at: { type: 'string', format: 'date-time', description: 'When this occurrence was due.' },
     next_at: { type: ['string', 'null'], format: 'date-time', description: 'The next occurrence, or null when the series ends.' },
     coalesced: { type: 'integer', description: 'Missed ticks folded into this run (0 when none).' },
+  },
+};
+
+/** One item of a connection batch (`data.events[i]`): a CloudEvents event of its own. */
+const BATCH_ITEM_SCHEMA = {
+  type: 'object',
+  description: 'One received item (CloudEvents): a feed item, a webhook call...',
+  properties: {
+    id: { type: 'string' },
+    type: { type: 'string' },
+    subject: { type: 'string', description: 'The item title / id, the webhook subject.' },
+    time: { type: 'string', format: 'date-time' },
+    data: {
+      type: 'object',
+      description: 'Feed item: title, link, published, summary. Webhook call: body (JSON) or body_text.',
+      properties: {
+        title: { type: 'string' },
+        link: { type: 'string' },
+        published: { type: 'string' },
+        summary: { type: 'string' },
+        body: { description: 'A webhook call\'s JSON body.' },
+        body_text: { type: 'string' },
+      },
+    },
   },
 };
 
@@ -53,8 +85,13 @@ export const TRIGGER_EVENT_SCHEMA: Record<string, unknown> = {
     datacontenttype: { type: 'string' },
     data: {
       type: 'object',
-      description: "The event's content (the email, the feed item, the webhook body...).",
-      properties: { series: SERIES_SCHEMA },
+      description: "The event's content. Connection sources (feeds, webhooks): a batch {count, events}; email: {count, messages}; schedules: the tick and its series.",
+      properties: {
+        count: { type: 'integer', description: 'How many items this run received (connection sources, email).' },
+        events: { type: 'array', description: 'The received items, oldest first (connection sources).', items: BATCH_ITEM_SCHEMA },
+        messages: { type: 'array', description: 'email.received: the messages (from, subject, date...); bodies ride input_data.emails.' },
+        series: SERIES_SCHEMA,
+      },
     },
     bindingid: { type: 'string' },
     connectionid: { type: 'string', description: 'The trigger connection that received it.' },
@@ -103,6 +140,17 @@ export function triggerEventRequirement(source: { needs_connection: boolean; cap
   return 'optional';
 }
 
+function schemaAt(schema: Record<string, unknown>, path: string): Record<string, unknown> {
+  let node: Record<string, unknown> = schema;
+  for (const part of path.split('.')) {
+    const props = node.properties as Record<string, Record<string, unknown>> | undefined;
+    const next = props?.[part];
+    if (!next) throw new TriggerEventError(`The trigger event schema has no ${path}`);
+    node = next;
+  }
+  return node;
+}
+
 export class TriggerEventError extends Error {
   constructor(message: string) {
     super(message);
@@ -136,13 +184,12 @@ export function withTriggerEvent(
   }
   const wired = edges.some((e) => e.source === start.id && e.sourceHandle === TRIGGER_EVENT_PIN_ID);
   if (wired) return { nodes: nextNodes, edges, breakNodeId: null };
-  const dataProps = (TRIGGER_EVENT_SCHEMA.properties as Record<string, Record<string, unknown>>);
   const outputs: Pin[] = TRIGGER_EVENT_FIELDS.map((path) => {
-    const leaf = path === 'data.series' ? SERIES_SCHEMA : dataProps[path];
+    const leaf = schemaAt(TRIGGER_EVENT_SCHEMA, path);
     return {
       id: path,
       label: path.split('.').slice(-1)[0],
-      type: leaf.type === 'object' ? 'object' : 'string',
+      type: leaf.type === 'object' ? 'object' : leaf.type === 'array' ? 'array' : leaf.type === 'integer' ? 'number' : 'string',
       ...(typeof leaf.description === 'string' ? { description: leaf.description } : {}),
       schema: leaf,
     } as Pin;
