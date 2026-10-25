@@ -53,6 +53,21 @@ published with the workflow. The `On Schedule`, `On Event` and `Delay` nodes
 wait inside a run that has already started and do not start runs. See
 [Web editor > Automation Defaults](web-editor.md#automation-defaults).
 
+## How Does A Workflow Read The Event That Started It?
+
+Select the workflow's **On Flow Start** and press **Add trigger event**. The
+node gets an `event` output, and a **Trigger event** node wired to it exposes
+`type`, `subject`, `time`, `data`, `count`, `events` and `series`. A feed or a
+webhook delivers a batch: loop over `events`, or add a path such as
+`data.events.0.data.title`. When you run the workflow by hand, `event` is
+empty. See [Web editor > The Trigger Event](web-editor.md#the-trigger-event).
+
+## Where Do I Create A Feed, Webhook Or Mailbox Connection?
+
+On the Gateway console's **Triggers** page (`/console#triggers`). In the
+Automation dialog, **New connection…** opens that page on the selected source;
+press **Refresh connections** when you come back.
+
 ## Why Does The Automation Dialog Say Trigger Sources Are Unavailable?
 
 The connected Gateway does not serve automations (it reports them as

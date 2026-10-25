@@ -64,7 +64,7 @@ flowchart TB
     Store["Editor store (hooks/useFlow.ts)<br/>loadFlow, undo/redo, preservedEdges"]
     Interfaces["Interface contracts (utils/flowFamilies.ts)<br/>KNOWN_INTERFACES, applyInterfacePins"]
     Preflight["Run preflight (utils/preflight.ts)"]
-    Triggers["Trigger sources + automation defaults<br/>(utils/triggerSources.ts, utils/triggerBindings.ts)"]
+    Triggers["Trigger sources, connections + automation defaults<br/>(utils/triggerSources.ts, triggerConnections.ts, triggerBindings.ts)"]
     Assistant["Workflow Authoring Assistant drawer"]
     Client["Gateway client (utils/gatewayClient.ts)"]
   end
@@ -154,6 +154,20 @@ flowchart LR
   Create --> Automation["Automation<br/>runs the workflow per trigger"]
 ```
 
+Sources that read from a connection (a feed, a webhook, a mailbox) bind one of
+the author's trigger connections, and every run receives the event that caused
+it on the workflow's `On Flow Start`:
+
+```mermaid
+flowchart LR
+  Console["Gateway console<br/>Triggers page"] -->|creates| Conn[(Trigger connection<br/>feed, webhook, mailbox)]
+  Dialog["Flow Library > Automation<br/>Connection selector"] -->|GET /api/gateway/triggers/connections| Conn
+  Dialog -->|trigger.connection_id| Doc["automation_defaults"]
+  Conn -->|events| Occ["Automation occurrence<br/>input_data.event (CloudEvents)"]
+  Occ --> Start["On Flow Start<br/>event output"]
+  Start --> Break["Trigger event (Break Object)<br/>type, subject, time, data, count, events, series"]
+```
+
 - **Discovery** (`src/utils/triggerSources.ts`): the trigger sources come from
   the Gateway (the `trigger_sources_endpoint` advertised in the capabilities,
   else `GET /api/gateway/trigger-sources`). Flow keeps no local list, so a
@@ -167,7 +181,15 @@ flowchart LR
   outside the subset is refused rather than partly checked.
 - **Editing** (`src/components/AutomationDefaultsModal.tsx`): the settings form
   is built from the source's schema; saving is a `PUT` whose answer must echo
-  the stored field.
+  the stored field. For a source with `needs_connection`, the dialog lists the
+  author's connections of that source (`src/utils/triggerConnections.ts`) and
+  stores the choice as `trigger.connection_id`.
+- **Trigger event** (`src/utils/triggerEvent.ts`): *Add trigger event* on
+  `On Flow Start` adds the `event` output, typed with the CloudEvents envelope's
+  schema, and a wired Break Object named "Trigger event". A workflow with that
+  output is triggerable; a source with `needs_connection` cannot be bound to a
+  workflow without it. Both are standard node types, so the Runtime executes
+  them unchanged.
 - **Gateway**: validates the field again on save, exports it on publish as
   `metadata.automation_defaults[<flow id>]`, and fills a creation request's
   missing trigger, context, title and `input_data` from it.

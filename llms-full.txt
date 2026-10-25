@@ -103,8 +103,14 @@ warns about missing, unconnected, or mistyped interface pins. See [VisualFlow JS
 A runnable workflow can also store automation defaults (Flow Library >
 **Automation**): the trigger source and settings discovered from the Gateway,
 the context mode, and default inputs that an automation created from the
-published workflow starts with. See
-[Web editor > Automation Defaults](docs/web-editor.md#automation-defaults).
+published workflow starts with. Sources that read from a connection (a feed,
+a webhook, a mailbox) list your connections from the Gateway console's
+Triggers page. A workflow becomes *triggerable* with **Add trigger event** on
+its `On Flow Start`: each run an automation starts then receives the event that
+caused it (type, subject, time, data, and a feed's or webhook's batch of
+items). See
+[Web editor > Automation Defaults](docs/web-editor.md#automation-defaults) and
+[The Trigger Event](docs/web-editor.md#the-trigger-event).
 
 The About button in the top bar opens the shared AbstractFramework About card:
 the AbstractFlow version, the AbstractFramework and AbstractGateway versions the
@@ -230,7 +236,7 @@ The canvas reflects that split:
 Start here:
 
 - [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
-- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, flow interfaces, automation defaults and trigger-source discovery, hidden connections, the authoring assistant, media and file nodes.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, flow interfaces, automation defaults, trigger-source discovery, trigger connections and the trigger event, hidden connections, the authoring assistant, media and file nodes.
 - [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
 - [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
@@ -239,7 +245,7 @@ Reference:
 - [Architecture](architecture.md): components, boundaries, and diagrams of the editor, the Flow server, and Gateway, including the automation-defaults path from document to automation.
 - [API and contracts](api.md): CLI options, environment variables, proxy contract, and the main frontend modules.
 - [CLI](cli.md): the `abstractflow-editor` command.
-- [VisualFlow JSON](visualflow.md): the workflow document format, interfaces and their boundary pins, the `automation_defaults` field, pin expressions, and sharing.
+- [VisualFlow JSON](visualflow.md): the workflow document format, interfaces and their boundary pins, the `automation_defaults` field (including `trigger.connection_id`), the trigger event a triggered run receives with one example per source, pin expressions, and sharing.
 
 Workflow authoring:
 
@@ -4167,7 +4173,7 @@ flowchart TB
     Store["Editor store (hooks/useFlow.ts)<br/>loadFlow, undo/redo, preservedEdges"]
     Interfaces["Interface contracts (utils/flowFamilies.ts)<br/>KNOWN_INTERFACES, applyInterfacePins"]
     Preflight["Run preflight (utils/preflight.ts)"]
-    Triggers["Trigger sources + automation defaults<br/>(utils/triggerSources.ts, utils/triggerBindings.ts)"]
+    Triggers["Trigger sources, connections + automation defaults<br/>(utils/triggerSources.ts, triggerConnections.ts, triggerBindings.ts)"]
     Assistant["Workflow Authoring Assistant drawer"]
     Client["Gateway client (utils/gatewayClient.ts)"]
   end
@@ -4257,6 +4263,20 @@ flowchart LR
   Create --> Automation["Automation<br/>runs the workflow per trigger"]
 ```
 
+Sources that read from a connection (a feed, a webhook, a mailbox) bind one of
+the author's trigger connections, and every run receives the event that caused
+it on the workflow's `On Flow Start`:
+
+```mermaid
+flowchart LR
+  Console["Gateway console<br/>Triggers page"] -->|creates| Conn[(Trigger connection<br/>feed, webhook, mailbox)]
+  Dialog["Flow Library > Automation<br/>Connection selector"] -->|GET /api/gateway/triggers/connections| Conn
+  Dialog -->|trigger.connection_id| Doc["automation_defaults"]
+  Conn -->|events| Occ["Automation occurrence<br/>input_data.event (CloudEvents)"]
+  Occ --> Start["On Flow Start<br/>event output"]
+  Start --> Break["Trigger event (Break Object)<br/>type, subject, time, data, count, events, series"]
+```
+
 - **Discovery** (`src/utils/triggerSources.ts`): the trigger sources come from
   the Gateway (the `trigger_sources_endpoint` advertised in the capabilities,
   else `GET /api/gateway/trigger-sources`). Flow keeps no local list, so a
@@ -4270,7 +4290,15 @@ flowchart LR
   outside the subset is refused rather than partly checked.
 - **Editing** (`src/components/AutomationDefaultsModal.tsx`): the settings form
   is built from the source's schema; saving is a `PUT` whose answer must echo
-  the stored field.
+  the stored field. For a source with `needs_connection`, the dialog lists the
+  author's connections of that source (`src/utils/triggerConnections.ts`) and
+  stores the choice as `trigger.connection_id`.
+- **Trigger event** (`src/utils/triggerEvent.ts`): *Add trigger event* on
+  `On Flow Start` adds the `event` output, typed with the CloudEvents envelope's
+  schema, and a wired Break Object named "Trigger event". A workflow with that
+  output is triggerable; a source with `needs_connection` cannot be bound to a
+  workflow without it. Both are standard node types, so the Runtime executes
+  them unchanged.
 - **Gateway**: validates the field again on save, exports it on publish as
   `metadata.automation_defaults[<flow id>]`, and fills a creation request's
   missing trigger, context, title and `input_data` from it.
@@ -4473,6 +4501,7 @@ The important Gateway surfaces are:
 - `/api/gateway/visualflows/{flow_id}` (`PUT` also stores `automation_defaults`)
 - `/api/gateway/visualflows/{flow_id}/publish`
 - `/api/gateway/trigger-sources` (automation trigger sources; the path is read from `contracts.common.automations.trigger_sources_endpoint` when the capabilities advertise it)
+- `/api/gateway/triggers/connections` (the signed-in person's trigger connections, listed in the Automation dialog for sources with `needs_connection`; a Gateway without the route answers 404 and the dialog says connections are unavailable)
 - `/api/gateway/runs/start`
 - `/api/gateway/runs/{run_id}/ledger`
 - `/api/gateway/runs/{run_id}/ledger/stream`
@@ -4516,7 +4545,9 @@ High-value source modules:
 - `src/hooks/openFlowMetadata.ts`: applies a Flow Library name, description, interface or automation-defaults change to the open document only when that document is still open; `putAutomationDefaults` checks that the Gateway's answer echoes the stored `automation_defaults`.
 - `src/utils/triggerSources.ts`: trigger-source discovery (`fetchTriggerSources`, `TriggerSourceCache`), contract parsing, and the `ok` / `unavailable` outcomes.
 - `src/utils/triggerBindings.ts`: the `automation_defaults` shape (`parseAutomationDefaults`), the JSON Schema subset validator (`validateTriggerConfig`, `unsupportedSchemaKeywords`), and the schema-driven form conversion.
-- `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog.
+- `src/utils/triggerConnections.ts`: trigger connections (`fetchTriggerConnections`, `connectionsForSource`, `connectionProblem`) and the console link `consoleNewConnectionUrl` (`<gateway>/console#triggers?new=<source id>`).
+- `src/utils/triggerEvent.ts`: the trigger event: `TRIGGER_EVENT_SCHEMA` (the CloudEvents envelope, including a connection batch's items), `isTriggerableFlow`, `triggerEventRequirement` (`required` for connection sources, `recommended` for other event sources, `optional` for time and manual sources) and `withTriggerEvent` (the store action `addTriggerEvent`).
+- `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog, including the **Connection** selector and the triggerable check.
 - `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time; the framework and gateway versions from `GET /api/gateway/about` through the ui-kit `aboutVersionsFromGateway` helper; no package list).
 - `bin/server.js`: the Flow server (`createFlowServer`) on `@abstractframework/app-server`: base path, identity header, session proxy, static files.
 - `bin/flags.js`: the launch flags and the Gateway URL resolution (`parseFlowFlags`).
@@ -5475,6 +5506,21 @@ published with the workflow. The `On Schedule`, `On Event` and `Delay` nodes
 wait inside a run that has already started and do not start runs. See
 [Web editor > Automation Defaults](web-editor.md#automation-defaults).
 
+## How Does A Workflow Read The Event That Started It?
+
+Select the workflow's **On Flow Start** and press **Add trigger event**. The
+node gets an `event` output, and a **Trigger event** node wired to it exposes
+`type`, `subject`, `time`, `data`, `count`, `events` and `series`. A feed or a
+webhook delivers a batch: loop over `events`, or add a path such as
+`data.events.0.data.title`. When you run the workflow by hand, `event` is
+empty. See [Web editor > The Trigger Event](web-editor.md#the-trigger-event).
+
+## Where Do I Create A Feed, Webhook Or Mailbox Connection?
+
+On the Gateway console's **Triggers** page (`/console#triggers`). In the
+Automation dialog, **New connection…** opens that page on the selected source;
+press **Refresh connections** when you come back.
+
 ## Why Does The Automation Dialog Say Trigger Sources Are Unavailable?
 
 The connected Gateway does not serve automations (it reports them as
@@ -5661,6 +5707,10 @@ it through the interface receives missing or mistyped values.
 | This source cannot be bound in the editor: its settings schema uses JSON Schema keywords the editor cannot check (...) | The source's `config_schema` uses a keyword or format outside the subset the editor validates. | Choose another source; the listed paths name each unsupported keyword. See [Web editor > Settings Validation](web-editor.md#settings-validation). |
 | trigger source "..." is not served / is unavailable / version ... is not served | The stored defaults name a source or version the connected Gateway does not offer. | Pick a served source and save again. |
 | Gateway answered the automation defaults update without storing them | The Gateway accepted the update but does not store `automation_defaults`. | Update the Gateway to a release with automations. |
+| Trigger connections are unavailable on this gateway (it predates them) | The Gateway does not serve `/api/gateway/triggers/connections` (HTTP 404). | Update the Gateway to a release with trigger connections. |
+| `trigger.connection_id` choose a connection / is not one of yours on this gateway / belongs to … | The source reads from a connection and none of yours is selected, or the saved one was deleted or belongs to another source. | Pick one of your connections, or create one with **New connection…**, then **Refresh connections**. |
+| This flow cannot receive the event yet | The source reads from a connection and the workflow's `On Flow Start` has no `event` output. | Open the workflow, select **On Flow Start**, press **Add trigger event**, save the workflow, then save the defaults. |
+| unknown trigger field(s) ['connection_id'] (HTTP 422) | The Gateway does not accept `trigger.connection_id` in `automation_defaults` yet. | Update the Gateway to a release with trigger connections. |
 
 ### Edited example flows do not appear in the Flow Library
 
@@ -5717,11 +5767,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-25
+
+Trigger connections need an AbstractGateway that serves `/api/gateway/triggers/connections` and accepts `trigger.connection_id` in `automation_defaults`; against an older Gateway the Automation dialog says connections are unavailable. The trigger event works with any Runtime that delivers `input_data.event`.
+
 ### Added
 
-- **Trigger connections in Automation defaults** (root backlog 1047). A source whose descriptor says `needs_connection` (a feed, a webhook, a mailbox) shows a **Connection** selector with your connections of that source (`GET /api/gateway/triggers/connections`), **New connection…** (opens the gateway console's Triggers page on that source) and **Refresh connections**; the choice is saved as `automation_defaults.trigger.connection_id`, required by such a source and refused by any other. Descriptors gain `needs_connection` / `connection_schema` (absent = no connection, a gateway before connections).
-- **Triggerable workflows.** On Flow Start's Properties offer **Add trigger event**: an `event` output (the CloudEvents envelope a triggered run receives as `input_data.event`, typed with its schema) and a **Trigger event** Break Object wired to it with `type`, `subject`, `time`, `data`, `count` (`data.count`), `events` (`data.events`, a connection source's batch of CloudEvents items) and `series` (`data.series`), in one undo step. Both are existing node types, so any runtime runs them. The automation dialog says whether the workflow is triggerable and refuses a connection source for one that is not. Docs: web editor (The Trigger Event), VisualFlow JSON (The trigger event), node catalog.
-- **If/Else from a dropped boolean wire.** Release a wire dragged from a boolean output on empty canvas and the menu now offers **If/Else** first: it arrives with that output wired to its `condition`.
+- **Trigger connections in Automation defaults.** A source whose descriptor says `needs_connection` (a feed, a webhook, a mailbox) shows a **Connection** selector with your connections of that source, **New connection…** (opens the Gateway console's Triggers page on that source) and **Refresh connections**. The choice is saved as `automation_defaults.trigger.connection_id`, required by such a source and refused by any other. Descriptors without `needs_connection` need no connection.
+- **Triggerable workflows.** On Flow Start's Properties offer **Add trigger event**: an `event` output (the CloudEvents envelope a triggered run receives as `input_data.event`, typed with its schema) and a wired **Trigger event** node exposing `type`, `subject`, `time`, `data`, `count`, `events` (a feed's or webhook's batch of items) and `series` (schedules), in one undo step. The Automation dialog says whether a workflow is triggerable and refuses a connection source for one that is not. See [Web editor > The Trigger Event](docs/web-editor.md#the-trigger-event) and [VisualFlow JSON > The trigger event](docs/visualflow.md#the-trigger-event) (one example per source).
+- **If/Else from a dropped boolean wire.** Release a wire dragged from a boolean output on empty canvas and the menu offers **If/Else** first: it arrives with that output wired to its `condition`.
 
 ## [0.10.0] - 2026-10-16
 

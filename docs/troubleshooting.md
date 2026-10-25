@@ -154,6 +154,10 @@ it through the interface receives missing or mistyped values.
 | This source cannot be bound in the editor: its settings schema uses JSON Schema keywords the editor cannot check (...) | The source's `config_schema` uses a keyword or format outside the subset the editor validates. | Choose another source; the listed paths name each unsupported keyword. See [Web editor > Settings Validation](web-editor.md#settings-validation). |
 | trigger source "..." is not served / is unavailable / version ... is not served | The stored defaults name a source or version the connected Gateway does not offer. | Pick a served source and save again. |
 | Gateway answered the automation defaults update without storing them | The Gateway accepted the update but does not store `automation_defaults`. | Update the Gateway to a release with automations. |
+| Trigger connections are unavailable on this gateway (it predates them) | The Gateway does not serve `/api/gateway/triggers/connections` (HTTP 404). | Update the Gateway to a release with trigger connections. |
+| `trigger.connection_id` choose a connection / is not one of yours on this gateway / belongs to … | The source reads from a connection and none of yours is selected, or the saved one was deleted or belongs to another source. | Pick one of your connections, or create one with **New connection…**, then **Refresh connections**. |
+| This flow cannot receive the event yet | The source reads from a connection and the workflow's `On Flow Start` has no `event` output. | Open the workflow, select **On Flow Start**, press **Add trigger event**, save the workflow, then save the defaults. |
+| unknown trigger field(s) ['connection_id'] (HTTP 422) | The Gateway does not accept `trigger.connection_id` in `automation_defaults` yet. | Update the Gateway to a release with trigger connections. |
 
 ### Edited example flows do not appear in the Flow Library
 

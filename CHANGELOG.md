@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-25
+
+Trigger connections need an AbstractGateway that serves `/api/gateway/triggers/connections` and accepts `trigger.connection_id` in `automation_defaults`; against an older Gateway the Automation dialog says connections are unavailable. The trigger event works with any Runtime that delivers `input_data.event`.
+
 ### Added
 
-- **Trigger connections in Automation defaults** (root backlog 1047). A source whose descriptor says `needs_connection` (a feed, a webhook, a mailbox) shows a **Connection** selector with your connections of that source (`GET /api/gateway/triggers/connections`), **New connection…** (opens the gateway console's Triggers page on that source) and **Refresh connections**; the choice is saved as `automation_defaults.trigger.connection_id`, required by such a source and refused by any other. Descriptors gain `needs_connection` / `connection_schema` (absent = no connection, a gateway before connections).
-- **Triggerable workflows.** On Flow Start's Properties offer **Add trigger event**: an `event` output (the CloudEvents envelope a triggered run receives as `input_data.event`, typed with its schema) and a **Trigger event** Break Object wired to it with `type`, `subject`, `time`, `data`, `count` (`data.count`), `events` (`data.events`, a connection source's batch of CloudEvents items) and `series` (`data.series`), in one undo step. Both are existing node types, so any runtime runs them. The automation dialog says whether the workflow is triggerable and refuses a connection source for one that is not. Docs: web editor (The Trigger Event), VisualFlow JSON (The trigger event), node catalog.
-- **If/Else from a dropped boolean wire.** Release a wire dragged from a boolean output on empty canvas and the menu now offers **If/Else** first: it arrives with that output wired to its `condition`.
+- **Trigger connections in Automation defaults.** A source whose descriptor says `needs_connection` (a feed, a webhook, a mailbox) shows a **Connection** selector with your connections of that source, **New connection…** (opens the Gateway console's Triggers page on that source) and **Refresh connections**. The choice is saved as `automation_defaults.trigger.connection_id`, required by such a source and refused by any other. Descriptors without `needs_connection` need no connection.
+- **Triggerable workflows.** On Flow Start's Properties offer **Add trigger event**: an `event` output (the CloudEvents envelope a triggered run receives as `input_data.event`, typed with its schema) and a wired **Trigger event** node exposing `type`, `subject`, `time`, `data`, `count`, `events` (a feed's or webhook's batch of items) and `series` (schedules), in one undo step. The Automation dialog says whether a workflow is triggerable and refuses a connection source for one that is not. See [Web editor > The Trigger Event](docs/web-editor.md#the-trigger-event) and [VisualFlow JSON > The trigger event](docs/visualflow.md#the-trigger-event) (one example per source).
+- **If/Else from a dropped boolean wire.** Release a wire dragged from a boolean output on empty canvas and the menu offers **If/Else** first: it arrives with that output wired to its `condition`.
 
 ## [0.10.0] - 2026-10-16
 

@@ -97,8 +97,14 @@ warns about missing, unconnected, or mistyped interface pins. See [VisualFlow JS
 A runnable workflow can also store automation defaults (Flow Library >
 **Automation**): the trigger source and settings discovered from the Gateway,
 the context mode, and default inputs that an automation created from the
-published workflow starts with. See
-[Web editor > Automation Defaults](docs/web-editor.md#automation-defaults).
+published workflow starts with. Sources that read from a connection (a feed,
+a webhook, a mailbox) list your connections from the Gateway console's
+Triggers page. A workflow becomes *triggerable* with **Add trigger event** on
+its `On Flow Start`: each run an automation starts then receives the event that
+caused it (type, subject, time, data, and a feed's or webhook's batch of
+items). See
+[Web editor > Automation Defaults](docs/web-editor.md#automation-defaults) and
+[The Trigger Event](docs/web-editor.md#the-trigger-event).
 
 The About button in the top bar opens the shared AbstractFramework About card:
 the AbstractFlow version, the AbstractFramework and AbstractGateway versions the

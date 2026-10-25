@@ -76,6 +76,7 @@ The important Gateway surfaces are:
 - `/api/gateway/visualflows/{flow_id}` (`PUT` also stores `automation_defaults`)
 - `/api/gateway/visualflows/{flow_id}/publish`
 - `/api/gateway/trigger-sources` (automation trigger sources; the path is read from `contracts.common.automations.trigger_sources_endpoint` when the capabilities advertise it)
+- `/api/gateway/triggers/connections` (the signed-in person's trigger connections, listed in the Automation dialog for sources with `needs_connection`; a Gateway without the route answers 404 and the dialog says connections are unavailable)
 - `/api/gateway/runs/start`
 - `/api/gateway/runs/{run_id}/ledger`
 - `/api/gateway/runs/{run_id}/ledger/stream`
@@ -119,7 +120,9 @@ High-value source modules:
 - `src/hooks/openFlowMetadata.ts`: applies a Flow Library name, description, interface or automation-defaults change to the open document only when that document is still open; `putAutomationDefaults` checks that the Gateway's answer echoes the stored `automation_defaults`.
 - `src/utils/triggerSources.ts`: trigger-source discovery (`fetchTriggerSources`, `TriggerSourceCache`), contract parsing, and the `ok` / `unavailable` outcomes.
 - `src/utils/triggerBindings.ts`: the `automation_defaults` shape (`parseAutomationDefaults`), the JSON Schema subset validator (`validateTriggerConfig`, `unsupportedSchemaKeywords`), and the schema-driven form conversion.
-- `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog.
+- `src/utils/triggerConnections.ts`: trigger connections (`fetchTriggerConnections`, `connectionsForSource`, `connectionProblem`) and the console link `consoleNewConnectionUrl` (`<gateway>/console#triggers?new=<source id>`).
+- `src/utils/triggerEvent.ts`: the trigger event: `TRIGGER_EVENT_SCHEMA` (the CloudEvents envelope, including a connection batch's items), `isTriggerableFlow`, `triggerEventRequirement` (`required` for connection sources, `recommended` for other event sources, `optional` for time and manual sources) and `withTriggerEvent` (the store action `addTriggerEvent`).
+- `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog, including the **Connection** selector and the triggerable check.
 - `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time; the framework and gateway versions from `GET /api/gateway/about` through the ui-kit `aboutVersionsFromGateway` helper; no package list).
 - `bin/server.js`: the Flow server (`createFlowServer`) on `@abstractframework/app-server`: base path, identity header, session proxy, static files.
 - `bin/flags.js`: the launch flags and the Gateway URL resolution (`parseFlowFlags`).
