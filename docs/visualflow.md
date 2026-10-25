@@ -71,7 +71,21 @@ A runnable workflow can carry the defaults of the automations created from it in
 
 - `trigger.source_id` / `source_version` name a trigger source served by the gateway (`GET /api/gateway/trigger-sources`); `config` must match that source's `config_schema`. For `schedule` v1: `start_at`, `until` and `anchor` are RFC 3339 timestamps, `every` is a whole number followed by `s`, `m`, `h` or `d`, `count` is an integer of at least 1. `manual` v1 takes `{}`.
 - `context.mode` is `independent` (default) or `growing`; `title` is optional; `input_data` (default `{}`) holds the `On Flow Start` inputs.
+- `trigger.connection_id` (optional string) names one of your trigger connections, for a source whose descriptor says `needs_connection: true` (a feed, a webhook, a mailbox). Such a source requires it; any other source refuses it. Connections are created on the gateway console's Triggers page (`/console#triggers`); the gateway refuses a connection that is not the automation owner's when the automation is created.
 - No other field is accepted: binding ids, credentials and automation ids are created by the gateway when an automation is created, never stored in the workflow.
+
+### The trigger event
+
+A run started by a trigger (an automation occurrence) receives the event as `input_data.event`, a CloudEvents 1.0 envelope: `id`, `type`, `source`, `subject`, `time`, `datacontenttype`, `data`, plus `bindingid`, `connectionid`, `correlationid`, `dedupekey`, `sequence` and `abstracttrust`; schedules add `data.series` (`rule`, `occurrence`, `scheduled_at`, `next_at`, `coalesced`). A workflow is **triggerable** when its `On Flow Start` declares the `event` output (type `object`):
+
+```json
+{"id": "start", "type": "on_flow_start", "data": {"outputs": [
+  {"id": "exec-out", "label": "", "type": "execution"},
+  {"id": "event", "label": "event", "type": "object"}
+]}}
+```
+
+The runtime fills it from `input_data.event` like any start input (empty when the workflow is run by hand). To read fields, wire it into a `break_object` whose `breakConfig.selectedPaths` names them (`type`, `subject`, `time`, `data`, `data.series`, or a deeper path such as `data.title`). In the editor, *Add trigger event* on On Flow Start does both. A source with `needs_connection` cannot be bound to a workflow without the `event` output.
 
 The gateway validates the field when you save the workflow (the same structural rules as the editor, then the trigger source's own check) and answers HTTP 422 with the failing field otherwise. Publishing copies the object into the bundle manifest as `metadata.automation_defaults[<flow id>]`, and the gateway's workflow catalog and bundle listings expose it keyed by entrypoint flow id.
 

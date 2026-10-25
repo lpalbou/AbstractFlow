@@ -12,13 +12,16 @@
  *   automation_defaults = {
  *     schema_version: 1,
  *     title?: string,
- *     trigger: { source_id, source_version, config },
+ *     trigger: { source_id, source_version, config, connection_id? },
  *     context: { mode: "independent" | "growing" },
  *     input_data: object,
  *   }
  *
  * No `binding_id`, credentials, timestamps or revisions: those are
- * server-owned and minted when an automation is created.
+ * server-owned and minted when an automation is created. `connection_id`
+ * names one of the author's trigger connections (sources with
+ * `needs_connection`, root backlog 1047); the gateway refuses a foreign one
+ * when an automation is created.
  */
 import type {
   AutomationContextMode,
@@ -60,7 +63,7 @@ function isJsonValue(value: unknown): value is JsonValue {
 }
 
 const TOP_KEYS = new Set(['schema_version', 'title', 'trigger', 'context', 'input_data']);
-const TRIGGER_KEYS = new Set(['source_id', 'source_version', 'config']);
+const TRIGGER_KEYS = new Set(['source_id', 'source_version', 'config', 'connection_id']);
 const CONTEXT_KEYS = new Set(['mode']);
 
 /**
@@ -87,6 +90,7 @@ export function parseAutomationDefaults(raw: unknown): AutomationDefaults {
   let sourceId = '';
   let sourceVersion = 0;
   let config: Record<string, JsonValue> = {};
+  let connectionId: string | undefined;
   if (!isRecord(trigger)) {
     issues.push({ field: 'trigger', message: 'must be an object' });
   } else {
@@ -107,6 +111,13 @@ export function parseAutomationDefaults(raw: unknown): AutomationDefaults {
       issues.push({ field: 'trigger.config', message: 'must be a JSON object' });
     } else {
       config = trigger.config as Record<string, JsonValue>;
+    }
+    if (trigger.connection_id !== undefined) {
+      if (typeof trigger.connection_id !== 'string' || !trigger.connection_id.trim()) {
+        issues.push({ field: 'trigger.connection_id', message: 'must be a non-empty string' });
+      } else {
+        connectionId = trigger.connection_id.trim();
+      }
     }
   }
 
@@ -142,7 +153,7 @@ export function parseAutomationDefaults(raw: unknown): AutomationDefaults {
   return {
     schema_version: AUTOMATION_DEFAULTS_SCHEMA_VERSION,
     ...(title ? { title } : {}),
-    trigger: { source_id: sourceId, source_version: sourceVersion, config },
+    trigger: { source_id: sourceId, source_version: sourceVersion, config, ...(connectionId ? { connection_id: connectionId } : {}) },
     context: { mode },
     input_data: inputData,
   };
@@ -331,7 +342,10 @@ export function validateAutomationDefaults(
       message: `trigger source "${source_id}" version ${source_version} is not served (served: ${served})`,
     }];
   }
-  return validateTriggerConfig(source.config_schema, config);
+  const connectionIssue = source.needs_connection
+    ? (defaults.trigger.connection_id ? null : { field: 'trigger.connection_id', message: `trigger source "${source_id}" listens to a connection: choose one` })
+    : (defaults.trigger.connection_id ? { field: 'trigger.connection_id', message: `trigger source "${source_id}" takes no connection` } : null);
+  return [...(connectionIssue ? [connectionIssue] : []), ...validateTriggerConfig(source.config_schema, config)];
 }
 
 /** Parse + validate; throws `AutomationDefaultsError` listing every issue. */
@@ -507,6 +521,7 @@ export function describeAutomationDefaults(
   const every = defaults.trigger.config.every;
   const parts = [`${name} v${defaults.trigger.source_version}`];
   if (typeof every === 'string') parts.push(`every ${every}`);
+  if (defaults.trigger.connection_id) parts.push('with a connection');
   if (defaults.context.mode === 'growing') parts.push('growing context');
   return parts.join(' · ');
 }

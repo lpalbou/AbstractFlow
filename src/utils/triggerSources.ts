@@ -34,6 +34,15 @@ export interface TriggerSource {
   config_schema: JsonSchema;
   event_schema: JsonSchema;
   capabilities: { kind: TriggerSourceKind };
+  /**
+   * The source reads from a per-user CONNECTION (this mailbox, this feed, this
+   * webhook; root backlog 1040/1041): a binding names one with
+   * `trigger.connection_id`. Descriptors from gateways before connections do
+   * not carry the flag: they have no connections, so it reads `false`.
+   */
+  needs_connection: boolean;
+  /** The settings of a connection (JSON Schema, same style as `config_schema`); `{}` when none. */
+  connection_schema: JsonSchema;
 }
 
 /** A source the gateway serves and that can be bound. */
@@ -87,7 +96,7 @@ const KINDS: ReadonlySet<string> = new Set(['time', 'manual', 'event']);
 export function parseTriggerSourceItem(raw: unknown, index = 0): TriggerSourceItem {
   const at = `items[${index}]`;
   if (!isRecord(raw)) throw new TriggerSourcesContractError(`${at} is not an object`);
-  const { id, version, label, config_schema, event_schema, capabilities, available, unavailable_reason } = raw;
+  const { id, version, label, config_schema, event_schema, capabilities, available, unavailable_reason, needs_connection, connection_schema } = raw;
   if (typeof id !== 'string' || !id.trim()) throw new TriggerSourcesContractError(`${at}.id is not a non-empty string`);
   if (typeof available !== 'boolean') throw new TriggerSourcesContractError(`${at}.available is not a boolean`);
   if (unavailable_reason !== undefined && unavailable_reason !== null && typeof unavailable_reason !== 'string') {
@@ -119,6 +128,15 @@ export function parseTriggerSourceItem(raw: unknown, index = 0): TriggerSourceIt
   if (!isRecord(capabilities) || typeof capabilities.kind !== 'string' || !KINDS.has(capabilities.kind)) {
     throw new TriggerSourcesContractError(`${at}.capabilities.kind is not one of time|manual|event`);
   }
+  if (needs_connection !== undefined && typeof needs_connection !== 'boolean') {
+    throw new TriggerSourcesContractError(`${at}.needs_connection is not a boolean`);
+  }
+  if (needs_connection === true && !isRecord(connection_schema)) {
+    throw new TriggerSourcesContractError(`${at}.connection_schema is not an object (the source needs a connection)`);
+  }
+  if (connection_schema !== undefined && connection_schema !== null && !isRecord(connection_schema)) {
+    throw new TriggerSourcesContractError(`${at}.connection_schema is not an object`);
+  }
   return {
     id,
     version,
@@ -126,6 +144,8 @@ export function parseTriggerSourceItem(raw: unknown, index = 0): TriggerSourceIt
     config_schema: config_schema as JsonSchema,
     event_schema: event_schema as JsonSchema,
     capabilities: { kind: capabilities.kind as TriggerSourceKind },
+    needs_connection: needs_connection === true,
+    connection_schema: (isRecord(connection_schema) ? connection_schema : {}) as JsonSchema,
     available: true,
   };
 }

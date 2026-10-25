@@ -1059,7 +1059,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `on_flow_start`
 - Document node: `{"id":"<unique_id>","type":"on_flow_start"}`
-- Utility: Entry point for a workflow run. Emits exec-out and any configured inputs as outputs.
+- Utility: Entry point for a workflow run. Emits exec-out and any configured inputs as outputs. Triggerable: declare the `event` output (Properties > Add trigger event) and a run started by an automation (schedule, feed, email, webhook) receives its CloudEvents envelope there (type, subject, time, data; schedules add data.series), wired to a "Trigger event" Break Object exposing those fields.
 - Gateway capability: none
 - Dynamic pin policy: dynamic outputs via the document `outputs` list
 - Authorable config: no node-specific document config beyond label/pin_defaults

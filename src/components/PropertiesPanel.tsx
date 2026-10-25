@@ -97,6 +97,7 @@ import {
   subflowPinPatchForSelectedFlow,
 } from '../utils/subflowPins';
 import { inferSchemaForNodeOutput } from '../utils/outputSchemaInference';
+import { startHasTriggerEvent } from '../utils/triggerEvent';
 import {
   EDITOR_DATA_PIN_TYPES,
   FLOW_IO_EDITOR_DATA_PIN_TYPES,
@@ -487,7 +488,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     copySelectionToClipboard,
     duplicateSelection,
     setRouteOverride,
+    addTriggerEvent,
   } = useFlowStore();
+  const [triggerEventNote, setTriggerEventNote] = useState<{ nodeId: string; ok: boolean; text: string } | null>(null);
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
@@ -4986,6 +4989,45 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       )}
 
       {/* On Flow Start dynamic parameters (output pins) */}
+      {data.nodeType === 'on_flow_start' && (
+        <div className="property-section" data-testid="trigger-event-section">
+          <label className="property-label">Trigger event</label>
+          {startHasTriggerEvent(data) ? (
+            <span className="property-hint">
+              Triggerable: a run started by an automation (schedule, feed, email, webhook) receives its event on the{' '}
+              <code>event</code> output — <code>type</code>, <code>subject</code>, <code>time</code>, <code>data</code>{' '}
+              (schedules add <code>data.series</code>). Empty when the flow is run by hand.
+            </span>
+          ) : (
+            <>
+              <span className="property-hint">
+                Lets an automation start this flow with its event (a feed item, an email, a webhook call, a schedule tick).
+              </span>
+              <button
+                type="button"
+                className="modal-button"
+                style={{ marginTop: 6 }}
+                onClick={() => {
+                  try {
+                    addTriggerEvent();
+                    setTriggerEventNote({ nodeId: node.id, ok: true, text: 'Added the event output and a "Trigger event" node with its fields.' });
+                  } catch (error) {
+                    setTriggerEventNote({ nodeId: node.id, ok: false, text: error instanceof Error ? error.message : String(error) });
+                  }
+                }}
+              >
+                Add trigger event
+              </button>
+            </>
+          )}
+          {triggerEventNote && triggerEventNote.nodeId === node.id ? (
+            <span className="property-hint" style={{ color: triggerEventNote.ok ? 'var(--success, #2ecc71)' : 'var(--error, #e74c3c)' }}>
+              {triggerEventNote.text}
+            </span>
+          ) : null}
+        </div>
+      )}
+
       {data.nodeType === 'on_flow_start' && (
         <div className="property-section">
           <label className="property-label">Flow Start Parameters</label>

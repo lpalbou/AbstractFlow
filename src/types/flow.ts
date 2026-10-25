@@ -530,6 +530,12 @@ export interface AutomationTriggerDefaults {
   source_id: string;
   source_version: number;
   config: Record<string, JsonValue>;
+  /**
+   * The trigger connection the automation listens to (sources with
+   * `needs_connection`; root backlog 1047): one of the author's connections,
+   * created on the gateway console's Triggers page. Absent for other sources.
+   */
+  connection_id?: string;
 }
 
 export type AutomationContextMode = 'independent' | 'growing';

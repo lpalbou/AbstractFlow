@@ -64,3 +64,63 @@ export const BROKEN_PLUGIN = {
 export const TRIGGER_SOURCES_RESPONSE = {
   items: [SCHEDULE_V1, MANUAL_V1, FIXTURE_SOURCE_V1, BROKEN_PLUGIN],
 };
+
+/**
+ * A source that reads from a per-user connection (root backlog 1040/1047):
+ * `needs_connection: true` with its `connection_schema`. Kept out of
+ * TRIGGER_SOURCES_RESPONSE (whose item list other tests pin).
+ */
+export const FEED_ITEM_V1 = {
+  id: 'feed.item',
+  version: 1,
+  label: 'Feed item',
+  config_schema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: { only_new: { type: 'boolean', title: 'Only new items' } },
+  },
+  event_schema: { type: 'object' },
+  capabilities: { kind: 'event' },
+  needs_connection: true,
+  connection_schema: {
+    type: 'object',
+    required: ['url'],
+    properties: { url: { type: 'string', title: 'Feed address' } },
+  },
+  available: true,
+};
+
+export const CONNECTIONS_RESPONSE = {
+  connections: [
+    {
+      connection_id: 'conn_feed1',
+      source_id: 'feed.item',
+      source_version: 1,
+      label: 'Release notes feed',
+      status: 'active',
+      created_at: '2026-10-25T10:00:00Z',
+      last_event_at: '2026-10-25T11:57:00Z',
+      config_public: { url: 'https://example.org/releases.xml' },
+    },
+    {
+      connection_id: 'conn_feed2',
+      source_id: 'feed.item',
+      source_version: 1,
+      label: 'Old blog',
+      status: 'paused',
+      created_at: '2026-10-20T10:00:00Z',
+      last_event_at: null,
+      config_public: {},
+    },
+    {
+      connection_id: 'conn_hook1',
+      source_id: 'webhook.received',
+      source_version: 1,
+      label: 'CI hook',
+      status: 'active',
+      created_at: '2026-10-25T10:00:00Z',
+      last_event_at: null,
+      config_public: {},
+    },
+  ],
+};

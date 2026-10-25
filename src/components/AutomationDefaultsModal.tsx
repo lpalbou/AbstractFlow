@@ -4,6 +4,13 @@
  * The trigger sources come from the gateway (utils/triggerSources.ts); the
  * config form is rendered from the chosen source's `config_schema`
  * (utils/triggerBindings.ts). Nothing here knows schedule@1 or manual@1.
+ *
+ * Sources with `needs_connection` (feeds, webhooks, mailboxes) listen to one
+ * of the author's trigger CONNECTIONS (utils/triggerConnections.ts): a
+ * selector lists them, "New connection…" opens the gateway console's
+ * Triggers page on that source, and the choice is saved as
+ * `trigger.connection_id`. Such a source needs a triggerable flow (On Flow
+ * Start declares the `event` input, utils/triggerEvent.ts).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AutomationContextMode, AutomationDefaults, JsonValue, VisualFlow } from '../types/flow';
@@ -28,6 +35,15 @@ import {
   type ConfigFormField,
   type ConfigFormValues,
 } from '../utils/triggerBindings';
+import {
+  connectionOptionLabel,
+  connectionProblem,
+  connectionsForSource,
+  consoleNewConnectionUrl,
+  fetchTriggerConnections,
+  type TriggerConnectionsResult,
+} from '../utils/triggerConnections';
+import { isTriggerableFlow, triggerEventRequirement } from '../utils/triggerEvent';
 
 export interface AutomationDefaultsModalProps {
   flow: VisualFlow;
@@ -165,6 +181,11 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
   const [inputDataText, setInputDataText] = useState(JSON.stringify(existing?.input_data || {}, null, 2));
   const [issues, setIssues] = useState<AutomationDefaultsIssue[]>([]);
   const [saving, setSaving] = useState(false);
+  const [gatewayUrl, setGatewayUrl] = useState('');
+  const [connections, setConnections] = useState<TriggerConnectionsResult | null>(null);
+  const [connectionsError, setConnectionsError] = useState('');
+  const [connectionsLoading, setConnectionsLoading] = useState(false);
+  const [connectionId, setConnectionId] = useState(existing?.trigger.connection_id || '');
 
   const load = useCallback(
     async (refresh: boolean) => {
@@ -172,6 +193,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
       setDiscoveryError('');
       try {
         const connection = await fetchGatewayConnection();
+        setGatewayUrl(connection.gateway_url);
         const result = await triggerSourceCache.load(connection.gateway_url, gatewayContracts, { refresh });
         setDiscovery(result);
       } catch (error) {
@@ -229,6 +251,32 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     setValues(seeded);
   }, [selected, currentConfig]);
 
+  const needsConnection = Boolean(selected?.needs_connection);
+  const loadConnections = useCallback(async () => {
+    setConnectionsLoading(true);
+    setConnectionsError('');
+    try {
+      setConnections(await fetchTriggerConnections());
+    } catch (error) {
+      setConnections(null);
+      setConnectionsError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setConnectionsLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (needsConnection && !connections && !connectionsLoading && !connectionsError) void loadConnections();
+  }, [needsConnection, connections, connectionsLoading, connectionsError, loadConnections]);
+  const sourceConnections = useMemo(
+    () => (selected && connections?.status === 'ok' ? connectionsForSource(connections.connections, selected) : []),
+    [selected, connections]
+  );
+  const triggerable = isTriggerableFlow(flow);
+  const eventRequirement = selected ? triggerEventRequirement(selected) : 'optional';
+  const blockedByEvent = eventRequirement === 'required' && !triggerable;
+  let newConnectionHref = '';
+  if (selected && needsConnection && gatewayUrl) newConnectionHref = consoleNewConnectionUrl(gatewayUrl, selected.id);
+
   const savedSourceMissing =
     existing && discovery?.status === 'ok' && !selected && sourceKey === `${existing.trigger.source_id}@${existing.trigger.source_version}`;
 
@@ -243,6 +291,17 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     }
     const { config, issues: configIssues } = configFromFormValues(selected.config_schema, values, currentConfig);
     found.push(...configIssues);
+    if (needsConnection) {
+      if (connections?.status !== 'ok') {
+        found.push({ field: 'trigger.connection_id', message: connections?.reason || 'your trigger connections could not be read: refresh them' });
+      } else {
+        const problem = connectionProblem(connectionId || undefined, connections.connections, selected);
+        if (problem) found.push({ field: 'trigger.connection_id', message: problem });
+      }
+    }
+    if (blockedByEvent) {
+      found.push({ field: 'flow', message: 'this source starts the flow with its event: open the flow, select On Flow Start and use "Add trigger event"' });
+    }
     if (found.length) {
       setIssues(found);
       return;
@@ -253,7 +312,12 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
         {
           schema_version: AUTOMATION_DEFAULTS_SCHEMA_VERSION,
           ...(title.trim() ? { title: title.trim() } : {}),
-          trigger: { source_id: selected.id, source_version: selected.version, config },
+          trigger: {
+            source_id: selected.id,
+            source_version: selected.version,
+            config,
+            ...(needsConnection && connectionId ? { connection_id: connectionId } : {}),
+          },
           context: { mode },
           input_data: inputData,
         },
@@ -351,6 +415,66 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
                   />
                 ))
               : null}
+            {selected && needsConnection ? (
+              <div className="run-form-field" style={{ marginTop: 10 }}>
+                <label className="run-form-label">Connection *</label>
+                {connectionsLoading ? <span className="property-hint">Loading your connections…</span> : null}
+                {connectionsError ? (
+                  <span className="property-hint" style={{ color: 'var(--error, #e74c3c)' }}>
+                    Your trigger connections could not be read: {connectionsError}
+                  </span>
+                ) : null}
+                {connections?.status === 'unavailable' ? (
+                  <span className="property-hint" style={{ color: 'var(--warning)' }}>
+                    {connections.reason}
+                  </span>
+                ) : null}
+                {connections?.status === 'ok' ? (
+                  <select
+                    className="run-form-select"
+                    aria-label="Connection"
+                    value={connectionId}
+                    onChange={(e) => setConnectionId(e.target.value)}
+                  >
+                    <option value="">
+                      {sourceConnections.length ? 'Choose a connection…' : `No ${selected.label} connection yet`}
+                    </option>
+                    {connectionId && !sourceConnections.some((c) => c.connection_id === connectionId) ? (
+                      <option value={connectionId}>{connectionId} (not one of yours on this gateway)</option>
+                    ) : null}
+                    {sourceConnections.map((c) => (
+                      <option key={c.connection_id} value={c.connection_id}>
+                        {connectionOptionLabel(c)}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <span className="property-hint">
+                  {newConnectionHref ? (
+                    <a href={newConnectionHref} target="_blank" rel="noreferrer">
+                      New connection…
+                    </a>
+                  ) : null}{' '}
+                  Connections (your mailbox, a feed address, a webhook) are created once on the gateway console&apos;s
+                  Triggers page; refresh this list after creating one.{' '}
+                  <button type="button" className="modal-button cancel" onClick={() => void loadConnections()} disabled={connectionsLoading}>
+                    Refresh connections
+                  </button>
+                </span>
+              </div>
+            ) : null}
+            {selected && eventRequirement !== 'optional' ? (
+              <div
+                className="property-hint"
+                style={{ marginTop: 8, color: triggerable ? undefined : eventRequirement === 'required' ? 'var(--error, #e74c3c)' : 'var(--warning)' }}
+              >
+                {triggerable
+                  ? 'Triggerable: each run receives the event on On Flow Start → event (type, subject, time, data).'
+                  : eventRequirement === 'required'
+                    ? 'This flow cannot receive the event yet: open it, select On Flow Start and use "Add trigger event", then save the flow.'
+                    : 'Tip: open the flow, select On Flow Start and use "Add trigger event" to read the event (type, subject, time, data).'}
+              </div>
+            ) : null}
             {selected && unsupported.length ? (
               <div className="property-hint" style={{ color: 'var(--error, #e74c3c)', marginTop: 8 }}>
                 This source cannot be bound in the editor: its settings schema uses JSON Schema keywords the editor
@@ -425,7 +549,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
           <button className="modal-button" onClick={() => void load(true)} disabled={saving || loading}>
             Refresh sources
           </button>
-          <button className="modal-button" onClick={handleSave} disabled={saving || !selected || unsupported.length > 0}>
+          <button className="modal-button" onClick={handleSave} disabled={saving || !selected || unsupported.length > 0 || blockedByEvent}>
             Save
           </button>
         </div>

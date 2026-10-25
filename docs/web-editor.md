@@ -303,6 +303,7 @@ Open the **Flow Library** and select a workflow. The **Automation** row summariz
 
 - **Trigger**: the trigger sources your gateway serves. The gateway ships **Schedule** and **Manual**; trigger adapters installed on the gateway appear in the same list with no editor update, because the list and each source's settings form come from the gateway. A source the gateway lists but cannot load is shown disabled with its reason. **Refresh sources** asks the gateway again.
 - **Settings**: a form built from the selected source's `config_schema`. For **Schedule**, `every` is a whole number of seconds, minutes, hours or days (for example 5 minutes or 24 hours), `start_at` and `until` are RFC 3339 timestamps, and `count` limits the number of runs. Schedules are fixed intervals in UTC; cron expressions are not supported. Without `every` the schedule fires once, at `start_at`. Leave a field empty to use the source's default. **Manual** has no settings.
+- **Connection** (sources that read from a connection: a feed, a webhook, a mailbox): your connections of that source, from `GET /api/gateway/triggers/connections`; a paused one says so. **New connection…** opens the gateway console's Triggers page on that source (`<gateway>/console#triggers?new=<source id>`), where you create it once (a feed address, a webhook and its secret, a mailbox); press **Refresh connections** afterwards. The choice is saved as `trigger.connection_id`. A gateway without connections says so and the source cannot be saved.
 - **Context**: *Independent* (every run starts fresh, the default) or *Growing* (every run continues the same conversation).
 - **Title** (optional) and **Default input_data**: the inputs of the workflow's `On Flow Start` node, as a JSON object. When an automation runs, a text `prompt` is prefixed with a line naming the trigger and the run number.
 
@@ -315,11 +316,17 @@ The dialog does not set tool approval. When an automation is created, the gatewa
 The editor reads the discovery path from the gateway's capabilities (`contracts.common.automations.trigger_sources_endpoint`) and falls back to `GET /api/gateway/trigger-sources`. The answer is kept per gateway URL until you press **Refresh sources**; a failed request is not kept, so the next attempt asks again.
 
 - When the capabilities report automations as unavailable, or the gateway does not serve the route (HTTP 404), the dialog shows that trigger sources are unavailable on this gateway.
-- Any other failure, including an answer that does not match the trigger-source contract (`id`, `version`, `label`, `config_schema`, `event_schema`, `capabilities.kind` of `time`, `manual` or `event`, `available`), is shown as a discovery error.
+- Any other failure, including an answer that does not match the trigger-source contract (`id`, `version`, `label`, `config_schema`, `event_schema`, `capabilities.kind` of `time`, `manual` or `event`, `available`; `needs_connection` a boolean when present, and a `connection_schema` object when it is true), is shown as a discovery error. A descriptor without `needs_connection` (a gateway that predates connections) needs no connection.
 
 ### Settings Validation
 
 The editor validates settings with a subset of JSON Schema: `type`, `properties`, `required`, `additionalProperties`, `enum`, `pattern`, `minimum`, `maximum`, `minLength`, `maxLength`, the formats `date-time` and `duration`, and the annotations `title`, `description`, `default`, `examples`, `$schema` and `$comment`. A source whose `config_schema` uses any other keyword or format cannot be checked in the editor: the dialog names each unsupported keyword and its path, and **Save** stays disabled for that source. A defaults object that names an unknown source, an unavailable source, or a version the gateway does not serve is refused with a message. The gateway validates the defaults again when you save and when an automation is created.
+
+### The Trigger Event
+
+A run an automation starts receives the event that caused it: a feed item, an email, a webhook call, a schedule tick. Select the workflow's **On Flow Start** and press **Add trigger event** (Properties): the node gets an `event` output (the CloudEvents envelope, typed so path pickers know its fields) and a **Trigger event** node (a Break Object) is wired to it, with the outputs `type`, `subject`, `time`, `data` and `series` (schedules only). Add paths to it for deeper fields, for example `data.title` of a feed item. When the workflow is run by hand, `event` is empty.
+
+A workflow with the `event` output is *triggerable*. The automation dialog says whether the workflow is triggerable; a source that reads from a connection cannot be saved for a workflow that is not, and other event sources show a tip. See [VisualFlow JSON > The trigger event](visualflow.md#the-trigger-event) for the envelope's fields.
 
 `On Schedule`, `On Event` and `Delay` (`wait_until`) are different: they wait inside a run that has already started and never start a workflow. See [Workflow node catalog](workflow-node-catalog.md).
 

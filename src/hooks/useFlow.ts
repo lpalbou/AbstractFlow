@@ -13,6 +13,7 @@ import {
   NodeChange,
   EdgeChange,
 } from 'reactflow';
+import { withTriggerEvent } from '../utils/triggerEvent';
 import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
@@ -309,6 +310,13 @@ interface FlowState {
     link: { from: { nodeId: string; handleId: string; side: 'source' | 'target' }; newPin: string }
   ) => string | null;
   updateNodeData: (nodeId: string, data: Partial<FlowNodeData>) => void;
+  /**
+   * Make the flow triggerable (root backlog 1047, utils/triggerEvent.ts): the
+   * `event` output on On Flow Start plus a "Trigger event" Break Object wired
+   * to it, in one undo step. Returns the Break Object id (null when it was
+   * already wired); throws `TriggerEventError` with the reason otherwise.
+   */
+  addTriggerEvent: () => string | null;
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
   disconnectPin: (nodeId: string, handleId: string, isInput: boolean) => void;
@@ -1135,6 +1143,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     nodeIdCounter += 1;
     set({ nodes, edges: addEdge({ ...connection, id: `edge-${Date.now()}` }, get().edges) });
     return id;
+  },
+
+  addTriggerEvent: () => {
+    const state = get();
+    const breakNodeId = `node-${nodeIdCounter + 1}`;
+    const next = withTriggerEvent(state.nodes, state.edges, { breakNodeId, edgeId: `edge-${Date.now()}` });
+    if (next.nodes === state.nodes && next.edges === state.edges) return null;
+    get()._captureHistory();
+    if (next.breakNodeId) nodeIdCounter += 1;
+    set({ nodes: next.nodes, edges: next.edges });
+    return next.breakNodeId;
   },
 
   // Update node data
