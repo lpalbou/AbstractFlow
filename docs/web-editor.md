@@ -376,7 +376,7 @@ A workflow with the `event` output is *triggerable*. **New Flow** with a trigger
 
 The **Mail and publish** section of the palette handles mail deterministically, with no model: each node is one fixed action of the runtime (`mail.*`) on a mailbox of yours, and a refusal (a read-only mailbox, a message the server no longer has) comes back as `success` false with the reason in `result`.
 
-- **Email** is a data type: one email has `id` (where the message is: what the mail nodes act on), `message_id`, `mailbox`, `folder`, `thread_id`, `from`, `to`, `cc`, `subject`, `date`, `body_text`, `body_html`, `attachments` (`index`, `name`, `size`, `type`), `seen`, `flagged` and `labels`; hover an Email pin to see them. A mail trigger's `messages` is an Email list; **ForEach** over an Email list gives one Email per item, which the mail nodes take as it is. **Email fields** turns one Email into a pin per field.
+- **Email** is a data type: one email has `id` (where the message is: what the mail nodes act on), `message_id`, `mailbox`, `folder`, `thread_id`, `from`, `to`, `cc`, `subject`, `date`, `body_text`, `body_html`, `attachments` (`index`, `name`, `size`, `type`), `seen`, `flagged` and `labels`; hover an Email pin to see them. A mail trigger's `messages` is an Email list; **ForEach** over an Email list gives one Email per item, which the mail nodes take as it is. **Email fields** (or **Break Email** beside Break Object, or the wire-drop menu on an Email) turns one Email into a pin per field, each with its type.
 - **Search mail** (mailbox, folder, limit; in Properties: from, to, subject has, contains, since, until, unread only, flagged only, with labels) gives an Email list, newest first, without bodies; **Get mail** reads emails with their bodies.
 - **Mark as read**, **Mark as unread**, **Flag**, **Unflag**, **Add label**, **Remove label**, **Move to folder** (pick the folder in Properties: the mailbox's folders, special ones with their role, e.g. "[Gmail]/Trash · Trash"; when the gateway cannot list them, type the name) and **Delete** (to the Trash; **Delete for good** under More options) change the emails they are given. **Mark mail** and **Label mail** do several of these at once.
 - **Send mail** (to, cc, bcc, subject, text, html, attachments), **Reply** (reply all) and **Forward** (to, note) send through your mailbox's recipient policy; **Get attachment** stores one attachment as a file.
@@ -400,6 +400,17 @@ Release a dragged wire on empty canvas (away from any pin or node) and a small m
   output; wire its execution input and its `true` / `false` outputs to the steps around it.
 - **Break Object** (from an object or `any` output) adds a Break Object wired to it and opens its
   properties, where you pick the fields.
+- **Break Email** (from an Email output, listed first: "Expose this email's fields: from, subject,
+  date, body, …") adds a Break Object already set up with every Email field as an output with its
+  type (`id` text, `to` list, `seen` boolean, `attachments` list, `labels` list, …), wired to the
+  email; there are no fields to pick. Break Email is also in the palette, right after Break Object,
+  and a Break Object you wire to an Email by any other route offers **Use the Email fields** in its
+  properties.
+- **ForEach** (from a list output: an array, an Email list, a list of files, of assertions or of
+  tools; listed first) adds a ForEach whose `items` is that list (over an Email list each `item` is
+  an Email). Wire the steps to run for each item to `loop`, and what comes after the last item to
+  `done`. For, While and Loop Limit are not offered: they count numbers, test a condition or cap a
+  repeating path, and none of them takes a list.
 
 Execution pins get no menu: relays carry data only. The relay and its wire are one undo step. A
 relay is also in the palette (Data and text → Relay).
@@ -435,6 +446,23 @@ badge greyed, the run checks refuse it, and the runtime refuses the flow at comp
 same words: "Wire S.pin -> T goes back out of L's loop body: the run would never end. A path inside
 a loop body can only repeat within the body; to repeat the whole loop, wire the loop-back after
 the loop's done." (backlog 1018).
+
+## A loop whose body ends the run
+
+A ForEach runs its body (the steps wired to `loop`) once per item; when the body's last step
+finishes, the next item starts, and `done` runs after the last one. **On Flow End** ends the run
+wherever it is reached, inside a loop body too. A body that reaches On Flow End therefore stops
+after the first item: a ForEach over five emails shows one message.
+
+The editor flags this shape on the loop and on that On Flow End: "This loop stops after its first
+item: its body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire
+out." (For and While say "first pass"). The same sentence appears when you save and in the run
+checks. **Fix the loop**, next to the warning, removes the body's wires into On Flow End and wires
+the loop's `done` to it, in one undo step; the data wires into On Flow End stay, and carry the last
+item's values. When `done` already leads to another node, the fix is not offered: remove the
+body's wire into On Flow End and end the path after `done` with On Flow End yourself. An On Flow
+End inside an inner loop's body is that inner loop's case. A body that ends the run on purpose (the
+first match ends it) can keep its shape: the warning never blocks a run.
 
 ## Hidden Connections
 

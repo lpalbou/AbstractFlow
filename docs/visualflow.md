@@ -225,7 +225,7 @@ Within rung 4, what an expression is NOT for:
 |---|---|
 | reading a run variable, incl. a dotted path and a default | **Get Variable** node, wired in |
 | reading one field off this pin's own wire | declare that **output pin upstream** |
-| reading several fields off one wire | **Break Object** |
+| reading several fields off one wire | **Break Object** (**Break Email** for an Email: every field, typed) |
 | interpolating values into a string | **String Template** |
 | combining two reads with `and` / `or` / `not` / a comparison | those nodes, or an expression |
 | multiple statements, branching, several outputs | **Code node** |

@@ -238,7 +238,7 @@ The canvas reflects that split:
 Start here:
 
 - [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
-- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, flow interfaces, automations (What starts it?, context budget, inputs form), trigger-source discovery, trigger connections and the trigger event, hidden connections, the authoring assistant, media and file nodes.
+- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, flow interfaces, automations (What starts it?, context budget, inputs form), trigger-source discovery, trigger connections and the trigger event, mail (Email fields, Break Email), the wire-drop menu (Relay, If/Else, Break Object, Break Email, ForEach), paths that repeat, a loop whose body ends the run (Fix the loop), hidden connections, the authoring assistant, media and file nodes.
 - [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
 - [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
@@ -727,7 +727,7 @@ A workflow with the `event` output is *triggerable*. **New Flow** with a trigger
 
 The **Mail and publish** section of the palette handles mail deterministically, with no model: each node is one fixed action of the runtime (`mail.*`) on a mailbox of yours, and a refusal (a read-only mailbox, a message the server no longer has) comes back as `success` false with the reason in `result`.
 
-- **Email** is a data type: one email has `id` (where the message is: what the mail nodes act on), `message_id`, `mailbox`, `folder`, `thread_id`, `from`, `to`, `cc`, `subject`, `date`, `body_text`, `body_html`, `attachments` (`index`, `name`, `size`, `type`), `seen`, `flagged` and `labels`; hover an Email pin to see them. A mail trigger's `messages` is an Email list; **ForEach** over an Email list gives one Email per item, which the mail nodes take as it is. **Email fields** turns one Email into a pin per field.
+- **Email** is a data type: one email has `id` (where the message is: what the mail nodes act on), `message_id`, `mailbox`, `folder`, `thread_id`, `from`, `to`, `cc`, `subject`, `date`, `body_text`, `body_html`, `attachments` (`index`, `name`, `size`, `type`), `seen`, `flagged` and `labels`; hover an Email pin to see them. A mail trigger's `messages` is an Email list; **ForEach** over an Email list gives one Email per item, which the mail nodes take as it is. **Email fields** (or **Break Email** beside Break Object, or the wire-drop menu on an Email) turns one Email into a pin per field, each with its type.
 - **Search mail** (mailbox, folder, limit; in Properties: from, to, subject has, contains, since, until, unread only, flagged only, with labels) gives an Email list, newest first, without bodies; **Get mail** reads emails with their bodies.
 - **Mark as read**, **Mark as unread**, **Flag**, **Unflag**, **Add label**, **Remove label**, **Move to folder** (pick the folder in Properties: the mailbox's folders, special ones with their role, e.g. "[Gmail]/Trash · Trash"; when the gateway cannot list them, type the name) and **Delete** (to the Trash; **Delete for good** under More options) change the emails they are given. **Mark mail** and **Label mail** do several of these at once.
 - **Send mail** (to, cc, bcc, subject, text, html, attachments), **Reply** (reply all) and **Forward** (to, note) send through your mailbox's recipient policy; **Get attachment** stores one attachment as a file.
@@ -751,6 +751,17 @@ Release a dragged wire on empty canvas (away from any pin or node) and a small m
   output; wire its execution input and its `true` / `false` outputs to the steps around it.
 - **Break Object** (from an object or `any` output) adds a Break Object wired to it and opens its
   properties, where you pick the fields.
+- **Break Email** (from an Email output, listed first: "Expose this email's fields: from, subject,
+  date, body, …") adds a Break Object already set up with every Email field as an output with its
+  type (`id` text, `to` list, `seen` boolean, `attachments` list, `labels` list, …), wired to the
+  email; there are no fields to pick. Break Email is also in the palette, right after Break Object,
+  and a Break Object you wire to an Email by any other route offers **Use the Email fields** in its
+  properties.
+- **ForEach** (from a list output: an array, an Email list, a list of files, of assertions or of
+  tools; listed first) adds a ForEach whose `items` is that list (over an Email list each `item` is
+  an Email). Wire the steps to run for each item to `loop`, and what comes after the last item to
+  `done`. For, While and Loop Limit are not offered: they count numbers, test a condition or cap a
+  repeating path, and none of them takes a list.
 
 Execution pins get no menu: relays carry data only. The relay and its wire are one undo step. A
 relay is also in the palette (Data and text → Relay).
@@ -786,6 +797,23 @@ badge greyed, the run checks refuse it, and the runtime refuses the flow at comp
 same words: "Wire S.pin -> T goes back out of L's loop body: the run would never end. A path inside
 a loop body can only repeat within the body; to repeat the whole loop, wire the loop-back after
 the loop's done." (backlog 1018).
+
+## A loop whose body ends the run
+
+A ForEach runs its body (the steps wired to `loop`) once per item; when the body's last step
+finishes, the next item starts, and `done` runs after the last one. **On Flow End** ends the run
+wherever it is reached, inside a loop body too. A body that reaches On Flow End therefore stops
+after the first item: a ForEach over five emails shows one message.
+
+The editor flags this shape on the loop and on that On Flow End: "This loop stops after its first
+item: its body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire
+out." (For and While say "first pass"). The same sentence appears when you save and in the run
+checks. **Fix the loop**, next to the warning, removes the body's wires into On Flow End and wires
+the loop's `done` to it, in one undo step; the data wires into On Flow End stay, and carry the last
+item's values. When `done` already leads to another node, the fix is not offered: remove the
+body's wire into On Flow End and end the path after `done` with On Flow End yourself. An On Flow
+End inside an inner loop's body is that inner loop's case. A body that ends the run on purpose (the
+first match ends it) can keep its shape: the warning never blocks a run.
 
 ## Hidden Connections
 
@@ -2606,6 +2634,39 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Inputs: `items` array; `key` string
 - Outputs: `result` array
 - Default config: none
+
+### data / Break Email
+
+- Node type: `break_object`
+- Document node: `{"id":"<unique_id>","type":"break_object","template":"Break Email"}`
+- Utility: Expose this email’s fields as outputs: from, to, cc, subject, date, body_text, attachments, seen, flagged, labels…
+- Gateway capability: none
+- Dynamic pin policy: dynamic outputs via the document `outputs` list (also drives `breakConfig.selectedPaths`)
+- Authorable config: select with `"template": "Break Email"`; input defaults with `pin_defaults`
+- Inputs: `object` email (email): The email to read.
+- Outputs: `id` string: Where the message is (what the mail nodes act on).; `message_id` string: The email’s Message-ID.; `mailbox` string: The mailbox it is in (its address).; `folder` string: The folder it is in (e.g. INBOX).; `thread_id` string: The conversation it belongs to.; `from` string: Who sent it.; `to` array: Who it was sent to.; `cc` array: Who was copied.; `subject` string: Its subject.; `date` string: When it was sent (date and time).; `body_text` string: The message as plain text.; `body_html` string: The message as HTML, when it has one.; `attachments` array: Its attachments: index, name, size, type (Get attachment reads one by index).; `seen` boolean: Whether it was read.; `flagged` boolean: Whether it is flagged.; `labels` array: Its labels.
+- Default config: {
+  "breakConfig": {
+    "selectedPaths": [
+      "id",
+      "message_id",
+      "mailbox",
+      "folder",
+      "thread_id",
+      "from",
+      "to",
+      "cc",
+      "subject",
+      "date",
+      "body_text",
+      "body_html",
+      "attachments",
+      "seen",
+      "flagged",
+      "labels"
+    ]
+  }
+}
 
 ### data / Break Object
 
@@ -5128,7 +5189,7 @@ Within rung 4, what an expression is NOT for:
 |---|---|
 | reading a run variable, incl. a dotted path and a default | **Get Variable** node, wired in |
 | reading one field off this pin's own wire | declare that **output pin upstream** |
-| reading several fields off one wire | **Break Object** |
+| reading several fields off one wire | **Break Object** (**Break Email** for an Email: every field, typed) |
 | interpolating values into a string | **String Template** |
 | combining two reads with `and` / `or` / `not` / a comparison | those nodes, or an expression |
 | multiple statements, branching, several outputs | **Code node** |
@@ -5869,6 +5930,10 @@ The connected Gateway does not serve automations (it reports them as
 unavailable or does not serve `/api/gateway/trigger-sources`). Connect to a
 Gateway with automations enabled, then press **Try again**.
 
+## Why Does My ForEach Run Only Once?
+
+Its body (the steps wired to `loop`) reaches On Flow End, and On Flow End ends the run wherever it is reached. Wire the loop's `done` to On Flow End instead; the body's last node needs no wire out. The editor shows this on the loop with **Fix the loop**, which does exactly that. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
+
 ## Why Does A Node Show "N hidden"?
 
 The stored workflow wires pins the canvas cannot draw, such as a code node's
@@ -6012,6 +6077,10 @@ See [VisualFlow JSON > Interfaces](visualflow.md#interfaces).
 
 See [Web editor > Hidden Connections](web-editor.md#hidden-connections).
 
+### A loop shows "This loop stops after its first item"
+
+The loop's body reaches On Flow End, so the run ends after the first item (For and While: the first pass). Press **Fix the loop** on the warning: the body's wires into On Flow End are removed and the loop's `done` is wired to it (one undo step). When the warning says `done` already leads to another node, remove the body's wire into On Flow End and end the path after `done` with On Flow End. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
+
 ### Run preflight warns about interface pins
 
 | Warning | Meaning | Fix |
@@ -6129,6 +6198,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New flow with a trigger** shows no Interfaces section and says "Runs by itself when its trigger fires: what arrives is on On Flow Start, build the steps on the canvas.". **Provider** and **Model** inputs are lists from the gateway with **Use the default (…)** first.
 - **Trigger list** grouped (Your mailboxes / feeds / webhooks), paused or failing ones shown with their state, **Add a feed or webhook…**; weekly schedules wait for a day; the time zone can be chosen; times read "08:00" (24-hour) everywhere; "50,000 tokens"; no "occurrence" in the copy; library rows show "3 nodes · 1 edge" instead of ids.
 - **Settings schemas never block a trigger.** Lists of strings render one per line, nested objects as a section, and a setting using a keyword the editor does not render is a JSON field of its own (checked by the gateway) instead of refusing the whole trigger. `email` and `uri` formats and `items`/`minItems`/`maxItems`/`uniqueItems` are checked.
+- **A loop whose body ends the run is flagged, with a one-click fix.** When a ForEach, For or While body reaches On Flow End (which ends the run after the first item), the loop and that On Flow End show "This loop stops after its first item: its body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire out." The same sentence appears on save and in the run checks (advisory). **Fix the loop** removes the body's wires into On Flow End and wires `done` to it, in one undo step (also the `fix_loop_end` authoring command); it is not offered when `done` already leads elsewhere.
+- **Break Email.** Dropping a wire from an Email output on empty canvas offers **Break Email** ("Expose this email's fields: from, subject, date, body, …"): a Break Object with every Email field as a typed output, wired, no field picking. It is also in the palette after Break Object, and a Break Object fed by an Email offers **Use the Email fields** in Properties. Break Object for plain objects is unchanged.
+- **ForEach from a list drop.** Dropping a wire from a list output (array, Email list, file lists, assertions, tools) on empty canvas offers **ForEach** with that list on its `items` (an Email list gives Email items), beside Relay.
 
 ### Fixed
 

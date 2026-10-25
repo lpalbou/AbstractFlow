@@ -472,6 +472,39 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `result` array
 - Default config: none
 
+### data / Break Email
+
+- Node type: `break_object`
+- Document node: `{"id":"<unique_id>","type":"break_object","template":"Break Email"}`
+- Utility: Expose this email’s fields as outputs: from, to, cc, subject, date, body_text, attachments, seen, flagged, labels…
+- Gateway capability: none
+- Dynamic pin policy: dynamic outputs via the document `outputs` list (also drives `breakConfig.selectedPaths`)
+- Authorable config: select with `"template": "Break Email"`; input defaults with `pin_defaults`
+- Inputs: `object` email (email): The email to read.
+- Outputs: `id` string: Where the message is (what the mail nodes act on).; `message_id` string: The email’s Message-ID.; `mailbox` string: The mailbox it is in (its address).; `folder` string: The folder it is in (e.g. INBOX).; `thread_id` string: The conversation it belongs to.; `from` string: Who sent it.; `to` array: Who it was sent to.; `cc` array: Who was copied.; `subject` string: Its subject.; `date` string: When it was sent (date and time).; `body_text` string: The message as plain text.; `body_html` string: The message as HTML, when it has one.; `attachments` array: Its attachments: index, name, size, type (Get attachment reads one by index).; `seen` boolean: Whether it was read.; `flagged` boolean: Whether it is flagged.; `labels` array: Its labels.
+- Default config: {
+  "breakConfig": {
+    "selectedPaths": [
+      "id",
+      "message_id",
+      "mailbox",
+      "folder",
+      "thread_id",
+      "from",
+      "to",
+      "cc",
+      "subject",
+      "date",
+      "body_text",
+      "body_html",
+      "attachments",
+      "seen",
+      "flagged",
+      "labels"
+    ]
+  }
+}
+
 ### data / Break Object
 
 - Node type: `break_object`

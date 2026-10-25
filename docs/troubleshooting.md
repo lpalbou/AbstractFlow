@@ -117,6 +117,10 @@ See [VisualFlow JSON > Interfaces](visualflow.md#interfaces).
 
 See [Web editor > Hidden Connections](web-editor.md#hidden-connections).
 
+### A loop shows "This loop stops after its first item"
+
+The loop's body reaches On Flow End, so the run ends after the first item (For and While: the first pass). Press **Fix the loop** on the warning: the body's wires into On Flow End are removed and the loop's `done` is wired to it (one undo step). When the warning says `done` already leads to another node, remove the body's wire into On Flow End and end the path after `done` with On Flow End. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
+
 ### Run preflight warns about interface pins
 
 | Warning | Meaning | Fix |
