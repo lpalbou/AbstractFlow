@@ -34,8 +34,8 @@ describe('inputs form ↔ input_data', () => {
 
   it('one field per On Flow Start input; prompt in words; the event is never asked', () => {
     expect(fields.map((f) => `${f.id}:${f.kind}:${f.label}`)).toEqual([
-      'provider:text:Provider',
       'prompt:prompt:What each run is asked to do',
+      'provider:text:Provider',
       'max_cycles:number:Max cycles',
       'dry_run:boolean:Dry run',
       'options:json:Options',

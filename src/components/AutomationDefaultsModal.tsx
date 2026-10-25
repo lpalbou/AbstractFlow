@@ -704,26 +704,27 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
           </>
         ) : null}
 
-        {issues.length ? (
-          <ul className="automation-issues" role="alert">
-            {issues.map((issue, i) => (
-              <li key={i}>{issue}</li>
-            ))}
-          </ul>
-        ) : null}
-
-        <div className="modal-actions">
-          {existing ? (
-            <button className="modal-button cancel automation-remove" onClick={handleRemove} disabled={saving}>
-              Remove automation
-            </button>
+        <div className="automation-footer">
+          {issues.length ? (
+            <ul className="automation-issues" role="alert">
+              {issues.map((issue, i) => (
+                <li key={i}>{issue}</li>
+              ))}
+            </ul>
           ) : null}
-          <button className="modal-button cancel" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-          <button className="modal-button primary" onClick={handleSave} disabled={saving || !sourcesReady}>
-            Save
-          </button>
+          <div className="modal-actions">
+            {existing ? (
+              <button className="modal-button cancel automation-remove" onClick={handleRemove} disabled={saving}>
+                Remove automation
+              </button>
+            ) : null}
+            <button className="modal-button cancel" onClick={onClose} disabled={saving}>
+              Cancel
+            </button>
+            <button className="modal-button primary" onClick={handleSave} disabled={saving || !sourcesReady}>
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </div>

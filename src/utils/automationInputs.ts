@@ -42,7 +42,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function inputFields(flow: Pick<VisualFlow, 'nodes'>): InputField[] {
   const start = flow.nodes.find((n) => n.type === 'on_flow_start' || n.data?.nodeType === 'on_flow_start');
   const pins = (start?.data?.outputs || []) as Array<{ id: string; label?: string; type?: string; description?: string }>;
-  return pins
+  // What each run is asked to do comes first: it is the one input most automations need.
+  const ordered = [...pins].sort((a, b) => Number(b.id === 'prompt') - Number(a.id === 'prompt'));
+  return ordered
     .filter((pin) => pin.type !== 'execution' && pin.id !== TRIGGER_EVENT_PIN_ID)
     .map((pin) => {
       if (pin.id === 'prompt') {

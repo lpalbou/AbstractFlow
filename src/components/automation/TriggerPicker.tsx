@@ -255,8 +255,10 @@ export function TriggerPicker({
                     disabled={a.disabled}
                     onChange={() => onChange({ ...value, arrival: a.key })}
                   />
-                  <span>{a.text}</span>
-                  {a.hint ? <span className="automation-muted"> · {a.hint}</span> : null}
+                  <span>
+                    {a.text}
+                    {a.hint ? <span className="automation-muted"> · {a.hint}</span> : null}
+                  </span>
                 </label>
               ))}
             </div>

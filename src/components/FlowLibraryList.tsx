@@ -272,7 +272,16 @@ export function FlowLibraryList({
           </div>
         </div>
         {nature.kind !== 'none' ? (
-          <div className={`flow-library-item-nature flow-library-item-nature--${nature.kind}`}>{nature.text}</div>
+          <div className={`flow-library-item-nature flow-library-item-nature--${nature.kind}`}>
+            {nature.kind === 'automation' ? (
+              <>
+                <span className="flow-library-item-nature-kind">Automation</span>
+                {nature.text.slice('Automation'.length)}
+              </>
+            ) : (
+              nature.text
+            )}
+          </div>
         ) : null}
         <div className="flow-library-item-sub">
           <span className={`flow-library-item-desc ${description ? '' : 'empty'}`}>

@@ -9089,13 +9089,22 @@ button.flow-nature-badge:hover {
   color: var(--text-primary);
   font-size: var(--font-size-sm);
 }
-.automation-modal .modal-actions {
+.automation-footer {
   position: sticky;
   bottom: -24px;
   margin: 16px -24px -24px;
   padding: 12px 24px;
   border-top: 1px solid var(--ui-border-1);
   background: var(--bg-secondary);
+}
+.automation-footer .modal-actions {
+  margin-top: 0;
+}
+.automation-footer .automation-issues {
+  margin: 0 0 10px;
+}
+.automation-field .property-hint {
+  margin: 0;
 }
 .automation-remove {
   margin-right: auto;
@@ -9117,4 +9126,39 @@ button.flow-nature-badge:hover {
 }
 .automation-modal .new-flow-header {
   margin-bottom: 8px;
+}
+/* The choice cards keep their own surfaces on hover (the generic button hover
+   would paint them over and drown the sub line). */
+.automation-choice:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary) 4%, var(--ui-surface-1));
+}
+.automation-choice.is-selected:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 14%, var(--ui-surface-1));
+}
+.automation-day:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+.automation-day.is-on:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+button.flow-nature-badge:hover:not(:disabled),
+.automation-link-button:hover:not(:disabled) {
+  background: transparent;
+}
+.automation-arrival {
+  align-items: flex-start;
+}
+.automation-arrival input {
+  margin-top: 3px;
+}
+/* An automation reads as the Automation dialog's amber, not the accent (red in some themes reads as an error). */
+.flow-nature-badge--automation {
+  border-color: color-mix(in srgb, var(--flow-hue-yellow) 70%, transparent);
+}
+.flow-library-item-nature--automation {
+  color: var(--text-secondary);
+}
+.flow-library-item-nature-kind {
+  color: var(--flow-hue-yellow);
+  font-weight: 600;
 }
