@@ -64,7 +64,7 @@ import {
   updateOpenFlowMetadata,
 } from '../hooks/openFlowMetadata';
 import { errorSnippet } from '../utils/errorSnippet';
-import { saveButtonDisabled, saveGateTooltip, type SaveGateInput } from '../utils/saveGate';
+import { saveButtonClass, saveButtonDisabled, saveGateTooltip, type SaveGateInput } from '../utils/saveGate';
 import { savedBaselineSnapshot, shouldRebaselineOnIdentityChange } from '../utils/saveBaseline';
 import type { PublishedBundleTarget } from '../utils/workflowBundles';
 import {
@@ -2141,30 +2141,39 @@ export function Toolbar() {
           </ToolbarAction>
         </div>
 
-        {/* File: create / open / save / duplicate */}
+        {/* File: create / open / save / duplicate. New, Open and Save each
+            carry their own hue (violet / blue / amber, palette.css) and a word
+            that shows when the toolbar row has room for it (the flow-toolbar
+            container query; never below 1440 px). Save reads at a glance:
+            unsaved = filled amber with a dot, saving = a spinner, saved =
+            quiet. */}
         <div className="toolbar-group" role="group" aria-label="Flow file actions">
-          <ToolbarAction tooltip="New flow" label="New Flow" onClick={handleNew}>
+          <ToolbarAction tooltip="New flow" label="New Flow" onClick={handleNew} className="file-action new-button">
             <IconFilePlus />
+            <span className="file-action-label" aria-hidden="true">New</span>
           </ToolbarAction>
           <ToolbarAction
             tooltip={visualflowCrudUnavailable ? saveUnavailableReason : 'Open a saved flow'}
             label="Open Flow"
             onClick={() => setShowFlowLibrary(true)}
             disabled={visualflowCrudUnavailable}
+            className="file-action open-button"
           >
             <IconFolder />
+            <span className="file-action-label" aria-hidden="true">Open</span>
           </ToolbarAction>
           <ToolbarAction
             tooltip={saveDisabledReason}
-            label="Save Flow"
+            label={saveMutation.isPending ? 'Saving flow' : hasUnsavedChanges ? 'Save Flow (unsaved changes)' : 'Save Flow'}
             onClick={handleSave}
             // A dirty flow's Save button is NEVER a dead control — see
             // utils/saveGate.ts for the rule and its regression test.
             disabled={saveButtonDisabled(saveGate)}
-            className={hasUnsavedChanges ? 'save-button dirty' : 'save-button'}
+            className={saveButtonClass({ savePending: saveMutation.isPending, hasUnsavedChanges })}
           >
-            <IconSave />
-            {hasUnsavedChanges ? <span className="save-dirty-dot" aria-hidden="true" /> : null}
+            {saveMutation.isPending ? <IconSpinner /> : <IconSave />}
+            <span className="file-action-label" aria-hidden="true">Save</span>
+            {hasUnsavedChanges && !saveMutation.isPending ? <span className="save-dirty-dot" aria-hidden="true" /> : null}
           </ToolbarAction>
           <ToolbarAction
             tooltip={

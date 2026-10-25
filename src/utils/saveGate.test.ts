@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   dirtyFlowHasClickableSave,
+  saveButtonClass,
   saveButtonDisabled,
   saveGateTooltip,
   type SaveGateInput,
@@ -98,5 +99,23 @@ describe('saveGateTooltip', () => {
 
   it('offers the shortcut when a save is possible', () => {
     expect(saveGateTooltip(gate())).toBe('Save Flow (Ctrl/⌘+S)');
+  });
+
+  it('says a save is running while it runs', () => {
+    expect(saveGateTooltip(gate({ savePending: true }))).toBe('Saving…');
+  });
+});
+
+describe('saveButtonClass (the Save state at a glance)', () => {
+  it('unsaved changes: the filled amber look', () => {
+    expect(saveButtonClass({ savePending: false, hasUnsavedChanges: true })).toBe('file-action save-button dirty');
+  });
+
+  it('saving: the spinner look wins over unsaved changes', () => {
+    expect(saveButtonClass({ savePending: true, hasUnsavedChanges: true })).toBe('file-action save-button saving');
+  });
+
+  it('saved: the quiet look', () => {
+    expect(saveButtonClass({ savePending: false, hasUnsavedChanges: false })).toBe('file-action save-button');
   });
 });

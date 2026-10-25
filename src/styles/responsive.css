@@ -99,6 +99,12 @@ body {
   .toolbar-spacer {
     display: none;
   }
+
+  /* New / Open / Save are icons here (their hue and tooltip carry them); the
+     words need the room the row only has from 1440 px (palette.css). */
+  .file-action-label {
+    display: none !important;
+  }
 }
 
 /* ------------------------------------------------------------------ */

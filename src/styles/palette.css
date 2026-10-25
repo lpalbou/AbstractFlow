@@ -740,6 +740,9 @@
   gap: 10px;
   flex: 1;
   min-width: 0;
+  /* The New / Open / Save words show when THIS row has room for them, not at
+     a window width (the name and the nature badge share the row). */
+  container: flow-toolbar / inline-size;
 }
 
 .flow-name-input {
@@ -863,12 +866,76 @@
   opacity: 0.7;
 }
 
-.toolbar-button.save-button.dirty {
-  box-shadow: inset 0 0 0 1px rgba(255, 176, 0, 0.55), 0 0 14px rgba(255, 176, 0, 0.14);
+/* New / Open / Save (operator 2026-10-25: three grey icons were easy to
+   miss). Each has its own hue from categories.css, apart from Run (the theme
+   accent) and Make it available (aqua): New violet (create, the core hue),
+   Open blue (the files hue: the library), Save amber (the unsaved colour the
+   dirty dot always had). The ink is the hue mixed toward the text, as the
+   Flow Library's kind tiles do, so it reads on light and dark headers. */
+.toolbar-group .toolbar-button.file-action {
+  --file-ink: color-mix(in srgb, var(--file-hue) 70%, var(--text-primary));
+  color: var(--file-ink);
+  background: color-mix(in srgb, var(--file-hue) 9%, transparent);
+}
+.toolbar-group .toolbar-button.file-action:hover:not(:disabled) {
+  color: var(--file-ink);
+  background: color-mix(in srgb, var(--file-hue) 18%, transparent);
+}
+.toolbar-button.new-button {
+  --file-hue: var(--flow-hue-violet, #9085e9);
+}
+.toolbar-button.open-button {
+  --file-hue: var(--flow-hue-blue, #3987e5);
+}
+.toolbar-button.save-button {
+  --file-hue: var(--flow-hue-yellow, #c98500);
 }
 
-.toolbar-button.save-button:disabled {
-  opacity: 0.45;
+/* The word next to the icon: only when the toolbar row has room for it. The
+   threshold is the row width that keeps the three words, the strip as it is
+   at 1440 px and wider, the name (90 px) and the nature badge (150 px) at
+   their least (responsive.css); below 1440 px the words never show. */
+.file-action-label {
+  display: none;
+  font-weight: 600;
+  line-height: 1;
+}
+@container flow-toolbar (min-width: 1240px) {
+  .file-action-label {
+    display: inline;
+  }
+  .toolbar-group .toolbar-button.file-action {
+    padding: 6px 10px;
+  }
+}
+
+/* Saved: quiet (nothing to do, the button is disabled). */
+.toolbar-group .toolbar-button.save-button:disabled {
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+
+/* Unsaved changes: filled amber with a dot; the ink is dark in every theme
+   (amber is a light colour on both headers). */
+.toolbar-group .toolbar-button.save-button.dirty {
+  background: var(--file-hue);
+  color: #1d1400;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--file-hue) 35%, transparent);
+}
+.toolbar-group .toolbar-button.save-button.dirty:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--file-hue) 85%, #fff);
+  color: #1d1400;
+}
+
+/* Saving: a spinner on an amber tint (disabled while the request runs, but
+   not faded: it is busy, not unavailable). */
+.toolbar-group .toolbar-button.save-button.saving,
+.toolbar-group .toolbar-button.save-button.saving:disabled {
+  background: color-mix(in srgb, var(--file-hue) 22%, transparent);
+  color: var(--file-ink);
+  opacity: 1;
+  cursor: progress;
 }
 
 .save-dirty-dot {
@@ -878,8 +945,8 @@
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: #ffb000;
-  box-shadow: 0 0 8px rgba(255, 176, 0, 0.7);
+  background: currentColor;
+  box-shadow: 0 0 0 1.5px var(--file-hue, #c98500);
 }
 
 /* "Waiting for you" badge (backlog 0138): a calm-amber pill that appears in

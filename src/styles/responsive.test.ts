@@ -69,6 +69,8 @@ describe('responsive.css (layout guard)', () => {
     expectRule('', '.app-container', /height:\s*var\(--vh-full/);
     expectRule('(max-width: 1439.98px)', '.toolbar-actions', /overflow-x:\s*auto/);
     expectRule('(max-width: 1439.98px)', '.toolbar', /overflow:\s*hidden/);
+    // New / Open / Save are icon-only below 1440 px (the words need the wide row)
+    expectRule('(max-width: 1439.98px)', '.file-action-label', /display:\s*none/);
     // the toolbar clip belongs to the narrow query only
     expect(declsFor(CSS.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, ''), '.toolbar')).toBe('');
   });

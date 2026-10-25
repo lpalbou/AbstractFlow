@@ -2,7 +2,7 @@
  * When the Save button is disabled, and what it says.
  *
  * The rule this file exists to enforce: a flow with unsaved changes NEVER gets
- * a dead Save button. The toolbar shows an orange dirty dot the moment the
+ * a dead Save button. The toolbar fills Save with amber (and a dot) the moment the
  * graph diverges from the last saved signature; if the button is also disabled
  * at that moment, the user is told "you have unsaved work" and then given a
  * control that swallows every click in silence. That is exactly how a whole
@@ -44,6 +44,7 @@ export function saveButtonDisabled(input: SaveGateInput): boolean {
 
 /** Tooltip / accessible hint for the Save button, most specific reason first. */
 export function saveGateTooltip(input: SaveGateInput): string {
+  if (input.savePending) return 'Saving…';
   if (input.crudUnavailable) {
     return input.crudUnavailableReason || 'Gateway VisualFlow storage is unavailable';
   }
@@ -62,4 +63,15 @@ export function saveGateTooltip(input: SaveGateInput): string {
 export function dirtyFlowHasClickableSave(input: SaveGateInput): boolean {
   if (!input.hasUnsavedChanges || input.savePending) return true;
   return !saveButtonDisabled(input);
+}
+
+/**
+ * The Save button's look, one state at a time (palette.css): `saving` (a
+ * spinner, while the request is in flight), `dirty` (unsaved changes: filled
+ * amber with a dot), otherwise the quiet saved look.
+ */
+export function saveButtonClass(input: Pick<SaveGateInput, 'savePending' | 'hasUnsavedChanges'>): string {
+  if (input.savePending) return 'file-action save-button saving';
+  if (input.hasUnsavedChanges) return 'file-action save-button dirty';
+  return 'file-action save-button';
 }
