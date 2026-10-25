@@ -9107,3 +9107,8 @@ button.flow-nature-badge:hover {
 .automation-budget {
   flex-wrap: wrap;
 }
+.automation-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

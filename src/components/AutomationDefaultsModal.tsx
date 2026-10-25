@@ -44,6 +44,7 @@ import {
 } from '../utils/automationChoice';
 import { choiceFromPicker, emptyPicker, pickerFromTrigger, type PickerData, type PickerState } from '../utils/automationPicker';
 import { enumWords, triggerSettingsCopy } from '../utils/triggerCopy';
+import { inputDataFromForm, inputFields, inputFormFromData, type InputField, type InputValues } from '../utils/automationInputs';
 import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
 import { useAutomationFacts } from './automation/useAutomationFacts';
 
@@ -138,10 +139,88 @@ export function ContextChoice({
   );
 }
 
-function startPinNames(flow: VisualFlow): string[] {
-  const start = flow.nodes.find((n) => n.type === 'on_flow_start' || n.data?.nodeType === 'on_flow_start');
-  const outputs = (start?.data?.outputs || []) as Array<{ id: string; type?: string }>;
-  return outputs.filter((pin) => pin.type !== 'execution').map((pin) => pin.id);
+/** The automation's inputs, one field per On Flow Start input (utils/automationInputs.ts). */
+export function InputsForm({
+  fields,
+  values,
+  onValues,
+  raw,
+  onRaw,
+}: {
+  fields: InputField[];
+  values: InputValues;
+  onValues: (next: InputValues) => void;
+  raw: string;
+  onRaw: (text: string) => void;
+}) {
+  const set = (id: string, value: string) => onValues({ ...values, [id]: value });
+  return (
+    <div className="automation-inputs">
+      {fields.length ? null : <p className="automation-help">This flow’s On Flow Start takes no inputs: each run gets only the trigger’s event.</p>}
+      {fields.map((field) => {
+        const id = `automation-input-${field.id.replace(/\W+/g, '-')}`;
+        const value = values[field.id] ?? '';
+        let control: JSX.Element;
+        switch (field.kind) {
+          case 'prompt':
+            control = (
+              <textarea
+                id={id}
+                className="run-form-input property-textarea"
+                rows={4}
+                value={value}
+                placeholder="e.g. Summarise the new messages and tell me which need an answer today."
+                onChange={(e) => set(field.id, e.target.value)}
+              />
+            );
+            break;
+          case 'number':
+            control = <input id={id} className="run-form-input" type="number" step="any" value={value} onChange={(e) => set(field.id, e.target.value)} />;
+            break;
+          case 'boolean':
+            control = (
+              <select id={id} className="run-form-select" value={value} onChange={(e) => set(field.id, e.target.value)}>
+                <option value="">Not set</option>
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            );
+            break;
+          case 'json':
+            control = (
+              <textarea id={id} className="run-form-input property-textarea code" rows={3} value={value} onChange={(e) => set(field.id, e.target.value)} />
+            );
+            break;
+          default:
+            control = <input id={id} className="run-form-input" type="text" value={value} onChange={(e) => set(field.id, e.target.value)} />;
+        }
+        return (
+          <div key={field.id} className="run-form-field automation-field">
+            <label className="run-form-label" htmlFor={id}>
+              {field.label}
+            </label>
+            {control}
+            {field.help ? <span className="property-hint">{field.help}</span> : null}
+            {field.kind === 'json' ? <span className="property-hint">Written as JSON.</span> : null}
+          </div>
+        );
+      })}
+      <details className="automation-more" open={Boolean(raw.trim())}>
+        <summary>Advanced: raw JSON</summary>
+        <div className="automation-more-body">
+          <textarea
+            className="run-form-input property-textarea code"
+            rows={4}
+            value={raw}
+            placeholder="{}"
+            aria-label="Other inputs as raw JSON"
+            onChange={(e) => onRaw(e.target.value)}
+          />
+          <span className="property-hint">Other inputs the fields above do not cover, as one JSON object. Most automations need nothing here.</span>
+        </div>
+      </details>
+    </div>
+  );
 }
 
 function ConfigField({
@@ -419,7 +498,10 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     setBudgetSeeded(true);
     setBudget(budgetText(existing?.context, historyDefault));
   }, [budgetSeeded, facts.historyDefault.state, existing, historyDefault]);
-  const [inputDataText, setInputDataText] = useState(JSON.stringify(existing?.input_data || {}, null, 2));
+  const inputFieldList = useMemo(() => inputFields(flow), [flow]);
+  const seededInputs = useMemo(() => inputFormFromData(inputFieldList, existing?.input_data || {}), [inputFieldList, existing]);
+  const [inputValues, setInputValues] = useState<InputValues>(seededInputs.values);
+  const [rawInputs, setRawInputs] = useState(seededInputs.raw);
   const [issues, setIssues] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -459,13 +541,9 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
 
   const handleSave = async () => {
     if (!sourcesReady) return;
-    let inputData: unknown;
-    const inputProblems: string[] = [];
-    try {
-      inputData = JSON.parse(inputDataText.trim() || '{}');
-    } catch (error) {
-      inputProblems.push(`Inputs: not valid JSON (${error instanceof Error ? error.message : String(error)})`);
-    }
+    const inputs = inputDataFromForm(inputFieldList, inputValues, rawInputs);
+    const inputProblems: string[] = 'problems' in inputs ? [...inputs.problems] : [];
+    const inputData = 'input_data' in inputs ? inputs.input_data : {};
     const ctx = contextFromForm(mode, budget, historyDefault);
     if ('problem' in ctx) inputProblems.unshift(ctx.problem);
     const draft = automationDraft({
@@ -510,7 +588,6 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     }
   };
 
-  const pins = startPinNames(flow);
   const savedLabel = existing ? sources.find((s) => s.id === existing.trigger.source_id)?.label || 'another trigger' : '';
 
   return (
@@ -593,23 +670,12 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
               <input className="run-form-input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
 
-            <div className="run-form-field" style={{ marginTop: 12 }}>
-              <label className="run-form-label">Default input_data (JSON object)</label>
-              <textarea
-                className="run-form-input property-textarea code"
-                rows={5}
-                value={inputDataText}
-                onChange={(e) => setInputDataText(e.target.value)}
-              />
-              <span className="property-hint">
-                {pins.length ? (
-                  <>
-                    On Flow Start inputs: {pins.map((p, i) => <span key={p}>{i ? ', ' : ''}<code>{p}</code></span>)}.{' '}
-                  </>
-                ) : null}
-                A string <code>prompt</code> is prefixed with the trigger line on every run.
-              </span>
-            </div>
+            <section className="automation-section" aria-labelledby="automation-inputs-title">
+              <h4 id="automation-inputs-title" className="automation-section-title">
+                Inputs
+              </h4>
+              <InputsForm fields={inputFieldList} values={inputValues} onValues={setInputValues} raw={rawInputs} onRaw={setRawInputs} />
+            </section>
           </>
         ) : null}
 
