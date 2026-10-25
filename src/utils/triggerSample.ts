@@ -152,6 +152,7 @@ export async function runAsIfTriggered(args: {
   start: (overrides?: Record<string, unknown>) => void;
 }): Promise<{ started: true; sentence: string } | { started: false; problem: string }> {
   if (args.edited) {
+    setPendingTestRun('with the inputs you edited');
     args.start();
     return { started: true, sentence: 'Running with the inputs you edited (test run)' };
   }
@@ -169,6 +170,48 @@ export async function runAsIfTriggered(args: {
     values[id] = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   }
   args.prefill(values);
+  setPendingTestRun(testRunWords(args.trigger, args.count, sample, args.words));
   args.start(sample.inputs);
   return { started: true, sentence: testRunSentence(args.trigger, args.count, sample, args.words) };
+}
+
+/** "with the latest 3 items of Python news" (what a finished test run ran on). */
+export function testRunWords(trigger: AutomationTriggerDefaults, count: number, sample: TriggerSample | null, words: AutomationWords = {}): string {
+  const kind = triggerPinKind(trigger);
+  const noun = sampleNoun(kind);
+  if (!noun) return kind === 'schedule' ? 'as if the schedule fired now' : '';
+  const found = sample ? sampleFound(trigger, sample) : null;
+  const n = found ?? count;
+  const word = n === 1 ? SINGULAR[noun] : noun;
+  return `with the latest ${n} ${word} of ${sampleSourceName(trigger, words)}`;
+}
+
+/** The response a run gave back (`response` on the result, or under output / result), or null. */
+export function runResponse(result: unknown): string | null {
+  const pick = (v: unknown): unknown => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>).response : undefined);
+  const root = result && typeof result === 'object' ? (result as Record<string, unknown>) : null;
+  const candidates = [pick(root), pick(root?.output), pick(root?.result), pick((root?.result as Record<string, unknown> | undefined)?.output)];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c;
+  }
+  return null;
+}
+
+export const EMPTY_RESULT_SENTENCE = 'the result is empty (nothing is connected to On Flow End’s response)';
+
+/** "Test run done with the latest 3 items of Python news." / "…: the result is empty (…)". */
+export function testRunDoneSentence(runWordsText: string, result: unknown): string {
+  const head = `Test run done${runWordsText ? ` ${runWordsText}` : ''}`;
+  return runResponse(result) === null ? `${head}: ${EMPTY_RESULT_SENTENCE}.` : `${head}.`;
+}
+
+// The test run in flight (set when Run as if triggered starts one, read once when it finishes).
+let pendingTestRun: string | null = null;
+export function setPendingTestRun(words: string | null): void {
+  pendingTestRun = words;
+}
+export function takePendingTestRun(): string | null {
+  const words = pendingTestRun;
+  pendingTestRun = null;
+  return words;
 }

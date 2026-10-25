@@ -14,8 +14,8 @@ import { MEDIA_NEEDS_HTTPS, mediaAvailable } from '../lib/secure-context';
 import { useFlowStore } from '../hooks/useFlow';
 import { TriggeredRunPanel } from './automation/TriggeredRunPanel';
 import { useTriggerWords } from './automation/FlowNatureBadge';
-import { TRIGGER_FILLED_PIN_IDS } from '../utils/triggerPins';
-import { DEFAULT_SAMPLE_COUNT, fetchTriggerSample, runAsIfTriggered, sameInputValue } from '../utils/triggerSample';
+import { EMPTY_RESULT_WARNING, TRIGGER_FILLED_PIN_IDS } from '../utils/triggerPins';
+import { DEFAULT_SAMPLE_COUNT, fetchTriggerSample, runAsIfTriggered, runResponse, sameInputValue } from '../utils/triggerSample';
 import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
@@ -2361,6 +2361,10 @@ export function RunFlowModal({
   const [sampleBusy, setSampleBusy] = useState(false);
   const [sampleError, setSampleError] = useState('');
   const [triggerInputsEdited, setTriggerInputsEdited] = useState(false);
+  // A triggered flow's run window keeps the plumbing (session, prompt caches,
+  // run and step ids) behind "Advanced settings" (UX re-review #6).
+  const [triggeredAdvanced, setTriggeredAdvanced] = useState(false);
+  const plumbingShown = !automationTrigger || triggeredAdvanced;
   // The values the last sample put in the advanced inputs (what "not edited" means).
   const sampledValuesRef = useRef<Record<string, string>>({});
   // Each opening of the dialog starts a new session: nothing is "edited" yet.
@@ -6551,7 +6555,7 @@ export function RunFlowModal({
             <span className="run-modal-flow-name">{runSubtitle}</span>
           </div>
           <div className="run-modal-titlebar-right">
-            {flowId && onSelectRunId ? (
+            {flowId && onSelectRunId && plumbingShown ? (
               <RunSwitcherDropdown
                 workflowId={flowId}
                 currentRunId={runWorkspaceRunId || rootRunId}
@@ -6712,7 +6716,7 @@ export function RunFlowModal({
                         title={step.error || snippet}
                       >
                         <span className="run-failures-node">{step.nodeLabel || step.nodeId || 'node'}</span>
-                        {shortRunId ? <span className="run-failures-run">run:{shortRunId}</span> : null}
+                        {shortRunId && plumbingShown ? <span className="run-failures-run">run:{shortRunId}</span> : null}
                         <span className="run-failures-error">{snippet}</span>
                       </button>
                     ))}
@@ -6896,7 +6900,7 @@ export function RunFlowModal({
                                       {s.toolApproval.auto ? 'auto-approved' : 'approved'}
                                     </span>
                                   ) : null}
-                                  {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
+                                  {s.nodeId && plumbingShown ? <span className="run-step-id">{s.nodeId}</span> : null}
                                   {s.status === 'completed' && s.metrics ? (
                                     <span className="run-step-metrics">
                                       {formatTokenBadge(s.metrics) ? (
@@ -7891,6 +7895,17 @@ export function RunFlowModal({
                       </div>
                       {effectiveResult.error ? (
                         <div className="run-details-error">{effectiveResult.error}</div>
+                      ) : automationTrigger ? (
+                        // A triggered flow's result is what the person sees: On
+                        // Flow End's response (or why it is empty); the whole
+                        // result stays under Details (UX re-review #6, #17).
+                        <>
+                          <TriggeredResultSummary result={effectiveResult.result} />
+                          <details className="run-triggered-details">
+                            <summary>Details</summary>
+                            <JsonViewer value={effectiveResult.result} />
+                          </details>
+                        </>
                       ) : (
                         <JsonViewer value={effectiveResult.result} />
                       )}
@@ -8477,7 +8492,7 @@ export function RunFlowModal({
                             is plumbing, not a parameter — show a copy chip, hide
                             the editable field behind an explicit toggle for
                             follow-up reuse. */}
-                        {!sessionPinId ? (
+                        {!sessionPinId && plumbingShown ? (
                           <div className="run-form-session">
                             <span className="run-form-session-label">Session</span>
                             <code className="run-form-session-id" title={sessionIdOverride || derivedSessionId}>
@@ -8516,7 +8531,13 @@ export function RunFlowModal({
                       </div>
                     </div>
 
-                    {promptCacheSessionLifecycle ? (
+                    {automationTrigger ? (
+                      <button type="button" className="automation-link-button run-triggered-more" onClick={() => setTriggeredAdvanced((v) => !v)} aria-expanded={triggeredAdvanced}>
+                        {triggeredAdvanced ? 'Hide advanced settings' : 'Advanced settings: session, prompt caches'}
+                      </button>
+                    ) : null}
+
+                    {promptCacheSessionLifecycle && plumbingShown ? (
                       <details className="run-form-section">
                         <summary className="run-form-section-summary">
                           <span className="run-form-section-title">
@@ -8597,6 +8618,7 @@ export function RunFlowModal({
                       </details>
                     ) : null}
 
+                    {plumbingShown ? (
                     <details className="run-form-section">
                       <summary className="run-form-section-summary">
                         <span className="run-form-section-title">
@@ -8758,6 +8780,7 @@ export function RunFlowModal({
                         </div>
                       </div>
                     </details>
+                    ) : null}
 
                   </div>
                 </div>
@@ -9046,6 +9069,19 @@ export function RunFlowModal({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** What the person sees from a triggered flow's run: its response, or why it is empty. */
+export function TriggeredResultSummary({ result }: { result: unknown }) {
+  const response = runResponse(result);
+  return response === null ? (
+    <p className="run-triggered-result run-triggered-result--empty">{EMPTY_RESULT_WARNING}</p>
+  ) : (
+    <div className="run-triggered-result">
+      <span className="run-triggered-result-label">What the person sees</span>
+      <MarkdownRenderer markdown={response} />
     </div>
   );
 }

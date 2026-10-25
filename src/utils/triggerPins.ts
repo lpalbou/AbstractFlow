@@ -68,7 +68,8 @@ const PINS: Record<TriggerPinKind, Pin[]> = {
   ],
   schedule: [
     { id: 'scheduled_at', label: 'scheduled_at', type: 'string', description: 'When this run was due (an ISO date and time).' },
-    { id: 'occurrence', label: 'occurrence', type: 'number', description: 'The run number: 1 for the first run, 2 for the second, …' },
+    // Wire name `occurrence` (the runtime's); the canvas says "run number" (re-review #18).
+    { id: 'occurrence', label: 'run number', type: 'number', description: 'The run number: 1 for the first run, 2 for the second, …' },
   ],
   manual: [],
 };
@@ -135,6 +136,9 @@ export function hasTriggerPins(flow: Pick<VisualFlow, 'nodes'>, kind: TriggerPin
 export const AUTOMATION_CANVAS_NOTE =
   'What arrives is on On Flow Start; put what the person should see on On Flow End’s response (and notify for an alert).';
 
+/** Said when a triggered flow's result would be empty (the save warning and the test result view). */
+export const EMPTY_RESULT_WARNING = 'Each run’s result will be empty unless something is connected to On Flow End’s response.';
+
 /**
  * Saving a triggered flow whose result is empty: a warning in words (the save
  * still happens), or null. `response` counts as set when a wire reaches it.
@@ -144,5 +148,5 @@ export function automationSaveWarning(flow: Pick<VisualFlow, 'nodes' | 'edges' |
   const ends = flow.nodes.filter((n) => n.data?.nodeType === 'on_flow_end');
   if (!ends.length) return 'Saved. This automation has no On Flow End yet: add one and connect its response, so each run shows what it did.';
   const wired = (flow.edges as Edge[]).some((e) => ends.some((n) => n.id === e.target) && e.targetHandle === 'response');
-  return wired ? null : 'Saved. Nothing is connected to On Flow End’s response yet, so each run will show an empty result.';
+  return wired ? null : `Saved. ${EMPTY_RESULT_WARNING}`;
 }

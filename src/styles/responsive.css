@@ -381,7 +381,8 @@ body {
     display: grid;
     grid-template-columns: auto auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "palette logo name actions"
+      "palette logo . actions"
+      "name name name badge"
       "tools tools tools tools";
     align-items: center;
     column-gap: 8px;
@@ -401,6 +402,15 @@ body {
   .flow-name-input {
     grid-area: name;
     width: 100%;
+    min-width: 0;
+  }
+
+  /* The flow's nature badge gets its own row on phones (re-review #10). */
+  .app-header .flow-nature-badge,
+  .app-header .flow-nature-menu-wrap {
+    grid-area: badge;
+    justify-self: end;
+    max-width: min(220px, 55vw);
   }
 
   .toolbar-actions {
@@ -429,10 +439,13 @@ body {
     display: none;
   }
 
+  /* The name gets its own row with the nature badge: beside the kit actions it
+     had no room and ran under them (re-review #10). */
   .app-header {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "palette name actions"
+      "palette . actions"
+      "name name badge"
       "tools tools tools";
   }
 }
@@ -854,13 +867,32 @@ body {
   }
 }
 
-/* The badge and the name give way before the action strip does (#19). */
-.flow-nature-badge,
-.flow-nature-menu-wrap {
-  flex-shrink: 20;
-  min-width: 112px;
+/* Wide header (#19, re-review #10): the flow NAME gives way first, then the
+   badge (it keeps "Automation · <trigger words>" as long as it can), before
+   the action strip; Resources is an icon (its tooltip keeps the words) and
+   below 1440 px Make it available too, so the strip is never clipped. */
+@media (min-width: 1440px) {
+  .flow-name-input {
+    flex-shrink: 30;
+    min-width: 90px;
+  }
+  .flow-nature-badge,
+  .flow-nature-menu-wrap {
+    flex-shrink: 6;
+    min-width: 150px;
+  }
+  /* The actions keep their size: the name and the badge give way. */
+  .toolbar-actions {
+    flex: 0 0 auto;
+  }
 }
-.flow-name-input {
-  flex-shrink: 10;
-  min-width: 120px;
+@media (min-width: 1024px) {
+  .resources-button > span {
+    display: none;
+  }
+}
+@media (min-width: 1024px) and (max-width: 1439.98px) {
+  .publish-button > span {
+    display: none;
+  }
 }

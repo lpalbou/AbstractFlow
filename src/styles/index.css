@@ -9224,6 +9224,9 @@ button.flow-nature-badge:hover:not(:disabled),
   display: flex;
   align-items: center;
   gap: 10px;
+  /* max-content then clamped: a narrow canvas wraps the sentence normally
+     (shrink-to-fit at left: 50% gave it half the width, one word a line). */
+  width: max-content;
   max-width: min(720px, calc(100% - 32px));
   padding: 8px 8px 8px 14px;
   border: 1px solid color-mix(in srgb, var(--flow-hue-yellow) 55%, transparent);
@@ -9369,4 +9372,30 @@ button.flow-nature-badge:hover:not(:disabled),
   padding: 6px 10px;
   color: var(--text-muted);
   font-size: var(--font-size-xs);
+}
+.run-triggered-more {
+  align-self: flex-start;
+  margin: 4px 0 8px;
+  font-size: var(--font-size-sm);
+}
+.run-triggered-result {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ui-surface-1);
+}
+.run-triggered-result--empty {
+  color: var(--warning);
+}
+.run-triggered-result-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+.run-triggered-details > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }

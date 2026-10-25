@@ -239,6 +239,7 @@ export function InputsForm({
           </div>
         );
       })}
+      {fields.length || raw.trim() ? (
       <details className="automation-more" open={Boolean(raw.trim())}>
         <summary>Advanced: raw JSON</summary>
         <div className="automation-more-body">
@@ -253,6 +254,7 @@ export function InputsForm({
           <span className="property-hint">Other inputs the fields above do not cover, as one JSON object. Most automations need nothing here.</span>
         </div>
       </details>
+      ) : null}
     </div>
   );
 }
@@ -268,6 +270,9 @@ function ConfigField({
 }) {
   const value = values[field.key] ?? '';
   const id = `automation-setting-${field.key.replace(/\W+/g, '-')}`;
+  // What an empty field means, never an example that reads as if filled (re-review #12).
+  const schemaDefault = (field.schema as { default?: unknown }).default;
+  const emptyMeans = schemaDefault !== undefined && schemaDefault !== null && typeof schemaDefault !== 'object' ? `${String(schemaDefault)} (default)` : '';
   if (field.kind === 'group') {
     return (
       <details className="automation-group" open={(field.children || []).some((c) => (values[c.key] ?? '') !== '')}>
@@ -340,6 +345,7 @@ function ConfigField({
           type="number"
           step={field.kind === 'integer' ? 1 : 'any'}
           value={value}
+          placeholder={emptyMeans}
           onChange={(e) => onChange(field.key, e.target.value)}
         />
       );
@@ -375,7 +381,7 @@ function ConfigField({
           className="run-form-input"
           type="text"
           value={value}
-          placeholder={field.kind === 'datetime' ? '2026-11-02T08:00:00Z' : ''}
+          placeholder={field.kind === 'datetime' ? 'Empty: from now' : emptyMeans}
           onChange={(e) => onChange(field.key, e.target.value)}
         />
       );

@@ -14,6 +14,8 @@ describe('trigger pins', () => {
     expect(names('feed')).toEqual(['items:array', 'feed:object', 'event:object']);
     expect(names('webhook')).toEqual(['calls:array', 'event:object']);
     expect(names('schedule')).toEqual(['scheduled_at:string', 'occurrence:number', 'event:object']);
+    // Wire name `occurrence`, canvas label "run number" (re-review #18).
+    expect(triggerStartPins('schedule').find((p) => p.id === 'occurrence')?.label).toBe('run number');
     expect(names('manual')).toEqual(['event:object']);
     for (const k of ['email', 'feed', 'webhook', 'schedule'] as const) {
       for (const pin of triggerStartPins(k)) expect(pin.description, pin.id).toBeTruthy();
@@ -65,8 +67,44 @@ describe('saving a triggered flow with nothing on response warns (never refuses)
       edges,
     }) as unknown as VisualFlow;
   it('says so in words, and is quiet once response is wired or for a chat flow', () => {
-    expect(automationSaveWarning(base([]))).toBe('Saved. Nothing is connected to On Flow End’s response yet, so each run will show an empty result.');
+    expect(automationSaveWarning(base([]))).toBe('Saved. Each run’s result will be empty unless something is connected to On Flow End’s response.');
     expect(automationSaveWarning(base([{ source: 'x', target: 'e', targetHandle: 'response' }]))).toBeNull();
     expect(automationSaveWarning({ ...base([]), automation_defaults: undefined })).toBeNull();
+  });
+});
+
+describe('re-review #6, #11, #12, #17', () => {
+  it('a finished test run says what it ran on, and when its result is empty', async () => {
+    const { testRunDoneSentence, testRunWords, runResponse } = await import('./triggerSample');
+    const feed = { source_id: 'feed.item', source_version: 1, config: {}, connection_id: 'c1' };
+    const words = testRunWords(feed, 20, { inputs: { items: [1, 2, 3] }, truncated: false, summary: '' }, { connections: [{ connection_id: 'c1', label: 'Python news' } as never] });
+    expect(words).toBe('with the latest 3 items of Python news');
+    expect(testRunDoneSentence(words, { output: { items: [] } })).toBe(
+      'Test run done with the latest 3 items of Python news: the result is empty (nothing is connected to On Flow End’s response).'
+    );
+    expect(testRunDoneSentence(words, { output: { response: 'Two releases.' } })).toBe('Test run done with the latest 3 items of Python news.');
+    expect(runResponse({ result: { response: 'x' } })).toBe('x');
+  });
+
+  it('time zones are cities with their offset, the person\'s first', async () => {
+    const { zoneChoicesFor, zoneLabel, zoneCity } = await import('./timeZones');
+    const winter = new Date('2026-01-15T12:00:00Z');
+    expect(zoneLabel('Europe/Paris', winter)).toBe('Paris (UTC+1)');
+    expect(zoneLabel('America/New_York', winter)).toBe('New York (UTC−5)');
+    expect(zoneLabel('Asia/Kolkata', winter)).toBe('Kolkata (UTC+5:30)');
+    expect(zoneCity('America/Argentina/Buenos_Aires')).toBe('Buenos Aires');
+    const list = zoneChoicesFor('Europe/Lisbon', winter);
+    expect(list[0]).toEqual({ zone: 'Europe/Lisbon', label: 'Lisbon (UTC)' });
+    expect(list.length).toBeLessThan(60);
+    expect(list.map((z) => z.label).join(' ')).not.toMatch(/Factory|Zulu|W-SU/);
+  });
+
+  it('no example value reads as if filled; Advanced raw JSON only when there are inputs', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('../components/AutomationDefaultsModal.tsx', import.meta.url), 'utf8');
+    expect(src).toContain("placeholder={field.kind === 'datetime' ? 'Empty: from now' : emptyMeans}");
+    expect(src).not.toContain("'2026-11-02T08:00:00Z'");
+    expect(src).toContain('{fields.length || raw.trim() ? (');
+    expect(src).toContain('{existing && !linked ? (');
   });
 });

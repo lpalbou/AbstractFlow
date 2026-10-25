@@ -55,6 +55,7 @@ import { FlowNatureBadge, useTriggerWords } from './automation/FlowNatureBadge';
 import { OPEN_AUTOMATION_EVENT } from './automation/CanvasNote';
 import { triggerSentence } from '../utils/automationChoice';
 import { automationSaveWarning, triggerPinKind } from '../utils/triggerPins';
+import { takePendingTestRun, testRunDoneSentence } from '../utils/triggerSample';
 import {
   interfacesFromPutResponse,
   descriptionFromPutResponse,
@@ -1437,7 +1438,11 @@ export function Toolbar() {
             success: true,
             result: payload,
           });
-          toast.success('Workflow executed successfully');
+          // A test run of a triggered flow says what it ran on, and whether
+          // its result is empty (UX re-review #6, #17).
+          const testRun = takePendingTestRun();
+          if (testRun !== null) toast.success(testRunDoneSentence(testRun, payload), { duration: 8000 });
+          else toast.success('Workflow executed successfully');
         }
       } else if (event.type === 'flow_error') {
         const fullError = { ...event };
@@ -2258,6 +2263,7 @@ export function Toolbar() {
             label="Open resources"
             onClick={() => setShowModelResidency(true)}
             iconOnly={false}
+            className="resources-button"
           >
             <IconChip />
             <span>Resources</span>

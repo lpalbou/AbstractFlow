@@ -3,7 +3,8 @@
  * by the New flow dialog and the Automation dialog. Plain choices, one line
  * of help each; source ids and versions never appear here.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { zoneChoicesFor, zoneCity } from '../../utils/timeZones';
 import {
   WEEKDAYS,
   WEEKDAY_NAMES,
@@ -84,18 +85,57 @@ function TimeOfDay({ value, onChange }: { value: string; onChange: (next: string
   );
 }
 
-/** Every zone the gateway offers (else this browser's list), the current one always present. */
-function zoneChoices(current: string, choices: string[]): string[] {
-  let list = choices;
-  if (!list.length) {
-    try {
-      const supported = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
-      list = supported ? supported('timeZone') : [];
-    } catch {
-      list = [];
-    }
+/** Every zone the gateway offers (else this browser's list), for the search. */
+function allZones(choices: string[]): string[] {
+  if (choices.length) return choices;
+  try {
+    const supported = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+    return supported ? supported('timeZone') : [];
+  } catch {
+    return [];
   }
-  return list.includes(current) ? list : [current, ...list];
+}
+
+/** The time zone: a short list of cities with their UTC offset, the person's first; search for any other. */
+function ZonePicker({ zone, zones, onZone }: { zone: string; zones: string[]; onZone: (zone: string) => void }) {
+  const [search, setSearch] = useState('');
+  const everything = allZones(zones);
+  const short = zoneChoicesFor(zone);
+  const listId = 'automation-zone-search';
+  return (
+    <span className="automation-zone-picker">
+      <select className="run-form-select automation-zone" aria-label="Time zone" value={zone} onChange={(e) => onZone(e.target.value)}>
+        {short.map((z) => (
+          <option key={z.zone} value={z.zone}>
+            {z.label}
+          </option>
+        ))}
+      </select>
+      <input
+        className="run-form-input automation-zone-search"
+        list={listId}
+        value={search}
+        placeholder="Search another city…"
+        aria-label="Search all time zones"
+        onChange={(e) => {
+          const v = e.target.value;
+          setSearch(v);
+          const hit = everything.find((z) => z === v || zoneCity(z).toLowerCase() === v.trim().toLowerCase());
+          if (hit) {
+            onZone(hit);
+            setSearch('');
+          }
+        }}
+      />
+      <datalist id={listId}>
+        {everything.map((z) => (
+          <option key={z} value={zoneCity(z)}>
+            {z}
+          </option>
+        ))}
+      </datalist>
+    </span>
+  );
 }
 
 function ScheduleEditor({
@@ -213,13 +253,7 @@ function ScheduleEditor({
       {rule.repeat !== 'every' ? (
         <label className="automation-inline-field">
           <span>Time zone</span>
-          <select className="run-form-select automation-zone" aria-label="Time zone" value={timeZone} onChange={(e) => onTimeZone(e.target.value)}>
-            {zoneChoices(timeZone, zones).map((z) => (
-              <option key={z} value={z}>
-                {z.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
+          <ZonePicker zone={timeZone} zones={zones} onZone={onTimeZone} />
           <span className="automation-muted">
             {origin === 'account' ? 'your account’s' : origin === 'browser' ? 'this browser’s' : 'chosen for this automation'}
           </span>

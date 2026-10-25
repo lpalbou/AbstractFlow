@@ -35,15 +35,15 @@ const DATA: PickerData = { sources: SOURCES, mailboxes: MAILBOXES, connections: 
 
 describe('schedule rules map to schedule@2 (never schedule@1 for a new automation)', () => {
   const cases: Array<[ScheduleRule, Record<string, unknown>, string]> = [
-    [{ repeat: 'daily', at: '08:00' }, { kind: 'daily', at: '08:00', time_zone: 'Europe/Paris' }, 'Every day at 08:00 (Europe/Paris)'],
+    [{ repeat: 'daily', at: '08:00' }, { kind: 'daily', at: '08:00', time_zone: 'Europe/Paris' }, 'Every day at 08:00 (Paris)'],
     [
       { repeat: 'weekly', days: ['thu', 'mon'], at: '07:30' },
       { kind: 'weekly', days: ['mon', 'thu'], at: '07:30', time_zone: 'Europe/Paris' },
-      'Every Monday and Thursday at 07:30 (Europe/Paris)',
+      'Every Monday and Thursday at 07:30 (Paris)',
     ],
-    [{ repeat: 'monthly', day: 'last', at: '18:00' }, { kind: 'monthly', day: 'last', at: '18:00', time_zone: 'Europe/Paris' }, 'Every month on the last day at 18:00 (Europe/Paris)'],
+    [{ repeat: 'monthly', day: 'last', at: '18:00' }, { kind: 'monthly', day: 'last', at: '18:00', time_zone: 'Europe/Paris' }, 'Every month on the last day at 18:00 (Paris)'],
     [{ repeat: 'every', amount: 15, unit: 'm' }, { kind: 'every', every: '15m' }, 'Every 15 minutes'],
-    [{ repeat: 'once', date: '2026-11-02', at: '09:00' }, { kind: 'once', at: '2026-11-02T09:00', time_zone: 'Europe/Paris' }, 'Once, on 2026-11-02 at 09:00 (Europe/Paris)'],
+    [{ repeat: 'once', date: '2026-11-02', at: '09:00' }, { kind: 'once', at: '2026-11-02T09:00', time_zone: 'Europe/Paris' }, 'Once, on 2026-11-02 at 09:00 (Paris)'],
   ];
   it.each(cases)('%j', (rule, config, sentence) => {
     const trigger = triggerFromChoice({ kind: 'schedule', rule, timeZone: 'Europe/Paris' }, SOURCES);
@@ -173,7 +173,7 @@ describe('New flow: "What starts it?"', () => {
     const schedule = renderToStaticMarkup(
       createElement(TriggerPicker, { value: emptyPicker('schedule'), onChange: () => {}, data: support.data, includeChat: true, timeZoneOrigin: 'account', gatewayUrl: 'http://gw' })
     );
-    expect(schedule).toContain('Every day at 08:00 (Europe/Paris)');
+    expect(schedule).toContain('Every day at 08:00 (Paris)');
     expect(schedule).toContain('Time zone');
     expect(schedule).toContain('your account’s');
     expect(schedule).toContain('aria-label="Hour"');

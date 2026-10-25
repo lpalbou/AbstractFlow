@@ -15,7 +15,7 @@ export interface TriggerSettingsCopy {
 }
 
 const BATCH = { label: 'At most this many per run', description: 'Items that arrive together start one run with all of them, up to this many.' };
-const START_AT = { label: 'Start listening from', description: 'A date and time such as 2026-11-02T08:00:00Z; empty = from now.' };
+const START_AT = { label: 'Start listening from', description: 'A date and time, written like 2026-11-02T08:00:00Z.' };
 
 const EMAIL: TriggerSettingsCopy = {
   title: 'More settings',

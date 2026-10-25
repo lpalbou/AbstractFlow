@@ -22,6 +22,7 @@
 import type { AutomationDefaults, AutomationTriggerDefaults, JsonValue } from '../types/flow';
 import type { AvailableTriggerSource, TriggerSourceItem } from './triggerSources';
 import type { TriggerConnection } from './triggerConnections';
+import { zoneCity } from './timeZones';
 
 export const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 export type Weekday = (typeof WEEKDAYS)[number];
@@ -243,7 +244,7 @@ export function scheduleSentence(rule: ScheduleRule): string {
 /** A rule's sentence with its clock ("… (Europe/Paris)"); intervals have no clock. */
 export function scheduleSentenceWithZone(rule: ScheduleRule, timeZone: string | null): string {
   const sentence = scheduleSentence(rule);
-  return rule.repeat === 'every' || !timeZone ? sentence : `${sentence} (${timeZone})`;
+  return rule.repeat === 'every' || !timeZone ? sentence : `${sentence} (${zoneCity(timeZone)})`;
 }
 
 /** The pre-calendar schedule (schedule@1, fixed UTC intervals) in words. */
