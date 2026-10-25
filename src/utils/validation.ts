@@ -180,6 +180,8 @@ export function validateConnection(
 /**
  * Check if two pin types are compatible for connection.
  */
+const EMAIL_PIN_TYPES: ReadonlySet<PinType> = new Set<PinType>(['email', 'emails']);
+
 export function areTypesCompatible(
   sourceType: PinType,
   targetType: PinType
@@ -205,6 +207,15 @@ export function areTypesCompatible(
     (sourceType === 'array' && targetType === 'assertions')
   ) {
     return true;
+  }
+
+  // Email records (utils/emailType.ts): an email is a JSON object, a list of
+  // emails an array; they never stand for other nominal types.
+  if (EMAIL_PIN_TYPES.has(sourceType) || EMAIL_PIN_TYPES.has(targetType)) {
+    if (sourceType === targetType || sourceType === 'any' || targetType === 'any') return true;
+    if ((sourceType === 'email' && targetType === 'object') || (sourceType === 'object' && targetType === 'email')) return true;
+    if ((sourceType === 'emails' && targetType === 'array') || (sourceType === 'array' && targetType === 'emails')) return true;
+    return false;
   }
 
   const artifactCompatibility = artifactPinTypesCompatible(sourceType, targetType);

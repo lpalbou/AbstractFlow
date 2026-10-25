@@ -25,6 +25,7 @@ export const PALETTE_SECTION_DEFS: readonly { key: string; label: string; catego
   { key: 'values', label: 'Values and schema', categories: ['literals', 'schema'] },
   { key: 'files', label: 'Files and artifacts', categories: ['files', 'artifacts'] },
   { key: 'media', label: 'Media', categories: ['media'] },
+  { key: 'mail', label: 'Mail and publish', categories: ['mail'] },
   { key: 'memory', label: 'Memory', categories: ['memory'] },
   { key: 'entity', label: 'Entity mind', categories: ['entity'] },
   { key: 'math', label: 'Math', categories: ['math'] },

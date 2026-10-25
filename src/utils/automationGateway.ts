@@ -46,6 +46,7 @@ export function parseMailboxes(raw: unknown): Mailbox[] {
       address: typeof item.address === 'string' && item.address ? item.address : null,
       configured: item.configured === true,
       can_read: item.can_read === true,
+      can_send: item.can_send === true,
       enabled: item.enabled !== false,
     };
   });

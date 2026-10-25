@@ -2,6 +2,8 @@
  * Properties panel for editing selected node configuration.
  */
 
+import { MailNodeSection, PublishNodeSection } from './automation/MailNodeSection';
+import { MAIL_NODE_TYPES, PUBLISH_NODE_TYPES } from '../utils/mailNodes';
 import React, { useCallback, useEffect, useState, useRef, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
@@ -4987,6 +4989,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </div>
         </div>
       )}
+
+      {/* Mail and Publish nodes (components/automation/MailNodeSection.tsx). */}
+      {(MAIL_NODE_TYPES as readonly string[]).includes(String(data.nodeType)) ? (
+        <MailNodeSection nodeId={node.id} data={data} onPinDefaults={(pinDefaults) => updateNodeData(node.id, { pinDefaults })} />
+      ) : null}
+      {(PUBLISH_NODE_TYPES as readonly string[]).includes(String(data.nodeType)) ? (
+        <PublishNodeSection nodeId={node.id} data={data} onPinDefaults={(pinDefaults) => updateNodeData(node.id, { pinDefaults })} />
+      ) : null}
 
       {/* On Flow Start dynamic parameters (output pins) */}
       {data.nodeType === 'on_flow_start' && (

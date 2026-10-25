@@ -61,6 +61,8 @@ export interface Mailbox {
   address: string | null;
   configured: boolean;
   can_read: boolean;
+  /** It has an outgoing server: Send / Reply / Forward can use it (false = read-only). */
+  can_send: boolean;
   enabled: boolean;
 }
 

@@ -10,7 +10,7 @@ import type { VisualFlow } from '../types/flow';
 describe('trigger pins', () => {
   it('per trigger, the runtime\'s names, typed and described', () => {
     const names = (k: Parameters<typeof triggerStartPins>[0]) => triggerStartPins(k).map((p) => `${p.id}:${p.type}`);
-    expect(names('email')).toEqual(['messages:array', 'mailbox:string', 'event:object']);
+    expect(names('email')).toEqual(['messages:emails', 'mailbox:string', 'event:object']);
     expect(names('feed')).toEqual(['items:array', 'feed:object', 'event:object']);
     expect(names('webhook')).toEqual(['calls:array', 'event:object']);
     expect(names('schedule')).toEqual(['scheduled_at:string', 'occurrence:number', 'event:object']);
@@ -19,7 +19,7 @@ describe('trigger pins', () => {
       for (const pin of triggerStartPins(k)) expect(pin.description, pin.id).toBeTruthy();
     }
     const messages = triggerStartPins('email')[0].schema as { items: { properties: Record<string, unknown> } };
-    expect(Object.keys(messages.items.properties)).toEqual(['id', 'from', 'to', 'subject', 'date', 'body_text', 'attachments']);
+    for (const field of ['id', 'from', 'to', 'subject', 'date', 'body_text', 'attachments']) expect(Object.keys(messages.items.properties)).toContain(field);
     expect(AUTOMATION_END_PINS.map((p) => `${p.id}:${p.type}`)).toEqual(['response:string', 'notify:object', 'success:boolean']);
   });
 

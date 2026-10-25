@@ -77,6 +77,7 @@
   --flow-cat-math: var(--flow-hue-magenta);
   --flow-cat-files: var(--flow-hue-blue);
   --flow-cat-media: var(--flow-hue-blue);
+  --flow-cat-mail: var(--flow-hue-yellow);
   --flow-cat-memory: var(--flow-hue-green);
   --flow-cat-entity: var(--flow-hue-green);
   --flow-cat-other: var(--text-muted);
@@ -107,6 +108,7 @@
 .react-flow__minimap-node.flow-cat--math { fill: var(--flow-cat-math); }
 .react-flow__minimap-node.flow-cat--files { fill: var(--flow-cat-files); }
 .react-flow__minimap-node.flow-cat--media { fill: var(--flow-cat-media); }
+.react-flow__minimap-node.flow-cat--mail { fill: var(--flow-cat-mail); }
 .react-flow__minimap-node.flow-cat--memory { fill: var(--flow-cat-memory); }
 .react-flow__minimap-node.flow-cat--entity { fill: var(--flow-cat-entity); }
 .react-flow__minimap-node.flow-cat--other { fill: var(--flow-cat-other); }

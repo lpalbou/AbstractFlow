@@ -20,7 +20,7 @@ import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { computeFoldedGetters } from '../utils/foldedGetters';
 import { withTrailStep } from '../utils/runSpotlight';
-import { withRelayTypes } from '../utils/relays';
+import { withLoopItemTypes, withRelayTypes } from '../utils/relays';
 import { withAgentSchemaOnInput } from '../utils/structuredOutput';
 import { withSetVariableRows } from '../utils/setVariables';
 import { withoutRedundantTemplateVars } from '../utils/textTemplate';
@@ -3439,6 +3439,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 // undo, the authoring assistant, load); it writes only when a type changes.
 useFlowStore.subscribe((state, previous) => {
   if (state.nodes === previous.nodes && state.edges === previous.edges) return;
-  const typed = withRelayTypes(state.nodes, state.edges);
+  const relayTyped = withRelayTypes(state.nodes, state.edges);
+  // ForEach over an Email list gives each Email (utils/relays.ts withLoopItemTypes).
+  const typed = withLoopItemTypes(relayTyped, state.edges);
   if (typed !== state.nodes) useFlowStore.setState({ nodes: typed });
 });

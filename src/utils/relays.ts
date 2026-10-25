@@ -1,3 +1,4 @@
+import { EMAIL_SCHEMA } from './emailType';
 /**
  * Relays (operator 2026-10-11): a dot on the canvas that lets one output feed
  * several inputs along a tidy path. Visual only: the runtime rewires every
@@ -69,4 +70,34 @@ export function dropChoicesFor(pinType: PinType | undefined, side: 'source' | 't
   const choices: DropChoice[] = side === 'source' && pinType === 'boolean' ? ['if', 'relay'] : ['relay'];
   if (side === 'source' && (pinType === 'object' || pinType === 'any')) choices.push('break_object');
   return choices;
+}
+
+/**
+ * ForEach's `item` takes the type of what it iterates when that is a typed
+ * list (operator wave 2026-10-25): over an `emails` list each item is an
+ * `email`, so Email fields and the Mail nodes take it as it is. Any other
+ * list gives `any` (as before). Returns the same array when nothing changed.
+ */
+export function withLoopItemTypes(nodes: Node<FlowNodeData>[], edges: Edge[]): Node<FlowNodeData>[] {
+  if (!nodes.some((n) => n.data?.nodeType === 'loop')) return nodes;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  let changed = false;
+  const next = nodes.map((node) => {
+    if (node.data?.nodeType !== 'loop') return node;
+    const wire = edges.find((e) => e.target === node.id && e.targetHandle === 'items');
+    const sourcePin = wire ? byId.get(wire.source)?.data.outputs.find((p) => p.id === wire.sourceHandle) : undefined;
+    const itemType: PinType = sourcePin?.type === 'emails' ? 'email' : 'any';
+    const item = node.data.outputs.find((p) => p.id === 'item');
+    if (!item || item.type === itemType) return node;
+    changed = true;
+    const outputs = node.data.outputs.map((p) =>
+      p.id === 'item'
+        ? itemType === 'email'
+          ? { ...p, type: itemType, schema: EMAIL_SCHEMA, description: 'The current email.' }
+          : { id: p.id, label: p.label, type: itemType }
+        : p
+    );
+    return { ...node, data: { ...node.data, outputs } };
+  });
+  return changed ? next : nodes;
 }

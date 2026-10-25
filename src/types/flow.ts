@@ -41,6 +41,8 @@ export type PinType =
   | 'provider_music' // Music-generation provider/backend id (string-like)
   | 'model_music'    // Compatibility alias for old saved flows; new flows use `model`
   | 'agent'     // Blue #4488FF - Agent reference
+  | 'email'     // Amber - one Email record (utils/emailType.ts)
+  | 'emails'    // Deep amber - a list of Email records (Email[])
   | 'any';      // Gray #888888 - Accepts any type
 
 // Pin colors
@@ -81,6 +83,8 @@ export const PIN_COLORS: Record<PinType, string> = {
   provider_music: '#F59E0B',
   model_music: '#9D4EDD',
   agent: '#4488FF',
+  email: '#FBBF24',
+  emails: '#D97706',
   any: '#888888',
 };
 
@@ -190,6 +194,10 @@ export type NodeType =
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   | 'tool_parameters'
   | 'json_schema'
+  // Mail and publish (deterministic, no model; runtime mail.* / publish.event effects)
+  | 'mail_search' | 'mail_get' | 'mail_mark_read' | 'mail_mark_unread' | 'mail_flag' | 'mail_unflag'
+  | 'mail_add_label' | 'mail_remove_label' | 'mail_move' | 'mail_delete' | 'mail_send' | 'mail_reply'
+  | 'mail_forward' | 'mail_get_attachment' | 'publish_event' | 'notify_me'
   // Effects - Side-effect nodes (require execution pins)
   | 'ask_user'
   | 'answer_user'

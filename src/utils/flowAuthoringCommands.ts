@@ -308,7 +308,7 @@ function nodeTemplateForCommand(
   command: Record<string, unknown>
 ): { template?: NodeTemplate; error?: string } {
   const candidates = getAllNodeTemplates().filter((template) => template.type === nodeType);
-  const visibleCandidates = candidates.filter((template) => !template.hiddenInPalette && !template.deprecated);
+  const visibleCandidates = candidates.filter((template) => !template.hiddenInPalette && !template.deprecated && !template.preset);
   const fallback = getNodeTemplate(nodeType);
 
   const variant = cleanText(

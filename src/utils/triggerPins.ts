@@ -18,6 +18,7 @@
 import type { Edge, Node } from 'reactflow';
 import type { AutomationTriggerDefaults, FlowNodeData, Pin, VisualFlow } from '../types/flow';
 import { TRIGGER_EVENT_PIN_ID, triggerEventPin } from './triggerEvent';
+import { emailsPin } from './emailType';
 
 export type TriggerPinKind = 'email' | 'feed' | 'webhook' | 'schedule' | 'manual';
 
@@ -29,23 +30,6 @@ export function triggerPinKind(trigger: Pick<AutomationTriggerDefaults, 'source_
   if (id === 'schedule') return 'schedule';
   return 'manual';
 }
-
-const MESSAGE_SCHEMA = {
-  type: 'object',
-  properties: {
-    id: { type: 'string', description: 'The message id.' },
-    from: { type: 'string', description: 'Who sent it.' },
-    to: { type: 'array', items: { type: 'string' }, description: 'Who it was sent to.' },
-    subject: { type: 'string' },
-    date: { type: 'string', format: 'date-time' },
-    body_text: { type: 'string', description: 'The message as plain text.' },
-    attachments: {
-      type: 'array',
-      description: 'Its attachments: name, size and the stored file (artifact).',
-      items: { type: 'object', properties: { name: { type: 'string' }, size: { type: 'integer' }, artifact: { type: 'object' }, index: { type: 'integer' } } },
-    },
-  },
-};
 
 const ITEM_SCHEMA = {
   type: 'object',
@@ -71,7 +55,8 @@ const CALL_SCHEMA = {
 
 const PINS: Record<TriggerPinKind, Pin[]> = {
   email: [
-    { id: 'messages', label: 'messages', type: 'array', description: 'The new mail of this run: from, to, subject, date, body_text, attachments (name, size, file).', schema: { type: 'array', items: MESSAGE_SCHEMA } },
+    // An Email list (utils/emailType.ts): ForEach gives each Email, the Mail nodes take them as they are.
+    emailsPin('messages', 'messages', 'The new mail of this run (Email list): from, to, subject, date, body_text, attachments…'),
     { id: 'mailbox', label: 'mailbox', type: 'string', description: 'The address of the mailbox it arrived in (its id when it has no address).' },
   ],
   feed: [

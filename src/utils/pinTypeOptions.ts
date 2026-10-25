@@ -25,6 +25,8 @@ export const EDITOR_DATA_PIN_TYPES = [
   'provider',
   'model',
   'agent',
+  'email',
+  'emails',
   'any',
 ] as const satisfies readonly Exclude<PinType, 'execution'>[];
 
@@ -51,6 +53,8 @@ export const FLOW_IO_EDITOR_DATA_PIN_TYPES = [
   'provider',
   'model',
   'agent',
+  'email',
+  'emails',
   'any',
 ] as const satisfies readonly EditorDataPinType[];
 
@@ -501,6 +505,8 @@ export function dataPinTypeLabel(type: PinType | string): string {
   if (type === 'provider_image') return 'image provider';
   if (type === 'provider_voice') return 'voice provider';
   if (type === 'provider_music') return 'music provider';
+  if (type === 'email') return 'email';
+  if (type === 'emails') return 'email list';
   return type;
 }
 

@@ -209,7 +209,7 @@ describe('New flow: "What starts it?"', () => {
     expect(isTriggerableFlow(flow)).toBe(true);
     const start = flow.nodes.find((n) => n.data.nodeType === 'on_flow_start')!;
     const end = flow.nodes.find((n) => n.data.nodeType === 'on_flow_end')!;
-    expect(start.data.outputs.map((p) => `${p.id}:${p.type}`)).toEqual(['exec-out:execution', 'messages:array', 'mailbox:string', 'event:object']);
+    expect(start.data.outputs.map((p) => `${p.id}:${p.type}`)).toEqual(['exec-out:execution', 'messages:emails', 'mailbox:string', 'event:object']);
     expect(start.data.outputs.every((p) => p.type === 'execution' || Boolean(p.description))).toBe(true);
     expect(end.data.inputs.map((p) => p.id)).toEqual(['exec-in', 'response', 'notify', 'success']);
     expect(flow.nodes.some((n) => n.data.nodeType === 'agent' || n.data.label === 'Trigger event')).toBe(false);
