@@ -361,7 +361,7 @@ interface FlowState {
    * interfaces, with the nodes they need already placed (and their pins). The
    * placed nodes are the document's starting point, not an undo step.
    */
-  createFlow: (values: { name: string; description: string; interfaces: string[] }) => void;
+  createFlow: (values: { name: string; description: string; interfaces: string[]; automation?: AutomationDefaults | null }) => void;
 }
 
 let nodeIdCounter = 0;
@@ -3376,11 +3376,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     nodeIdCounter = 0;
   },
 
-  createFlow: ({ name, description, interfaces }) => {
+  createFlow: ({ name, description, interfaces, automation }) => {
     get().clearFlow();
     const flowInterfaces = normalizeInterfaces(interfaces);
     const pins = interfaceBoundaryPins(flowInterfaces);
-    const nodes: Node<FlowNodeData>[] = interfaceScaffoldTypes(flowInterfaces).map((type) => {
+    const scaffold = (type: ScaffoldNodeType): Node<FlowNodeData> => {
       const template = getNodeTemplate(type);
       if (!template) throw new Error(`Node template "${type}" is missing`);
       return {
@@ -3389,12 +3389,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         position: SCAFFOLD_POSITIONS[type],
         data: withInterfacePins(createNodeData(template), pins),
       };
-    });
+    };
+    let nodes: Node<FlowNodeData>[] = interfaceScaffoldTypes(flowInterfaces).map(scaffold);
+    let edges: Edge[] = [];
+    if (automation) {
+      // An automation flow (operator 2026-10-25): On Flow Start with the
+      // trigger event wired in, so the run's event is there from the start.
+      if (!nodes.some((n) => n.data.nodeType === 'on_flow_start')) nodes = [scaffold('on_flow_start'), ...nodes];
+      const next = withTriggerEvent(nodes, edges, { breakNodeId: `node-${nodeIdCounter + 1}`, edgeId: `edge-trigger-event-${nodeIdCounter + 1}` });
+      if (next.breakNodeId) nodeIdCounter += 1;
+      nodes = next.nodes;
+      edges = next.edges;
+    }
     set((state) => ({
       flowName: name,
       flowDescription: description,
       flowInterfaces,
       nodes,
+      edges,
+      flowAutomationDefaults: automation ? deepClone(automation) : null,
       fitViewRequest: nodes.length ? { nonce: (state.fitViewRequest?.nonce || 0) + 1 } : state.fitViewRequest,
     }));
   },

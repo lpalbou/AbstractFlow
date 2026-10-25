@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { AfChip, AfChipButton, DisclosureList, type AfChipTone, type DisclosureRow } from '@abstractframework/ui-kit';
 import type { LibraryRow } from '../utils/flowLibraryRows';
 import { isExecutableFlow } from '../utils/flowFamilies';
+import { flowNature, type AutomationWords } from '../utils/automationChoice';
 
 /**
  * Flow Library rows — a CONSUMER of the uic kit DisclosureList (the
@@ -42,6 +43,8 @@ export interface FlowLibraryListProps {
   duplicateNames?: ReadonlySet<string>;
   /** In the runnable-only view the runnable badge is redundant noise. */
   hideRunnableBadge?: boolean;
+  /** Mailbox addresses / connection names for the rows' "Automation · …" line. */
+  natureWords?: AutomationWords;
   onSelect: (flowId: string, rowKey: string) => void;
   onLoad: (flowId: string) => void;
   onToggleExpand: (rowKey: string) => void;
@@ -77,6 +80,7 @@ export function FlowLibraryList({
   cyclePromotedIds,
   duplicateNames,
   hideRunnableBadge,
+  natureWords,
   onSelect,
   onLoad,
   onToggleExpand,
@@ -159,6 +163,7 @@ export function FlowLibraryList({
     const executable = isExecutableFlow(flow);
     const metaUpdated = formatDateTime(flow.updated_at) || formatDateTime(flow.created_at);
     const description = flow.description?.trim() || '';
+    const nature = flowNature(flow, executable, natureWords);
 
     return (
       <div
@@ -266,6 +271,9 @@ export function FlowLibraryList({
             ) : null}
           </div>
         </div>
+        {nature.kind !== 'none' ? (
+          <div className={`flow-library-item-nature flow-library-item-nature--${nature.kind}`}>{nature.text}</div>
+        ) : null}
         <div className="flow-library-item-sub">
           <span className={`flow-library-item-desc ${description ? '' : 'empty'}`}>
             {description || 'No description'}

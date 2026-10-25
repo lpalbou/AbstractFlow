@@ -46,7 +46,10 @@ import { computeRunPreflightIssues } from '../utils/preflight';
 import { waitNotificationText } from '../utils/waitClassification';
 import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateFlowFamily';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
-import { INTERFACE_PINS_ADDED_NOTICE } from '../utils/flowFamilies';
+import { INTERFACE_PINS_ADDED_NOTICE, isExecutableFlow } from '../utils/flowFamilies';
+import { AutomationDefaultsModal } from './AutomationDefaultsModal';
+import { FlowNatureBadge, useTriggerWords } from './automation/FlowNatureBadge';
+import { triggerSentence } from '../utils/automationChoice';
 import {
   interfacesFromPutResponse,
   descriptionFromPutResponse,
@@ -421,6 +424,8 @@ export function Toolbar() {
     edges,
     flowInterfaces,
     flowFunctions,
+    flowAutomationDefaults,
+    setFlowAutomationDefaults,
     execView,
     setExecView,
     foldReads,
@@ -432,6 +437,7 @@ export function Toolbar() {
     undo,
     redo,
   } = useFlowStore();
+  const natureWords = useTriggerWords(flowAutomationDefaults?.trigger);
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
 
@@ -442,6 +448,8 @@ export function Toolbar() {
   const [showLifecycleModal, setShowLifecycleModal] = useState(false);
   const [showModelResidency, setShowModelResidency] = useState(false);
   const [showNewFlowModal, setShowNewFlowModal] = useState(false);
+  // The Automation dialog for the OPEN flow (header badge; a new automation flow).
+  const [showOpenFlowAutomation, setShowOpenFlowAutomation] = useState(false);
   const [confirmPrompt, setConfirmPrompt] = useState<ConfirmPrompt | null>(null);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
@@ -1755,7 +1763,11 @@ export function Toolbar() {
       // Name, description, interfaces and the nodes those interfaces need.
       useFlowStore.getState().createFlow(values);
       setSavedFlowSignature(flowSignatureFor({ name: UNTITLED_FLOW_NAME, description: '', interfaces: [], nodes: [], edges: [] }));
-      toast.success(`Created ${values.name}: save it to store it on the gateway`);
+      toast.success(
+        values.automation
+          ? `Created ${values.name}, an automation (${triggerSentence(values.automation.trigger)}): save it to store it on the gateway`
+          : `Created ${values.name}: save it to store it on the gateway`
+      );
     },
     [clearRunState, resetLoadedDocument]
   );
@@ -1927,6 +1939,12 @@ export function Toolbar() {
           onChange={(e) => setFlowName(e.target.value)}
           placeholder="Flow name..."
           aria-label="Flow name"
+        />
+        <FlowNatureBadge
+          automation={flowAutomationDefaults}
+          executable={isExecutableFlow({ interfaces: flowInterfaces })}
+          words={natureWords}
+          onClick={() => setShowOpenFlowAutomation(true)}
         />
 
         {/* The action groups. On desktop this wrapper is display: contents (the
@@ -2124,9 +2142,21 @@ export function Toolbar() {
         <>
         {showNewFlowModal ? (
           <NewFlowDialog
+            gatewayContracts={gatewayContracts}
             unsavedChanges={hasUnsavedChanges}
             onCreate={createNewFlow}
             onCancel={() => setShowNewFlowModal(false)}
+          />
+        ) : null}
+        {showOpenFlowAutomation ? (
+          <AutomationDefaultsModal
+            flow={getFlow()}
+            gatewayContracts={gatewayContracts}
+            onClose={() => setShowOpenFlowAutomation(false)}
+            onSave={(next) => {
+              // The open document: saved with the flow (Save), like any edit.
+              setFlowAutomationDefaults(next);
+            }}
           />
         ) : null}
 

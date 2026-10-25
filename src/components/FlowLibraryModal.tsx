@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AfChip, useAfMedia } from '@abstractframework/ui-kit';
 import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import type { GatewayContracts } from '../utils/gatewayClient';
-import { describeAutomationDefaults } from '../utils/triggerBindings';
 import { AutomationDefaultsModal } from './AutomationDefaultsModal';
+import { triggerNeedsWords, useAutomationWords } from './automation/FlowNatureBadge';
+import { triggerSentence } from '../utils/automationChoice';
 import { BUNDLED_COMPOSED_ONLY_IDS } from '../utils/bundledFlows';
 import {
   buildFlowFamilyIndex,
@@ -139,6 +140,17 @@ export function FlowLibraryModal({
   const bundledRunTargetIdSet = useMemo(() => new Set(bundledRunTargetIds || []), [bundledRunTargetIds]);
 
   const allFlows = useMemo(() => (Array.isArray(flows) ? flows : []), [flows]);
+  // The rows' "Automation · When mail arrives in …" names mailboxes and connections.
+  const wordNeeds = useMemo(() => {
+    const need = { mail: false, conn: false };
+    for (const flow of allFlows) {
+      const n = triggerNeedsWords(flow.automation_defaults?.trigger);
+      need.mail ||= n.mail;
+      need.conn ||= n.conn;
+    }
+    return need;
+  }, [allFlows]);
+  const natureWords = useAutomationWords(wordNeeds);
   const familyIndex = useMemo(
     () => buildFlowFamilyIndex(allFlows, { composedOnlyIds: BUNDLED_COMPOSED_ONLY_IDS }),
     [allFlows]
@@ -708,6 +720,7 @@ export function FlowLibraryModal({
                 cyclePromotedIds={familyIndex.cyclePromotedIds}
                 duplicateNames={duplicateNames}
                 hideRunnableBadge={viewMode === 'executable'}
+                natureWords={natureWords}
                 onSelect={selectRow}
                 onLoad={onLoadFlow}
                 onToggleExpand={toggleExpand}
@@ -801,7 +814,7 @@ export function FlowLibraryModal({
                     <span className="flow-library-preview-val flow-library-preview-inline">
                       <span>
                         {selectedFlow.automation_defaults
-                          ? describeAutomationDefaults(selectedFlow.automation_defaults)
+                          ? triggerSentence(selectedFlow.automation_defaults.trigger, natureWords)
                           : isExecutableFlow(selectedFlow)
                             ? '—'
                             : 'Declare a runnable interface first'}
@@ -811,8 +824,8 @@ export function FlowLibraryModal({
                           type="button"
                           className="flow-library-edit-icon meta"
                           onClick={() => setIsEditingAutomation(true)}
-                          aria-label="Edit automation defaults"
-                          title="Edit automation defaults"
+                          aria-label="Automation…"
+                          title="Automation…"
                         >
                           <EditIcon size={13} />
                         </button>

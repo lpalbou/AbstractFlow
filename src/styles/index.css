@@ -8776,3 +8776,233 @@ body.af-schema-editor-open .af-tooltip-bubble {
   gap: 6px;
   align-items: center;
 }
+
+/* What starts it? (operator 2026-10-25): the human trigger picker shared by
+   the New flow dialog and the Automation dialog; the flow's nature badge in
+   the header and its line in the library. */
+.automation-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.automation-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+.automation-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-1);
+  border-radius: 10px;
+  background: var(--ui-surface-1);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+.automation-choice:hover:not(:disabled) {
+  border-color: var(--ui-border-2);
+}
+.automation-choice:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.automation-choice.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--ui-surface-1));
+}
+.automation-choice:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.automation-choice-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 2px solid var(--text-muted);
+  border-radius: 50%;
+}
+.automation-choice.is-selected .automation-choice-dot {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 3px var(--bg-secondary), inset 0 0 0 7px var(--accent);
+}
+.automation-choice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.automation-choice-title {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+.automation-choice-sub {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+.automation-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--ui-surface-2);
+}
+.automation-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.automation-schedule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.automation-schedule-row .run-form-select,
+.automation-schedule-row .run-form-input {
+  width: auto;
+}
+.automation-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+.automation-amount {
+  width: 5.5em !important;
+}
+.automation-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.automation-day {
+  min-width: 44px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border-1);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.automation-day.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text-primary);
+}
+.automation-arrivals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.automation-arrival {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.automation-arrival.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.automation-help {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+.automation-help--choice {
+  color: var(--text-muted);
+}
+.automation-muted {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+.automation-problem {
+  margin: 0;
+  color: var(--error);
+  font-size: var(--font-size-sm);
+}
+.automation-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+.automation-links a {
+  color: var(--accent);
+}
+.automation-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.automation-link-button:hover,
+.automation-links a:hover {
+  text-decoration: underline;
+}
+.modal-actions-note {
+  margin-right: auto;
+  align-self: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.flow-nature-badge {
+  flex: none;
+  max-width: 340px;
+  overflow: hidden;
+  padding: 3px 10px;
+  border: 1px solid var(--ui-border-1);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+button.flow-nature-badge {
+  cursor: pointer;
+}
+button.flow-nature-badge:hover {
+  border-color: var(--ui-border-2);
+  color: var(--text-primary);
+}
+.flow-nature-badge--automation {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--text-primary);
+}
+.flow-nature-badge--none {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+.flow-library-item-nature {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+.flow-library-item-nature--automation {
+  color: var(--accent);
+}
+@media (max-width: 767.98px) {
+  .flow-nature-badge {
+    max-width: 180px;
+  }
+}

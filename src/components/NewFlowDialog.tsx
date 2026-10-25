@@ -2,18 +2,44 @@ import { useState } from 'react';
 import { InterfacePicker } from './InterfacePicker';
 import { IconFilePlus } from './ToolbarIcons';
 import { normalizeInterfaces } from '../utils/flowFamilies';
+import type { AutomationDefaults } from '../types/flow';
+import type { GatewayContracts } from '../utils/gatewayClient';
+import { AutomationChoiceError, automationFromChoice } from '../utils/automationChoice';
+import { choiceFromPicker, emptyPicker, type PickerState } from '../utils/automationPicker';
+import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
+import { useAutomationFacts } from './automation/useAutomationFacts';
 
 export interface NewFlowValues {
   name: string;
   description: string;
   interfaces: string[];
+  /**
+   * What starts it, when it is an automation (operator 2026-10-25): the
+   * flow is created with On Flow Start, the Trigger event node wired to it,
+   * and these defaults. Absent: a flow for chat.
+   */
+  automation?: AutomationDefaults;
 }
 
+/** The interface an automation flow starts with when none is ticked: it gives On Flow Start its `prompt`. */
+export const AUTOMATION_DEFAULT_INTERFACE = 'abstractcode.agent.v1';
+
 /** The values a New flow dialog creates with, or the reason Create is unavailable. */
-export function newFlowValues(name: string, description: string, interfaces: string[]): NewFlowValues | { error: string } {
+export function newFlowValues(
+  name: string,
+  description: string,
+  interfaces: string[],
+  start: { automation: AutomationDefaults | null; problem?: string } = { automation: null }
+): NewFlowValues | { error: string } {
   const title = name.trim();
   if (!title) return { error: 'A title is required.' };
-  return { name: title, description: description.trim(), interfaces: normalizeInterfaces(interfaces) };
+  if (start.problem) return { error: start.problem };
+  return {
+    name: title,
+    description: description.trim(),
+    interfaces: normalizeInterfaces(interfaces),
+    ...(start.automation ? { automation: start.automation } : {}),
+  };
 }
 
 /**
@@ -25,18 +51,32 @@ export function NewFlowDialog({
   unsavedChanges,
   onCreate,
   onCancel,
+  gatewayContracts = null,
 }: {
   unsavedChanges: boolean;
   onCreate: (values: NewFlowValues) => void;
   onCancel: () => void;
+  gatewayContracts?: GatewayContracts | null;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [interfaces, setInterfaces] = useState<string[]>([]);
-  const result = newFlowValues(name, description, interfaces);
+  const [picker, setPicker] = useState<PickerState>(emptyPicker('chat'));
+  const isAutomation = picker.start !== null && picker.start !== 'chat';
+  // Loaded once a trigger is chosen: a chat flow needs nothing from the gateway here.
+  const facts = useAutomationFacts(gatewayContracts, { enabled: isAutomation });
+  const support = pickerSupport(facts);
+  const start = automationStart(picker, support);
+  const result = newFlowValues(name, description, interfaces, start);
   const error = 'error' in result ? result.error : '';
   const create = () => {
     if (!('error' in result)) onCreate(result);
+  };
+  const choosePicker = (next: PickerState) => {
+    // An automation flow needs a prompt on On Flow Start: the runnable agent
+    // interface gives it, ticked when nothing else is.
+    if (next.start && next.start !== 'chat' && interfaces.length === 0) setInterfaces([AUTOMATION_DEFAULT_INTERFACE]);
+    setPicker(next);
   };
   return (
     <div className="modal-overlay" onClick={onCancel} role="presentation">
@@ -58,7 +98,11 @@ export function NewFlowDialog({
           </span>
           <div>
             <h3 id="new-flow-title">New flow</h3>
-            <p className="new-flow-subtitle">Name it now; the description and interfaces can wait.</p>
+            <p className="new-flow-subtitle">
+              {isAutomation
+                ? 'An automation flow: it opens with its trigger wired in; inputs and context are under Automation.'
+                : 'A flow for chat. Name it now; the description and interfaces can wait.'}
+            </p>
           </div>
         </div>
         {unsavedChanges ? (
@@ -85,6 +129,24 @@ export function NewFlowDialog({
               pinNote="The On Flow Start and On Flow End nodes you add get these pins; wire them so hosts get real values."
               leading={
                 <section className="new-flow-details" aria-label="Details">
+                  <div className="run-form-field">
+                    <span className="run-form-label" id="new-flow-start-label">
+                      What starts it?
+                    </span>
+                    <TriggerPicker
+                      value={picker}
+                      onChange={choosePicker}
+                      data={support.data}
+                      includeChat
+                      timeZoneOrigin={facts.timeZone.origin}
+                      gatewayUrl={facts.gatewayUrl}
+                      arrivalsNote={support.arrivalsNote}
+                      onRefreshArrivals={facts.reloadArrivals}
+                      unavailable={support.unavailable}
+                      idPrefix="new-flow-trigger"
+                    />
+                    {isAutomation && support.sourcesProblem ? <p className="automation-problem">{support.sourcesProblem}</p> : null}
+                  </div>
                   <div className="run-form-field">
                     <label className="run-form-label" htmlFor="new-flow-name">
                       Title
@@ -118,6 +180,11 @@ export function NewFlowDialog({
             />
           </div>
           <div className="modal-actions">
+            {error && name.trim() ? (
+              <span className="modal-actions-note" role="status">
+                {error}
+              </span>
+            ) : null}
             <button type="button" className="modal-button cancel" onClick={onCancel}>
               Cancel
             </button>
@@ -127,11 +194,28 @@ export function NewFlowDialog({
               disabled={Boolean(error)}
               title={error || undefined}
             >
-              Create flow
+              {isAutomation ? 'Create automation flow' : 'Create flow'}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
+}
+
+/** The automation a picker state creates (null for chat), or why it cannot yet. */
+export function automationStart(
+  picker: PickerState,
+  support: ReturnType<typeof pickerSupport>
+): { automation: AutomationDefaults | null; problem?: string } {
+  const picked = choiceFromPicker(picker, support.data);
+  if ('problem' in picked) return { automation: null, problem: picked.problem };
+  if (picked.choice.kind === 'chat') return { automation: null };
+  if (support.sourcesProblem) return { automation: null, problem: support.sourcesProblem };
+  try {
+    return { automation: automationFromChoice(picked.choice, support.data.sources) };
+  } catch (error) {
+    if (error instanceof AutomationChoiceError) return { automation: null, problem: error.message };
+    throw error;
+  }
 }
