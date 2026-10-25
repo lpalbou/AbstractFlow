@@ -9215,3 +9215,48 @@ button.flow-nature-badge:hover:not(:disabled),
   display: inline-flex;
   align-items: center;
 }
+
+/* The canvas note: a new automation flow's next step (dismissible). */
+.canvas-note {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(720px, calc(100% - 32px));
+  padding: 8px 8px 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--flow-hue-yellow) 55%, transparent);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+.canvas-note-text {
+  flex: 1;
+  min-width: 0;
+}
+.canvas-note-action,
+.canvas-note-dismiss {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.canvas-note-dismiss {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+.canvas-note-action:hover:not(:disabled),
+.canvas-note-dismiss:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}

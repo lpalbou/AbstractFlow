@@ -14,6 +14,7 @@ import {
   EdgeChange,
 } from 'reactflow';
 import { withTriggerEvent } from '../utils/triggerEvent';
+import { arrivalKindOf, automationNextNote, withAutomationAgent } from '../utils/automationScaffold';
 import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
@@ -194,6 +195,9 @@ interface FlowState {
    * carried unchanged by load/save; validated by utils/triggerBindings.ts.
    */
   flowAutomationDefaults: AutomationDefaults | null;
+  /** A dismissible note over the canvas (a new automation flow's next step); null = none. */
+  canvasNote: string | null;
+  setCanvasNote: (note: string | null) => void;
 
   // Selection
   selectedNode: Node<FlowNodeData> | null;
@@ -720,6 +724,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   edges: [],
   flowFunctions: [],
   flowAutomationDefaults: null,
+  canvasNote: null,
   interfacePinsAddedOnLoad: 0,
   preservedEdges: [],
   loadEdgeReport: { preserved: [], dropped: [] },
@@ -766,6 +771,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ flowInterfaces, nodes, selectedNode });
   },
   setFlowAutomationDefaults: (defaults) => set({ flowAutomationDefaults: defaults ? deepClone(defaults) : null }),
+  setCanvasNote: (note) => set({ canvasNote: note }),
   setNodes: (nodes) => {
     syncNodeIdCounter(nodes);
     set({ nodes });
@@ -3290,6 +3296,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       loadEdgeReport: edgeReport,
       flowFunctions,
       flowAutomationDefaults,
+      canvasNote: null,
       interfacePinsAddedOnLoad,
       selectedNode: null,
       selectedEdge: null,
@@ -3361,6 +3368,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: [],
       flowFunctions: [],
       flowAutomationDefaults: null,
+      canvasNote: null,
       interfacePinsAddedOnLoad: 0,
       preservedEdges: [],
       loadEdgeReport: { preserved: [], dropped: [] },
@@ -3392,14 +3400,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     };
     let nodes: Node<FlowNodeData>[] = interfaceScaffoldTypes(flowInterfaces).map(scaffold);
     let edges: Edge[] = [];
+    let note: string | null = null;
     if (automation) {
       // An automation flow (operator 2026-10-25): On Flow Start with the
       // trigger event wired in, so the run's event is there from the start.
       if (!nodes.some((n) => n.data.nodeType === 'on_flow_start')) nodes = [scaffold('on_flow_start'), ...nodes];
       const next = withTriggerEvent(nodes, edges, { breakNodeId: `node-${nodeIdCounter + 1}`, edgeId: `edge-trigger-event-${nodeIdCounter + 1}` });
       if (next.breakNodeId) nodeIdCounter += 1;
-      nodes = next.nodes;
-      edges = next.edges;
+      // ...and an Agent between start and end, given the task and what
+      // arrived, so the new flow runs as is (UX review #20).
+      const kind = arrivalKindOf(automation.trigger.source_id, Boolean(automation.trigger.connection_id));
+      const wired = withAutomationAgent(next.nodes, next.edges, kind, (type, position) => {
+        const template = getNodeTemplate(type as never);
+        if (!template) throw new Error(`Node template "${type}" is missing`);
+        const data = createNodeData(template);
+        return { id: `node-${++nodeIdCounter}`, type: 'custom', position, data: type === 'on_flow_end' ? withInterfacePins(data, pins) : data };
+      });
+      nodes = wired.nodes;
+      edges = wired.edges;
+      note = automationNextNote(kind);
     }
     set((state) => ({
       flowName: name,
@@ -3408,6 +3427,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes,
       edges,
       flowAutomationDefaults: automation ? deepClone(automation) : null,
+      canvasNote: note,
       fitViewRequest: nodes.length ? { nonce: (state.fitViewRequest?.nonce || 0) + 1 } : state.fitViewRequest,
     }));
   },

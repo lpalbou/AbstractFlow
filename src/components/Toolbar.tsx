@@ -51,6 +51,7 @@ import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../uti
 import { INTERFACE_PINS_ADDED_NOTICE, isExecutableFlow } from '../utils/flowFamilies';
 import { AutomationDefaultsModal, type AutomationGraph } from './AutomationDefaultsModal';
 import { FlowNatureBadge, useTriggerWords } from './automation/FlowNatureBadge';
+import { OPEN_AUTOMATION_EVENT } from './automation/CanvasNote';
 import { triggerSentence } from '../utils/automationChoice';
 import {
   interfacesFromPutResponse,
@@ -442,6 +443,12 @@ export function Toolbar() {
     redo,
   } = useFlowStore();
   const natureWords = useTriggerWords(flowAutomationDefaults?.trigger);
+  // The canvas note's Automation… (components/automation/CanvasNote.tsx).
+  useEffect(() => {
+    const open = () => setShowOpenFlowAutomation(true);
+    window.addEventListener(OPEN_AUTOMATION_EVENT, open);
+    return () => window.removeEventListener(OPEN_AUTOMATION_EVENT, open);
+  }, []);
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
 

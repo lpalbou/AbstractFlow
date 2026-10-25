@@ -2,6 +2,7 @@
  * Main canvas component with React Flow.
  */
 
+import { CanvasNote } from './automation/CanvasNote';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, DragEvent, MouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import ReactFlow, {
   Background,
@@ -1588,6 +1589,7 @@ function CanvasBody() {
           edges={edges}
           wrapperRef={reactFlowWrapper}
         />
+        <CanvasNote />
         <RunPreflightPanel onFocusNode={focusNode} />
         <PinLegend />
         {routeChoiceMenu}
