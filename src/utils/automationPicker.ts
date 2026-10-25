@@ -6,6 +6,7 @@
 import type { AutomationTriggerDefaults } from '../types/flow';
 import {
   choiceFromTrigger,
+  connectionKind,
   connectionSentence,
   connectionSources,
   defaultRule,
@@ -24,6 +25,8 @@ import type { TriggerConnection } from './triggerConnections';
 export interface PickerState {
   start: StartKind | null;
   rule: ScheduleRule;
+  /** The schedule's clock when the person picked one; '' = their account's (or this browser's). */
+  timeZone?: string;
   /** `mail:<account_id>` or `conn:<connection_id>`. */
   arrival: string;
   /** An old flow's schedule@1, kept as is until the person edits the schedule. */
@@ -37,12 +40,37 @@ export interface PickerData {
   timeZone: string;
 }
 
+export type ArrivalGroup = 'mailboxes' | 'feeds' | 'webhooks' | 'other';
+
+export const ARRIVAL_GROUP_TITLES: Record<ArrivalGroup, string> = {
+  mailboxes: 'Your mailboxes',
+  feeds: 'Your feeds',
+  webhooks: 'Your webhooks',
+  other: 'Your other connections',
+};
+
 export interface ArrivalOption {
   key: string;
   text: string;
+  group: ArrivalGroup;
   hint?: string;
+  /** The hint is a problem (a broken or paused connection), shown in the warning tone. */
+  warn?: boolean;
   disabled?: boolean;
   choice: TriggerChoice;
+}
+
+/** A connection's state in words: paused, or why it cannot read (its last error), else nothing. */
+export function connectionStateWords(conn: Pick<TriggerConnection, 'status' | 'last_error'>): string {
+  if (conn.last_error) {
+    const cause = conn.last_error.cause || conn.last_error.code || 'it failed';
+    return `not working: ${cause}${conn.last_error.fix ? ` ${conn.last_error.fix}` : ''}`.trim();
+  }
+  if (!conn.status || conn.status === 'active') return '';
+  if (conn.status === 'paused') return 'paused';
+  if (conn.status === 'error' || conn.status === 'failed') return 'not working';
+  if (conn.status === 'disabled') return 'switched off';
+  return conn.status;
 }
 
 export function emptyPicker(start: StartKind | null = null): PickerState {
@@ -58,7 +86,8 @@ export function arrivalOptions(data: Pick<PickerData, 'sources' | 'mailboxes' | 
       out.push({
         key: `mail:${box.account_id}`,
         text: `When mail arrives in ${box.address || (box.primary ? 'your main mailbox' : box.account_id)}`,
-        ...(box.enabled ? {} : { hint: 'this mailbox is switched off in your settings' }),
+        group: 'mailboxes',
+        ...(box.enabled ? {} : { hint: 'switched off in My email', warn: true }),
         choice: { kind: 'mail', account: box.account_id },
       });
     }
@@ -67,6 +96,7 @@ export function arrivalOptions(data: Pick<PickerData, 'sources' | 'mailboxes' | 
         out.push({
           key: `mail:${box.account_id}`,
           text: `When mail arrives in ${box.address || box.account_id}`,
+          group: 'mailboxes',
           hint: 'cannot be watched: it has no incoming server',
           disabled: true,
           choice: { kind: 'mail', account: box.account_id },
@@ -78,10 +108,13 @@ export function arrivalOptions(data: Pick<PickerData, 'sources' | 'mailboxes' | 
   for (const conn of data.connections || []) {
     const source = served.find((s) => s.id === conn.source_id && s.version === conn.source_version);
     if (!source) continue;
+    const state = connectionStateWords(conn);
+    const kind = connectionKind(conn.source_id);
     out.push({
       key: `conn:${conn.connection_id}`,
       text: connectionSentence(conn.label, conn.source_id),
-      ...(conn.status && conn.status !== 'active' ? { hint: conn.status } : {}),
+      group: kind === 'feed' ? 'feeds' : kind === 'webhook' ? 'webhooks' : 'other',
+      ...(state ? { hint: state, warn: true } : {}),
       choice: { kind: 'connection', connectionId: conn.connection_id, sourceId: source.id, sourceVersion: source.version },
     });
   }
@@ -98,9 +131,10 @@ export function choiceFromPicker(state: PickerState, data: PickerData): { choice
     case 'manual':
       return { choice: { kind: 'manual' } };
     case 'schedule': {
-      const problems = scheduleRuleProblems(state.rule, data.timeZone);
+      const zone = state.timeZone || data.timeZone;
+      const problems = scheduleRuleProblems(state.rule, zone);
       if (problems.length) return { problem: problems.join(' ') };
-      return { choice: { kind: 'schedule', rule: state.rule, timeZone: data.timeZone } };
+      return { choice: { kind: 'schedule', rule: state.rule, timeZone: zone } };
     }
     case 'arrives': {
       if (!state.arrival) return { problem: 'Choose what it listens to.' };
@@ -121,7 +155,7 @@ export function pickerFromTrigger(trigger: AutomationTriggerDefaults, data: Pick
     case 'legacy-schedule':
       return { start: 'schedule', rule: read.seed || defaultRule('daily'), arrival: '', legacy: { trigger, sentence: read.sentence } };
     case 'schedule':
-      return { start: 'schedule', rule: read.rule, arrival: '', legacy: null };
+      return { start: 'schedule', rule: read.rule, arrival: '', legacy: null, ...(read.timeZone !== data.timeZone ? { timeZone: read.timeZone } : {}) };
     case 'mail':
       return { ...emptyPicker('arrives'), arrival: `mail:${read.account}` };
     case 'connection':

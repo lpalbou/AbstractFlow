@@ -5,6 +5,7 @@ import type { GatewayContracts } from '../utils/gatewayClient';
 import { AutomationDefaultsModal, type AutomationGraph } from './AutomationDefaultsModal';
 import { triggerNeedsWords, useAutomationWords } from './automation/FlowNatureBadge';
 import { triggerSentence } from '../utils/automationChoice';
+import { graphSize } from '../utils/flowLibraryRows';
 import { BUNDLED_COMPOSED_ONLY_IDS } from '../utils/bundledFlows';
 import {
   buildFlowFamilyIndex,
@@ -637,7 +638,7 @@ export function FlowLibraryModal({
             <input
               ref={searchRef}
               className="flow-library-search"
-              placeholder="Search name, description, id…  ( / )"
+              placeholder="Search names and descriptions  ( / )"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -776,7 +777,6 @@ export function FlowLibraryModal({
                         ) : null}
                       </div>
                     )}
-                    <div className="flow-library-preview-id">{selectedFlow.id}</div>
                   </div>
                 </div>
 
@@ -792,7 +792,7 @@ export function FlowLibraryModal({
                   <div className="flow-library-preview-row">
                     <span className="flow-library-preview-key">Graph</span>
                     <span className="flow-library-preview-val">
-                      {selectedFlow.nodes.length} nodes • {selectedFlow.edges.length} edges
+                      {graphSize(selectedFlow)}
                     </span>
                   </div>
                   <div className="flow-library-preview-row">

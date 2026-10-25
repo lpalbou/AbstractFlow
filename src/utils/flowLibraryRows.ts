@@ -228,3 +228,10 @@ export function buildLibraryRows(
 export function libraryRowsFor(flows: VisualFlow[], options: LibraryRowsOptions): LibraryRowsResult {
   return buildLibraryRows(flows, buildFlowFamilyIndex(flows, options.familyIndexOptions), options);
 }
+
+/** "3 nodes · 1 edge": a flow's size in words (also what tells same-named flows apart, never their ids). */
+export function graphSize(flow: { nodes?: unknown[]; edges?: unknown[] }): string {
+  const n = Array.isArray(flow.nodes) ? flow.nodes.length : 0;
+  const e = Array.isArray(flow.edges) ? flow.edges.length : 0;
+  return `${n} node${n === 1 ? '' : 's'} · ${e} edge${e === 1 ? '' : 's'}`;
+}

@@ -3,6 +3,7 @@ import { AfChip, AfChipButton, DisclosureList, type AfChipTone, type DisclosureR
 import type { LibraryRow } from '../utils/flowLibraryRows';
 import { isExecutableFlow } from '../utils/flowFamilies';
 import { flowNature, type AutomationWords } from '../utils/automationChoice';
+import { graphSize } from '../utils/flowLibraryRows';
 
 /**
  * Flow Library rows — a CONSUMER of the uic kit DisclosureList (the
@@ -176,11 +177,9 @@ export function FlowLibraryList({
           <div className="flow-library-item-name">
             {flow.name || flow.id}
             {duplicateNames?.has(flow.name || '') && flow.id !== flow.name ? (
-              <span
-                className="flow-library-item-id-hint"
-                title={`Several flows share this name — this one is ${flow.id}`}
-              >
-                {flow.id.length <= 12 ? flow.id : flow.id.slice(0, 8)}
+              // Same-named flows told apart by their size (UX review #27: no ids in rows).
+              <span className="flow-library-item-id-hint" title="Several flows share this name">
+                {graphSize(flow)}
               </span>
             ) : null}
           </div>

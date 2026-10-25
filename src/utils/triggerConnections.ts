@@ -27,6 +27,8 @@ export interface TriggerConnection {
   created_at: string | null;
   last_event_at: string | null;
   config_public: Record<string, JsonValue>;
+  /** The last failed read (`{code, cause, fix}`, runtime feed.py), null when it works. */
+  last_error: { code?: string; cause?: string; fix?: string } | null;
 }
 
 export type TriggerConnectionsResult =
@@ -53,7 +55,7 @@ function optionalTimestamp(value: unknown, at: string): string | null {
 export function parseTriggerConnection(raw: unknown, index = 0): TriggerConnection {
   const at = `connections[${index}]`;
   if (!isRecord(raw)) throw new TriggerConnectionsContractError(`${at} is not an object`);
-  const { connection_id, source_id, source_version, label, status, created_at, last_event_at, config_public } = raw;
+  const { connection_id, source_id, source_version, label, status, created_at, last_event_at, config_public, last_error } = raw;
   if (typeof connection_id !== 'string' || !connection_id.trim()) throw new TriggerConnectionsContractError(`${at}.connection_id is not a non-empty string`);
   if (typeof source_id !== 'string' || !source_id.trim()) throw new TriggerConnectionsContractError(`${at}.source_id is not a non-empty string`);
   if (typeof source_version !== 'number' || !Number.isInteger(source_version) || source_version < 1) {
@@ -72,6 +74,13 @@ export function parseTriggerConnection(raw: unknown, index = 0): TriggerConnecti
     created_at: optionalTimestamp(created_at, `${at}.created_at`),
     last_event_at: optionalTimestamp(last_event_at, `${at}.last_event_at`),
     config_public: (isRecord(config_public) ? config_public : {}) as Record<string, JsonValue>,
+    last_error: isRecord(last_error)
+      ? {
+          ...(typeof last_error.code === 'string' ? { code: last_error.code } : {}),
+          ...(typeof last_error.cause === 'string' ? { cause: last_error.cause } : {}),
+          ...(typeof last_error.fix === 'string' ? { fix: last_error.fix } : {}),
+        }
+      : null,
   };
 }
 

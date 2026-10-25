@@ -158,7 +158,7 @@ describe('New flow: "What starts it?"', () => {
     sources: { state: 'ok', value: { status: 'ok', endpoint: 'x', items: SOURCES as TriggerSourceItem[] } },
     mailboxes: { state: 'ok', value: { status: 'ok', mailboxes: MAILBOXES } },
     connections: { state: 'ok', value: { status: 'ok', connections: CONNECTIONS } },
-    timeZone: { zone: 'Europe/Paris', origin: 'account' },
+    timeZone: { zone: 'Europe/Paris', origin: 'account', choices: [] },
   });
 
   it('asks first, with four human choices; chat is the default', () => {
@@ -174,13 +174,18 @@ describe('New flow: "What starts it?"', () => {
       createElement(TriggerPicker, { value: emptyPicker('schedule'), onChange: () => {}, data: support.data, includeChat: true, timeZoneOrigin: 'account', gatewayUrl: 'http://gw' })
     );
     expect(schedule).toContain('Every day at 08:00 (Europe/Paris)');
-    expect(schedule).toContain('your account’s time zone');
+    expect(schedule).toContain('Time zone');
+    expect(schedule).toContain('your account’s');
+    expect(schedule).toContain('aria-label="Hour"');
+    expect(schedule).not.toContain('type="time"');
     expect(schedule).not.toMatch(/schedule v|v2|UTC intervals/);
     const arrives = renderToStaticMarkup(
       createElement(TriggerPicker, { value: { ...emptyPicker('arrives'), arrival: 'mail:default' }, onChange: () => {}, data: support.data, includeChat: false, timeZoneOrigin: 'account', gatewayUrl: 'http://gw/' })
     );
     expect(arrives).toContain('When mail arrives in test@abstractframework.ai');
     expect(arrives).toContain('href="http://gw/console#triggers"');
+    expect(arrives).toContain('Add a feed or webhook…');
+    for (const title of ['Your mailboxes', 'Your feeds', 'Your webhooks']) expect(arrives).toContain(title);
     expect(arrives).toContain('href="http://gw/console#users"');
     expect(arrives).toContain('Runs every time a new message lands in that mailbox; the flow receives the messages.');
     expect(arrives).not.toContain('A person, in a chat');
@@ -211,5 +216,53 @@ describe('New flow: "What starts it?"', () => {
     useFlowStore.getState().createFlow({ name: 'Chat', description: '', interfaces: ['abstractcode.agent.v1'] });
     expect(useFlowStore.getState().getFlow().automation_defaults).toBeUndefined();
     expect(isTriggerableFlow(useFlowStore.getState().getFlow())).toBe(false);
+  });
+});
+
+describe('UX review #25, #26, #6, #27', () => {
+  it('weekly waits for a day; the sentence never reads "Every at"', async () => {
+    const { scheduleSentence } = await import('./automationChoice');
+    expect(scheduleSentence({ repeat: 'weekly', days: [], at: '08:00' })).toBe('Every week: pick at least one day');
+    expect(choiceFromPicker({ ...emptyPicker('schedule'), rule: { repeat: 'weekly', days: [], at: '08:00' } }, DATA)).toEqual({ problem: 'Choose at least one day of the week.' });
+  });
+
+  it('a time zone picked for the schedule is the one saved and read back', () => {
+    const state = { ...emptyPicker('schedule'), timeZone: 'America/New_York' };
+    const picked = choiceFromPicker(state, DATA);
+    if (!('choice' in picked) || picked.choice.kind === 'chat') throw new Error('expected a schedule');
+    const trigger = triggerFromChoice(picked.choice, SOURCES);
+    expect(trigger.config.time_zone).toBe('America/New_York');
+    expect(pickerFromTrigger(trigger, DATA).timeZone).toBe('America/New_York');
+  });
+
+  it('a broken or paused feed is listed with its state, in its group', async () => {
+    const { parseTriggerConnectionsResponse: parse } = await import('./triggerConnections');
+    const conns = parse({ connections: [{ ...CONNECTIONS_RESPONSE.connections[0], last_error: { code: 'http_404', cause: 'The feed answered HTTP 404.', fix: 'Check the feed address.' } }] });
+    const options = arrivalOptions({ ...DATA, connections: conns });
+    const feed = options.find((o) => o.key === 'conn:conn_feed1')!;
+    expect(feed.group).toBe('feeds');
+    expect(feed.warn).toBe(true);
+    expect(feed.hint).toBe('not working: The feed answered HTTP 404. Check the feed address.');
+  });
+
+  it('copy: never "occurrence"; 50,000 tokens', async () => {
+    const { choiceHelp, formatTokens } = await import('./automationChoice');
+    expect(choiceHelp({ kind: 'schedule' })).toBe('Runs on this clock, even when nobody is around.');
+    expect(formatTokens(50000)).toBe('50,000');
+    const { readFileSync } = await import('node:fs');
+    for (const f of ['./automationChoice.ts', '../components/automation/TriggerPicker.tsx', '../components/AutomationDefaultsModal.tsx']) {
+      const text = readFileSync(new URL(f, import.meta.url), 'utf8').split('\n').filter((l) => !l.trim().startsWith('*') && !l.trim().startsWith('//')).join('\n');
+      expect(text, f).not.toMatch(/occurrence/i);
+    }
+  });
+
+  it('library rows tell same-named flows apart by size, never by id', async () => {
+    const { graphSize } = await import('./flowLibraryRows');
+    expect(graphSize({ nodes: [1, 2, 3], edges: [1] })).toBe('3 nodes · 1 edge');
+    const { readFileSync } = await import('node:fs');
+    const list = readFileSync(new URL('../components/FlowLibraryList.tsx', import.meta.url), 'utf8');
+    expect(list).not.toMatch(/flow\.id\.slice|this one is \$\{flow\.id\}/);
+    const modal = readFileSync(new URL('../components/FlowLibraryModal.tsx', import.meta.url), 'utf8');
+    expect(modal).not.toContain('flow-library-preview-id');
   });
 });

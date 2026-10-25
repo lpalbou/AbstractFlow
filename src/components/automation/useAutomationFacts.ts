@@ -11,7 +11,7 @@ import { fetchGatewayConnection } from '../GatewayConnectionModal';
 import { triggerSourceCache, type TriggerSourcesResult } from '../../utils/triggerSources';
 import { fetchTriggerConnections, type TriggerConnectionsResult } from '../../utils/triggerConnections';
 import { browserTimeZone, type Mailbox } from '../../utils/automationChoice';
-import { fetchAccountTimeZone, fetchHistoryDefault, fetchMailboxes } from '../../utils/automationGateway';
+import { fetchAccountTimeZone, fetchHistoryDefault, fetchMailboxes, fetchTimeZoneChoices } from '../../utils/automationGateway';
 
 export type Fact<T> = { state: 'loading' } | { state: 'ok'; value: T } | { state: 'error'; message: string };
 
@@ -21,7 +21,7 @@ export interface AutomationFacts {
   mailboxes: Fact<{ status: 'ok'; mailboxes: Mailbox[] } | { status: 'unavailable'; reason: string }>;
   connections: Fact<TriggerConnectionsResult>;
   /** The account's zone, else the browser's; `origin` says which. */
-  timeZone: { zone: string; origin: 'account' | 'browser' };
+  timeZone: { zone: string; origin: 'account' | 'browser'; choices: string[] };
   historyDefault: Fact<number>;
   reloadSources: () => void;
   reloadArrivals: () => void;
@@ -47,7 +47,7 @@ export function useAutomationFacts(gatewayContracts: GatewayContracts | null, op
   const [sources, setSources] = useState<AutomationFacts['sources']>(LOADING);
   const [mailboxes, setMailboxes] = useState<AutomationFacts['mailboxes']>(LOADING);
   const [connections, setConnections] = useState<AutomationFacts['connections']>(LOADING);
-  const [timeZone, setTimeZone] = useState<AutomationFacts['timeZone']>({ zone: browserTimeZone(), origin: 'browser' });
+  const [timeZone, setTimeZone] = useState<AutomationFacts['timeZone']>({ zone: browserTimeZone(), origin: 'browser', choices: [] });
   const [historyDefault, setHistoryDefault] = useState<AutomationFacts['historyDefault']>(LOADING);
 
   const loadSources = useCallback(
@@ -77,7 +77,10 @@ export function useAutomationFacts(gatewayContracts: GatewayContracts | null, op
     void loadSources(false);
     void loadArrivals();
     void settle(() => fetchAccountTimeZone()).then((fact) => {
-      if (alive && fact.state === 'ok' && fact.value) setTimeZone({ zone: fact.value, origin: 'account' });
+      if (alive && fact.state === 'ok' && fact.value) setTimeZone((t) => ({ ...t, zone: fact.value as string, origin: 'account' }));
+    });
+    void settle(() => fetchTimeZoneChoices()).then((fact) => {
+      if (alive && fact.state === 'ok' && fact.value.length) setTimeZone((t) => ({ ...t, choices: fact.value }));
     });
     void settle(() => fetchHistoryDefault()).then((fact) => {
       if (alive) setHistoryDefault(fact);

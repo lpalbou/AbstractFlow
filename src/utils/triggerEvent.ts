@@ -37,12 +37,12 @@ export const TRIGGER_EVENT_FIELDS = ['type', 'subject', 'time', 'data', 'data.co
 
 const SERIES_SCHEMA = {
   type: 'object',
-  description: 'Schedules only: which occurrence of the series this run is.',
+  description: 'Schedules only: which run of the schedule this is (run #1, #2, …).',
   properties: {
     rule: { type: 'string', description: 'The schedule rule (e.g. every 1d at 08:00 Europe/Paris).' },
-    occurrence: { type: 'integer', description: 'The occurrence number (1, 2, ...).' },
-    scheduled_at: { type: 'string', format: 'date-time', description: 'When this occurrence was due.' },
-    next_at: { type: ['string', 'null'], format: 'date-time', description: 'The next occurrence, or null when the series ends.' },
+    occurrence: { type: 'integer', description: 'The run number: 1 for run #1, 2 for run #2, …' },
+    scheduled_at: { type: 'string', format: 'date-time', description: 'When this run was due.' },
+    next_at: { type: ['string', 'null'], format: 'date-time', description: 'When the next run is due, or null when the schedule ends.' },
     coalesced: { type: 'integer', description: 'Missed ticks folded into this run (0 when none).' },
   },
 };

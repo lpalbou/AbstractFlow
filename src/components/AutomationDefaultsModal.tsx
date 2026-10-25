@@ -680,6 +680,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
                 data={support.data}
                 includeChat={false}
                 timeZoneOrigin={facts.timeZone.origin}
+                timeZoneChoices={facts.timeZone.choices}
                 gatewayUrl={facts.gatewayUrl}
                 arrivalsNote={support.arrivalsNote}
                 onRefreshArrivals={facts.reloadArrivals}

@@ -65,6 +65,18 @@ export async function fetchMailboxes(
   }
 }
 
+/** The zones the account may pick (`time_zone.choices`, IANA names); [] when the gateway does not say. */
+export async function fetchTimeZoneChoices(fetchJson: GatewayJsonFetcher = defaultFetcher): Promise<string[]> {
+  try {
+    const raw = await fetchJson(MY_PREFERENCES_ENDPOINT);
+    const block = isRecord(raw) ? raw.time_zone : undefined;
+    return isRecord(block) && Array.isArray(block.choices) ? block.choices.filter((z): z is string => typeof z === 'string' && Boolean(z)) : [];
+  } catch (error) {
+    if (error instanceof GatewayHttpError && error.status === 404) return [];
+    throw error;
+  }
+}
+
 /** The account's time zone (`time_zone.effective`), or null when the gateway does not say. */
 export async function fetchAccountTimeZone(fetchJson: GatewayJsonFetcher = defaultFetcher): Promise<string | null> {
   try {

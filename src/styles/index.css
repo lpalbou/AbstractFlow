@@ -9280,3 +9280,36 @@ button.flow-nature-badge:hover:not(:disabled),
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* UX review #26: arrivals grouped by kind, states in the warning tone, links in the link colour (never the accent red). */
+.automation-arrival-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.automation-arrival-group + .automation-arrival-group {
+  margin-top: 6px;
+}
+.automation-arrival-group-title {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.automation-warn {
+  color: var(--warning);
+  font-size: var(--font-size-xs);
+}
+.automation-links a,
+.automation-link-button,
+.canvas-note-action {
+  color: var(--info);
+}
+.automation-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.automation-zone {
+  max-width: 240px;
+}

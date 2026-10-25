@@ -158,8 +158,8 @@ describe('the library save of an OPEN flow adds the Trigger event to its canvas 
 describe('context with a budget (one central default)', () => {
   it('Growing reads the gateway default, writes a budget only when it differs, and refuses words in plain words', async () => {
     const { budgetText, contextFromForm } = await import('../utils/automationChoice');
-    expect(budgetText(undefined, 50000)).toBe('50000');
-    expect(budgetText({ mode: 'growing', growing: { max_tokens: 8000 } }, 50000)).toBe('8000');
+    expect(budgetText(undefined, 50000)).toBe('50,000');
+    expect(budgetText({ mode: 'growing', growing: { max_tokens: 8000 } }, 50000)).toBe('8,000');
     expect(contextFromForm('growing', '50,000', 50000)).toEqual({ context: { mode: 'growing' } });
     expect(contextFromForm('growing', '', null)).toEqual({ context: { mode: 'growing' } });
     expect(contextFromForm('growing', '12 000', 50000)).toEqual({ context: { mode: 'growing', growing: { max_tokens: 12000 } } });

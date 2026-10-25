@@ -19,7 +19,7 @@ import {
   type StartKind,
   type Weekday,
 } from '../../utils/automationChoice';
-import { arrivalOptions, choiceFromPicker, type PickerData, type PickerState } from '../../utils/automationPicker';
+import { ARRIVAL_GROUP_TITLES, arrivalOptions, choiceFromPicker, type ArrivalGroup, type PickerData, type PickerState } from '../../utils/automationPicker';
 import type { AutomationFacts } from './useAutomationFacts';
 
 const START_CHOICES: Array<{ kind: StartKind; title: string; sub: string }> = [
@@ -45,6 +45,8 @@ export interface TriggerPickerProps {
   includeChat: boolean;
   /** Where the zone comes from, said next to it. */
   timeZoneOrigin: 'account' | 'browser';
+  /** Zones the account may pick (the gateway's list); [] = this browser's list. */
+  timeZoneChoices?: string[];
   gatewayUrl: string;
   /** Mailboxes / connections still loading, or why they could not be read. */
   arrivalsNote?: ReactNode;
@@ -54,34 +56,71 @@ export interface TriggerPickerProps {
   idPrefix?: string;
 }
 
+const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
+/** HH:MM as two 24-hour selects: "08:00" reads the same everywhere (no AM/PM by locale). */
+function TimeOfDay({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const [h, m] = /^\d{2}:\d{2}$/.test(value) ? value.split(':') : ['08', '00'];
+  const minutes = MINUTES.includes(m) ? MINUTES : [...MINUTES, m].sort();
+  return (
+    <span className="automation-time" role="group" aria-label="Time of day">
+      <select className="run-form-select" aria-label="Hour" value={h} onChange={(e) => onChange(`${e.target.value}:${m}`)}>
+        {HOURS.map((x) => (
+          <option key={x} value={x}>
+            {x}
+          </option>
+        ))}
+      </select>
+      <span aria-hidden="true">:</span>
+      <select className="run-form-select" aria-label="Minute" value={m} onChange={(e) => onChange(`${h}:${e.target.value}`)}>
+        {minutes.map((x) => (
+          <option key={x} value={x}>
+            {x}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
+/** Every zone the gateway offers (else this browser's list), the current one always present. */
+function zoneChoices(current: string, choices: string[]): string[] {
+  let list = choices;
+  if (!list.length) {
+    try {
+      const supported = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+      list = supported ? supported('timeZone') : [];
+    } catch {
+      list = [];
+    }
+  }
+  return list.includes(current) ? list : [current, ...list];
+}
+
 function ScheduleEditor({
   rule,
   onRule,
   timeZone,
   origin,
-  idPrefix,
+  zones,
+  onTimeZone,
 }: {
   rule: ScheduleRule;
   onRule: (rule: ScheduleRule) => void;
   timeZone: string;
-  origin: 'account' | 'browser';
-  idPrefix: string;
+  origin: 'account' | 'browser' | 'chosen';
+  zones: string[];
+  onTimeZone: (zone: string) => void;
 }) {
-  const id = (s: string) => `${idPrefix}-${s}`;
   const timeField =
     rule.repeat !== 'every' ? (
       <label className="automation-inline-field">
         <span>at</span>
-        <input
-          id={id('at')}
-          className="run-form-input automation-time"
-          type="time"
-          value={rule.at}
-          onChange={(e) => onRule({ ...rule, at: e.target.value })}
-          aria-label="Time of day"
-        />
+        <TimeOfDay value={rule.at} onChange={(at) => onRule({ ...rule, at })} />
       </label>
     ) : null;
+  const noDay = rule.repeat === 'weekly' && rule.days.length === 0;
   return (
     <div className="automation-schedule">
       <div className="automation-schedule-row">
@@ -171,12 +210,22 @@ function ScheduleEditor({
           })}
         </div>
       ) : null}
-      <p className="automation-help">
-        {scheduleSentenceWithZone(rule, timeZone)}
-        {rule.repeat !== 'every' ? (
-          <span className="automation-muted"> · {origin === 'account' ? 'your account’s time zone' : 'this browser’s time zone'}</span>
-        ) : null}
-      </p>
+      {rule.repeat !== 'every' ? (
+        <label className="automation-inline-field">
+          <span>Time zone</span>
+          <select className="run-form-select automation-zone" aria-label="Time zone" value={timeZone} onChange={(e) => onTimeZone(e.target.value)}>
+            {zoneChoices(timeZone, zones).map((z) => (
+              <option key={z} value={z}>
+                {z.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+          <span className="automation-muted">
+            {origin === 'account' ? 'your account’s' : origin === 'browser' ? 'this browser’s' : 'chosen for this automation'}
+          </span>
+        </label>
+      ) : null}
+      <p className={noDay ? 'automation-problem' : 'automation-help'}>{noDay ? 'Pick at least one day.' : scheduleSentenceWithZone(rule, timeZone)}</p>
     </div>
   );
 }
@@ -187,6 +236,7 @@ export function TriggerPicker({
   data,
   includeChat,
   timeZoneOrigin,
+  timeZoneChoices = [],
   gatewayUrl,
   arrivalsNote,
   onRefreshArrivals,
@@ -234,9 +284,10 @@ export function TriggerPicker({
           <ScheduleEditor
             rule={value.rule}
             onRule={(rule) => onChange({ ...value, rule, legacy: null })}
-            timeZone={data.timeZone}
-            origin={timeZoneOrigin}
-            idPrefix={idPrefix}
+            timeZone={value.timeZone || data.timeZone}
+            origin={value.timeZone && value.timeZone !== data.timeZone ? 'chosen' : timeZoneOrigin}
+            zones={timeZoneChoices}
+            onTimeZone={(zone) => onChange({ ...value, timeZone: zone === data.timeZone ? '' : zone, legacy: null })}
           />
         </div>
       ) : null}
@@ -245,25 +296,34 @@ export function TriggerPicker({
         <div className="automation-detail">
           {arrivals.length ? (
             <div className="automation-arrivals" role="radiogroup" aria-label="What it listens to">
-              {arrivals.map((a) => (
-                <label key={a.key} className={`automation-arrival${a.disabled ? ' is-disabled' : ''}`}>
-                  <input
-                    type="radio"
-                    name={`${idPrefix}-arrival`}
-                    value={a.key}
-                    checked={value.arrival === a.key}
-                    disabled={a.disabled}
-                    onChange={() => onChange({ ...value, arrival: a.key })}
-                  />
-                  <span>
-                    {a.text}
-                    {a.hint ? <span className="automation-muted"> · {a.hint}</span> : null}
-                  </span>
-                </label>
-              ))}
+              {(['mailboxes', 'feeds', 'webhooks', 'other'] as ArrivalGroup[]).map((group) => {
+                const rows = arrivals.filter((a) => a.group === group);
+                if (!rows.length) return null;
+                return (
+                  <div key={group} className="automation-arrival-group">
+                    <div className="automation-arrival-group-title">{ARRIVAL_GROUP_TITLES[group]}</div>
+                    {rows.map((a) => (
+                      <label key={a.key} className={`automation-arrival${a.disabled ? ' is-disabled' : ''}`}>
+                        <input
+                          type="radio"
+                          name={`${idPrefix}-arrival`}
+                          value={a.key}
+                          checked={value.arrival === a.key}
+                          disabled={a.disabled}
+                          onChange={() => onChange({ ...value, arrival: a.key })}
+                        />
+                        <span>
+                          {a.text}
+                          {a.hint ? <span className={a.warn ? 'automation-warn' : 'automation-muted'}> · {a.hint}</span> : null}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           ) : arrivalsNote ? null : (
-            <p className="automation-help">Nothing is set up yet: add a mailbox, or a feed or webhook, then refresh.</p>
+            <p className="automation-help">Nothing to listen to yet: add a mailbox, a feed or a webhook, then refresh.</p>
           )}
           {arrivalsNote ? <div className="automation-help">{arrivalsNote}</div> : null}
           <p className="automation-links">
@@ -273,7 +333,7 @@ export function TriggerPicker({
                   Add a mailbox…
                 </a>
                 <a href={`${base}/console#triggers`} target="_blank" rel="noreferrer">
-                  Set up a new one…
+                  Add a feed or webhook…
                 </a>
               </>
             ) : null}

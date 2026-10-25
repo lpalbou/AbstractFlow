@@ -224,6 +224,7 @@ export function scheduleSentence(rule: ScheduleRule): string {
       return `Every day at ${rule.at}`;
     case 'weekly': {
       const days = WEEKDAYS.filter((d) => rule.days.includes(d));
+      if (!days.length) return 'Every week: pick at least one day';
       if (days.length === 7) return `Every day at ${rule.at}`;
       if (days.length === 5 && !days.includes('sat') && !days.includes('sun')) return `Every weekday at ${rule.at}`;
       return `Every ${joinWords(days.map((d) => WEEKDAY_NAMES[d]))} at ${rule.at}`;
@@ -361,7 +362,7 @@ export function choiceHelp(choice: { kind: StartChoice['kind'] | 'legacy-schedul
       return 'Someone writes to it in the Assistant or Code, and each message runs the flow.';
     case 'schedule':
     case 'legacy-schedule':
-      return 'Runs on this clock, even when nobody is around; each run knows which occurrence it is.';
+      return 'Runs on this clock, even when nobody is around.';
     case 'mail':
       return 'Runs every time a new message lands in that mailbox; the flow receives the messages.';
     case 'connection':
@@ -443,8 +444,8 @@ export function formatTokens(n: number): string {
 /** The budget field's text for saved context (the saved budget, else the gateway's default). */
 export function budgetText(context: AutomationDefaults['context'] | undefined, historyDefault: number | null): string {
   const saved = context?.growing?.max_tokens;
-  if (typeof saved === 'number') return String(saved);
-  return historyDefault ? String(historyDefault) : '';
+  if (typeof saved === 'number') return formatTokens(saved);
+  return historyDefault ? formatTokens(historyDefault) : '';
 }
 
 /**

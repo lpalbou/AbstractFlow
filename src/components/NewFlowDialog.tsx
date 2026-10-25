@@ -130,6 +130,7 @@ export function NewFlowDialog({
                       data={support.data}
                       includeChat
                       timeZoneOrigin={facts.timeZone.origin}
+                timeZoneChoices={facts.timeZone.choices}
                       gatewayUrl={facts.gatewayUrl}
                       arrivalsNote={support.arrivalsNote}
                       onRefreshArrivals={facts.reloadArrivals}
@@ -190,6 +191,7 @@ export function NewFlowDialog({
                         data={support.data}
                         includeChat
                         timeZoneOrigin={facts.timeZone.origin}
+                timeZoneChoices={facts.timeZone.choices}
                         gatewayUrl={facts.gatewayUrl}
                         arrivalsNote={support.arrivalsNote}
                         onRefreshArrivals={facts.reloadArrivals}
