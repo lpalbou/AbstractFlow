@@ -93,7 +93,7 @@ Gateway planner runs unless a model is pinned, and reads planner responses from
 run ledgers. The model authors the complete workflow as one JSON document; the
 editor diffs it against the draft canvas and applies only validated edits. It can
 create or refine common workflows such as internet research, deep research, news
-digests, and job searches; Save, Publish, and Run remain explicit user actions.
+digests, and job searches; Save, Make it available, and Run remain explicit user actions.
 
 Workflows can declare the interfaces they implement (for example
 `abstractcode.agent.v1`, so they can be run as agents). Declaring an interface
@@ -107,7 +107,9 @@ choice creates the flow with its trigger and the wired **Trigger event** node
 already in place. The **Automation** dialog (the header badge, or Flow Library
 > **Automation…**) sets what starts it, the context (independent runs, or a
 growing conversation that remembers up to the gateway's default token budget)
-and the inputs, as a form built from `On Flow Start`. See
+and the inputs, as a form built from `On Flow Start`; **Turn it on** makes the flow
+available and creates the automation. A new automation flow already has an
+Agent wired between start and end. See
 [Web editor > Automations](docs/web-editor.md#automations) and
 [The Trigger Event](docs/web-editor.md#the-trigger-event).
 
@@ -585,8 +587,8 @@ with a mouse, the panels keep their dense layout with text at 12 px or more
 On/off settings are switches labelled by what they control; a switch is
 highlighted with a check mark when on and plain when off. The properties
 panel has **Recurrent** (On Schedule) and
-**Free text answers** (Ask User). The dialogs have **Reload gateway bundles**
-(Publish), **Private workspace per run** (the run window's run workspace),
+**Free text answers** (Ask User). The dialogs have **Load it into the gateway now**
+(Make it available, under Details), **Private workspace per run** (the run window's run workspace),
 **Durable** (sending an event to a waiting run), and **Lock after load** and
 **Cached and non-resident models** (Resources). When a switch cannot change,
 it says why next to it: **Private workspace per run** is fixed while the gateway
@@ -642,13 +644,13 @@ When AbstractFlow opens on a blank canvas, it offers **Create Flow** (the New fl
 **New Flow** first asks **What starts it?**, then the workflow's title, an optional description and the interfaces it declares (the same interface list as the Flow Library, with each interface's pins). The four answers are:
 
 - **A person, in a chat** (the default): a flow for chat, created as before.
-- **On a schedule**: every day, every week (pick the days), every month, every few minutes or hours, or once on a date, at a time of day. The sentence under the editor reads the schedule back with its time zone, for example "Every Monday and Thursday at 07:30 (Europe/Paris)": your account's time zone from the gateway, else this browser's.
-- **When something arrives**: your mailboxes, by address ("When mail arrives in me@example.org"), and your feeds and webhooks, by name ("When Release notes has a new item", "When CI hook is called"). **Add a mailbox…** opens the gateway console's account page and **Set up a new one…** its Triggers page; **Refresh** reads the lists again.
+- **On a schedule**: every day, every week (pick at least one day), every month, every few minutes or hours, or once on a date, at a time of day (24-hour hour and minute). **Time zone** starts on your account's time zone from the gateway (else this browser's) and can be changed for this automation. The sentence under the editor reads the schedule back, for example "Every Monday and Thursday at 07:30 (Europe/Paris)".
+- **When something arrives**: grouped as **Your mailboxes** (by address: "When mail arrives in me@example.org"), **Your feeds** and **Your webhooks** (by name: "When Release notes has a new item", "When CI hook is called"). A paused, switched-off or failing one is listed with its state ("paused", "not working: The feed answered HTTP 404. Check the feed address."). **Add a mailbox…** opens the gateway console's account page and **Add a feed or webhook…** its Triggers page; **Refresh** reads the lists again.
 - **By hand (Run now only)**: the automation runs only when someone presses Run now.
 
-Each choice shows one line saying what it does. Choosing a trigger ticks **Runnable agent (v1)** when no interface is ticked (it gives `On Flow Start` the `prompt` input), and **Create automation flow** builds `On Flow Start` with the **Trigger event** node already wired to it (see [The Trigger Event](#the-trigger-event)) and stores the trigger as the flow's automation; the rest is in the [Automation dialog](#automations). Otherwise **Create flow** places the `On Flow Start` and `On Flow End` nodes the declared interfaces need, already carrying their pins; you build the steps between them. **Save Flow** stores the title, description, interfaces, automation and nodes on the gateway. If the open flow has unsaved changes, the dialog says creating a new flow discards them.
+Each choice shows one line saying what it does. Once a trigger is chosen the dialog says "Runs by itself when its trigger fires; set its task under Automation." and has no Interfaces section: the flow takes the runnable agent contract itself (`prompt`, `provider` and `model` on `On Flow Start`). **Create automation flow** builds a flow that runs as is: `On Flow Start`, the wired **Trigger event** node (see [The Trigger Event](#the-trigger-event)), an **Agent** and `On Flow End`. The Agent gets the task (`prompt`) and, for feeds and webhooks, the new items (a **New items** String Template writes them under the task; for mail, the messages); provider and model come from `On Flow Start` (empty = the gateway's default). A note over the canvas says the next step: "Next: tell the Agent what to do with the new items under Automation → What each run is asked to do.", with **Automation…**; dismiss it with ×. The rest is in the [Automation dialog](#automations). Otherwise **Create flow** places the `On Flow Start` and `On Flow End` nodes the declared interfaces need, already carrying their pins; you build the steps between them. **Save Flow** stores the title, description, interfaces, automation and nodes on the gateway. If the open flow has unsaved changes, the dialog says creating a new flow discards them.
 
-The header shows what the open flow is, next to its name: **Automation · Every day at 08:00 (Europe/Paris)** or **Automation · When mail arrives in me@example.org** for an automation, **Chat** for a runnable flow without one, and a dashed **Automation…** otherwise. Click it to open the Automation dialog on the open flow; its changes are saved with the flow. The Flow Library shows the same line under each workflow's name.
+The header shows what the open flow is, next to its name: **Automation · Every day at 08:00 (Europe/Paris)** or **Automation · When mail arrives in me@example.org** for an automation, **Chat** for a runnable flow without one, and a dashed **Automation…** otherwise. Click it for **Automation…** (the dialog on the open flow; its changes are saved with the flow) and **Turn it on**. The badge keeps the word "Automation" and shortens the sentence when the header is narrow. The Flow Library shows the same line under each workflow's name; flows with the same name are told apart by their size ("3 nodes · 1 edge").
 
 To change the interfaces of an existing workflow, open the **Flow Library**, select a workflow and use the edit button next to **Interfaces** to declare the contracts it implements (for example **Runnable agent (v1)**). The interfaces are listed one per line; ticking or inspecting one opens its details beside the list, with the `On Flow Start` and `On Flow End` nodes drawn with the pins it requires. The footer carries **Cancel** and **Save Interfaces**. Saving adds the missing ones to the `On Flow Start` and `On Flow End` nodes: right away when the workflow is open in the editor (your unsaved edits and undo history are kept, and the flow shows unsaved changes until you **Save**), otherwise the next time you open it. Wire the added pins on the canvas so hosts get real values. See [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for the pins of every interface.
 
@@ -660,10 +662,14 @@ Open the **Automation** dialog from the header badge of the open flow, from **Ne
 
 - **What starts it?** The same choices as New Flow, without chat: **On a schedule**, **When something arrives** (your mailboxes by address, your feeds and webhooks by name) or **By hand (Run now only)**. A schedule is saved as `schedule` version 2 (calendar rules in your time zone); a workflow saved with an older fixed-interval schedule shows it ("Now: Every 5 minutes · an older schedule") and keeps it until you change the schedule. A mailbox is saved as `trigger.config.account`; a feed or webhook as `trigger.connection_id`. **More settings** shows the chosen trigger's other settings in plain words, built from its schema: for mail, the folder, how often new mail is gathered into one run, how many messages per run, automatic messages, and **Only mail that…** (comes from, comes from the domain, is sent to: one address or domain per line; has in its subject; has an attachment). Empty settings use the trigger's defaults.
 - **Context.** **Independent** (every run starts fresh) or **Growing** (every run continues the same conversation). Growing shows **Remembers up to N tokens of earlier runs**, filled with the gateway's one default (`GET /api/gateway/automations/defaults`, `growing_max_tokens`). Keep it to follow that default wherever it changes; a different number is saved as `context.growing.max_tokens`. A larger budget lets each run build on more of the earlier runs and costs more tokens and time per run.
-- **Inputs.** One field per input of the workflow's `On Flow Start`: `prompt` is **What each run is asked to do** (the trigger's details are added to it on every run), text, number and yes/no inputs get matching fields with their labels, and an object or list input a small JSON field of its own. The `event` input is never asked: the trigger fills it. **Advanced: raw JSON** holds any other input as one JSON object.
+- **Inputs.** One field per input of the workflow's `On Flow Start`: `prompt` is **What each run is asked to do** (the trigger's details are added to it on every run), **Provider** and **Model** are lists from the gateway with **Use the default (…)** first, text, number and yes/no inputs get matching fields with their labels, and an object or list input a small JSON field of its own. The `event` input is never asked: the trigger fills it. **Advanced: raw JSON** holds any other input as one JSON object.
 - **Name** (optional): how automations made from the workflow are named in Observer and the Assistant; empty uses the workflow's name.
 
-**Save** checks everything and names each problem in words (for example "Comes from: "x" is not an email address"); the problems stay visible above the buttons. When the workflow cannot receive the trigger's event yet, Save adds and wires the **Trigger event** node itself, in the same save. From the Flow Library the workflow is updated on the gateway (`PUT` on the workflow, with its nodes when the event was added) and the answer must contain the stored defaults, else the dialog shows an error instead of reporting a save; if that workflow is open in the editor, the change is applied to it and your unsaved edits are kept. From the header badge the change goes into the open flow and is saved with it. **Remove automation** clears the field. **Save**, **Duplicate** and **Publish** carry the field with the workflow; see [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults) for the stored shape.
+**Turn it on** saves, makes the workflow available (below) and creates the automation through the gateway (`POST /api/gateway/automations` with the published workflow and the saved trigger, context and inputs), then says "Release digest is on. See it in Observer or the Assistant." with **Open Observer**. A refusal is said in words (a feed or mailbox that is no longer yours, an expired session). Pause or stop it in Observer or the Assistant.
+
+**Save** checks everything and names each problem in words (for example "Comes from: "x" is not an email address"); the problems stay visible above the buttons. When the workflow cannot receive the trigger's event yet, Save adds and wires the **Trigger event** node itself, in the same save. From the Flow Library the workflow is updated on the gateway (`PUT` on the workflow, with its nodes when the event was added) and the answer must contain the stored defaults, else the dialog shows an error instead of reporting a save; if that workflow is open in the editor, the change is applied to it and your unsaved edits are kept. From the header badge the change goes into the open flow and is saved with it. **Remove automation** clears the field. **Save**, **Duplicate** and **Make it available** carry the field with the workflow; see [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults) for the stored shape.
+
+**Make it available** (the toolbar, and part of Turn it on) makes the saved workflow available to Observer and the Assistant: "Release digest is ready for Observer and the Assistant." Each time adds a new version and keeps the earlier ones; the gateway name, the version and **Load it into the gateway now** are under **Details**.
 
 The dialog does not set tool approval. When an automation is created, the gateway applies its default policy, in which creating the automation counts as consent for the tools the workflow uses; a creation request that sets `policy.tool_approval` to `ask` makes every run wait for approval instead. Questions from `Ask User` nodes always wait for a person.
 
@@ -5790,6 +5796,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Context with a budget.** *Independent* or *Growing*; Growing shows **Remembers up to N tokens of earlier runs**, prefilled from the gateway's one default (`GET /api/gateway/automations/defaults`); a different budget is saved as `context.growing.max_tokens` (needs a Gateway that accepts it).
 - **Inputs as a form.** One field per `On Flow Start` input (`prompt` = *What each run is asked to do*; text, number, yes/no; a JSON field only for object/list inputs; `event` never asked), with **Advanced: raw JSON** for anything else. Problems are named in words, above the buttons.
 - **Save adds the Trigger event itself.** Saving a trigger on a workflow without the `event` input adds and wires the **Trigger event** node in the same save; the dialog no longer asks you to.
+- **Turn it on.** The Automation dialog and the header badge's menu make the flow available and create the automation through the gateway (`POST /api/gateway/automations`), then say "Release digest is on. See it in Observer or the Assistant." with **Open Observer**; refusals in plain words.
+- **Publish is "Make it available".** One sentence before and after; the gateway name, version and the load switch under **Details**.
+- **A new automation flow runs as is.** On Flow Start → Agent → On Flow End, the Agent given the task and the new items (a "New items" String Template for feeds, webhooks and mail), with a dismissible canvas note on the next step.
+- **New flow with a trigger** shows no Interfaces section and says "Runs by itself when its trigger fires; set its task under Automation.". **Provider** and **Model** inputs are lists from the gateway with **Use the default (…)** first.
+- **Trigger list** grouped (Your mailboxes / feeds / webhooks), paused or failing ones shown with their state, **Add a feed or webhook…**; weekly schedules wait for a day; the time zone can be chosen; times read "08:00" (24-hour) everywhere; "50,000 tokens"; no "occurrence" in the copy; library rows show "3 nodes · 1 edge" instead of ids.
+
+### Fixed
+
+- The unsaved-changes dot no longer stays after a save that followed an Automation change (the dirty check now follows the automation defaults and the description).
+- The header no longer overlaps at 1440 px and up with the automation badge: the name and badge give way first and the actions scroll as one strip.
+
+### Changed (continued)
+
 - **Settings schemas never block a trigger.** Lists of strings render one per line, nested objects as a section, and a setting using a keyword the editor does not render is a JSON field of its own (checked by the gateway) instead of refusing the whole trigger. `email` and `uri` formats and `items`/`minItems`/`maxItems`/`uniqueItems` are checked.
 
 ## [0.11.0] - 2026-10-25

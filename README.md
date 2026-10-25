@@ -87,7 +87,7 @@ Gateway planner runs unless a model is pinned, and reads planner responses from
 run ledgers. The model authors the complete workflow as one JSON document; the
 editor diffs it against the draft canvas and applies only validated edits. It can
 create or refine common workflows such as internet research, deep research, news
-digests, and job searches; Save, Publish, and Run remain explicit user actions.
+digests, and job searches; Save, Make it available, and Run remain explicit user actions.
 
 Workflows can declare the interfaces they implement (for example
 `abstractcode.agent.v1`, so they can be run as agents). Declaring an interface
@@ -101,7 +101,9 @@ choice creates the flow with its trigger and the wired **Trigger event** node
 already in place. The **Automation** dialog (the header badge, or Flow Library
 > **Automation…**) sets what starts it, the context (independent runs, or a
 growing conversation that remembers up to the gateway's default token budget)
-and the inputs, as a form built from `On Flow Start`. See
+and the inputs, as a form built from `On Flow Start`; **Turn it on** makes the flow
+available and creates the automation. A new automation flow already has an
+Agent wired between start and end. See
 [Web editor > Automations](docs/web-editor.md#automations) and
 [The Trigger Event](docs/web-editor.md#the-trigger-event).
 

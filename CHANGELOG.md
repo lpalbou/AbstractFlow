@@ -15,7 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Context with a budget.** *Independent* or *Growing*; Growing shows **Remembers up to N tokens of earlier runs**, prefilled from the gateway's one default (`GET /api/gateway/automations/defaults`); a different budget is saved as `context.growing.max_tokens` (needs a Gateway that accepts it).
 - **Inputs as a form.** One field per `On Flow Start` input (`prompt` = *What each run is asked to do*; text, number, yes/no; a JSON field only for object/list inputs; `event` never asked), with **Advanced: raw JSON** for anything else. Problems are named in words, above the buttons.
 - **Save adds the Trigger event itself.** Saving a trigger on a workflow without the `event` input adds and wires the **Trigger event** node in the same save; the dialog no longer asks you to.
+- **Turn it on.** The Automation dialog and the header badge's menu make the flow available and create the automation through the gateway (`POST /api/gateway/automations`), then say "Release digest is on. See it in Observer or the Assistant." with **Open Observer**; refusals in plain words.
+- **Publish is "Make it available".** One sentence before and after; the gateway name, version and the load switch under **Details**.
+- **A new automation flow runs as is.** On Flow Start → Agent → On Flow End, the Agent given the task and the new items (a "New items" String Template for feeds, webhooks and mail), with a dismissible canvas note on the next step.
+- **New flow with a trigger** shows no Interfaces section and says "Runs by itself when its trigger fires; set its task under Automation.". **Provider** and **Model** inputs are lists from the gateway with **Use the default (…)** first.
+- **Trigger list** grouped (Your mailboxes / feeds / webhooks), paused or failing ones shown with their state, **Add a feed or webhook…**; weekly schedules wait for a day; the time zone can be chosen; times read "08:00" (24-hour) everywhere; "50,000 tokens"; no "occurrence" in the copy; library rows show "3 nodes · 1 edge" instead of ids.
 - **Settings schemas never block a trigger.** Lists of strings render one per line, nested objects as a section, and a setting using a keyword the editor does not render is a JSON field of its own (checked by the gateway) instead of refusing the whole trigger. `email` and `uri` formats and `items`/`minItems`/`maxItems`/`uniqueItems` are checked.
+
+### Fixed
+
+- The unsaved-changes dot no longer stays after a save that followed an Automation change (the dirty check now follows the automation defaults and the description).
+- The header no longer overlaps at 1440 px and up with the automation badge: the name and badge give way first and the actions scroll as one strip.
 
 ## [0.11.0] - 2026-10-25
 
