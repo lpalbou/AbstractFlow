@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Delay** sits in the Waits section with Wait Until, Wait for Event and Emit Event: it pauses the run and does not start the flow.
+
 ### Added
 
 - **Open Flow from a trigger.** `?trigger=<connection id>` (a feed or webhook) or `?trigger=mail:<mailbox id>` on the editor's address (standalone or `/apps/flow/`) opens **New flow** with *What starts it?* on that trigger, picked from your connections, and the title focused with a proposed name ("<connection name> digest", "<mailbox> handling"); a trigger that is not among your connections leaves *When something arrives* with nothing picked and says "The trigger <id> is not among your connections.". The parameter leaves the address once read, so a reload does not reopen the dialog. For the Gateway console's Triggers page. Docs: [Web editor > Open Flow From A Trigger](docs/web-editor.md#open-flow-from-a-trigger).

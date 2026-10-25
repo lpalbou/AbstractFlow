@@ -124,7 +124,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'wait_until',
     icon: '&#x23F3;', // Hourglass
     label: 'Delay',
-    description: 'Pause execution for a duration (seconds), then continue.',
+    description: 'Pauses this run for a number of seconds, then continues. It does not start the flow (an automation does).',
     headerColor: '#F39C12', // Orange - timing
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -133,7 +133,7 @@ const EVENT_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
     ],
-    category: 'events',
+    category: 'waits',
   },
 ];
 

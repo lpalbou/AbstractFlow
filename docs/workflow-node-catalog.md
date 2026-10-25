@@ -1089,18 +1089,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `iso` string; `timezone` string; `utc_offset_minutes` number; `locale` string
 - Default config: none
 
-### events / Delay
-
-- Node type: `wait_until`
-- Document node: `{"id":"<unique_id>","type":"wait_until"}`
-- Utility: Pause execution for a duration (seconds), then continue.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `duration` number
-- Outputs: `exec-out` execution
-- Default config: none
-
 ### files / Export Artifact
 
 - Node type: `export_artifact`
@@ -2317,6 +2305,18 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
     "recurrent": true
   }
 }
+
+### waits / Delay
+
+- Node type: `wait_until`
+- Document node: `{"id":"<unique_id>","type":"wait_until"}`
+- Utility: Pauses this run for a number of seconds, then continues. It does not start the flow (an automation does).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `duration` number
+- Outputs: `exec-out` execution
+- Default config: none
 
 ## Hidden Or Deprecated Templates
 
