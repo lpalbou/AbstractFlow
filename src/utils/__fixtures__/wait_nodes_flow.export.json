@@ -1,0 +1,336 @@
+{
+  "id": "wait-nodes-fixture",
+  "name": "Wait nodes fixture",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      }
+    },
+    {
+      "id": "schedule",
+      "type": "on_schedule",
+      "position": {
+        "x": 0,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "on_schedule",
+        "label": "On Schedule",
+        "icon": "&#x23F0;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "schedule",
+            "label": "timestamp",
+            "type": "string"
+          },
+          {
+            "id": "recurrent",
+            "label": "recurrent",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "timestamp",
+            "label": "time",
+            "type": "string"
+          }
+        ],
+        "eventConfig": {
+          "schedule": "15s",
+          "recurrent": true
+        }
+      }
+    },
+    {
+      "id": "listener",
+      "type": "on_event",
+      "position": {
+        "x": 0,
+        "y": 400
+      },
+      "data": {
+        "nodeType": "on_event",
+        "label": "On Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event",
+            "label": "event",
+            "type": "object"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          }
+        ],
+        "eventConfig": {
+          "name": "my_event",
+          "scope": "session"
+        }
+      }
+    },
+    {
+      "id": "park",
+      "type": "wait_event",
+      "position": {
+        "x": 400,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "wait_event",
+        "label": "Wait Event",
+        "icon": "&#x1F514;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event_key",
+            "label": "event_key",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          },
+          {
+            "id": "allow_free_text",
+            "label": "allow_free_text",
+            "type": "boolean"
+          },
+          {
+            "id": "until",
+            "label": "until",
+            "type": "string",
+            "description": "Optional idle deadline (ISO timestamp; runtime-normalized to UTC). Past-deadline resume carries {\"timed_out\": true}."
+          },
+          {
+            "id": "details",
+            "label": "details",
+            "type": "object",
+            "description": "Optional wait metadata carried into the ledger wait record (e.g. {\"kind\": \"visitor_message\"}); lets clients render the park honestly."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event_data",
+            "label": "event_data",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "event_key": "approval",
+          "prompt": "Go ahead?"
+        }
+      }
+    },
+    {
+      "id": "park_custom",
+      "type": "wait_event",
+      "position": {
+        "x": 400,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "wait_event",
+        "label": "SLEEP UNTIL EVENT",
+        "icon": "&#x1F514;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event_key",
+            "label": "event_key",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          },
+          {
+            "id": "allow_free_text",
+            "label": "allow_free_text",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event_data",
+            "label": "event_data",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    {
+      "id": "emit",
+      "type": "emit_event",
+      "position": {
+        "x": 800,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "park",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e2",
+      "source": "park",
+      "sourceHandle": "exec-out",
+      "target": "park_custom",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e3",
+      "source": "park_custom",
+      "sourceHandle": "exec-out",
+      "target": "emit",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e4",
+      "source": "listener",
+      "sourceHandle": "payload",
+      "target": "emit",
+      "targetHandle": "payload",
+      "animated": false
+    }
+  ],
+  "entryNode": "start"
+}

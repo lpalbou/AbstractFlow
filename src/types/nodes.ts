@@ -35,6 +35,11 @@ export interface NodeTemplate {
    * authoring assistant uses it only when it names it.
    */
   preset?: boolean;
+  /**
+   * Other words the palette search finds this node by (an earlier name such
+   * as "On Schedule", a common synonym). Search only; never displayed.
+   */
+  aliases?: string[];
 }
 
 // Node categories
@@ -116,10 +121,36 @@ const EVENT_NODES: NodeTemplate[] = [
     category: 'events',
   },
   {
+    type: 'wait_until',
+    icon: '&#x23F3;', // Hourglass
+    label: 'Delay',
+    description: 'Pause execution for a duration (seconds), then continue.',
+    headerColor: '#F39C12', // Orange - timing
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'duration', label: 'duration', type: 'number' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+    ],
+    category: 'events',
+  },
+];
+
+// Waits: nodes that pause a run that is ALREADY running, until a time or a
+// named event (Emit Event wakes the runs waiting for one). None of them starts
+// a flow: a trigger does (an automation: Automation… in the editor header or
+// the Flow Library). Node types are unchanged from when these lived under
+// Events (`on_schedule`, `on_event`, `wait_event`, `emit_event`), so every
+// saved flow and bundle compiles exactly as before; only the names, the
+// palette section and the card badge changed (utils/waitNodes.ts maps the
+// earlier default names to the current ones on the card).
+const WAIT_NODES: NodeTemplate[] = [
+  {
     type: 'on_schedule',
     icon: '&#x23F0;', // Alarm clock
-    label: 'On Schedule',
-    description: 'Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Automation…: the editor header badge or the Flow Library). Outputs the fire time.',
+    label: 'Wait Until',
+    description: 'Pauses this run until a time (ISO timestamp) or for an interval (15s, 5m, 2h, 1d; no cron); it does not start the flow (an automation does: Automation… in the editor header or the Flow Library). Its branch runs when the time comes; with recurrent on it waits again after the branch ends (the header reads "Wait Until · every 15s"). Outputs the fire time.',
     headerColor: '#C0392B',
     inputs: [
       // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.
@@ -130,13 +161,14 @@ const EVENT_NODES: NodeTemplate[] = [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'timestamp', label: 'time', type: 'string' },
     ],
-    category: 'events',
+    category: 'waits',
+    aliases: ['On Schedule', 'schedule', 'timer', 'interval'],
   },
   {
     type: 'on_event',
     icon: '&#x1F4E3;', // Megaphone
-    label: 'On Event',
-    description: 'Waits inside a running flow for a durable custom event, then continues. It does not start the flow: only runs already waiting receive the event. Outputs event metadata + payload.',
+    label: 'Wait for Event',
+    description: 'Pauses this run until a named event arrives (an Emit Event in this or another run, or a host sending it); it does not start the flow (an automation does): only a run already waiting receives the event. Its branch then runs with the event and its payload, and it waits again when the branch ends. Name and scope pick the event (an empty name takes any event); Advanced switches it to waiting at a step for an event key, with an optional question, choices and deadline.',
     headerColor: '#C0392B', // Red for events (like UE4)
     inputs: [
       // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.
@@ -147,14 +179,20 @@ const EVENT_NODES: NodeTemplate[] = [
       { id: 'event', label: 'event', type: 'object' },
       { id: 'payload', label: 'payload', type: 'any' },
     ],
-    category: 'events',
+    category: 'waits',
+    aliases: ['On Event', 'Wait Event', 'listen', 'custom event'],
   },
   {
+    // The step form of Wait for Event (the runtime's WAIT_EVENT on a raw key).
+    // Never offered to new flows on its own: the palette has one Wait for
+    // Event (`on_event`) whose Advanced section switches a node to this form;
+    // saved `wait_event` nodes load, render as Wait for Event and compile as
+    // before.
     type: 'wait_event',
     icon: '&#x1F514;', // Bell
-    label: 'Wait Event',
+    label: 'Wait for Event',
     description:
-      'Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable a durable “ask + wait” prompt for whoever runs the workflow. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).',
+      'Pauses this run at this step until the event with this event_key arrives, then continues with event_data; it does not start the flow (an automation does). Optional pins (prompt/choices/allow_free_text) enable a durable “ask + wait” prompt for whoever runs the workflow. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).',
     headerColor: '#C0392B',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -172,13 +210,14 @@ const EVENT_NODES: NodeTemplate[] = [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'event_data', label: 'event_data', type: 'object' },
     ],
-    category: 'events',
+    category: 'waits',
+    hiddenInPalette: true,
   },
   {
     type: 'emit_event',
     icon: '&#x1F4E3;', // Megaphone
     label: 'Emit Event',
-    description: 'Emit a durable event (scope/session) with payload. Useful for cross-node or cross-agent signaling.',
+    description: 'Sends a named event (name and scope, with a payload) that wakes the runs waiting for it in a Wait for Event; it does not start a flow (an automation does). Outputs how many waiting runs received it.',
     headerColor: '#C0392B',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -193,22 +232,7 @@ const EVENT_NODES: NodeTemplate[] = [
       { id: 'delivered_to', label: 'delivered_to', type: 'array' },
       { id: 'wait_key', label: 'wait_key', type: 'string' },
     ],
-    category: 'events',
-  },
-  {
-    type: 'wait_until',
-    icon: '&#x23F3;', // Hourglass
-    label: 'Delay',
-    description: 'Pause execution for a duration (seconds), then continue.',
-    headerColor: '#F39C12', // Orange - timing
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'duration', label: 'duration', type: 'number' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-    ],
-    category: 'events',
+    category: 'waits',
   },
 ];
 
@@ -2855,6 +2879,11 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     label: 'Events',
     icon: '&#x1F514;', // Bell - for events/triggers
     nodes: EVENT_NODES,
+  },
+  waits: {
+    label: 'Waits',
+    icon: '&#x23F8;', // Pause
+    nodes: WAIT_NODES,
   },
   core: {
     label: 'Core',

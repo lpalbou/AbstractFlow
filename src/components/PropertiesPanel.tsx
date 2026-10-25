@@ -14,6 +14,8 @@ import { categoryColorVar, nodeColorSection } from '../utils/nodeCategoryColors'
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin, PinType } from '../types/flow';
 import { getBundledFlow } from '../utils/bundledFlows';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
+import { WaitForEventAdvanced } from './WaitForEventAdvanced';
+import { isWaitForEventType, nodeDisplayName } from '../utils/waitNodes';
 import { useFlowStore } from '../hooks/useFlow';
 import { TemplateTextEditor } from './TemplateText';
 import { templateInputNameProblem, templateInputPins } from '../utils/textTemplate';
@@ -2023,7 +2025,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         <input
           type="text"
           className="property-input"
-          value={data.label}
+          value={nodeDisplayName(data)}
           onChange={handleLabelChange}
         />
       </div>
@@ -4899,10 +4901,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
-      {/* Event node properties - On Schedule */}
+      {/* Wait Until (`on_schedule`): pauses this run until a time or interval */}
       {data.nodeType === 'on_schedule' && (
         <div className="property-section">
-          <label className="property-label">Event Configuration</label>
+          <label className="property-label">Wait until</label>
+          <span className="property-hint">
+            Pauses this run; it does not start the flow (an automation does).
+          </span>
           <div className="property-group">
             <label className="property-sublabel">Schedule</label>
             <input
@@ -4928,7 +4933,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               variant="row"
               className="property-switch"
               label="Recurrent"
-              description="The schedule re-arms after the branch completes."
+              description="Waits again after its branch ends (the header shows “every …”)."
               action="recurrent"
               checked={data.eventConfig?.recurrent ?? true}
               onChange={(recurrent) =>
@@ -4944,10 +4949,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
-      {/* Event node properties - On Event (custom durable event) */}
+      {/* Wait for Event (`on_event`): pauses this run until a named event */}
       {data.nodeType === 'on_event' && (
         <div className="property-section">
-          <label className="property-label">Event Configuration</label>
+          <label className="property-label">Wait for event</label>
+          <span className="property-hint">
+            Pauses this run until the event arrives; it does not start the flow (an automation does).
+          </span>
           <div className="property-group">
             <label className="property-sublabel">Name</label>
             {availableEventNames.length > 0 ? (
@@ -5004,6 +5012,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             </span>
           </div>
         </div>
+      )}
+
+      {/* Wait for Event > Advanced: its two forms (on_event / wait_event). */}
+      {isWaitForEventType(String(data.nodeType)) && (
+        <WaitForEventAdvanced nodeId={node.id} data={data} edges={edges} updateNodeData={updateNodeData} />
       )}
 
       {/* Mail and Publish nodes (components/automation/MailNodeSection.tsx). */}

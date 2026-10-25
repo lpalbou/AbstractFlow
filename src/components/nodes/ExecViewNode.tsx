@@ -11,6 +11,7 @@
  * and the layout matches the full view when switching back and forth.
  */
 
+import { nodeDisplayName } from '../../utils/waitNodes';
 import { memo, useState, type CSSProperties } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import clsx from 'clsx';
@@ -141,7 +142,8 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
   const typeLabel = template?.label || data.nodeType;
   // Show the node type as a subtitle only when the user renamed the node;
   // otherwise the family name gives the fastest orientation.
-  const subtitle = data.label && data.label !== typeLabel ? typeLabel : EXEC_FAMILY_LABELS[family];
+  const name = nodeDisplayName(data);
+  const subtitle = name && name !== typeLabel ? typeLabel : EXEC_FAMILY_LABELS[family];
   // Reuse the full-view header colour (the node's category token, R14-W8) so a
   // node is instantly recognizable when switching modes.
   const headerColor = categoryColorVar(nodeColorSection(data.nodeType, data.label));
@@ -178,7 +180,7 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
           <FamilyIcon family={family} />
         </span>
         <span className="exec-view-text">
-          <span className="exec-view-label">{data.label || typeLabel}</span>
+          <span className="exec-view-label">{name || typeLabel}</span>
           <span className="exec-view-family-label">{subtitle}</span>
         </span>
         {!multiOut &&

@@ -1,3 +1,4 @@
+import { nodeDisplayName } from './waitNodes';
 import type { Edge, Node } from 'reactflow';
 import type { FlowNodeData, Pin } from '../types/flow';
 import { getNodeTemplate } from '../types/nodes';
@@ -153,8 +154,9 @@ export function execGlimpse(node: Node<FlowNodeData>, nodes: Node<FlowNodeData>[
   const data = node.data;
   const template = getNodeTemplate(data.nodeType);
   const typeLabel = template?.label || data.nodeType;
-  const title = data.label || typeLabel;
-  const subtitle = data.label && data.label !== typeLabel ? typeLabel : '';
+  const name = nodeDisplayName(data);
+  const title = name || typeLabel;
+  const subtitle = name && name !== typeLabel ? typeLabel : '';
   const defaults = (data.pinDefaults || {}) as Record<string, unknown>;
   const dataOutputs = (data.outputs || []).filter((p) => p.type !== 'execution');
   const sections: GlimpseSection[] = [];

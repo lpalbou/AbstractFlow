@@ -21,11 +21,12 @@ export const NODE_ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   on_user_request: 'chat',
   on_agent_message: 'inbox',
   system_datetime: 'clock',
+  wait_until: 'history',
+  // Waits (pause a running run until a time or a named event)
   on_schedule: 'clock',
   on_event: 'inbox',
-  wait_event: 'pause',
+  wait_event: 'inbox', // the step form of Wait for Event: same node to the reader
   emit_event: 'send',
-  wait_until: 'history',
   // Mail and publish
   mail_search: 'inbox',
   mail_get: 'inbox',
@@ -206,6 +207,7 @@ export const NODE_ICON_BY_TYPE_AND_LABEL: Readonly<Record<string, IconName>> = {
 /** Fallback per semantic category (a node type the map does not know yet). */
 export const CATEGORY_ICON: Readonly<Record<string, IconName>> = {
   events: 'clock',
+  waits: 'pause',
   core: 'sparkle',
   media: 'image',
   entity: 'user',
@@ -223,6 +225,7 @@ export const CATEGORY_ICON: Readonly<Record<string, IconName>> = {
 /** The canvas card's type badge: one short word per semantic category. */
 export const CATEGORY_BADGE: Readonly<Record<string, string>> = {
   events: 'Event',
+  waits: 'Waits',
   core: 'Core',
   media: 'Media',
   entity: 'Entity',

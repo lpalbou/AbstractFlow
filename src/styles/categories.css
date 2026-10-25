@@ -71,6 +71,7 @@
   --flow-cat-core: var(--flow-hue-violet);
   --flow-cat-control: var(--flow-hue-orange);
   --flow-cat-events: var(--flow-hue-aqua);
+  --flow-cat-waits: var(--flow-hue-aqua);
   --flow-cat-variables: var(--flow-hue-yellow);
   --flow-cat-values: var(--flow-hue-yellow);
   --flow-cat-data: var(--flow-hue-magenta);
@@ -102,6 +103,7 @@
 .react-flow__minimap-node.flow-cat--core { fill: var(--flow-cat-core); }
 .react-flow__minimap-node.flow-cat--control { fill: var(--flow-cat-control); }
 .react-flow__minimap-node.flow-cat--events { fill: var(--flow-cat-events); }
+.react-flow__minimap-node.flow-cat--waits { fill: var(--flow-cat-waits); }
 .react-flow__minimap-node.flow-cat--variables { fill: var(--flow-cat-variables); }
 .react-flow__minimap-node.flow-cat--values { fill: var(--flow-cat-values); }
 .react-flow__minimap-node.flow-cat--data { fill: var(--flow-cat-data); }

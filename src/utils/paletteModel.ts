@@ -20,6 +20,7 @@ export const PALETTE_SECTION_DEFS: readonly { key: string; label: string; catego
   { key: 'core', label: 'Core', categories: ['core'] },
   { key: 'control', label: 'Control flow', categories: ['control'] },
   { key: 'events', label: 'Events and time', categories: ['events'] },
+  { key: 'waits', label: 'Waits', categories: ['waits'] },
   { key: 'variables', label: 'Variables', categories: ['variables'] },
   { key: 'data', label: 'Data and text', categories: ['data'] },
   { key: 'values', label: 'Values and schema', categories: ['literals', 'schema'] },
@@ -81,7 +82,8 @@ export function nodeMatchesSearch(node: NodeTemplate, term: string): boolean {
   return (
     node.label.toLowerCase().includes(q) ||
     node.type.toLowerCase().includes(q) ||
-    node.description.toLowerCase().includes(q)
+    node.description.toLowerCase().includes(q) ||
+    (node.aliases ?? []).some((alias) => alias.toLowerCase().includes(q))
   );
 }
 

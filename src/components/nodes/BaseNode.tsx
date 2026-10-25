@@ -13,6 +13,7 @@ import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { Icon, randomId } from '@abstractframework/ui-kit';
 import { nodeIconName, nodeTypeBadge } from '../../utils/nodeIcons';
+import { nodeDisplayLabel } from '../../utils/waitNodes';
 import type { FlowNodeData, JsonValue, Pin, PinType, VisualFlow } from '../../types/flow';
 import { getBundledFlow } from '../../utils/bundledFlows';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
@@ -3890,7 +3891,7 @@ export const BaseNode = memo(function BaseNode({
           <Icon name={headerIcon} size={14} />
         </span>
         <span className="node-heading">
-          <span className="node-title">{data.label}</span>
+          <span className="node-title">{nodeDisplayLabel(data, { connectedInputs: connectedInputPinIds })}</span>
           <span className="node-type-badge">{typeBadge}</span>
         </span>
         {loopBadge ? <span className="node-progress-badge" title="Loop progress">{loopBadge}</span> : null}
