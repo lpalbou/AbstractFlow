@@ -94,16 +94,15 @@ Workflows can declare the interfaces they implement (for example
 adds its typed pins to `On Flow Start` and `On Flow End`, and Run preflight
 warns about missing, unconnected, or mistyped interface pins. See [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
 
-A runnable workflow can also store automation defaults (Flow Library >
-**Automation**): the trigger source and settings discovered from the Gateway,
-the context mode, and default inputs that an automation created from the
-published workflow starts with. Sources that read from a trigger connection (a
-feed, a webhook) list your connections from the Gateway console's Triggers
-page; an email trigger names one of your mailboxes in its settings. A workflow becomes *triggerable* with **Add trigger event** on
-its `On Flow Start`: each run an automation starts then receives the event that
-caused it (type, subject, time, data, and a feed's or webhook's batch of
-items). See
-[Web editor > Automation Defaults](docs/web-editor.md#automation-defaults) and
+A workflow can also be an automation. **New Flow** asks *What starts it?*: a
+person in a chat, a schedule (in your time zone), something arriving (one of
+your mailboxes, feeds or webhooks, listed by name) or Run now only; a trigger
+choice creates the flow with its trigger and the wired **Trigger event** node
+already in place. The **Automation** dialog (the header badge, or Flow Library
+> **Automation…**) sets what starts it, the context (independent runs, or a
+growing conversation that remembers up to the gateway's default token budget)
+and the inputs, as a form built from `On Flow Start`. See
+[Web editor > Automations](docs/web-editor.md#automations) and
 [The Trigger Event](docs/web-editor.md#the-trigger-event).
 
 The About button in the top bar opens the shared AbstractFramework About card:

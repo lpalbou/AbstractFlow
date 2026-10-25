@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Automations start from New Flow.** The dialog asks **What starts it?** first: *A person, in a chat* (the default), *On a schedule*, *When something arrives* or *By hand (Run now only)*. A trigger choice creates the flow with `On Flow Start`, the wired **Trigger event** node and its automation, and ticks **Runnable agent (v1)** when no interface is ticked. The header shows the open flow's nature (**Automation · When mail arrives in me@example.org**, **Chat**) and opens the Automation dialog on it; Flow Library rows show the same line, and the library's action is **Automation…**.
+- **The Automation dialog speaks in human words.** Title **Automation**, one intro sentence, no source ids or versions. *What starts it?*: a schedule editor (every day / week with day chips / month, every few minutes or hours, once on a date, at a time) shown with your account's time zone and saved as `schedule` version 2 (an older fixed-interval schedule is shown and kept until changed); your mailboxes by address, saved as `trigger.config.account` (never a connection); your feeds and webhooks by name, saved as `trigger.connection_id`; Run now only. Each choice says what it does in one line. The trigger's other settings sit under **More settings** with plain labels (email: folder, batching, automatic messages, **Only mail that…**).
+- **Context with a budget.** *Independent* or *Growing*; Growing shows **Remembers up to N tokens of earlier runs**, prefilled from the gateway's one default (`GET /api/gateway/automations/defaults`); a different budget is saved as `context.growing.max_tokens` (needs a Gateway that accepts it).
+- **Inputs as a form.** One field per `On Flow Start` input (`prompt` = *What each run is asked to do*; text, number, yes/no; a JSON field only for object/list inputs; `event` never asked), with **Advanced: raw JSON** for anything else. Problems are named in words, above the buttons.
+- **Save adds the Trigger event itself.** Saving a trigger on a workflow without the `event` input adds and wires the **Trigger event** node in the same save; the dialog no longer asks you to.
+- **Settings schemas never block a trigger.** Lists of strings render one per line, nested objects as a section, and a setting using a keyword the editor does not render is a JSON field of its own (checked by the gateway) instead of refusing the whole trigger. `email` and `uri` formats and `items`/`minItems`/`maxItems`/`uniqueItems` are checked.
+
 ## [0.11.0] - 2026-10-25
 
 Trigger connections need an AbstractGateway that serves `/api/gateway/triggers/connections` and accepts `trigger.connection_id` in `automation_defaults`; against an older Gateway the Automation dialog says connections are unavailable. The trigger event works with any Runtime that delivers `input_data.event`.

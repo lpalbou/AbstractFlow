@@ -1071,7 +1071,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `on_schedule`
 - Document node: `{"id":"<unique_id>","type":"on_schedule"}`
-- Utility: Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Flow Library > Automation defaults). Outputs the fire time.
+- Utility: Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Automation…: the editor header badge or the Flow Library). Outputs the fire time.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`; event settings with `event`

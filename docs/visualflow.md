@@ -57,7 +57,7 @@ When you declare an interface in the editor (Flow Library > Interfaces), Abstrac
 
 ## Automation Defaults
 
-A runnable workflow can carry the defaults of the automations created from it in a top-level `automation_defaults` object (edited in Flow Library > Automation, see [Web Editor > Automation Defaults](web-editor.md#automation-defaults)):
+A runnable workflow can carry the defaults of the automations created from it in a top-level `automation_defaults` object (edited in the Automation dialog, see [Web Editor > Automations](web-editor.md#automations)):
 
 ```json
 "automation_defaults": {
@@ -70,7 +70,7 @@ A runnable workflow can carry the defaults of the automations created from it in
 ```
 
 - `trigger.source_id` / `source_version` name a trigger source served by the gateway (`GET /api/gateway/trigger-sources`); `config` must match that source's `config_schema`. For `schedule` v1: `start_at`, `until` and `anchor` are RFC 3339 timestamps, `every` is a whole number followed by `s`, `m`, `h` or `d`, `count` is an integer of at least 1. `manual` v1 takes `{}`.
-- `context.mode` is `independent` (default) or `growing`; `title` is optional; `input_data` (default `{}`) holds the `On Flow Start` inputs.
+- `context.mode` is `independent` (default) or `growing`; a growing context may set `context.growing.max_tokens` (a positive whole number: how much of the earlier runs each run reads); without it the gateway's one default applies (`GET /api/gateway/automations/defaults` → `growing_max_tokens`). `title` is optional; `input_data` (default `{}`) holds the `On Flow Start` inputs.
 - `trigger.connection_id` (optional string) names one of your trigger connections, for a source whose descriptor says `needs_connection: true` with the `trigger_connections` provider (a feed, a webhook). An email trigger (`connection_provider: email_accounts`) reads one of your mailboxes instead, named in its own settings (`account`); mailboxes are added under Accounts → your row → Email in the Gateway console. Such a source requires it; any other source refuses it. Connections are created on the gateway console's Triggers page (`/console#triggers`); the gateway refuses a connection that is not the automation owner's when the automation is created.
 - No other field is accepted: binding ids, credentials and automation ids are created by the gateway when an automation is created, never stored in the workflow.
 

@@ -73,7 +73,7 @@ The server in `bin/cli.js` serves `dist/` on `127.0.0.1:3003` and forwards API a
 
 ## Next Steps
 
-- [Web editor](web-editor.md): the editor's features, including flow interfaces, automation defaults, and the About dialog.
+- [Web editor](web-editor.md): the editor's features, including flow interfaces, automations, and the About dialog.
 - [VisualFlow JSON](visualflow.md): the workflow document format.
 - [Architecture](architecture.md): how the editor, the Flow server, and Gateway fit together.
 - [Troubleshooting](troubleshooting.md): sign-in, proxy, and build problems.

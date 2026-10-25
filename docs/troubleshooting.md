@@ -145,19 +145,20 @@ it through the interface receives missing or mistyped values.
 - **Fix:** start the Gateway and confirm the Flow server targets it (the
   `gateway_url` in `/api/health`).
 
-### The Automation dialog cannot save automation defaults
+### The Automation dialog cannot save
 
 | Message | Cause | Fix |
 | --- | --- | --- |
-| Trigger sources are unavailable on this gateway / Automations are not available on this gateway | The Gateway does not serve `/api/gateway/trigger-sources` (HTTP 404) or reports automations as unavailable in its capabilities. | Connect to a Gateway with automations enabled, then press **Refresh sources**. |
+| Trigger sources are unavailable on this gateway / Automations are not available on this gateway | The Gateway does not serve `/api/gateway/trigger-sources` (HTTP 404) or reports automations as unavailable in its capabilities. | Connect to a Gateway with automations enabled, then press **Try again**. |
 | Trigger-source discovery failed: ... | The request failed for another reason, or the answer does not match the trigger-source contract. | Check that the Gateway is reachable; the message names the failing field. |
-| This source cannot be bound in the editor: its settings schema uses JSON Schema keywords the editor cannot check (...) | The source's `config_schema` uses a keyword or format outside the subset the editor validates. | Choose another source; the listed paths name each unsupported keyword. See [Web editor > Settings Validation](web-editor.md#settings-validation). |
 | trigger source "..." is not served / is unavailable / version ... is not served | The stored defaults name a source or version the connected Gateway does not offer. | Pick a served source and save again. |
 | Gateway answered the automation defaults update without storing them | The Gateway accepted the update but does not store `automation_defaults`. | Update the Gateway to a release with automations. |
-| Trigger connections are unavailable on this gateway (it predates them) | The Gateway does not serve `/api/gateway/triggers/connections` (HTTP 404). | Update the Gateway to a release with trigger connections. |
-| `trigger.connection_id` choose a connection / is not one of yours on this gateway / belongs to … | The source reads from a connection and none of yours is selected, or the saved one was deleted or belongs to another source. | Pick one of your connections, or create one with **New connection…**, then **Refresh connections**. |
-| This flow cannot receive the event yet | The source reads from a connection and the workflow's `On Flow Start` has no `event` output. | Open the workflow, select **On Flow Start**, press **Add trigger event**, save the workflow, then save the defaults. |
+| Your feeds and webhooks could not be read: … / Trigger connections are unavailable on this gateway (it predates them) | The Gateway does not serve `/api/gateway/triggers/connections` (HTTP 404). | Update the Gateway to a release with trigger connections. |
+| That connection is not one of yours on this gateway: choose another. / Connection: … | The source reads from a connection and none of yours is selected, or the saved one was deleted or belongs to another source. | Pick another one under **When something arrives**, or create one with **Set up a new one…**, then **Refresh**. |
 | unknown trigger field(s) ['connection_id'] (HTTP 422) | The Gateway does not accept `trigger.connection_id` in `automation_defaults` yet. | Update the Gateway to a release with trigger connections. |
+| unknown context field(s) ['growing'] (HTTP 422) | You changed **Remembers up to** and the Gateway does not accept `context.growing.max_tokens` yet. | Keep the default budget, or update the Gateway. |
+| This gateway cannot run calendar schedules yet. | The Gateway serves only the older fixed-interval schedule. | Update the Gateway; an existing older schedule keeps working. |
+| Mailboxes are not available on this gateway. / Your mailboxes could not be read: … | The Gateway has no mail routes, or reading `GET /api/gateway/me/email` failed. | Connect a mailbox in the console (**Add a mailbox…**) or check the Gateway. |
 
 ### Edited example flows do not appear in the Flow Library
 

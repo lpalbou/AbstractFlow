@@ -59,12 +59,12 @@ Flow serves the built editor and forwards HTTP and SSE calls under `/api/*`. The
 flowchart TB
   subgraph Browser["Browser editor (src/)"]
     TopBar["Top bar<br/>connection pill, About dialog (ui-kit)"]
-    Toolbar["Toolbar + Flow Library<br/>open, save, publish, interfaces, automation defaults"]
+    Toolbar["Toolbar + Flow Library<br/>open, save, publish, interfaces, automations"]
     Canvas["Canvas + nodes<br/>hidden-connection badges"]
     Store["Editor store (hooks/useFlow.ts)<br/>loadFlow, undo/redo, preservedEdges"]
     Interfaces["Interface contracts (utils/flowFamilies.ts)<br/>KNOWN_INTERFACES, applyInterfacePins"]
     Preflight["Run preflight (utils/preflight.ts)"]
-    Triggers["Trigger sources, connections + automation defaults<br/>(utils/triggerSources.ts, triggerConnections.ts, triggerBindings.ts)"]
+    Triggers["Trigger sources, connections + automations<br/>(utils/triggerSources.ts, triggerConnections.ts, triggerBindings.ts,<br/>automationChoice.ts, automationInputs.ts)"]
     Assistant["Workflow Authoring Assistant drawer"]
     Client["Gateway client (utils/gatewayClient.ts)"]
   end
@@ -173,8 +173,10 @@ flowchart LR
   the Gateway (the `trigger_sources_endpoint` advertised in the capabilities,
   else `GET /api/gateway/trigger-sources`). Flow keeps no local list, so a
   trigger source added to the Runtime registry appears in the editor without a
-  Flow change. Answers are cached per Gateway URL; **Refresh sources**
-  re-fetches.
+  Flow change. Answers are cached per Gateway URL; **Try again** re-fetches
+  after a failure. The person never sees source ids: the trigger picker
+  (`src/utils/automationChoice.ts`, `automationPicker.ts`) maps human choices
+  (a schedule, a mailbox, a feed or webhook, Run now) to the served sources.
 - **Validation** (`src/utils/triggerBindings.ts`): the field's shape is
   checked (unknown keys refused, so no automation id or credential is stored in
   a workflow), then the trigger settings are checked against the source's
@@ -197,7 +199,7 @@ flowchart LR
 
 The `On Schedule`, `On Event` and `Delay` nodes are unrelated to this path:
 they wait inside a run that has already started. See
-[Web editor > Automation Defaults](web-editor.md#automation-defaults) and
+[Web editor > Automations](web-editor.md#automations) and
 [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults).
 
 ## Repository Layout

@@ -51,11 +51,13 @@ Create an automation from the published workflow on the gateway
 interval, context mode, inputs) in Flow Library > **Automation**; they are
 published with the workflow. The `On Schedule`, `On Event` and `Delay` nodes
 wait inside a run that has already started and do not start runs. See
-[Web editor > Automation Defaults](web-editor.md#automation-defaults).
+[Web editor > Automations](web-editor.md#automations).
 
 ## How Does A Workflow Read The Event That Started It?
 
-Select the workflow's **On Flow Start** and press **Add trigger event**. The
+A workflow created with a trigger (**New Flow** > *What starts it?*), or saved
+with one in the Automation dialog, already reads it. Otherwise select the
+workflow's **On Flow Start** and press **Add trigger event**. The
 node gets an `event` output, and a **Trigger event** node wired to it exposes
 `type`, `subject`, `time`, `data`, `count`, `events` and `series`. A feed or a
 webhook delivers a batch: loop over `events`, or add a path such as
@@ -64,17 +66,18 @@ empty. See [Web editor > The Trigger Event](web-editor.md#the-trigger-event).
 
 ## Where Do I Create A Feed Or Webhook Connection?
 
-On the Gateway console's **Triggers** page (`/console#triggers`). In the
-Automation dialog, **New connection…** opens that page on the selected source;
-press **Refresh connections** when you come back. Mailboxes are not
-connections: add one under **Accounts → your row → Email** in the console, then
-name it in the email trigger's settings (`account`).
+On the Gateway console's **Triggers** page (`/console#triggers`). Under
+**When something arrives** (New Flow or the Automation dialog), **Set up a new
+one…** opens that page; press **Refresh** when you come back. Mailboxes are not
+connections: **Add a mailbox…** opens the console's account page, where you
+connect one; it then appears by its address ("When mail arrives in
+me@example.org").
 
 ## Why Does The Automation Dialog Say Trigger Sources Are Unavailable?
 
 The connected Gateway does not serve automations (it reports them as
 unavailable or does not serve `/api/gateway/trigger-sources`). Connect to a
-Gateway with automations enabled, then press **Refresh sources**.
+Gateway with automations enabled, then press **Try again**.
 
 ## Why Does A Node Show "N hidden"?
 
