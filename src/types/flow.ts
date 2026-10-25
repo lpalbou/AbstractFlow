@@ -195,9 +195,8 @@ export type NodeType =
   | 'tool_parameters'
   | 'json_schema'
   // Mail and publish (deterministic, no model; runtime mail.* / publish.event effects)
-  | 'mail_search' | 'mail_get' | 'mail_mark_read' | 'mail_mark_unread' | 'mail_flag' | 'mail_unflag'
-  | 'mail_add_label' | 'mail_remove_label' | 'mail_move' | 'mail_delete' | 'mail_send' | 'mail_reply'
-  | 'mail_forward' | 'mail_get_attachment' | 'publish_event' | 'notify_me'
+  | 'mail_search' | 'mail_get' | 'mail_mark' | 'mail_label' | 'mail_move' | 'mail_delete' | 'mail_send'
+  | 'mail_reply' | 'mail_forward' | 'mail_attachment' | 'publish_event'
   // Effects - Side-effect nodes (require execution pins)
   | 'ask_user'
   | 'answer_user'

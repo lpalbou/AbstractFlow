@@ -2363,122 +2363,87 @@ const FILE_NODES: NodeTemplate[] = [
 // These nodes have execution pins and represent side effects.
 
 // Mail nodes (operator wave 2026-10-25): deterministic, fixed-verb mail
-// actions, no model involved. Each lowers to one runtime mail effect
-// (mail.search/get/mark/label/move/delete/send/reply/forward/attachment).
-// `mailbox` empty = the flow's trigger mailbox, else the person's main one.
-const MAILBOX_PIN: Pin = { id: 'mailbox', label: 'mailbox', type: 'string', description: 'Which mailbox (its id or address). Empty: the trigger’s mailbox, else your main one.' };
-const EMAIL_IN = (description: string): Pin => emailPin('email', 'email', description);
-const MAIL_DONE: Pin[] = [{ id: 'exec-out', label: '', type: 'execution' }];
+// actions, no model involved. Exactly the runtime's contract (abstractruntime
+// 0.12.0 mail_verbs.py + visualflow_compiler CAMERA_TOOL_INVOKE_ARG_PINS):
+// each type compiles to ONE mail.* verb baked from the type; outputs are
+// `result` + `success` plus the convenience pins `emails` / `artifact` /
+// `message_id`. `mailbox` empty = the run's trigger mailbox, else the main one.
+// Presets ("Mark as read", "Add label", "Notify me") set the verb's fixed
+// arguments as pin defaults.
+const MAILBOX_PIN: Pin = { id: 'mailbox', label: 'mailbox', type: 'string', description: 'Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.' };
+const IDS_PIN = (description: string): Pin => emailsPin('ids', 'emails', description);
+const ID_PIN = (description: string): Pin => emailPin('id', 'email', description);
+const MAIL_RESULT: Pin[] = [
+  { id: 'exec-out', label: '', type: 'execution' },
+  { id: 'result', label: 'result', type: 'object', description: 'What the mail server answered.' },
+  { id: 'success', label: 'success', type: 'boolean', description: 'False when the mail action was refused (the result says why).' },
+];
 const MAIL_HEADER = '#D97706';
 const MAIL_ICON = '&#x2709;'; // Envelope
+const EXEC_IN: Pin = { id: 'exec-in', label: '', type: 'execution' };
+
+function mailNode(type: NodeType, label: string, description: string, inputs: Pin[], extraOutputs: Pin[] = [], preset = false): NodeTemplate {
+  return { type, icon: MAIL_ICON, label, description, headerColor: MAIL_HEADER, inputs: [EXEC_IN, ...inputs], outputs: [...MAIL_RESULT, ...extraOutputs], category: 'mail', ...(preset ? { preset: true } : {}) };
+}
+
+/** Preset → the verb's fixed arguments (pin defaults, applied by the runtime even without a pin). */
+export const MAIL_PRESET_DEFAULTS: Readonly<Record<string, Record<string, JsonValue>>> = {
+  'Mark as read': { seen: true },
+  'Mark as unread': { seen: false },
+  Flag: { flagged: true },
+  Unflag: { flagged: false },
+  'Notify me': { channel: 'me', alert: true },
+};
 
 const MAIL_NODES: NodeTemplate[] = [
-  {
-    type: 'mail_search',
-    icon: MAIL_ICON,
-    label: 'Search mail',
-    description: 'Find emails in a mailbox by sender, recipient, subject, words, dates, read / flagged state, labels and folder. Outputs an Email list (newest first).',
-    headerColor: MAIL_HEADER,
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
+  mailNode(
+    'mail_search',
+    'Search mail',
+    'Find emails in a mailbox: by sender, recipient, subject, words, dates, unread / flagged, labels (set them in Properties). Outputs an Email list, newest first, without bodies (Get mail reads them).',
+    [
       MAILBOX_PIN,
+      { id: 'query', label: 'query', type: 'object', description: 'What to look for: from, to, subject, text, since, until, unseen, flagged, labels (Properties fills it).' },
       { id: 'folder', label: 'folder', type: 'string', description: 'The folder to search (empty: the inbox).' },
-      { id: 'from', label: 'from', type: 'string', description: 'Sent by this address or name.' },
-      { id: 'to', label: 'to', type: 'string', description: 'Sent to this address.' },
-      { id: 'subject', label: 'subject', type: 'string', description: 'Words in the subject.' },
-      { id: 'contains', label: 'contains', type: 'string', description: 'Words anywhere in the message.' },
-      { id: 'since', label: 'since', type: 'string', description: 'Received on or after this date (YYYY-MM-DD or a date and time).' },
-      { id: 'until', label: 'until', type: 'string', description: 'Received before this date.' },
-      { id: 'unread_only', label: 'unread only', type: 'boolean', description: 'Only messages not read yet.' },
-      { id: 'flagged_only', label: 'flagged only', type: 'boolean', description: 'Only flagged messages.' },
-      { id: 'labels', label: 'labels', type: 'array', description: 'Only messages with all of these labels.' },
-      { id: 'limit', label: 'limit', type: 'number', description: 'At most this many (default 50).' },
+      { id: 'limit', label: 'limit', type: 'number', description: 'At most this many (the newest).' },
     ],
-    outputs: [...MAIL_DONE, emailsPin('emails', 'emails', 'The emails found (Email list), newest first.'), { id: 'count', label: 'count', type: 'number', description: 'How many were found.' }],
-    category: 'mail',
-  },
-  {
-    type: 'mail_get',
-    icon: MAIL_ICON,
-    label: 'Get mail',
-    description: 'Read one email by its id (with its body and attachment list).',
-    headerColor: MAIL_HEADER,
-    inputs: [{ id: 'exec-in', label: '', type: 'execution' }, MAILBOX_PIN, { id: 'id', label: 'id', type: 'string', description: 'The email’s id.' }],
-    outputs: [...MAIL_DONE, emailPin('email', 'email', 'The email.')],
-    category: 'mail',
-  },
-  ...(
+    [emailsPin('emails', 'emails', 'The emails found (Email list), newest first.')]
+  ),
+  mailNode('mail_get', 'Get mail', 'Read emails with their bodies and attachment lists.', [MAILBOX_PIN, IDS_PIN('The emails to read (Email list, or one Email).')], [
+    emailsPin('emails', 'emails', 'The emails, with their bodies.'),
+  ]),
+  mailNode('mail_mark', 'Mark mail', 'Mark emails read / unread and flagged / not flagged.', [
+    MAILBOX_PIN,
+    IDS_PIN('The emails to mark.'),
+    { id: 'seen', label: 'read', type: 'boolean', description: 'True: read. False: unread. Empty: unchanged.' },
+    { id: 'flagged', label: 'flagged', type: 'boolean', description: 'True: flagged. False: not flagged. Empty: unchanged.' },
+  ]),
+  mailNode('mail_mark', 'Mark as read', 'Mark the emails as read.', [MAILBOX_PIN, IDS_PIN('The emails (from the trigger, Search mail or ForEach).')], [], true),
+  mailNode('mail_mark', 'Mark as unread', 'Mark the emails as not read.', [MAILBOX_PIN, IDS_PIN('The emails.')], [], true),
+  mailNode('mail_mark', 'Flag', 'Flag the emails.', [MAILBOX_PIN, IDS_PIN('The emails.')], [], true),
+  mailNode('mail_mark', 'Unflag', 'Remove the emails’ flag.', [MAILBOX_PIN, IDS_PIN('The emails.')], [], true),
+  mailNode('mail_label', 'Label mail', 'Add and / or remove labels on emails.', [
+    MAILBOX_PIN,
+    IDS_PIN('The emails to label.'),
+    { id: 'add', label: 'add', type: 'array', description: 'Labels to add, e.g. ["triaged"].' },
+    { id: 'remove', label: 'remove', type: 'array', description: 'Labels to remove.' },
+  ]),
+  mailNode('mail_label', 'Add label', 'Add labels to the emails.', [MAILBOX_PIN, IDS_PIN('The emails to label.'), { id: 'add', label: 'labels', type: 'array', description: 'The labels to add, e.g. ["triaged"].' }], [], true),
+  mailNode('mail_label', 'Remove label', 'Remove labels from the emails.', [MAILBOX_PIN, IDS_PIN('The emails.'), { id: 'remove', label: 'labels', type: 'array', description: 'The labels to remove.' }], [], true),
+  mailNode('mail_move', 'Move to folder', 'Move the emails to another folder of their mailbox.', [
+    MAILBOX_PIN,
+    IDS_PIN('The emails to move.'),
+    { id: 'folder', label: 'folder', type: 'string', description: 'The folder to move them to (pick one in Properties).' },
+  ]),
+  mailNode('mail_delete', 'Delete', 'Move the emails to the Trash (deleted for good only with permanent on, under More options).', [
+    MAILBOX_PIN,
+    IDS_PIN('The emails to delete.'),
+    { id: 'permanent', label: 'permanent', type: 'boolean', description: 'Off (default): to the Trash. On: deleted for good.' },
+  ]),
+  mailNode(
+    'mail_send',
+    'Send mail',
+    'Send a new email from a mailbox that can send.',
     [
-      ['mail_mark_read', 'Mark as read', 'Mark the email as read.'],
-      ['mail_mark_unread', 'Mark as unread', 'Mark the email as not read.'],
-      ['mail_flag', 'Flag', 'Flag the email.'],
-      ['mail_unflag', 'Unflag', 'Remove the email’s flag.'],
-    ] as const
-  ).map(([type, label, description]): NodeTemplate => ({
-    type,
-    icon: MAIL_ICON,
-    label,
-    description,
-    headerColor: MAIL_HEADER,
-    inputs: [{ id: 'exec-in', label: '', type: 'execution' }, EMAIL_IN('The email (from Search mail, ForEach, or the trigger’s messages).')],
-    outputs: [...MAIL_DONE],
-    category: 'mail',
-  })),
-  ...(
-    [
-      ['mail_add_label', 'Add label', 'Add a label to the email.'],
-      ['mail_remove_label', 'Remove label', 'Remove a label from the email.'],
-    ] as const
-  ).map(([type, label, description]): NodeTemplate => ({
-    type,
-    icon: MAIL_ICON,
-    label,
-    description,
-    headerColor: MAIL_HEADER,
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      EMAIL_IN('The email to label.'),
-      { id: 'label', label: 'label', type: 'string', description: 'The label, e.g. triaged.' },
-    ],
-    outputs: [...MAIL_DONE],
-    category: 'mail',
-  })),
-  {
-    type: 'mail_move',
-    icon: MAIL_ICON,
-    label: 'Move to folder',
-    description: 'Move the email to another folder of its mailbox.',
-    headerColor: MAIL_HEADER,
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      EMAIL_IN('The email to move.'),
-      { id: 'folder', label: 'folder', type: 'string', description: 'The folder to move it to (pick one in Properties).' },
-    ],
-    outputs: [...MAIL_DONE],
-    category: 'mail',
-  },
-  {
-    type: 'mail_delete',
-    icon: MAIL_ICON,
-    label: 'Delete',
-    description: 'Move the email to the Trash (delete it for good only with permanent on).',
-    headerColor: MAIL_HEADER,
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      EMAIL_IN('The email to delete.'),
-      { id: 'permanent', label: 'permanent', type: 'boolean', description: 'Off (default): to the Trash. On: deleted for good.' },
-    ],
-    outputs: [...MAIL_DONE],
-    category: 'mail',
-  },
-  {
-    type: 'mail_send',
-    icon: MAIL_ICON,
-    label: 'Send mail',
-    description: 'Send a new email from a mailbox that can send.',
-    headerColor: MAIL_HEADER,
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
       MAILBOX_PIN,
       { id: 'to', label: 'to', type: 'array', description: 'Recipients (addresses).' },
       { id: 'cc', label: 'cc', type: 'array', description: 'Copied (addresses).' },
@@ -2488,55 +2453,40 @@ const MAIL_NODES: NodeTemplate[] = [
       { id: 'html', label: 'html', type: 'string', description: 'Optional HTML version.' },
       { id: 'attachments', label: 'attachments', type: 'artifacts', description: 'Files to attach.' },
     ],
-    outputs: [...MAIL_DONE, { id: 'message_id', label: 'message_id', type: 'string', description: 'The id of the sent message.' }],
-    category: 'mail',
-  },
-  {
-    type: 'mail_reply',
-    icon: MAIL_ICON,
-    label: 'Reply',
-    description: 'Reply to the email, from the mailbox it arrived in.',
-    headerColor: MAIL_HEADER,
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      EMAIL_IN('The email to answer.'),
+    [{ id: 'message_id', label: 'message_id', type: 'string', description: 'The Message-ID of the sent email.' }]
+  ),
+  mailNode(
+    'mail_reply',
+    'Reply',
+    'Reply to the email, from its mailbox.',
+    [
+      MAILBOX_PIN,
+      ID_PIN('The email to answer.'),
       { id: 'text', label: 'text', type: 'string', description: 'The answer as plain text.' },
       { id: 'html', label: 'html', type: 'string', description: 'Optional HTML version.' },
       { id: 'reply_all', label: 'reply all', type: 'boolean', description: 'Also answer everyone who received it.' },
-      { id: 'attachments', label: 'attachments', type: 'artifacts', description: 'Files to attach.' },
     ],
-    outputs: [...MAIL_DONE, { id: 'message_id', label: 'message_id', type: 'string', description: 'The id of the reply.' }],
-    category: 'mail',
-  },
-  {
-    type: 'mail_forward',
-    icon: MAIL_ICON,
-    label: 'Forward',
-    description: 'Forward the email, with its attachments, to other people.',
-    headerColor: MAIL_HEADER,
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      EMAIL_IN('The email to forward.'),
+    [{ id: 'message_id', label: 'message_id', type: 'string', description: 'The Message-ID of the reply.' }]
+  ),
+  mailNode(
+    'mail_forward',
+    'Forward',
+    'Forward the email, with its attachments, to other people.',
+    [
+      MAILBOX_PIN,
+      ID_PIN('The email to forward.'),
       { id: 'to', label: 'to', type: 'array', description: 'Recipients (addresses).' },
       { id: 'note', label: 'note', type: 'string', description: 'A note above the forwarded message.' },
     ],
-    outputs: [...MAIL_DONE, { id: 'message_id', label: 'message_id', type: 'string', description: 'The id of the forwarded message.' }],
-    category: 'mail',
-  },
-  {
-    type: 'mail_get_attachment',
-    icon: MAIL_ICON,
-    label: 'Get attachment',
-    description: 'Read one attachment of the email as a file.',
-    headerColor: MAIL_HEADER,
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      EMAIL_IN('The email.'),
-      { id: 'index', label: 'index', type: 'number', description: 'Which attachment (its index in the email’s attachments, from 0).' },
-    ],
-    outputs: [...MAIL_DONE, { id: 'file', label: 'file', type: 'artifact', description: 'The attachment, stored as a file.' }],
-    category: 'mail',
-  },
+    [{ id: 'message_id', label: 'message_id', type: 'string', description: 'The Message-ID of the forwarded email.' }]
+  ),
+  mailNode(
+    'mail_attachment',
+    'Get attachment',
+    'Read one attachment of the email as a file.',
+    [MAILBOX_PIN, ID_PIN('The email.'), { id: 'index', label: 'index', type: 'number', description: 'Which attachment: its index in the email’s attachments (from 0).' }],
+    [{ id: 'artifact', label: 'file', type: 'artifact', description: 'The attachment, stored as a file.' }]
+  ),
   {
     // An Email's fields as pins: a Break Object preset (the runtime already
     // knows break_object), its input typed `email`.
@@ -2557,31 +2507,41 @@ const MAIL_NODES: NodeTemplate[] = [
     description: 'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant and the watch.',
     headerColor: MAIL_HEADER,
     inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
+      EXEC_IN,
       { id: 'channel', label: 'channel', type: 'string', description: 'A name applications subscribe to (lowercase letters, digits, . _ -), e.g. results.' },
       { id: 'type', label: 'type', type: 'string', description: 'What kind of message it is, your own name (default: <channel>.message).' },
       { id: 'title', label: 'title', type: 'string', description: 'A short title (required).' },
       { id: 'body', label: 'body', type: 'string', description: 'The text (optional).' },
-      { id: 'data', label: 'data', type: 'object', description: 'Any extra JSON for the applications.' },
       { id: 'subject', label: 'subject', type: 'string', description: 'What it is about (optional).' },
+      { id: 'data', label: 'data', type: 'object', description: 'Any extra JSON for the applications.' },
       { id: 'alert', label: 'alert', type: 'boolean', description: 'On: also notify me (tray, Assistant, watch).' },
     ],
-    outputs: [...MAIL_DONE, { id: 'event_id', label: 'event_id', type: 'string', description: 'The id of the published event.' }],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'result', label: 'result', type: 'object', description: 'The published event: event_id, sequence, alerted.' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
     category: 'mail',
   },
   {
-    type: 'notify_me',
+    // Publish to channel with Alert on (its fixed arguments are pin defaults).
+    type: 'publish_event',
     icon: '&#x1F514;', // Bell
     label: 'Notify me',
-    description: 'Notify me on the tray, the Assistant and the watch (Publish to channel with Alert on).',
+    preset: true,
+    description: 'Notify me on the tray, the Assistant and the watch.',
     headerColor: MAIL_HEADER,
     inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
+      EXEC_IN,
       { id: 'title', label: 'title', type: 'string', description: 'What the notification says (required).' },
       { id: 'body', label: 'body', type: 'string', description: 'More text (optional).' },
       { id: 'data', label: 'data', type: 'object', description: 'Any extra JSON.' },
     ],
-    outputs: [...MAIL_DONE, { id: 'event_id', label: 'event_id', type: 'string' }],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
     category: 'mail',
   },
 ];
@@ -2999,7 +2959,8 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     // when the author has not chosen).
     ...(template.type === 'agent' && { pinDefaults: { max_iterations: 20 } }),
     ...(template.type === 'loop_limit' && { pinDefaults: { max: 3 } }),
-    ...(template.type === 'publish_event' && { pinDefaults: { channel: 'results', alert: false } }),
+    ...(template.type === 'publish_event' && !(template.label in MAIL_PRESET_DEFAULTS) ? { pinDefaults: { channel: 'results', alert: false } } : {}),
+    ...(MAIL_PRESET_DEFAULTS[template.label] ? { pinDefaults: { ...MAIL_PRESET_DEFAULTS[template.label] } } : {}),
     ...(template.type === 'model_residency' && {
       pinDefaults: {
         operation: 'load',

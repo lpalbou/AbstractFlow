@@ -215,6 +215,8 @@ export function areTypesCompatible(
     if (sourceType === targetType || sourceType === 'any' || targetType === 'any') return true;
     if ((sourceType === 'email' && targetType === 'object') || (sourceType === 'object' && targetType === 'email')) return true;
     if ((sourceType === 'emails' && targetType === 'array') || (sourceType === 'array' && targetType === 'emails')) return true;
+    // One Email where the mail verbs take a list (ForEach item -> Mark as read).
+    if (sourceType === 'email' && targetType === 'emails') return true;
     return false;
   }
 

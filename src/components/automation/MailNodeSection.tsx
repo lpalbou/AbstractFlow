@@ -16,6 +16,8 @@ import { useFlowStore } from '../../hooks/useFlow';
 import { fetchMailboxes } from '../../utils/automationGateway';
 import type { Mailbox } from '../../utils/automationChoice';
 import {
+  MAIL_QUERY_FIELDS,
+  mailQueryFromForm,
   PUBLISH_CHANNEL_SUGGESTIONS,
   defaultMailboxFor,
   fetchMailboxFolders,
@@ -107,6 +109,12 @@ export function MailNodeSection({ nodeId, data, onPinDefaults }: { nodeId: strin
           {refusal}
         </p>
       ) : null}
+      {type === 'mail_search' && !wired(edges, nodeId, 'query') ? (
+        <SearchQueryForm
+          query={(defaults.query && typeof defaults.query === 'object' && !Array.isArray(defaults.query) ? defaults.query : {}) as Record<string, JsonValue>}
+          onQuery={(query) => onPinDefaults({ ...defaults, query })}
+        />
+      ) : null}
       {type === 'mail_move' && !wired(edges, nodeId, 'folder') ? (
         <div className="run-form-field automation-field">
           <label className="property-label" htmlFor={`folder-${nodeId}`}>
@@ -149,11 +157,42 @@ export function MailNodeSection({ nodeId, data, onPinDefaults }: { nodeId: strin
   );
 }
 
+/** Search mail's query as fields (from, to, subject, contains, since, until, unread / flagged only, labels). */
+function SearchQueryForm({ query, onQuery }: { query: Record<string, JsonValue>; onQuery: (q: Record<string, JsonValue>) => void }) {
+  const values: Record<string, string | boolean> = {};
+  for (const f of MAIL_QUERY_FIELDS) {
+    const v = query[f.key];
+    values[f.key] = f.kind === 'bool' ? v === true : f.kind === 'list' ? (Array.isArray(v) ? v.join('\n') : '') : typeof v === 'string' ? v : '';
+  }
+  const set = (key: string, value: string | boolean) => onQuery(mailQueryFromForm({ ...values, [key]: value }) as Record<string, JsonValue>);
+  return (
+    <div className="mail-query-form">
+      <span className="property-label">Look for</span>
+      {MAIL_QUERY_FIELDS.map((f) =>
+        f.kind === 'bool' ? (
+          <AfSwitch key={f.key} variant="row" label={f.label} action={`mail-query-${f.key}`} checked={values[f.key] === true} onChange={(on: boolean) => set(f.key, on)} />
+        ) : (
+          <div key={f.key} className="run-form-field automation-field">
+            <label className="run-form-label">{f.label}</label>
+            {f.kind === 'list' ? (
+              <textarea className="run-form-input property-textarea" rows={2} value={String(values[f.key])} onChange={(e) => set(f.key, e.target.value)} />
+            ) : (
+              <input className="run-form-input" type={f.kind === 'date' ? 'date' : 'text'} value={String(values[f.key])} onChange={(e) => set(f.key, e.target.value)} />
+            )}
+            {f.help ? <span className="property-hint">{f.help}</span> : null}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 export function PublishNodeSection({ nodeId, data, onPinDefaults }: { nodeId: string; data: FlowNodeData; onPinDefaults: Patch }) {
   const edges = useFlowStore((s) => s.edges);
   const nodes = useFlowStore((s) => s.nodes);
   const defaults = (data.pinDefaults || {}) as Record<string, JsonValue>;
-  const isNotify = data.nodeType === 'notify_me';
+  // "Notify me" is Publish to channel with its channel and alert fixed (no channel pin).
+  const isNotify = !data.inputs.some((p) => p.id === 'channel');
   const channel = typeof defaults.channel === 'string' ? defaults.channel : '';
   const used = nodes
     .filter((n) => n.data.nodeType === 'publish_event' && n.id !== nodeId)

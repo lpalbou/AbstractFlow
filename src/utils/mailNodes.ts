@@ -13,20 +13,46 @@ import { GatewayHttpError, gatewayJson } from './gatewayClient';
 export const MAIL_NODE_TYPES = [
   'mail_search',
   'mail_get',
-  'mail_mark_read',
-  'mail_mark_unread',
-  'mail_flag',
-  'mail_unflag',
-  'mail_add_label',
-  'mail_remove_label',
+  'mail_mark',
+  'mail_label',
   'mail_move',
   'mail_delete',
   'mail_send',
   'mail_reply',
   'mail_forward',
-  'mail_get_attachment',
+  'mail_attachment',
 ] as const;
-export const PUBLISH_NODE_TYPES = ['publish_event', 'notify_me'] as const;
+export const PUBLISH_NODE_TYPES = ['publish_event'] as const;
+
+/** Search mail's query fields in words (`query` keys of mail.search). */
+export const MAIL_QUERY_FIELDS: ReadonlyArray<{ key: string; label: string; kind: 'text' | 'date' | 'bool' | 'list'; help?: string }> = [
+  { key: 'from', label: 'From', kind: 'text', help: 'An address or a name.' },
+  { key: 'to', label: 'To', kind: 'text' },
+  { key: 'subject', label: 'Subject has', kind: 'text' },
+  { key: 'text', label: 'Contains', kind: 'text', help: 'Words anywhere in the message.' },
+  { key: 'since', label: 'Since', kind: 'date' },
+  { key: 'until', label: 'Until', kind: 'date' },
+  { key: 'unseen', label: 'Unread only', kind: 'bool' },
+  { key: 'flagged', label: 'Flagged only', kind: 'bool' },
+  { key: 'labels', label: 'With labels', kind: 'list', help: 'One per line.' },
+];
+
+/** The Search mail query from its form values (empty fields omitted). */
+export function mailQueryFromForm(values: Record<string, string | boolean>): Record<string, string | boolean | string[]> {
+  const out: Record<string, string | boolean | string[]> = {};
+  for (const field of MAIL_QUERY_FIELDS) {
+    const v = values[field.key];
+    if (field.kind === 'bool') {
+      if (v === true) out[field.key] = true;
+    } else if (field.kind === 'list') {
+      const list = String(v || '').split(/\n|,/).map((x) => x.trim()).filter(Boolean);
+      if (list.length) out[field.key] = list;
+    } else if (typeof v === 'string' && v.trim()) {
+      out[field.key] = v.trim();
+    }
+  }
+  return out;
+}
 
 /** Nodes that send mail (refused on a read-only mailbox). */
 const SENDING = new Set(['mail_send', 'mail_reply', 'mail_forward']);

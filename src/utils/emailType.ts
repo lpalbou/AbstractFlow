@@ -3,9 +3,10 @@
  * handling). One record per message, the runtime's shape (W1's mail effects
  * and the mail trigger's `messages`):
  *
- *   Email = {id, mailbox, folder, thread_id, from, to, cc, subject, date,
- *            body_text, body_html?, attachments[{index, name, size, type}],
- *            seen, flagged, labels}
+ *   Email = {id (the locator "uidvalidity:uid:folder" the verbs take),
+ *            message_id, mailbox, folder, thread_id, from, to, cc, subject,
+ *            date, body_text, body_html, attachments[{index, name, size, type,
+ *            artifact}], seen, flagged, labels}   (abstractruntime 0.12.0)
  *
  * Pins: `email` (one) and `emails` (a list). An `email` connects to object
  * and any pins, an `emails` list to array and any pins; ForEach over an
@@ -15,6 +16,7 @@ import type { Pin } from '../types/flow';
 
 export const EMAIL_FIELDS = [
   'id',
+  'message_id',
   'mailbox',
   'folder',
   'thread_id',
@@ -33,7 +35,8 @@ export const EMAIL_FIELDS = [
 export type EmailField = (typeof EMAIL_FIELDS)[number];
 
 const FIELD_DOCS: Record<EmailField, { type: string; description: string; schema?: Record<string, unknown> }> = {
-  id: { type: 'string', description: 'The message id (what the mail nodes act on).' },
+  id: { type: 'string', description: 'Where the message is (what the mail nodes act on).' },
+  message_id: { type: 'string', description: 'The email’s Message-ID.' },
   mailbox: { type: 'string', description: 'The mailbox it is in (its address).' },
   folder: { type: 'string', description: 'The folder it is in (e.g. INBOX).' },
   thread_id: { type: 'string', description: 'The conversation it belongs to.' },
@@ -47,7 +50,7 @@ const FIELD_DOCS: Record<EmailField, { type: string; description: string; schema
   attachments: {
     type: 'array',
     description: 'Its attachments: index, name, size, type (Get attachment reads one by index).',
-    schema: { type: 'array', items: { type: 'object', properties: { index: { type: 'integer' }, name: { type: 'string' }, size: { type: 'integer' }, type: { type: 'string' } } } },
+    schema: { type: 'array', items: { type: 'object', properties: { index: { type: 'integer' }, name: { type: 'string' }, size: { type: 'integer' }, type: { type: 'string' }, artifact: { type: ['object', 'null'] } } } },
   },
   seen: { type: 'boolean', description: 'Whether it was read.' },
   flagged: { type: 'boolean', description: 'Whether it is flagged.' },

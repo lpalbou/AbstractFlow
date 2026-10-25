@@ -18,62 +18,98 @@ import { ME_EMAIL_RESPONSE } from './triggerSources.fixtures';
 
 const template = (label: string) => getAllNodeTemplates().find((t) => t.label === label)!;
 
-describe('the Mail and publish catalog', () => {
-  it('has the fixed-verb mail nodes, Publish to channel and Notify me, in their own palette section', () => {
-    expect(NODE_CATEGORIES.mail.nodes.map((t) => `${t.type}:${t.label}`)).toEqual([
+describe('the Mail and publish catalog (abstractruntime 0.12.0 contract)', () => {
+  it('has the runtime\'s node types, fixed-verb presets, Publish to channel and Notify me, in their own palette section', () => {
+    expect(NODE_CATEGORIES.mail.nodes.map((t) => `${t.type}:${t.label}${t.preset ? '*' : ''}`)).toEqual([
       'mail_search:Search mail',
       'mail_get:Get mail',
-      'mail_mark_read:Mark as read',
-      'mail_mark_unread:Mark as unread',
-      'mail_flag:Flag',
-      'mail_unflag:Unflag',
-      'mail_add_label:Add label',
-      'mail_remove_label:Remove label',
+      'mail_mark:Mark mail',
+      'mail_mark:Mark as read*',
+      'mail_mark:Mark as unread*',
+      'mail_mark:Flag*',
+      'mail_mark:Unflag*',
+      'mail_label:Label mail',
+      'mail_label:Add label*',
+      'mail_label:Remove label*',
       'mail_move:Move to folder',
       'mail_delete:Delete',
       'mail_send:Send mail',
       'mail_reply:Reply',
       'mail_forward:Forward',
-      'mail_get_attachment:Get attachment',
-      'break_object:Email fields',
+      'mail_attachment:Get attachment',
+      'break_object:Email fields*',
       'publish_event:Publish to channel',
-      'notify_me:Notify me',
+      'publish_event:Notify me*',
     ]);
     expect(PALETTE_SECTION_DEFS.find((d) => d.key === 'mail')?.label).toBe('Mail and publish');
+    // The canonical template of each type is the plain one, never a preset.
+    expect(getNodeTemplate('mail_mark')?.label).toBe('Mark mail');
+    expect(getNodeTemplate('publish_event')?.label).toBe('Publish to channel');
   });
 
-  it('types its pins: Search gives an Email list, the verbs take an Email, Get attachment gives a file', () => {
-    const pins = (label: string, side: 'inputs' | 'outputs') => template(label)[side].map((p) => `${p.id}:${p.type}`);
-    expect(pins('Search mail', 'inputs')).toEqual([
-      'exec-in:execution', 'mailbox:string', 'folder:string', 'from:string', 'to:string', 'subject:string', 'contains:string',
-      'since:string', 'until:string', 'unread_only:boolean', 'flagged_only:boolean', 'labels:array', 'limit:number',
-    ]);
-    expect(pins('Search mail', 'outputs')).toEqual(['exec-out:execution', 'emails:emails', 'count:number']);
-    for (const verb of ['Mark as read', 'Mark as unread', 'Flag', 'Unflag', 'Add label', 'Remove label', 'Move to folder', 'Delete', 'Reply', 'Forward', 'Get attachment']) {
-      expect(pins(verb, 'inputs')).toContain('email:email');
+  it('carries exactly the compiler\'s argument pins and its output pins', () => {
+    // abstractruntime visualflow_compiler/visual/executor.py CAMERA_TOOL_INVOKE_ARG_PINS (read 2026-10-25)
+    const ARG_PINS: Record<string, string[]> = {
+      mail_search: ['mailbox', 'query', 'folder', 'limit'],
+      mail_get: ['mailbox', 'ids'],
+      mail_mark: ['mailbox', 'ids', 'seen', 'flagged'],
+      mail_label: ['mailbox', 'ids', 'add', 'remove'],
+      mail_move: ['mailbox', 'ids', 'folder'],
+      mail_delete: ['mailbox', 'ids', 'permanent'],
+      mail_send: ['mailbox', 'to', 'cc', 'bcc', 'subject', 'text', 'html', 'attachments'],
+      mail_reply: ['mailbox', 'id', 'text', 'html', 'reply_all'],
+      mail_forward: ['mailbox', 'id', 'to', 'note'],
+      mail_attachment: ['mailbox', 'id', 'index'],
+      publish_event: ['channel', 'type', 'title', 'body', 'subject', 'data', 'alert'],
+    };
+    for (const [type, pins] of Object.entries(ARG_PINS)) {
+      const t = getNodeTemplate(type as never)!;
+      expect(t.inputs.filter((p) => p.type !== 'execution').map((p) => p.id), type).toEqual(pins);
+      expect(t.outputs.map((p) => p.id).slice(0, 3), type).toEqual(['exec-out', 'result', 'success']);
     }
-    expect(pins('Get attachment', 'outputs')).toContain('file:artifact');
-    expect(pins('Send mail', 'inputs')).toEqual(['exec-in:execution', 'mailbox:string', 'to:array', 'cc:array', 'bcc:array', 'subject:string', 'text:string', 'html:string', 'attachments:artifacts']);
-    expect(pins('Reply', 'inputs')).toContain('reply_all:boolean');
-    expect(pins('Publish to channel', 'inputs')).toEqual(['exec-in:execution', 'channel:string', 'type:string', 'title:string', 'body:string', 'data:object', 'subject:string', 'alert:boolean']);
+    const out = (type: string) => getNodeTemplate(type as never)!.outputs.map((p) => `${p.id}:${p.type}`);
+    expect(out('mail_search')).toContain('emails:emails');
+    expect(out('mail_get')).toContain('emails:emails');
+    expect(out('mail_send')).toContain('message_id:string');
+    expect(out('mail_attachment')).toContain('artifact:artifact');
+    const pin = (type: string, id: string) => getNodeTemplate(type as never)!.inputs.find((p) => p.id === id)!;
+    expect(pin('mail_mark', 'ids').type).toBe('emails');
+    expect(pin('mail_reply', 'id').type).toBe('email');
     expect(template('Publish to channel').description).toBe(
       'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant and the watch.'
     );
-    expect(createNodeData(template('Publish to channel')).pinDefaults).toEqual({ channel: 'results', alert: false });
-    expect(pins('Notify me', 'inputs')).toEqual(['exec-in:execution', 'title:string', 'body:string', 'data:object']);
-    // Every mail pin explains itself on hover.
-    for (const t of NODE_CATEGORIES.mail.nodes) for (const p of t.inputs) if (p.type !== 'execution' && t.type !== 'publish_event') expect(p.description, `${t.label}.${p.id}`).toBeTruthy();
   });
 
-  it('Email fields: a Break Object preset on an email, one typed output per field; Break Object stays the canonical template', () => {
+  it('presets fix the verb\'s arguments as pin defaults (the runtime applies them without a pin)', () => {
+    expect(createNodeData(template('Mark as read')).pinDefaults).toEqual({ seen: true });
+    expect(createNodeData(template('Mark as unread')).pinDefaults).toEqual({ seen: false });
+    expect(createNodeData(template('Flag')).pinDefaults).toEqual({ flagged: true });
+    expect(createNodeData(template('Unflag')).pinDefaults).toEqual({ flagged: false });
+    expect(template('Add label').inputs.map((p) => p.id)).toEqual(['exec-in', 'mailbox', 'ids', 'add']);
+    expect(createNodeData(template('Notify me')).pinDefaults).toEqual({ channel: 'me', alert: true });
+    expect(createNodeData(template('Publish to channel')).pinDefaults).toEqual({ channel: 'results', alert: false });
+  });
+
+  it('Email fields: a Break Object preset on an email, one typed output per field; Break Object stays canonical', () => {
     const t = template('Email fields');
     expect(t.type).toBe('break_object');
     expect(t.inputs.map((p) => `${p.id}:${p.type}`)).toEqual(['object:email']);
     expect(t.outputs.map((p) => p.id)).toEqual([...EMAIL_FIELDS]);
     expect(t.outputs.find((p) => p.id === 'seen')?.type).toBe('boolean');
-    expect(t.outputs.find((p) => p.id === 'attachments')?.description).toMatch(/index, name, size, type/);
+    expect(t.outputs.find((p) => p.id === 'message_id')?.description).toMatch(/Message-ID/);
     expect(createNodeData(t).breakConfig?.selectedPaths).toEqual([...EMAIL_FIELDS]);
     expect(getNodeTemplate('break_object')?.label).toBe('Break Object');
+  });
+
+  it('Search mail\'s Properties write the runtime\'s query keys', async () => {
+    const { mailQueryFromForm } = await import('./mailNodes');
+    expect(mailQueryFromForm({ from: ' boss@example.org ', text: 'invoice', unseen: true, flagged: false, labels: 'a\nb', since: '2026-10-01' })).toEqual({
+      from: 'boss@example.org',
+      text: 'invoice',
+      unseen: true,
+      labels: ['a', 'b'],
+      since: '2026-10-01',
+    });
   });
 });
 
@@ -86,7 +122,8 @@ describe('Email pins', () => {
     expect(areTypesCompatible('array', 'emails')).toBe(true);
     expect(areTypesCompatible('email', 'string')).toBe(false);
     expect(areTypesCompatible('emails', 'email')).toBe(false);
-    expect(areTypesCompatible('email', 'emails')).toBe(false);
+    // One Email where the mail verbs take a list (ForEach item -> Mark as read).
+    expect(areTypesCompatible('email', 'emails')).toBe(true);
   });
 
   it('the mail trigger\'s messages are an Email list; ForEach over it gives an Email that Email fields and Mark as read take as is', () => {
@@ -103,7 +140,7 @@ describe('Email pins', () => {
     const item = typed.find((n) => n.id === 'l')!.data.outputs.find((p) => p.id === 'item')!;
     expect(item.type).toBe('email');
     expect(validateConnection(typed, edges, { source: 'l', sourceHandle: 'item', target: 'f', targetHandle: 'object' })).toBe(true);
-    expect(validateConnection(typed, edges, { source: 'l', sourceHandle: 'item', target: 'm', targetHandle: 'email' })).toBe(true);
+    expect(validateConnection(typed, edges, { source: 'l', sourceHandle: 'item', target: 'm', targetHandle: 'ids' })).toBe(true);
     // Unwired, the item is `any` again; a second pass changes nothing.
     const back = withLoopItemTypes(typed, []);
     expect(back.find((n) => n.id === 'l')!.data.outputs.find((p) => p.id === 'item')!.type).toBe('any');
