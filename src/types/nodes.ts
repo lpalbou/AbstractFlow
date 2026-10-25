@@ -112,7 +112,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_schedule',
     icon: '&#x23F0;', // Alarm clock
     label: 'On Schedule',
-    description: 'Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Flow Library > Automation defaults). Outputs the fire time.',
+    description: 'Waits inside a running flow until a timestamp or interval (15s, 5m, 2h, 1d; no cron), then continues; recurrent re-arms it. It does not start the flow: recurring runs are automations (Automation…: the editor header badge or the Flow Library). Outputs the fire time.',
     headerColor: '#C0392B',
     inputs: [
       // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.

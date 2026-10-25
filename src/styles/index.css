@@ -9112,3 +9112,9 @@ button.flow-nature-badge:hover {
   flex-direction: column;
   gap: 12px;
 }
+.automation-header-icon {
+  background: var(--flow-hue-yellow);
+}
+.automation-modal .new-flow-header {
+  margin-bottom: 8px;
+}

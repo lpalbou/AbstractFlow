@@ -184,3 +184,15 @@ describe('context with a budget (one central default)', () => {
     expect(() => parseAutomationDefaults(raw({ mode: 'growing', growing: { max_tokens: 0 } }))).toThrow(/positive whole number/);
   });
 });
+
+describe('title and copy (item 5)', () => {
+  it('is "Automation", says what happens in one sentence, and makes no UTC-interval claim', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('./AutomationDefaultsModal.tsx', import.meta.url), 'utf8');
+    expect(src).toContain('<h3 id="automation-dialog-title">Automation</h3>');
+    expect(src).toContain('When the trigger fires, this flow runs with these inputs. Create or pause it in Observer or the Assistant.');
+    expect(src).not.toMatch(/fixed UTC intervals|Automation defaults<|input_data \(JSON|Refresh sources|Choose a trigger source/);
+    const nodes = readFileSync(new URL('../types/nodes.ts', import.meta.url), 'utf8');
+    expect(nodes).not.toContain('Automation defaults');
+  });
+});

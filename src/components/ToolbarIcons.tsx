@@ -209,3 +209,12 @@ export function IconContrast() {
     </ToolbarIcon>
   );
 }
+
+/** A lightning bolt: something that starts on its own (an automation's trigger). */
+export function IconBolt() {
+  return (
+    <ToolbarIcon>
+      <path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12z" />
+    </ToolbarIcon>
+  );
+}

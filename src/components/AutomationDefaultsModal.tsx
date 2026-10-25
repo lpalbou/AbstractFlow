@@ -47,6 +47,7 @@ import { enumWords, triggerSettingsCopy } from '../utils/triggerCopy';
 import { inputDataFromForm, inputFields, inputFormFromData, type InputField, type InputValues } from '../utils/automationInputs';
 import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
 import { useAutomationFacts } from './automation/useAutomationFacts';
+import { IconBolt } from './ToolbarIcons';
 
 export interface AutomationGraph {
   nodes: VisualFlow['nodes'];
@@ -592,12 +593,24 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
 
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
-      <div className="modal automation-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Automation defaults">
-        <h3>Automation defaults</h3>
-        <p className="property-hint">
-          What an automation created from <strong>{flow.name}</strong> starts with: its trigger, context and inputs.
-          Saved in the flow and published with it; creating the automation happens in AbstractObserver or the
-          Assistant. Schedules are fixed UTC intervals.
+      <div
+        className="modal automation-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="automation-dialog-title"
+      >
+        <div className="new-flow-header">
+          <span className="new-flow-header-icon automation-header-icon" aria-hidden="true">
+            <IconBolt />
+          </span>
+          <div>
+            <h3 id="automation-dialog-title">Automation</h3>
+            <p className="new-flow-subtitle">{flow.name}</p>
+          </div>
+        </div>
+        <p className="automation-intro">
+          When the trigger fires, this flow runs with these inputs. Create or pause it in Observer or the Assistant.
         </p>
 
         {support.sourcesProblem ? (
@@ -665,16 +678,28 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
               />
             </section>
 
-            <div className="run-form-field" style={{ marginTop: 12 }}>
-              <label className="run-form-label">Title (optional)</label>
-              <input className="run-form-input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
-            </div>
-
             <section className="automation-section" aria-labelledby="automation-inputs-title">
               <h4 id="automation-inputs-title" className="automation-section-title">
                 Inputs
               </h4>
               <InputsForm fields={inputFieldList} values={inputValues} onValues={setInputValues} raw={rawInputs} onRaw={setRawInputs} />
+            </section>
+
+            <section className="automation-section" aria-labelledby="automation-name-title">
+              <div className="run-form-field automation-field">
+                <label id="automation-name-title" className="run-form-label" htmlFor="automation-name">
+                  Name <span className="new-flow-optional">optional</span>
+                </label>
+                <input
+                  id="automation-name"
+                  className="run-form-input"
+                  type="text"
+                  value={title}
+                  placeholder={flow.name}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+                <span className="property-hint">How automations made from this flow are named in Observer and the Assistant.</span>
+              </div>
             </section>
           </>
         ) : null}
