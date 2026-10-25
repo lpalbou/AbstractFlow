@@ -157,14 +157,18 @@ drawing: the runtime ignores it. It is saved with the node.
 
 ### Folded operator nodes
 
-Fold an operator node into a small round node with only its sign, its pins and its wires: tap or
+Fold an operator node into a small round node with only its sign, its wired pins and its wires: tap or
 click the fold button in its header (any device), or double-click it (mouse or trackpad). Unfold it
 with a double-click, or with a tap on a touch screen (a tap on a folded node never opens the
 properties drawer). Operators are the math nodes, the
 small text nodes (Concat, Length, Is Empty, Contains, Uppercase, Lowercase, Trim), the array and
 object builders (Make Array, Array Append, Array Concat, Array Length, Build JSON, Merge Objects,
 Break Object), the logic gates, Coalesce and Compare; a Get Variable node folds into a rounded
-rectangle that shows the variable's name. Hovering a folded node shows what it is, what
+rectangle that shows the variable's name, and Get Variables into the names of the variables it
+wires out. Folded, a node draws only the pins that carry a wire (and any execution pin), one row
+each, so a Break Email with two fields wired is a small circle with two pins, not a pill as tall as
+the open card; with nothing wired it is just its sign. The other pins are still there: unfold the
+node to wire them, and every wire stays attached while it is folded. Hovering a folded node shows what it is, what
 feeds each input (an expression, a variable, another node's output or a literal value) and its
 outputs (Break Object: each field with its path, type and schema). The properties panel has a
 **Folded** switch for these nodes, and folding is off while the canvas is locked. Values set on

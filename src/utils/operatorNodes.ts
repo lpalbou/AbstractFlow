@@ -6,7 +6,7 @@
  * the node's values stay, the hover card lists what feeds each input, and
  * unfolding shows the full card.
  */
-import type { FlowNodeData } from '../types/flow';
+import type { FlowNodeData, Pin } from '../types/flow';
 
 /**
  * Each foldable node: the sign it shows folded, what it is (the hover card's
@@ -81,6 +81,42 @@ export function operatorTitle(nodeType: string): string {
 /** Is this node drawn folded? Only operators fold, whatever the saved flag says. */
 export function isCollapsedOperator(data: Pick<FlowNodeData, 'nodeType' | 'collapsed'>): boolean {
   return data.collapsed === true && isCollapsibleOperator(data.nodeType);
+}
+
+/** A folded node's row pitch and its smallest size (a circle that size). */
+export const COLLAPSED_PIN_GAP = 18;
+export const COLLAPSED_MIN_SIZE = 56;
+
+export interface CollapsedPinLayout {
+  /** Shown on the folded node, one row each: execution pins and pins with a wire. */
+  inputs: Pin[];
+  outputs: Pin[];
+  /** Kept as invisible handles at the edge middle, so React Flow still knows them. */
+  hiddenInputs: Pin[];
+  hiddenOutputs: Pin[];
+  /** One row per shown pin on the busier side, never below the circle. */
+  height: number;
+}
+
+/**
+ * Which pins a folded node shows (operator 2026-10-25): the execution pins and
+ * the pins that carry a wire, inputs and outputs; the others stay as handles
+ * but are not drawn, and the node is only as tall as its shown rows.
+ */
+export function collapsedPinLayout(
+  data: Pick<FlowNodeData, 'inputs' | 'outputs'>,
+  connected: (pinId: string, isInput: boolean) => boolean
+): CollapsedPinLayout {
+  const split = (pins: Pin[], isInput: boolean) => {
+    const shown: Pin[] = [];
+    const hidden: Pin[] = [];
+    for (const pin of pins) (pin.type === 'execution' || connected(pin.id, isInput) ? shown : hidden).push(pin);
+    return [shown, hidden] as const;
+  };
+  const [inputs, hiddenInputs] = split(data.inputs || [], true);
+  const [outputs, hiddenOutputs] = split(data.outputs || [], false);
+  const height = Math.max(COLLAPSED_MIN_SIZE, Math.max(inputs.length, outputs.length) * COLLAPSED_PIN_GAP + 20);
+  return { inputs, outputs, hiddenInputs, hiddenOutputs, height };
 }
 
 /** What feeds one input of a folded operator, for its hover card. */

@@ -4,15 +4,12 @@ import { useFlowStore } from '../../hooks/useFlow';
 import { getNodeTemplate } from '../../types/nodes';
 import { PIN_COLORS, type FlowNodeData, type Pin } from '../../types/flow';
 import { categoryColorVar, nodeColorSection } from '../../utils/nodeCategoryColors';
-import { foldedShape, operatorInputSources, operatorOutputRows, operatorSymbol, operatorTitle } from '../../utils/operatorNodes';
+import { COLLAPSED_MIN_SIZE as MIN_SIZE, COLLAPSED_PIN_GAP as PIN_GAP, collapsedPinLayout, foldedShape, operatorInputSources, operatorOutputRows, operatorSymbol, operatorTitle } from '../../utils/operatorNodes';
 import { Icon } from '@abstractframework/ui-kit';
 import { PinShape } from '../pins/PinShape';
 import { HiddenConnectionsBadge } from './HiddenConnectionsBadge';
 import { collectDeclaredVarNames } from '../../utils/preflight';
 import { parseTemplate, slotKind, templateInputPins } from '../../utils/textTemplate';
-
-const PIN_GAP = 18;
-const MIN_SIZE = 56;
 
 /** A String Template's text with its chips, for the hover card of the folded node (operator 2026-10-14). */
 function TemplateText({ data }: { data: FlowNodeData }) {
@@ -87,11 +84,16 @@ function OperatorCard({ id, data }: { id: string; data: FlowNodeData }) {
 
 /**
  * An operator node folded (utils/operatorNodes.ts): a circle (a capsule when it
- * has many pins) with the operator sign, its inputs on the left and its outputs
- * on the right, under the same handle ids as the full card, so every wire stays
- * attached. It keeps the card's run status and hidden-connections badge, and a
- * click on a connected pin disconnects it, as on the card. Hovering it shows
- * what it is and what feeds each input.
+ * shows many pins) with the operator sign, its wired inputs on the left and its
+ * wired outputs on the right (operator 2026-10-25: a folded Break Email showed
+ * all 16 outputs as a pill as tall as the open card; folded, a node shows only
+ * the pins that carry a wire, plus any execution pins). Every pin keeps its
+ * handle under the same id as the full card: the shown ones one row each, the
+ * others invisible, not connectable, stacked at the edge middle, so React Flow
+ * still finds every handle and no wire is ever dropped (collapsedPinLayout).
+ * It keeps the card's run status and hidden-connections badge, and a click on a
+ * connected pin disconnects it, as on the card. Hovering it shows what it is
+ * and what feeds each input.
  */
 export const CollapsedOperatorNode = memo(function CollapsedOperatorNode({ id, data, selected }: NodeProps<FlowNodeData>) {
   const updateNodeInternals = useUpdateNodeInternals();
@@ -102,15 +104,14 @@ export const CollapsedOperatorNode = memo(function CollapsedOperatorNode({ id, d
   const isFailed = useFlowStore((s) => s.failedNodeId === id);
   const isRecent = useFlowStore((s) => Boolean(s.recentNodeIds && (s.recentNodeIds as Record<string, true>)[id]));
   const [hovered, setHovered] = useState(false);
-  const inputs = data.inputs.filter((pin) => pin.type !== 'execution');
-  const outputs = data.outputs.filter((pin) => pin.type !== 'execution');
-  const height = Math.max(MIN_SIZE, Math.max(inputs.length, outputs.length) * PIN_GAP + 20);
   const connected = (pinId: string, isInput: boolean) =>
     edges.some((e) => (isInput ? e.target === id && e.targetHandle === pinId : e.source === id && e.sourceHandle === pinId));
+  const { inputs, outputs, hiddenInputs, hiddenOutputs, height } = collapsedPinLayout(data, connected);
 
-  // The handles moved or were renamed (same count, other ids): React Flow
-  // re-measures them so the wires follow.
-  const pinKey = `${inputs.map((p) => p.id).join('|')}__${outputs.map((p) => p.id).join('|')}`;
+  // The handles moved, were renamed, or a wire came or went (a pin shown or
+  // hidden): React Flow re-measures them so the wires follow.
+  const ids = (pins: Pin[]) => pins.map((p) => p.id).join('|');
+  const pinKey = `${ids(inputs)}__${ids(outputs)}__${ids(hiddenInputs)}__${ids(hiddenOutputs)}`;
   useEffect(() => {
     updateNodeInternals(id);
   }, [id, pinKey, updateNodeInternals]);
@@ -136,6 +137,19 @@ export const CollapsedOperatorNode = memo(function CollapsedOperatorNode({ id, d
         className={`pin ${pin.type}`}
         onClickCapture={(e) => pinClick(e, pin.id, isInput)}
       />
+    </span>
+  );
+  // A pin without a wire, folded: its handle stays (same id, at the edge
+  // middle, laid out so React Flow measures it) but is invisible and takes no
+  // pointer or new wire; unfold the node to wire it.
+  const renderHiddenPin = (pin: Pin, isInput: boolean) => (
+    <span
+      key={`${isInput ? 'in' : 'out'}-hidden-${pin.id}`}
+      className={`collapsed-operator-pin collapsed-operator-pin--${isInput ? 'in' : 'out'} collapsed-operator-pin--hidden`}
+      style={{ top: height / 2 }}
+      aria-hidden="true"
+    >
+      <Handle type={isInput ? 'target' : 'source'} position={isInput ? Position.Left : Position.Right} id={pin.id} className={`pin ${pin.type}`} isConnectable={false} />
     </span>
   );
 
@@ -166,7 +180,7 @@ export const CollapsedOperatorNode = memo(function CollapsedOperatorNode({ id, d
         <span className="collapsed-template-icon" aria-label="Text with variables">
           <Icon name="compose" size={20} />
         </span>
-      ) : data.nodeType === 'get_vars' ? (
+      ) : data.nodeType === 'get_vars' && outputs.length ? (
         // Get Variables folds to its list of names, each beside its output pin.
         <span className="collapsed-getvars-names">
           {outputs.map((pin) => (
@@ -184,6 +198,8 @@ export const CollapsedOperatorNode = memo(function CollapsedOperatorNode({ id, d
       {hovered ? <OperatorCard id={id} data={data} /> : null}
       {inputs.map((pin, index) => renderPin(pin, index, inputs.length, true))}
       {outputs.map((pin, index) => renderPin(pin, index, outputs.length, false))}
+      {hiddenInputs.map((pin) => renderHiddenPin(pin, true))}
+      {hiddenOutputs.map((pin) => renderHiddenPin(pin, false))}
     </div>
   );
 });

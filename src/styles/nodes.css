@@ -1998,6 +1998,15 @@
 .collapsed-operator-pin--out {
   right: -6px;
 }
+/* A folded node's pin without a wire: its handle stays at the edge middle
+   (measured by React Flow, so no wire is dropped) but is not drawn and takes
+   no pointer; unfold the node to wire it. Not display:none: a handle with no
+   box would be measured at the node's corner. */
+.collapsed-operator-pin--hidden,
+.collapsed-operator-pin--hidden .react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
 /* A ~24 px target around the 10 px pin, like the full card's handles. */
 .collapsed-template-icon {
   display: inline-flex;

@@ -508,14 +508,18 @@ drawing: the runtime ignores it. It is saved with the node.
 
 ### Folded operator nodes
 
-Fold an operator node into a small round node with only its sign, its pins and its wires: tap or
+Fold an operator node into a small round node with only its sign, its wired pins and its wires: tap or
 click the fold button in its header (any device), or double-click it (mouse or trackpad). Unfold it
 with a double-click, or with a tap on a touch screen (a tap on a folded node never opens the
 properties drawer). Operators are the math nodes, the
 small text nodes (Concat, Length, Is Empty, Contains, Uppercase, Lowercase, Trim), the array and
 object builders (Make Array, Array Append, Array Concat, Array Length, Build JSON, Merge Objects,
 Break Object), the logic gates, Coalesce and Compare; a Get Variable node folds into a rounded
-rectangle that shows the variable's name. Hovering a folded node shows what it is, what
+rectangle that shows the variable's name, and Get Variables into the names of the variables it
+wires out. Folded, a node draws only the pins that carry a wire (and any execution pin), one row
+each, so a Break Email with two fields wired is a small circle with two pins, not a pill as tall as
+the open card; with nothing wired it is just its sign. The other pins are still there: unfold the
+node to wire them, and every wire stays attached while it is folded. Hovering a folded node shows what it is, what
 feeds each input (an expression, a variable, another node's output or a literal value) and its
 outputs (Break Object: each field with its path, type and schema). The properties panel has a
 **Folded** switch for these nodes, and folding is off while the canvas is locked. Values set on
@@ -6209,6 +6213,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A folded node shows only its wired pins.** Folded, a node draws the pins that carry a wire (inputs and outputs, plus any execution pin), one row each, and is only as tall as those rows: a Break Email with 16 fields and two of them wired is a small circle with its input and two outputs, no longer a pill as tall as the open card; with nothing wired it is just its sign (Get Variables: the names of the variables it wires out). The other pins keep their handles, invisible and not connectable, at the node's edge middle, so every wire stays attached; unfold to wire them. Docs: [Web editor > Folded operator nodes](docs/web-editor.md#folded-operator-nodes).
 - **The Flow Library sorts flows by what starts them.** Four kinds, in the New flow question's words: **Chat** (declares an interface: runs when a person or an app asks), **Scheduled**, **Triggered** (mail, a feed, a webhook, or Run now only) and **Other** (parts of other flows, and flows nothing starts yet). One row of pills with counts (**All · Chat · Scheduled · Triggered · Other**) replaces *All | Runnable*; the header says the counts in words; **All** groups the rows under foldable kind headings; a kind lists every flow of that kind, subflows included, with a plain empty state. Each row leads with the kind's icon and colour and what starts it ("Runs when you ask", "Every day at 08:00 (Paris)", "When mail arrives in …", "Runs inside deep-research"), then the description and a quiet date (no more *runnable* badge or monospace). The preview leads with the name, the kind and its start sentence; then the description, the interfaces (Chat; **Make it an automation…**) or the automation and its edit button (Scheduled / Triggered), the family, and the dates and size last. Docs: [Web editor > Kinds of flows](docs/web-editor.md#kinds-of-flows).
 - **Automations start from New Flow.** The dialog asks **What starts it?** first: *A person, in a chat* (the default), *On a schedule*, *When something arrives* or *By hand (Run now only)*. A trigger choice creates the flow with `On Flow Start`, the wired **Trigger event** node and its automation, and ticks **Runnable agent (v1)** when no interface is ticked. The header shows the open flow's nature (**Automation · When mail arrives in me@example.org**, **Chat**) and opens the Automation dialog on it; the Flow Library sorts flows by the same answer (Chat, Scheduled, Triggered, Other: above), and the library's action is **Automation…**.
 - **The Automation dialog speaks in human words.** Title **Automation**, one intro sentence, no source ids or versions. *What starts it?*: a schedule editor (every day / week with day chips / month, every few minutes or hours, once on a date, at a time) shown with your account's time zone and saved as `schedule` version 2 (an older fixed-interval schedule is shown and kept until changed); your mailboxes by address, saved as `trigger.config.account` (never a connection); your feeds and webhooks by name, saved as `trigger.connection_id`; Run now only. Each choice says what it does in one line. The trigger's other settings sit under **More settings** with plain labels (email: folder, batching, automatic messages, **Only mail that…**).

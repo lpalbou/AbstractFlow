@@ -38,14 +38,18 @@ describe('Get Variables', () => {
     expect(html).toContain('+ Add variable');
   });
 
-  it('folded, it shows the names beside their pins', () => {
+  // Folded, it shows the names of its wired variables beside their pins
+  // (collapsedPins.test.tsx); with none wired (2026-10-25), just its sign, and
+  // every variable keeps its handle.
+  it('folded with no wire, it shows its sign and keeps a handle per variable', () => {
     const n = getVarsNode(true);
     const html = renderToStaticMarkup(
       createElement(ReactFlowProvider, null, createElement(nodeTypes.custom as any, { id: 'gv', data: n.data, selected: false, type: 'custom', xPos: 0, yPos: 0, zIndex: 0, isConnectable: true, dragging: false }))
     );
-    expect(html).toContain('collapsed-getvars-names');
-    expect(html).toMatch(/collapsed-getvars-name[^>]*>history</);
-    expect(html).toMatch(/collapsed-getvars-name[^>]*>reviews</);
+    expect(html).not.toContain('collapsed-getvars-names');
+    expect(html).toContain('(x)');
+    expect(html).toContain('data-handleid="history"');
+    expect(html).toContain('data-handleid="reviews"');
   });
 
   it('the variables it reads are known to the run checks', () => {
