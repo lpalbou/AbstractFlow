@@ -666,6 +666,8 @@ Open the **Automation** dialog from the header badge of the open flow, from **Ne
 - **Inputs.** Only the workflow's own `On Flow Start` inputs, the ones the trigger does not fill (never `event`, `messages`, `items`, `calls`, `scheduled_at`…): a `prompt` input is **What each run is asked to do**, **Provider** and **Model** are lists from the gateway with **Use the default (…)** first, text, number and yes/no inputs get matching fields with their labels, and an object or list input a small JSON field of its own. A flow without its own inputs says "This flow takes no inputs besides what arrives." **Advanced: raw JSON** holds any other input as one JSON object.
 - **Name** (optional): how automations made from the workflow are named in Observer and the Assistant; empty uses the workflow's name.
 
+A flow has one automation. Once it is on, the dialog and the header badge's menu say **On · see it in Observer** and offer **Update the automation** (it is revised to the flow's saved trigger, context and inputs, on the newly available version: `PATCH /api/gateway/automations/{id}`) and **Turn it off** / **Turn it back on** (pause / resume); Turn it on never creates a second one. Flow remembers which automation a flow turned on in this browser, and otherwise finds it among your automations by its flow.
+
 **Turn it on** saves, makes the workflow available (below) and creates the automation through the gateway (`POST /api/gateway/automations` with the published workflow and the saved trigger, context and inputs), then says "Release digest is on. See it in Observer or the Assistant." with **Open Observer**. A refusal is said in words (a feed or mailbox that is no longer yours, an expired session). Pause or stop it in Observer or the Assistant.
 
 **Save** checks everything and names each problem in words (for example "Comes from: "x" is not an email address"); the problems stay visible above the buttons. When the workflow does not have the trigger's inputs yet, Save adds them to `On Flow Start` (and `response`, `notify`, `success` to `On Flow End`) in the same save; it never adds a node. From the Flow Library the workflow is updated on the gateway (`PUT` on the workflow, with its nodes when pins were added) and the answer must contain the stored defaults, else the dialog shows an error instead of reporting a save; if that workflow is open in the editor, the change is applied to it and your unsaved edits are kept. From the header badge the change goes into the open flow and is saved with it. **Remove automation** clears the field. **Save**, **Duplicate** and **Make it available** carry the field with the workflow; see [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults) for the stored shape.
@@ -699,17 +701,19 @@ A triggered flow reads what arrived on `On Flow Start`, as typed, named outputs 
 
 Every triggered flow also has `event`, the whole raw event. Your own inputs (a threshold, a `prompt` if you want one) stay on `On Flow Start` and are set under **Inputs** in the Automation dialog. `On Flow End` takes what the run gives back: `response` (what the person sees as the run's result), `notify` (optional `{title, body}`: an alert on the watch, the tray and the Assistant) and `success` (false marks the run failed: it is retried, then an alert says so). Saving a triggered flow with nothing connected to `response` saves it and says so. The runtime's side of this contract: [AbstractRuntime > Occurrence inputs and outputs](https://github.com/lpalbou/abstractruntime/blob/main/docs/automations.md#occurrence-inputs-and-outputs-the-flow-contract).
 
-**Run as if triggered.** Pressing **Run** on a flow with an automation trigger opens the run window with **Run as if triggered** first: "Using: When mail arrives in me@example.org", one control (**Use the last [100] messages**; items for a feed, calls for a webhook; "As if it fired now." for a schedule; nothing for by hand) and **Run**. Run asks the gateway for a sample of what the trigger would deliver (`POST /api/gateway/triggers/sample {trigger, count}` → `{inputs, truncated, summary}`), fills those inputs and starts a normal run with them, saying "Running with the last 100 messages of me@example.org (test run)". Nothing is turned on. Your own inputs stay under **Your inputs**; what the trigger fills (`messages`, `mailbox`, `event`, …) is under **Advanced: edit the inputs**, filled from the sample and editable (once you edit them, Run uses your values). A failure is said in words (a mailbox that cannot be reached, a feed that answered 404). Flows without a trigger keep the plain run window.
+In that window, a triggered flow keeps the session, the prompt caches and the run and step ids behind **Advanced settings**; its result shows what the person sees (On Flow End's `response`), or "Each run's result will be empty unless something is connected to On Flow End's response.", with the whole result under **Details**, and the finished test run says "Test run done with the latest 3 items of Python news". Time zones are a short list of cities with their offset ("Paris (UTC+1)"), yours first; search for any other.
+
+**Run as if triggered.** Pressing **Run** on a flow with an automation trigger opens the run window with **Run as if triggered** first: "Using: When mail arrives in me@example.org", one control (**Use the last [100] messages**; items for a feed, calls for a webhook; nothing for a schedule or by hand) and one sentence saying what **Run** will do ("Run reads the last 100 messages of me@example.org again and runs the flow on them."). The window has one **Run** button, at the bottom. Every Run asks the gateway for a fresh sample with the current count (`POST /api/gateway/triggers/sample {trigger, count}` → `{inputs, truncated, summary}`), fills those inputs and starts a normal run with them, saying "Running with the last 100 messages of me@example.org (test run)", or "Only 3 messages found: running with them (test run)" when fewer came back, with "(stopped after 20 s)" when the gateway stopped reading early. Nothing is turned on. Your own inputs stay under **Your inputs**; what the trigger fills (`messages`, `mailbox`, `event`, …) is under **Advanced: edit the inputs**, filled from the last sample. Only typing in them counts as editing: the panel then says "Using your edited inputs." with **Use the sample again**, and Run uses your values until then (each opening of the window starts fresh). A failure is said in words (a mailbox that cannot be reached, a feed that answered 404). Flows without a trigger keep the plain run window.
 
 **Worked example: a safe-mail judge.** A mail trigger, and a deterministic flow that never lets a model act on untrusted mail with tools:
 
-1. `On Flow Start`: `messages`.
-2. **Stringify JSON** (`messages`) → **LLM Call** with **no tools**, `system` "Is this mail safe to act on? Answer yes or no, and why.", and a `resp_schema` `{safe: boolean, why: string}` (structured answer).
+1. `On Flow Start`: `messages` (an Email list) → **ForEach** (each `item` is an Email).
+2. **Email fields** on the item (`from`, `subject`, `body_text`) → **String Template** → **LLM Call** with **no tools**, `system` "Is this mail safe to act on? Answer yes or no, and why.", and a `resp_schema` `{safe: boolean, why: string}` (structured answer).
 3. **Break Object** on the LLM Call's `data` (`safe`, `why`) → **If/Else** on `safe`.
-4. True: a second **LLM Call** summarises the mail → `On Flow End` `response`.
+4. True: **Mark as read** (the item) → **Add label** `["triaged"]` (the item) → **Notify me** (`title` "Triaged", `body` ← the subject); a second **LLM Call** can summarise it for `On Flow End` `response`.
 5. False: `On Flow End` `response` ← `why`, and `notify` ← a **Build JSON** `{title: "Suspicious mail", body: why}`.
 
-Turn it on from the Automation dialog: each new mail runs the judge, and only a suspicious one raises an alert.
+Turn it on from the Automation dialog: each new mail runs the judge; safe mail is marked read and labelled, and only a suspicious one raises an alert.
 
 ### The Trigger Event
 
@@ -718,6 +722,20 @@ The **Trigger event** node is an optional helper for the raw envelope: most flow
 A workflow with the `event` output is *triggerable*. **New Flow** with a trigger and **Save** in the Automation dialog add it (and the named outputs) for you; the Trigger event node is never placed by default. See [VisualFlow JSON > The trigger event](visualflow.md#the-trigger-event) for the envelope's fields.
 
 `On Schedule`, `On Event` and `Delay` (`wait_until`) are different: they wait inside a run that has already started and never start a workflow. See [Workflow node catalog](workflow-node-catalog.md).
+
+## Mail
+
+The **Mail and publish** section of the palette handles mail deterministically, with no model: each node is one fixed action of the runtime (`mail.*`) on a mailbox of yours, and a refusal (a read-only mailbox, a message the server no longer has) comes back as `success` false with the reason in `result`.
+
+- **Email** is a data type: one email has `id` (where the message is: what the mail nodes act on), `message_id`, `mailbox`, `folder`, `thread_id`, `from`, `to`, `cc`, `subject`, `date`, `body_text`, `body_html`, `attachments` (`index`, `name`, `size`, `type`), `seen`, `flagged` and `labels`; hover an Email pin to see them. A mail trigger's `messages` is an Email list; **ForEach** over an Email list gives one Email per item, which the mail nodes take as it is. **Email fields** turns one Email into a pin per field.
+- **Search mail** (mailbox, folder, limit; in Properties: from, to, subject has, contains, since, until, unread only, flagged only, with labels) gives an Email list, newest first, without bodies; **Get mail** reads emails with their bodies.
+- **Mark as read**, **Mark as unread**, **Flag**, **Unflag**, **Add label**, **Remove label**, **Move to folder** (pick the folder in Properties) and **Delete** (to the Trash; **Delete for good** under More options) change the emails they are given. **Mark mail** and **Label mail** do several of these at once.
+- **Send mail** (to, cc, bcc, subject, text, html, attachments), **Reply** (reply all) and **Forward** (to, note) send through your mailbox's recipient policy; **Get attachment** stores one attachment as a file.
+- **Mailbox**: every node has a mailbox picker in Properties (your mailboxes by address). Empty means the trigger's mailbox, else your main one. Sending from a read-only mailbox (no outgoing server) is refused there, in words, before you run anything.
+
+## Publish
+
+**Publish to channel** sends a message (channel, type, title, body, subject, data) that any application subscribed to that channel receives (`GET /api/gateway/me/events?channel=…`). Channel names use lowercase letters, digits, `.`, `_` or `-`; `attention` is the gateway's own. Turn on **Also notify me** to be notified on the tray, the Assistant and the watch as well. **Notify me** is the short form: a title and a body, and you are notified.
 
 ## Relays and the wire-drop menu
 
@@ -2592,11 +2610,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 ### data / Break Object
 
 - Node type: `break_object`
-- Document node: `{"id":"<unique_id>","type":"break_object"}`
+- Document node: `{"id":"<unique_id>","type":"break_object","template":"Break Object"}`
 - Utility: Expose selected fields of an object as individual output pins (configured paths).
 - Gateway capability: none
 - Dynamic pin policy: dynamic outputs via the document `outputs` list (also drives `breakConfig.selectedPaths`)
-- Authorable config: input defaults with `pin_defaults`
+- Authorable config: select with `"template": "Break Object"`; input defaults with `pin_defaults`
 - Inputs: `object` object: Input object to decompose into selected output fields.
 - Outputs: none
 - Default config: {
@@ -3569,6 +3587,281 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Inputs: none
 - Outputs: `tools` tools
 - Default config: none
+
+### mail / Email fields
+
+- Node type: `break_object`
+- Document node: `{"id":"<unique_id>","type":"break_object","template":"Email fields"}`
+- Utility: The fields of one email as outputs: from, to, cc, subject, date, body_text, attachments, seen, flagged, labels…
+- Gateway capability: none
+- Dynamic pin policy: dynamic outputs via the document `outputs` list (also drives `breakConfig.selectedPaths`)
+- Authorable config: select with `"template": "Email fields"`; input defaults with `pin_defaults`
+- Inputs: `object` email (email): The email to read.
+- Outputs: `id` string: Where the message is (what the mail nodes act on).; `message_id` string: The email’s Message-ID.; `mailbox` string: The mailbox it is in (its address).; `folder` string: The folder it is in (e.g. INBOX).; `thread_id` string: The conversation it belongs to.; `from` string: Who sent it.; `to` array: Who it was sent to.; `cc` array: Who was copied.; `subject` string: Its subject.; `date` string: When it was sent (date and time).; `body_text` string: The message as plain text.; `body_html` string: The message as HTML, when it has one.; `attachments` array: Its attachments: index, name, size, type (Get attachment reads one by index).; `seen` boolean: Whether it was read.; `flagged` boolean: Whether it is flagged.; `labels` array: Its labels.
+- Default config: {
+  "breakConfig": {
+    "selectedPaths": [
+      "id",
+      "message_id",
+      "mailbox",
+      "folder",
+      "thread_id",
+      "from",
+      "to",
+      "cc",
+      "subject",
+      "date",
+      "body_text",
+      "body_html",
+      "attachments",
+      "seen",
+      "flagged",
+      "labels"
+    ]
+  }
+}
+
+### mail / Get attachment
+
+- Node type: `mail_attachment`
+- Document node: `{"id":"<unique_id>","type":"mail_attachment"}`
+- Utility: Read one attachment of the email as a file.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `id` email (email): The email.; `index` number: Which attachment: its index in the email’s attachments (from 0).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `artifact` artifact (file): The attachment, stored as a file.
+- Default config: none
+
+### mail / Delete
+
+- Node type: `mail_delete`
+- Document node: `{"id":"<unique_id>","type":"mail_delete"}`
+- Utility: Move the emails to the Trash (deleted for good only with permanent on, under More options).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to delete.; `permanent` boolean: Off (default): to the Trash. On: deleted for good.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Forward
+
+- Node type: `mail_forward`
+- Document node: `{"id":"<unique_id>","type":"mail_forward"}`
+- Utility: Forward the email, with its attachments, to other people.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `id` email (email): The email to forward.; `to` array: Recipients (addresses).; `note` string: A note above the forwarded message.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `message_id` string: The Message-ID of the forwarded email.
+- Default config: none
+
+### mail / Get mail
+
+- Node type: `mail_get`
+- Document node: `{"id":"<unique_id>","type":"mail_get"}`
+- Utility: Read emails with their bodies and attachment lists.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to read (Email list, or one Email).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `emails` emails: The emails, with their bodies.
+- Default config: none
+
+### mail / Add label
+
+- Node type: `mail_label`
+- Document node: `{"id":"<unique_id>","type":"mail_label","template":"Add label"}`
+- Utility: Add labels to the emails.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Add label"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to label.; `add` array (labels): The labels to add, e.g. ["triaged"].
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Label mail
+
+- Node type: `mail_label`
+- Document node: `{"id":"<unique_id>","type":"mail_label","template":"Label mail"}`
+- Utility: Add and / or remove labels on emails.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Label mail"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to label.; `add` array: Labels to add, e.g. ["triaged"].; `remove` array: Labels to remove.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Remove label
+
+- Node type: `mail_label`
+- Document node: `{"id":"<unique_id>","type":"mail_label","template":"Remove label"}`
+- Utility: Remove labels from the emails.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Remove label"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails.; `remove` array (labels): The labels to remove.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Flag
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Flag"}`
+- Utility: Flag the emails.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Flag"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: {
+  "pinDefaults": {
+    "flagged": true
+  }
+}
+
+### mail / Mark as read
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Mark as read"}`
+- Utility: Mark the emails as read.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Mark as read"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails (from the trigger, Search mail or ForEach).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: {
+  "pinDefaults": {
+    "seen": true
+  }
+}
+
+### mail / Mark as unread
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Mark as unread"}`
+- Utility: Mark the emails as not read.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Mark as unread"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: {
+  "pinDefaults": {
+    "seen": false
+  }
+}
+
+### mail / Mark mail
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Mark mail"}`
+- Utility: Mark emails read / unread and flagged / not flagged.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Mark mail"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to mark.; `seen` boolean (read): True: read. False: unread. Empty: unchanged.; `flagged` boolean: True: flagged. False: not flagged. Empty: unchanged.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Unflag
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Unflag"}`
+- Utility: Remove the emails’ flag.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Unflag"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: {
+  "pinDefaults": {
+    "flagged": false
+  }
+}
+
+### mail / Move to folder
+
+- Node type: `mail_move`
+- Document node: `{"id":"<unique_id>","type":"mail_move"}`
+- Utility: Move the emails to another folder of their mailbox.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to move.; `folder` string: The folder to move them to (pick one in Properties).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Reply
+
+- Node type: `mail_reply`
+- Document node: `{"id":"<unique_id>","type":"mail_reply"}`
+- Utility: Reply to the email, from its mailbox.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `id` email (email): The email to answer.; `text` string: The answer as plain text.; `html` string: Optional HTML version.; `reply_all` boolean (reply all): Also answer everyone who received it.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `message_id` string: The Message-ID of the reply.
+- Default config: none
+
+### mail / Search mail
+
+- Node type: `mail_search`
+- Document node: `{"id":"<unique_id>","type":"mail_search"}`
+- Utility: Find emails in a mailbox: by sender, recipient, subject, words, dates, unread / flagged, labels (set them in Properties). Outputs an Email list, newest first, without bodies (Get mail reads them).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `query` object: What to look for: from, to, subject, text, since, until, unseen, flagged, labels (Properties fills it).; `folder` string: The folder to search (empty: the inbox).; `limit` number: At most this many (the newest).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `emails` emails: The emails found (Email list), newest first.
+- Default config: none
+
+### mail / Send mail
+
+- Node type: `mail_send`
+- Document node: `{"id":"<unique_id>","type":"mail_send"}`
+- Utility: Send a new email from a mailbox that can send.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `to` array: Recipients (addresses).; `cc` array: Copied (addresses).; `bcc` array: Blind-copied (addresses).; `subject` string: The subject.; `text` string: The message as plain text.; `html` string: Optional HTML version.; `attachments` artifacts: Files to attach.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `message_id` string: The Message-ID of the sent email.
+- Default config: none
+
+### mail / Notify me
+
+- Node type: `publish_event`
+- Document node: `{"id":"<unique_id>","type":"publish_event","template":"Notify me"}`
+- Utility: Notify me on the tray, the Assistant and the watch.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Notify me"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `title` string: What the notification says (required).; `body` string: More text (optional).; `data` object: Any extra JSON.
+- Outputs: `exec-out` execution; `result` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "channel": "me",
+    "alert": true
+  }
+}
+
+### mail / Publish to channel
+
+- Node type: `publish_event`
+- Document node: `{"id":"<unique_id>","type":"publish_event","template":"Publish to channel"}`
+- Utility: Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant and the watch.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Publish to channel"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `channel` string: A name applications subscribe to (lowercase letters, digits, . _ -), e.g. results.; `type` string: What kind of message it is, your own name (default: <channel>.message).; `title` string: A short title (required).; `body` string: The text (optional).; `subject` string: What it is about (optional).; `data` object: Any extra JSON for the applications.; `alert` boolean: On: also notify me (tray, Assistant, watch).
+- Outputs: `exec-out` execution; `result` object: The published event: event_id, sequence, alerted.; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "channel": "results",
+    "alert": false
+  }
+}
 
 ### math / Absolute
 
@@ -5825,6 +6118,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Inputs as a form.** One field per `On Flow Start` input (`prompt` = *What each run is asked to do*; text, number, yes/no; a JSON field only for object/list inputs; `event` never asked), with **Advanced: raw JSON** for anything else. Problems are named in words, above the buttons.
 - **Save adds the Trigger event itself.** Saving a trigger on a workflow without the `event` input adds and wires the **Trigger event** node in the same save; the dialog no longer asks you to.
 - **Run as if triggered.** Run on a flow with an automation trigger reads the saved trigger ("Using: When mail arrives in …"), takes the last N messages / items / calls (or "as if it fired now" for a schedule) from the gateway (`POST /api/gateway/triggers/sample`) and starts a test run with them; the trigger-filled inputs sit under "Advanced: edit the inputs". Chat flows keep the plain run window.
+- **Mail nodes and the Email type.** A *Mail and publish* palette section: Search mail, Get mail, Mark as read / unread, Flag / Unflag, Add / Remove label, Mark mail, Label mail, Move to folder, Delete, Send mail, Reply, Forward, Get attachment — deterministic, one runtime `mail.*` action each, a mailbox picker by address (empty = the trigger's mailbox), a plain refusal to send from a read-only mailbox. An *Email* pin type (hover lists the fields); a mail trigger's `messages` is an Email list and ForEach gives an Email; *Email fields* gives a pin per field. Needs AbstractRuntime 0.12.0.
+- **Publish to channel and Notify me.** Publish a message on a channel applications subscribe to, with *Also notify me*; *Notify me* notifies you on the tray, the Assistant and the watch.
+- **One automation per flow.** Once on, the dialog and the badge menu offer *Update the automation* and *Turn it off* / *Turn it back on*; Turn it on never duplicates.
+- **The run window of a triggered flow** keeps session, prompt caches and ids under *Advanced settings*, shows what the person sees as the result, and says "Test run done with the latest 3 items of …".
+- **Time zones** as cities with their UTC offset, yours first, search for the rest.
 - **Turn it on.** The Automation dialog and the header badge's menu make the flow available and create the automation through the gateway (`POST /api/gateway/automations`), then say "Release digest is on. See it in Observer or the Assistant." with **Open Observer**; refusals in plain words.
 - **Publish is "Make it available".** One sentence before and after; the gateway name, version and the load switch under **Details**.
 - **A triggered flow is your own workflow.** New flow with a trigger opens with only On Flow Start and On Flow End (no pre-built steps, no prompt) and a dismissible note. On Flow Start carries what arrives as typed, named outputs (mail: `messages`, `mailbox`; feed: `items`, `feed`; webhook: `calls`; schedule: `scheduled_at`, `occurrence`) beside `event`; On Flow End takes `response`, `notify`, `success`. The Automation dialog adds them on Save (never a node); its Inputs list only the flow's own inputs. Saving a triggered flow with nothing on `response` warns.
@@ -5834,6 +6132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Run as if triggered re-samples on every Run with the current count (a first sample's inputs were reused as if edited): only typing in the advanced inputs counts as editing ("Using your edited inputs." / "Use the sample again"), fewer results say "Only N messages found", an early stop "(stopped after 20 s)"; the window has one Run button.
 - The unsaved-changes dot no longer stays after a save that followed an Automation change (the dirty check now follows the automation defaults and the description).
 - The header no longer overlaps at 1440 px and up with the automation badge: the name and badge give way first and the actions scroll as one strip.
 

@@ -475,11 +475,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 ### data / Break Object
 
 - Node type: `break_object`
-- Document node: `{"id":"<unique_id>","type":"break_object"}`
+- Document node: `{"id":"<unique_id>","type":"break_object","template":"Break Object"}`
 - Utility: Expose selected fields of an object as individual output pins (configured paths).
 - Gateway capability: none
 - Dynamic pin policy: dynamic outputs via the document `outputs` list (also drives `breakConfig.selectedPaths`)
-- Authorable config: input defaults with `pin_defaults`
+- Authorable config: select with `"template": "Break Object"`; input defaults with `pin_defaults`
 - Inputs: `object` object: Input object to decompose into selected output fields.
 - Outputs: none
 - Default config: {
@@ -1452,6 +1452,281 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Inputs: none
 - Outputs: `tools` tools
 - Default config: none
+
+### mail / Email fields
+
+- Node type: `break_object`
+- Document node: `{"id":"<unique_id>","type":"break_object","template":"Email fields"}`
+- Utility: The fields of one email as outputs: from, to, cc, subject, date, body_text, attachments, seen, flagged, labels…
+- Gateway capability: none
+- Dynamic pin policy: dynamic outputs via the document `outputs` list (also drives `breakConfig.selectedPaths`)
+- Authorable config: select with `"template": "Email fields"`; input defaults with `pin_defaults`
+- Inputs: `object` email (email): The email to read.
+- Outputs: `id` string: Where the message is (what the mail nodes act on).; `message_id` string: The email’s Message-ID.; `mailbox` string: The mailbox it is in (its address).; `folder` string: The folder it is in (e.g. INBOX).; `thread_id` string: The conversation it belongs to.; `from` string: Who sent it.; `to` array: Who it was sent to.; `cc` array: Who was copied.; `subject` string: Its subject.; `date` string: When it was sent (date and time).; `body_text` string: The message as plain text.; `body_html` string: The message as HTML, when it has one.; `attachments` array: Its attachments: index, name, size, type (Get attachment reads one by index).; `seen` boolean: Whether it was read.; `flagged` boolean: Whether it is flagged.; `labels` array: Its labels.
+- Default config: {
+  "breakConfig": {
+    "selectedPaths": [
+      "id",
+      "message_id",
+      "mailbox",
+      "folder",
+      "thread_id",
+      "from",
+      "to",
+      "cc",
+      "subject",
+      "date",
+      "body_text",
+      "body_html",
+      "attachments",
+      "seen",
+      "flagged",
+      "labels"
+    ]
+  }
+}
+
+### mail / Get attachment
+
+- Node type: `mail_attachment`
+- Document node: `{"id":"<unique_id>","type":"mail_attachment"}`
+- Utility: Read one attachment of the email as a file.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `id` email (email): The email.; `index` number: Which attachment: its index in the email’s attachments (from 0).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `artifact` artifact (file): The attachment, stored as a file.
+- Default config: none
+
+### mail / Delete
+
+- Node type: `mail_delete`
+- Document node: `{"id":"<unique_id>","type":"mail_delete"}`
+- Utility: Move the emails to the Trash (deleted for good only with permanent on, under More options).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to delete.; `permanent` boolean: Off (default): to the Trash. On: deleted for good.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Forward
+
+- Node type: `mail_forward`
+- Document node: `{"id":"<unique_id>","type":"mail_forward"}`
+- Utility: Forward the email, with its attachments, to other people.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `id` email (email): The email to forward.; `to` array: Recipients (addresses).; `note` string: A note above the forwarded message.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `message_id` string: The Message-ID of the forwarded email.
+- Default config: none
+
+### mail / Get mail
+
+- Node type: `mail_get`
+- Document node: `{"id":"<unique_id>","type":"mail_get"}`
+- Utility: Read emails with their bodies and attachment lists.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to read (Email list, or one Email).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `emails` emails: The emails, with their bodies.
+- Default config: none
+
+### mail / Add label
+
+- Node type: `mail_label`
+- Document node: `{"id":"<unique_id>","type":"mail_label","template":"Add label"}`
+- Utility: Add labels to the emails.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Add label"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to label.; `add` array (labels): The labels to add, e.g. ["triaged"].
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Label mail
+
+- Node type: `mail_label`
+- Document node: `{"id":"<unique_id>","type":"mail_label","template":"Label mail"}`
+- Utility: Add and / or remove labels on emails.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Label mail"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to label.; `add` array: Labels to add, e.g. ["triaged"].; `remove` array: Labels to remove.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Remove label
+
+- Node type: `mail_label`
+- Document node: `{"id":"<unique_id>","type":"mail_label","template":"Remove label"}`
+- Utility: Remove labels from the emails.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Remove label"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails.; `remove` array (labels): The labels to remove.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Flag
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Flag"}`
+- Utility: Flag the emails.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Flag"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: {
+  "pinDefaults": {
+    "flagged": true
+  }
+}
+
+### mail / Mark as read
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Mark as read"}`
+- Utility: Mark the emails as read.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Mark as read"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails (from the trigger, Search mail or ForEach).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: {
+  "pinDefaults": {
+    "seen": true
+  }
+}
+
+### mail / Mark as unread
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Mark as unread"}`
+- Utility: Mark the emails as not read.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Mark as unread"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: {
+  "pinDefaults": {
+    "seen": false
+  }
+}
+
+### mail / Mark mail
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Mark mail"}`
+- Utility: Mark emails read / unread and flagged / not flagged.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Mark mail"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to mark.; `seen` boolean (read): True: read. False: unread. Empty: unchanged.; `flagged` boolean: True: flagged. False: not flagged. Empty: unchanged.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Unflag
+
+- Node type: `mail_mark`
+- Document node: `{"id":"<unique_id>","type":"mail_mark","template":"Unflag"}`
+- Utility: Remove the emails’ flag.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Unflag"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: {
+  "pinDefaults": {
+    "flagged": false
+  }
+}
+
+### mail / Move to folder
+
+- Node type: `mail_move`
+- Document node: `{"id":"<unique_id>","type":"mail_move"}`
+- Utility: Move the emails to another folder of their mailbox.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `ids` emails (emails): The emails to move.; `folder` string: The folder to move them to (pick one in Properties).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).
+- Default config: none
+
+### mail / Reply
+
+- Node type: `mail_reply`
+- Document node: `{"id":"<unique_id>","type":"mail_reply"}`
+- Utility: Reply to the email, from its mailbox.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `id` email (email): The email to answer.; `text` string: The answer as plain text.; `html` string: Optional HTML version.; `reply_all` boolean (reply all): Also answer everyone who received it.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `message_id` string: The Message-ID of the reply.
+- Default config: none
+
+### mail / Search mail
+
+- Node type: `mail_search`
+- Document node: `{"id":"<unique_id>","type":"mail_search"}`
+- Utility: Find emails in a mailbox: by sender, recipient, subject, words, dates, unread / flagged, labels (set them in Properties). Outputs an Email list, newest first, without bodies (Get mail reads them).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `query` object: What to look for: from, to, subject, text, since, until, unseen, flagged, labels (Properties fills it).; `folder` string: The folder to search (empty: the inbox).; `limit` number: At most this many (the newest).
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `emails` emails: The emails found (Email list), newest first.
+- Default config: none
+
+### mail / Send mail
+
+- Node type: `mail_send`
+- Document node: `{"id":"<unique_id>","type":"mail_send"}`
+- Utility: Send a new email from a mailbox that can send.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `mailbox` string: Which mailbox (its id). Empty: the trigger’s mailbox, else your main one.; `to` array: Recipients (addresses).; `cc` array: Copied (addresses).; `bcc` array: Blind-copied (addresses).; `subject` string: The subject.; `text` string: The message as plain text.; `html` string: Optional HTML version.; `attachments` artifacts: Files to attach.
+- Outputs: `exec-out` execution; `result` object: What the mail server answered.; `success` boolean: False when the mail action was refused (the result says why).; `message_id` string: The Message-ID of the sent email.
+- Default config: none
+
+### mail / Notify me
+
+- Node type: `publish_event`
+- Document node: `{"id":"<unique_id>","type":"publish_event","template":"Notify me"}`
+- Utility: Notify me on the tray, the Assistant and the watch.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Notify me"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `title` string: What the notification says (required).; `body` string: More text (optional).; `data` object: Any extra JSON.
+- Outputs: `exec-out` execution; `result` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "channel": "me",
+    "alert": true
+  }
+}
+
+### mail / Publish to channel
+
+- Node type: `publish_event`
+- Document node: `{"id":"<unique_id>","type":"publish_event","template":"Publish to channel"}`
+- Utility: Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant and the watch.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Publish to channel"`; input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `channel` string: A name applications subscribe to (lowercase letters, digits, . _ -), e.g. results.; `type` string: What kind of message it is, your own name (default: <channel>.message).; `title` string: A short title (required).; `body` string: The text (optional).; `subject` string: What it is about (optional).; `data` object: Any extra JSON for the applications.; `alert` boolean: On: also notify me (tray, Assistant, watch).
+- Outputs: `exec-out` execution; `result` object: The published event: event_id, sequence, alerted.; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "channel": "results",
+    "alert": false
+  }
+}
 
 ### math / Absolute
 

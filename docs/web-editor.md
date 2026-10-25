@@ -315,6 +315,8 @@ Open the **Automation** dialog from the header badge of the open flow, from **Ne
 - **Inputs.** Only the workflow's own `On Flow Start` inputs, the ones the trigger does not fill (never `event`, `messages`, `items`, `calls`, `scheduled_at`…): a `prompt` input is **What each run is asked to do**, **Provider** and **Model** are lists from the gateway with **Use the default (…)** first, text, number and yes/no inputs get matching fields with their labels, and an object or list input a small JSON field of its own. A flow without its own inputs says "This flow takes no inputs besides what arrives." **Advanced: raw JSON** holds any other input as one JSON object.
 - **Name** (optional): how automations made from the workflow are named in Observer and the Assistant; empty uses the workflow's name.
 
+A flow has one automation. Once it is on, the dialog and the header badge's menu say **On · see it in Observer** and offer **Update the automation** (it is revised to the flow's saved trigger, context and inputs, on the newly available version: `PATCH /api/gateway/automations/{id}`) and **Turn it off** / **Turn it back on** (pause / resume); Turn it on never creates a second one. Flow remembers which automation a flow turned on in this browser, and otherwise finds it among your automations by its flow.
+
 **Turn it on** saves, makes the workflow available (below) and creates the automation through the gateway (`POST /api/gateway/automations` with the published workflow and the saved trigger, context and inputs), then says "Release digest is on. See it in Observer or the Assistant." with **Open Observer**. A refusal is said in words (a feed or mailbox that is no longer yours, an expired session). Pause or stop it in Observer or the Assistant.
 
 **Save** checks everything and names each problem in words (for example "Comes from: "x" is not an email address"); the problems stay visible above the buttons. When the workflow does not have the trigger's inputs yet, Save adds them to `On Flow Start` (and `response`, `notify`, `success` to `On Flow End`) in the same save; it never adds a node. From the Flow Library the workflow is updated on the gateway (`PUT` on the workflow, with its nodes when pins were added) and the answer must contain the stored defaults, else the dialog shows an error instead of reporting a save; if that workflow is open in the editor, the change is applied to it and your unsaved edits are kept. From the header badge the change goes into the open flow and is saved with it. **Remove automation** clears the field. **Save**, **Duplicate** and **Make it available** carry the field with the workflow; see [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults) for the stored shape.
@@ -348,17 +350,19 @@ A triggered flow reads what arrived on `On Flow Start`, as typed, named outputs 
 
 Every triggered flow also has `event`, the whole raw event. Your own inputs (a threshold, a `prompt` if you want one) stay on `On Flow Start` and are set under **Inputs** in the Automation dialog. `On Flow End` takes what the run gives back: `response` (what the person sees as the run's result), `notify` (optional `{title, body}`: an alert on the watch, the tray and the Assistant) and `success` (false marks the run failed: it is retried, then an alert says so). Saving a triggered flow with nothing connected to `response` saves it and says so. The runtime's side of this contract: [AbstractRuntime > Occurrence inputs and outputs](https://github.com/lpalbou/abstractruntime/blob/main/docs/automations.md#occurrence-inputs-and-outputs-the-flow-contract).
 
+In that window, a triggered flow keeps the session, the prompt caches and the run and step ids behind **Advanced settings**; its result shows what the person sees (On Flow End's `response`), or "Each run's result will be empty unless something is connected to On Flow End's response.", with the whole result under **Details**, and the finished test run says "Test run done with the latest 3 items of Python news". Time zones are a short list of cities with their offset ("Paris (UTC+1)"), yours first; search for any other.
+
 **Run as if triggered.** Pressing **Run** on a flow with an automation trigger opens the run window with **Run as if triggered** first: "Using: When mail arrives in me@example.org", one control (**Use the last [100] messages**; items for a feed, calls for a webhook; nothing for a schedule or by hand) and one sentence saying what **Run** will do ("Run reads the last 100 messages of me@example.org again and runs the flow on them."). The window has one **Run** button, at the bottom. Every Run asks the gateway for a fresh sample with the current count (`POST /api/gateway/triggers/sample {trigger, count}` → `{inputs, truncated, summary}`), fills those inputs and starts a normal run with them, saying "Running with the last 100 messages of me@example.org (test run)", or "Only 3 messages found: running with them (test run)" when fewer came back, with "(stopped after 20 s)" when the gateway stopped reading early. Nothing is turned on. Your own inputs stay under **Your inputs**; what the trigger fills (`messages`, `mailbox`, `event`, …) is under **Advanced: edit the inputs**, filled from the last sample. Only typing in them counts as editing: the panel then says "Using your edited inputs." with **Use the sample again**, and Run uses your values until then (each opening of the window starts fresh). A failure is said in words (a mailbox that cannot be reached, a feed that answered 404). Flows without a trigger keep the plain run window.
 
 **Worked example: a safe-mail judge.** A mail trigger, and a deterministic flow that never lets a model act on untrusted mail with tools:
 
-1. `On Flow Start`: `messages`.
-2. **Stringify JSON** (`messages`) → **LLM Call** with **no tools**, `system` "Is this mail safe to act on? Answer yes or no, and why.", and a `resp_schema` `{safe: boolean, why: string}` (structured answer).
+1. `On Flow Start`: `messages` (an Email list) → **ForEach** (each `item` is an Email).
+2. **Email fields** on the item (`from`, `subject`, `body_text`) → **String Template** → **LLM Call** with **no tools**, `system` "Is this mail safe to act on? Answer yes or no, and why.", and a `resp_schema` `{safe: boolean, why: string}` (structured answer).
 3. **Break Object** on the LLM Call's `data` (`safe`, `why`) → **If/Else** on `safe`.
-4. True: a second **LLM Call** summarises the mail → `On Flow End` `response`.
+4. True: **Mark as read** (the item) → **Add label** `["triaged"]` (the item) → **Notify me** (`title` "Triaged", `body` ← the subject); a second **LLM Call** can summarise it for `On Flow End` `response`.
 5. False: `On Flow End` `response` ← `why`, and `notify` ← a **Build JSON** `{title: "Suspicious mail", body: why}`.
 
-Turn it on from the Automation dialog: each new mail runs the judge, and only a suspicious one raises an alert.
+Turn it on from the Automation dialog: each new mail runs the judge; safe mail is marked read and labelled, and only a suspicious one raises an alert.
 
 ### The Trigger Event
 
@@ -367,6 +371,20 @@ The **Trigger event** node is an optional helper for the raw envelope: most flow
 A workflow with the `event` output is *triggerable*. **New Flow** with a trigger and **Save** in the Automation dialog add it (and the named outputs) for you; the Trigger event node is never placed by default. See [VisualFlow JSON > The trigger event](visualflow.md#the-trigger-event) for the envelope's fields.
 
 `On Schedule`, `On Event` and `Delay` (`wait_until`) are different: they wait inside a run that has already started and never start a workflow. See [Workflow node catalog](workflow-node-catalog.md).
+
+## Mail
+
+The **Mail and publish** section of the palette handles mail deterministically, with no model: each node is one fixed action of the runtime (`mail.*`) on a mailbox of yours, and a refusal (a read-only mailbox, a message the server no longer has) comes back as `success` false with the reason in `result`.
+
+- **Email** is a data type: one email has `id` (where the message is: what the mail nodes act on), `message_id`, `mailbox`, `folder`, `thread_id`, `from`, `to`, `cc`, `subject`, `date`, `body_text`, `body_html`, `attachments` (`index`, `name`, `size`, `type`), `seen`, `flagged` and `labels`; hover an Email pin to see them. A mail trigger's `messages` is an Email list; **ForEach** over an Email list gives one Email per item, which the mail nodes take as it is. **Email fields** turns one Email into a pin per field.
+- **Search mail** (mailbox, folder, limit; in Properties: from, to, subject has, contains, since, until, unread only, flagged only, with labels) gives an Email list, newest first, without bodies; **Get mail** reads emails with their bodies.
+- **Mark as read**, **Mark as unread**, **Flag**, **Unflag**, **Add label**, **Remove label**, **Move to folder** (pick the folder in Properties) and **Delete** (to the Trash; **Delete for good** under More options) change the emails they are given. **Mark mail** and **Label mail** do several of these at once.
+- **Send mail** (to, cc, bcc, subject, text, html, attachments), **Reply** (reply all) and **Forward** (to, note) send through your mailbox's recipient policy; **Get attachment** stores one attachment as a file.
+- **Mailbox**: every node has a mailbox picker in Properties (your mailboxes by address). Empty means the trigger's mailbox, else your main one. Sending from a read-only mailbox (no outgoing server) is refused there, in words, before you run anything.
+
+## Publish
+
+**Publish to channel** sends a message (channel, type, title, body, subject, data) that any application subscribed to that channel receives (`GET /api/gateway/me/events?channel=…`). Channel names use lowercase letters, digits, `.`, `_` or `-`; `attention` is the gateway's own. Turn on **Also notify me** to be notified on the tray, the Assistant and the watch as well. **Notify me** is the short form: a title and a body, and you are notified.
 
 ## Relays and the wire-drop menu
 
