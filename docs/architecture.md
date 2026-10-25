@@ -154,8 +154,9 @@ flowchart LR
   Create --> Automation["Automation<br/>runs the workflow per trigger"]
 ```
 
-Sources that read from a connection (a feed, a webhook, a mailbox) bind one of
-the author's trigger connections, and every run receives the event that caused
+Sources that read from a trigger connection (a feed, a webhook) bind one of
+the author's trigger connections (an email trigger names one of the author's
+mailboxes in its settings instead), and every run receives the event that caused
 it on the workflow's `On Flow Start`:
 
 ```mermaid

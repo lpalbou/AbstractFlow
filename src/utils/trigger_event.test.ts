@@ -32,10 +32,10 @@ describe('triggerable flows', () => {
   });
 
   it('is required by connection sources, recommended by event sources, optional for time/manual', () => {
-    expect(triggerEventRequirement({ needs_connection: true, capabilities: { kind: 'event' } })).toBe('required');
-    expect(triggerEventRequirement({ needs_connection: false, capabilities: { kind: 'event' } })).toBe('recommended');
-    expect(triggerEventRequirement({ needs_connection: false, capabilities: { kind: 'time' } })).toBe('optional');
-    expect(triggerEventRequirement({ needs_connection: false, capabilities: { kind: 'manual' } })).toBe('optional');
+    expect(triggerEventRequirement({ uses_trigger_connection: true, capabilities: { kind: 'event' } })).toBe('required');
+    expect(triggerEventRequirement({ uses_trigger_connection: false, capabilities: { kind: 'event' } })).toBe('recommended');
+    expect(triggerEventRequirement({ uses_trigger_connection: false, capabilities: { kind: 'time' } })).toBe('optional');
+    expect(triggerEventRequirement({ uses_trigger_connection: false, capabilities: { kind: 'manual' } })).toBe('optional');
   });
 });
 
@@ -104,5 +104,11 @@ describe('store: addTriggerEvent', () => {
     useFlowStore.getState().undo();
     expect(isTriggerableFlow(useFlowStore.getState().getFlow())).toBe(false);
     expect(useFlowStore.getState().nodes).toHaveLength(1);
+  });
+});
+
+describe('email is recommended, not required', () => {
+  it('an email trigger also delivers its bodies as the emails input', () => {
+    expect(triggerEventRequirement({ uses_trigger_connection: false, capabilities: { kind: 'event' } })).toBe('recommended');
   });
 });

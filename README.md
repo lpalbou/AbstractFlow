@@ -97,9 +97,9 @@ warns about missing, unconnected, or mistyped interface pins. See [VisualFlow JS
 A runnable workflow can also store automation defaults (Flow Library >
 **Automation**): the trigger source and settings discovered from the Gateway,
 the context mode, and default inputs that an automation created from the
-published workflow starts with. Sources that read from a connection (a feed,
-a webhook, a mailbox) list your connections from the Gateway console's
-Triggers page. A workflow becomes *triggerable* with **Add trigger event** on
+published workflow starts with. Sources that read from a trigger connection (a
+feed, a webhook) list your connections from the Gateway console's Triggers
+page; an email trigger names one of your mailboxes in its settings. A workflow becomes *triggerable* with **Add trigger event** on
 its `On Flow Start`: each run an automation starts then receives the event that
 caused it (type, subject, time, data, and a feed's or webhook's batch of
 items). See

@@ -41,6 +41,15 @@ export interface TriggerSource {
    * not carry the flag: they have no connections, so it reads `false`.
    */
   needs_connection: boolean;
+  /**
+   * Where that connection lives: `trigger_connections` (feeds, webhooks: the
+   * Gateway console's Triggers page, bound as `trigger.connection_id`) or
+   * `email_accounts` (an email trigger reads one of the person's mailboxes,
+   * named in its own settings: `config.account`).
+   */
+  connection_provider: 'trigger_connections' | 'email_accounts';
+  /** The binding names a trigger connection (`needs_connection` and the `trigger_connections` provider). */
+  uses_trigger_connection: boolean;
   /** The settings of a connection (JSON Schema, same style as `config_schema`); `{}` when none. */
   connection_schema: JsonSchema;
 }
@@ -96,7 +105,7 @@ const KINDS: ReadonlySet<string> = new Set(['time', 'manual', 'event']);
 export function parseTriggerSourceItem(raw: unknown, index = 0): TriggerSourceItem {
   const at = `items[${index}]`;
   if (!isRecord(raw)) throw new TriggerSourcesContractError(`${at} is not an object`);
-  const { id, version, label, config_schema, event_schema, capabilities, available, unavailable_reason, needs_connection, connection_schema } = raw;
+  const { id, version, label, config_schema, event_schema, capabilities, available, unavailable_reason, needs_connection, connection_schema, connection_provider } = raw;
   if (typeof id !== 'string' || !id.trim()) throw new TriggerSourcesContractError(`${at}.id is not a non-empty string`);
   if (typeof available !== 'boolean') throw new TriggerSourcesContractError(`${at}.available is not a boolean`);
   if (unavailable_reason !== undefined && unavailable_reason !== null && typeof unavailable_reason !== 'string') {
@@ -131,7 +140,17 @@ export function parseTriggerSourceItem(raw: unknown, index = 0): TriggerSourceIt
   if (needs_connection !== undefined && typeof needs_connection !== 'boolean') {
     throw new TriggerSourcesContractError(`${at}.needs_connection is not a boolean`);
   }
-  if (needs_connection === true && !isRecord(connection_schema)) {
+  if (
+    connection_provider !== undefined &&
+    connection_provider !== null &&
+    connection_provider !== 'trigger_connections' &&
+    connection_provider !== 'email_accounts'
+  ) {
+    throw new TriggerSourcesContractError(`${at}.connection_provider is not trigger_connections or email_accounts`);
+  }
+  const provider = connection_provider === 'email_accounts' ? 'email_accounts' : 'trigger_connections';
+  const usesTriggerConnection = needs_connection === true && provider === 'trigger_connections';
+  if (usesTriggerConnection && !isRecord(connection_schema)) {
     throw new TriggerSourcesContractError(`${at}.connection_schema is not an object (the source needs a connection)`);
   }
   if (connection_schema !== undefined && connection_schema !== null && !isRecord(connection_schema)) {
@@ -145,6 +164,8 @@ export function parseTriggerSourceItem(raw: unknown, index = 0): TriggerSourceIt
     event_schema: event_schema as JsonSchema,
     capabilities: { kind: capabilities.kind as TriggerSourceKind },
     needs_connection: needs_connection === true,
+    connection_provider: provider,
+    uses_trigger_connection: usesTriggerConnection,
     connection_schema: (isRecord(connection_schema) ? connection_schema : {}) as JsonSchema,
     available: true,
   };

@@ -62,11 +62,13 @@ webhook delivers a batch: loop over `events`, or add a path such as
 `data.events.0.data.title`. When you run the workflow by hand, `event` is
 empty. See [Web editor > The Trigger Event](web-editor.md#the-trigger-event).
 
-## Where Do I Create A Feed, Webhook Or Mailbox Connection?
+## Where Do I Create A Feed Or Webhook Connection?
 
 On the Gateway console's **Triggers** page (`/console#triggers`). In the
 Automation dialog, **New connection…** opens that page on the selected source;
-press **Refresh connections** when you come back.
+press **Refresh connections** when you come back. Mailboxes are not
+connections: add one under **Accounts → your row → Email** in the console, then
+name it in the email trigger's settings (`account`).
 
 ## Why Does The Automation Dialog Say Trigger Sources Are Unavailable?
 

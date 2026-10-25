@@ -5,7 +5,7 @@
  * config form is rendered from the chosen source's `config_schema`
  * (utils/triggerBindings.ts). Nothing here knows schedule@1 or manual@1.
  *
- * Sources with `needs_connection` (feeds, webhooks, mailboxes) listen to one
+ * Sources with a trigger connection (feeds, webhooks) listen to one
  * of the author's trigger CONNECTIONS (utils/triggerConnections.ts): a
  * selector lists them, "New connection…" opens the gateway console's
  * Triggers page on that source, and the choice is saved as
@@ -251,7 +251,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     setValues(seeded);
   }, [selected, currentConfig]);
 
-  const needsConnection = Boolean(selected?.needs_connection);
+  const needsConnection = Boolean(selected?.uses_trigger_connection);
   const loadConnections = useCallback(async () => {
     setConnectionsLoading(true);
     setConnectionsError('');

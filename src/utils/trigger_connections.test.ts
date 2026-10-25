@@ -119,3 +119,39 @@ describe('automation_defaults.trigger.connection_id', () => {
     expect(() => parseAutomationDefaults(draft({ connection_id: 7 }))).toThrow(/trigger.connection_id/);
   });
 });
+
+describe('mailbox-backed sources (connection_provider: email_accounts)', () => {
+  const EMAIL = {
+    id: 'email.received',
+    version: 1,
+    label: 'When an email arrives',
+    config_schema: { type: 'object', properties: { account: { type: 'string', default: 'self' } } },
+    event_schema: { type: 'object' },
+    capabilities: { kind: 'event' },
+    needs_connection: true,
+    connection_provider: 'email_accounts',
+    connection_schema: { type: 'object', properties: { account: { type: 'string' } } },
+    available: true,
+  };
+  const sources = parseTriggerSourcesResponse({ items: [...TRIGGER_SOURCES_RESPONSE.items, FEED_ITEM_V1, EMAIL] });
+
+  it('reads its mailbox from its own settings, never a trigger connection', () => {
+    const email = sources.find((s): s is AvailableTriggerSource => s.id === 'email.received' && s.available)!;
+    expect(email.needs_connection).toBe(true);
+    expect(email.connection_provider).toBe('email_accounts');
+    expect(email.uses_trigger_connection).toBe(false);
+    expect(FEED.uses_trigger_connection).toBe(true);
+    const draft = (trigger: Record<string, unknown>) => ({
+      schema_version: 1,
+      trigger: { source_id: 'email.received', source_version: 1, config: { account: 'work' }, ...trigger },
+      context: { mode: 'independent' },
+      input_data: {},
+    });
+    expect(assertValidAutomationDefaults(draft({}), sources).trigger.config).toEqual({ account: 'work' });
+    expect(() => assertValidAutomationDefaults(draft({ connection_id: 'conn_feed1' }), sources)).toThrow(/takes no connection/);
+  });
+
+  it('refuses an unknown provider', () => {
+    expect(() => parseTriggerSourceItem({ ...EMAIL, connection_provider: 'somewhere' })).toThrow(/connection_provider/);
+  });
+});

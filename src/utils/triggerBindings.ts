@@ -342,7 +342,7 @@ export function validateAutomationDefaults(
       message: `trigger source "${source_id}" version ${source_version} is not served (served: ${served})`,
     }];
   }
-  const connectionIssue = source.needs_connection
+  const connectionIssue = source.uses_trigger_connection
     ? (defaults.trigger.connection_id ? null : { field: 'trigger.connection_id', message: `trigger source "${source_id}" listens to a connection: choose one` })
     : (defaults.trigger.connection_id ? { field: 'trigger.connection_id', message: `trigger source "${source_id}" takes no connection` } : null);
   return [...(connectionIssue ? [connectionIssue] : []), ...validateTriggerConfig(source.config_schema, config)];

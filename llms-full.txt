@@ -103,9 +103,9 @@ warns about missing, unconnected, or mistyped interface pins. See [VisualFlow JS
 A runnable workflow can also store automation defaults (Flow Library >
 **Automation**): the trigger source and settings discovered from the Gateway,
 the context mode, and default inputs that an automation created from the
-published workflow starts with. Sources that read from a connection (a feed,
-a webhook, a mailbox) list your connections from the Gateway console's
-Triggers page. A workflow becomes *triggerable* with **Add trigger event** on
+published workflow starts with. Sources that read from a trigger connection (a
+feed, a webhook) list your connections from the Gateway console's Triggers
+page; an email trigger names one of your mailboxes in its settings. A workflow becomes *triggerable* with **Add trigger event** on
 its `On Flow Start`: each run an automation starts then receives the event that
 caused it (type, subject, time, data, and a feed's or webhook's batch of
 items). See
@@ -652,7 +652,7 @@ Open the **Flow Library** and select a workflow. The **Automation** row summariz
 
 - **Trigger**: the trigger sources your gateway serves. The gateway ships **Schedule** and **Manual**; trigger adapters installed on the gateway appear in the same list with no editor update, because the list and each source's settings form come from the gateway. A source the gateway lists but cannot load is shown disabled with its reason. **Refresh sources** asks the gateway again.
 - **Settings**: a form built from the selected source's `config_schema`. For **Schedule**, `every` is a whole number of seconds, minutes, hours or days (for example 5 minutes or 24 hours), `start_at` and `until` are RFC 3339 timestamps, and `count` limits the number of runs. Schedules are fixed intervals in UTC; cron expressions are not supported. Without `every` the schedule fires once, at `start_at`. Leave a field empty to use the source's default. **Manual** has no settings.
-- **Connection** (sources that read from a connection: a feed, a webhook, a mailbox): your connections of that source, from `GET /api/gateway/triggers/connections`; a paused one says so. **New connection…** opens the gateway console's Triggers page on that source (`<gateway>/console#triggers?new=<source id>`), where you create it once (a feed address, a webhook and its secret, a mailbox); press **Refresh connections** afterwards. The choice is saved as `trigger.connection_id`. A gateway without connections says so and the source cannot be saved.
+- **Connection** (sources that read from a trigger connection: a feed, a webhook; an email trigger names your mailbox in its settings instead): your connections of that source, from `GET /api/gateway/triggers/connections`; a paused one says so. **New connection…** opens the gateway console's Triggers page on that source (`<gateway>/console#triggers?new=<source id>`), where you create it once (a feed address, a webhook and its secret, a mailbox); press **Refresh connections** afterwards. The choice is saved as `trigger.connection_id`. A gateway without connections says so and the source cannot be saved.
 - **Context**: *Independent* (every run starts fresh, the default) or *Growing* (every run continues the same conversation).
 - **Title** (optional) and **Default input_data**: the inputs of the workflow's `On Flow Start` node, as a JSON object. When an automation runs, a text `prompt` is prefixed with a line naming the trigger and the run number.
 
@@ -4263,8 +4263,9 @@ flowchart LR
   Create --> Automation["Automation<br/>runs the workflow per trigger"]
 ```
 
-Sources that read from a connection (a feed, a webhook, a mailbox) bind one of
-the author's trigger connections, and every run receives the event that caused
+Sources that read from a trigger connection (a feed, a webhook) bind one of
+the author's trigger connections (an email trigger names one of the author's
+mailboxes in its settings instead), and every run receives the event that caused
 it on the workflow's `On Flow Start`:
 
 ```mermaid
@@ -4638,7 +4639,7 @@ A runnable workflow can carry the defaults of the automations created from it in
 
 - `trigger.source_id` / `source_version` name a trigger source served by the gateway (`GET /api/gateway/trigger-sources`); `config` must match that source's `config_schema`. For `schedule` v1: `start_at`, `until` and `anchor` are RFC 3339 timestamps, `every` is a whole number followed by `s`, `m`, `h` or `d`, `count` is an integer of at least 1. `manual` v1 takes `{}`.
 - `context.mode` is `independent` (default) or `growing`; `title` is optional; `input_data` (default `{}`) holds the `On Flow Start` inputs.
-- `trigger.connection_id` (optional string) names one of your trigger connections, for a source whose descriptor says `needs_connection: true` (a feed, a webhook, a mailbox). Such a source requires it; any other source refuses it. Connections are created on the gateway console's Triggers page (`/console#triggers`); the gateway refuses a connection that is not the automation owner's when the automation is created.
+- `trigger.connection_id` (optional string) names one of your trigger connections, for a source whose descriptor says `needs_connection: true` with the `trigger_connections` provider (a feed, a webhook). An email trigger (`connection_provider: email_accounts`) reads one of your mailboxes instead, named in its own settings (`account`); mailboxes are added under Accounts → your row → Email in the Gateway console. Such a source requires it; any other source refuses it. Connections are created on the gateway console's Triggers page (`/console#triggers`); the gateway refuses a connection that is not the automation owner's when the automation is created.
 - No other field is accepted: binding ids, credentials and automation ids are created by the gateway when an automation is created, never stored in the workflow.
 
 ### The trigger event
@@ -5515,11 +5516,13 @@ webhook delivers a batch: loop over `events`, or add a path such as
 `data.events.0.data.title`. When you run the workflow by hand, `event` is
 empty. See [Web editor > The Trigger Event](web-editor.md#the-trigger-event).
 
-## Where Do I Create A Feed, Webhook Or Mailbox Connection?
+## Where Do I Create A Feed Or Webhook Connection?
 
 On the Gateway console's **Triggers** page (`/console#triggers`). In the
 Automation dialog, **New connection…** opens that page on the selected source;
-press **Refresh connections** when you come back.
+press **Refresh connections** when you come back. Mailboxes are not
+connections: add one under **Accounts → your row → Email** in the console, then
+name it in the email trigger's settings (`account`).
 
 ## Why Does The Automation Dialog Say Trigger Sources Are Unavailable?
 
@@ -5773,7 +5776,7 @@ Trigger connections need an AbstractGateway that serves `/api/gateway/triggers/c
 
 ### Added
 
-- **Trigger connections in Automation defaults.** A source whose descriptor says `needs_connection` (a feed, a webhook, a mailbox) shows a **Connection** selector with your connections of that source, **New connection…** (opens the Gateway console's Triggers page on that source) and **Refresh connections**. The choice is saved as `automation_defaults.trigger.connection_id`, required by such a source and refused by any other. Descriptors without `needs_connection` need no connection.
+- **Trigger connections in Automation defaults.** A source that reads from a trigger connection (a feed, a webhook: `needs_connection` with the `trigger_connections` provider) shows a **Connection** selector with your connections of that source, **New connection…** (opens the Gateway console's Triggers page on that source) and **Refresh connections**. The choice is saved as `automation_defaults.trigger.connection_id`, required by such a source and refused by any other. Descriptors without `needs_connection` need no connection; an email trigger (`connection_provider: email_accounts`) names one of your mailboxes in its settings and takes no connection.
 - **Triggerable workflows.** On Flow Start's Properties offer **Add trigger event**: an `event` output (the CloudEvents envelope a triggered run receives as `input_data.event`, typed with its schema) and a wired **Trigger event** node exposing `type`, `subject`, `time`, `data`, `count`, `events` (a feed's or webhook's batch of items) and `series` (schedules), in one undo step. The Automation dialog says whether a workflow is triggerable and refuses a connection source for one that is not. See [Web editor > The Trigger Event](docs/web-editor.md#the-trigger-event) and [VisualFlow JSON > The trigger event](docs/visualflow.md#the-trigger-event) (one example per source).
 - **If/Else from a dropped boolean wire.** Release a wire dragged from a boolean output on empty canvas and the menu offers **If/Else** first: it arrives with that output wired to its `condition`.
 

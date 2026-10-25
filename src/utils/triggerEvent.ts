@@ -129,13 +129,14 @@ export function isTriggerableFlow(flow: Pick<VisualFlow, 'nodes'>): boolean {
 
 /**
  * How much a trigger source depends on the event input:
- * - `required`: it reads from a connection (feed, webhook, mailbox): the
+ * - `required`: it reads from a trigger connection (feed, webhook): the
  *   event IS the work, so a flow without the `event` input cannot be bound;
- * - `recommended`: other event sources (the content arrives as the event);
+ * - `recommended`: other event sources, email included (the content arrives
+ *   as the event; an email's bodies also arrive as the `emails` input);
  * - `optional`: time and manual sources (the event only says which tick).
  */
-export function triggerEventRequirement(source: { needs_connection: boolean; capabilities: { kind: string } }): 'required' | 'recommended' | 'optional' {
-  if (source.needs_connection) return 'required';
+export function triggerEventRequirement(source: { uses_trigger_connection: boolean; capabilities: { kind: string } }): 'required' | 'recommended' | 'optional' {
+  if (source.uses_trigger_connection) return 'required';
   if (source.capabilities.kind === 'event') return 'recommended';
   return 'optional';
 }
