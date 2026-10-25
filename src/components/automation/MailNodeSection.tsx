@@ -21,6 +21,8 @@ import {
   PUBLISH_CHANNEL_SUGGESTIONS,
   defaultMailboxFor,
   fetchMailboxFolders,
+  folderLabel,
+  type MailFolder,
   mailSendRefusal,
   publishChannelProblem,
 } from '../../utils/mailNodes';
@@ -36,7 +38,7 @@ export function MailNodeSection({ nodeId, data, onPinDefaults }: { nodeId: strin
   const trigger = useFlowStore((s) => s.flowAutomationDefaults?.trigger) || null;
   const [mailboxes, setMailboxes] = useState<Mailbox[] | null>(null);
   const [mailboxError, setMailboxError] = useState('');
-  const [folders, setFolders] = useState<string[] | null>(null);
+  const [folders, setFolders] = useState<MailFolder[] | null>(null);
   const [folderNote, setFolderNote] = useState('');
   const defaults = (data.pinDefaults || {}) as Record<string, JsonValue>;
   const type = String(data.nodeType);
@@ -70,7 +72,11 @@ export function MailNodeSection({ nodeId, data, onPinDefaults }: { nodeId: strin
           setFolderNote(r.reason);
         }
       })
-      .catch((e: unknown) => alive && setFolderNote(`The folders could not be read: ${e instanceof Error ? e.message : String(e)}`));
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setFolders(null);
+        setFolderNote(`Type the folder name: the folders could not be read (${e instanceof Error ? e.message : String(e)}).`);
+      });
     return () => {
       alive = false;
     };
@@ -129,12 +135,20 @@ export function MailNodeSection({ nodeId, data, onPinDefaults }: { nodeId: strin
             >
               <option value="">Choose a folder…</option>
               {folders.map((f) => (
-                <option key={f} value={f}>
-                  {f}
+                <option key={f.name} value={f.name}>
+                  {folderLabel(f)}
                 </option>
               ))}
             </select>
-          ) : null}
+          ) : (
+            <input
+              id={`folder-${nodeId}`}
+              className="run-form-input"
+              value={typeof defaults.folder === 'string' ? defaults.folder : ''}
+              placeholder="Folder name, e.g. Archive"
+              onChange={(e) => onPinDefaults({ ...defaults, folder: e.target.value })}
+            />
+          )}
           {folderNote ? <span className="property-hint">{folderNote}</span> : null}
         </div>
       ) : null}

@@ -12,7 +12,7 @@ import { withLoopItemTypes } from './relays';
 import { triggerStartPins } from './triggerPins';
 import { PALETTE_SECTION_DEFS } from './paletteModel';
 import { GatewayHttpError } from './gatewayClient';
-import { defaultMailboxFor, fetchMailboxFolders, mailSendRefusal, publishChannelProblem } from './mailNodes';
+import { defaultMailboxFor, fetchMailboxFolders, folderLabel, mailSendRefusal, publishChannelProblem } from './mailNodes';
 import { parseMailboxes } from './automationGateway';
 import { ME_EMAIL_RESPONSE } from './triggerSources.fixtures';
 
@@ -174,12 +174,23 @@ describe('design-time mail rules', () => {
     expect(publishChannelProblem('')).toMatch(/Name the channel/);
   });
 
-  it('folders come from the gateway; without the route the node says to type the name', async () => {
-    await expect(fetchMailboxFolders('default', async () => ({ folders: [{ name: 'INBOX' }, 'Archive'] }))).resolves.toEqual({ status: 'ok', folders: ['INBOX', 'Archive'] });
+  it('folders come from the gateway (primary or by mailbox id), special ones with their role word; a failure means typing the name', async () => {
+    const answer = { folders: [{ name: 'INBOX', special: 'inbox', messages: 12 }, { name: '[Gmail]/Trash', special: 'trash' }, { name: 'Receipts', special: null }] };
+    const paths: string[] = [];
+    const fetchJson = async (p: string) => (paths.push(p), answer);
+    const primary = await fetchMailboxFolders('default', fetchJson);
+    await fetchMailboxFolders('', fetchJson);
+    await fetchMailboxFolders('work', fetchJson);
+    expect(paths).toEqual(['api/gateway/me/email/folders', 'api/gateway/me/email/folders', 'api/gateway/me/email/accounts/work/folders']);
+    expect(primary.status === 'ok' && primary.folders.map(folderLabel)).toEqual(['INBOX', '[Gmail]/Trash · Trash', 'Receipts']);
     await expect(
-      fetchMailboxFolders('default', async () => {
+      fetchMailboxFolders('work', async () => {
         throw new GatewayHttpError('nf', 404, null);
       })
-    ).resolves.toEqual({ status: 'unavailable', reason: 'This gateway does not list folders yet: type the folder name on the node.' });
+    ).resolves.toEqual({ status: 'unavailable', reason: 'Type the folder name: this gateway does not list folders.' });
+    const broken = await fetchMailboxFolders('work', async () => {
+      throw new GatewayHttpError('HTTP 502', 502, null);
+    });
+    expect(broken.status === 'unavailable' && broken.reason).toMatch(/^Type the folder name: the folders could not be read/);
   });
 });

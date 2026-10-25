@@ -105,22 +105,51 @@ export function mailSendRefusal(
   return `${name} is read-only: replies and forwards go out from it, and it cannot send mail. Connect its outgoing server in My email.`;
 }
 
-/** The mailbox's folders (`GET /api/gateway/me/email/accounts/{id}/folders` -> {folders: [{name}] | [name]}). */
+export interface MailFolder {
+  name: string;
+  /** The folder's role: inbox | sent | trash | drafts | junk | archive, or null. */
+  special: string | null;
+  messages?: number;
+}
+
+const ROLE_WORDS: Record<string, string> = { inbox: 'Inbox', sent: 'Sent', trash: 'Trash', drafts: 'Drafts', junk: 'Junk', archive: 'Archive' };
+
+/** A folder in the picker: its name, with its role word when it has one ("[Gmail]/Trash · Trash"). */
+export function folderLabel(folder: MailFolder): string {
+  const role = folder.special ? ROLE_WORDS[folder.special] || folder.special : '';
+  return role && role.toLowerCase() !== folder.name.toLowerCase() ? `${folder.name} · ${role}` : folder.name;
+}
+
+/**
+ * A mailbox's folders (gateway 3c99b771): `GET /api/gateway/me/email/folders`
+ * for the primary mailbox (empty / "default" / "self"), else
+ * `GET /api/gateway/me/email/accounts/{mailbox_id}/folders`
+ * -> {folders: [{name, special, messages?}]}. Any failure: type the name.
+ */
 export async function fetchMailboxFolders(
   accountId: string,
   fetchJson: (path: string) => Promise<unknown> = (path) => gatewayJson<unknown>(path)
-): Promise<{ status: 'ok'; folders: string[] } | { status: 'unavailable'; reason: string }> {
+): Promise<{ status: 'ok'; folders: MailFolder[] } | { status: 'unavailable'; reason: string }> {
+  const primary = !accountId || accountId === 'default' || accountId === 'self';
+  const path = primary ? 'api/gateway/me/email/folders' : `api/gateway/me/email/accounts/${encodeURIComponent(accountId)}/folders`;
   try {
-    const raw = (await fetchJson(`api/gateway/me/email/accounts/${encodeURIComponent(accountId)}/folders`)) as { folders?: unknown };
+    const raw = (await fetchJson(path)) as { folders?: unknown };
     if (!raw || !Array.isArray(raw.folders)) throw new Error('the gateway answered without a folders list');
-    const folders = raw.folders
-      .map((f) => (typeof f === 'string' ? f : f && typeof f === 'object' && typeof (f as { name?: unknown }).name === 'string' ? (f as { name: string }).name : ''))
-      .filter(Boolean);
+    const folders: MailFolder[] = [];
+    for (const f of raw.folders) {
+      if (typeof f === 'string' && f) folders.push({ name: f, special: null });
+      else if (f && typeof f === 'object' && typeof (f as { name?: unknown }).name === 'string') {
+        const r = f as { name: string; special?: unknown; messages?: unknown };
+        folders.push({
+          name: r.name,
+          special: typeof r.special === 'string' ? r.special : null,
+          ...(typeof r.messages === 'number' ? { messages: r.messages } : {}),
+        });
+      }
+    }
     return { status: 'ok', folders };
   } catch (error) {
-    if (error instanceof GatewayHttpError && error.status === 404) {
-      return { status: 'unavailable', reason: 'This gateway does not list folders yet: type the folder name on the node.' };
-    }
-    throw error;
+    const why = error instanceof GatewayHttpError && error.status === 404 ? 'this gateway does not list folders' : `the folders could not be read (${error instanceof Error ? error.message : String(error)})`;
+    return { status: 'unavailable', reason: `Type the folder name: ${why}.` };
   }
 }
