@@ -8,7 +8,7 @@
 import type { AutomationTriggerDefaults } from '../../types/flow';
 import { triggerSentence, type AutomationWords } from '../../utils/automationChoice';
 import { triggerPinKind } from '../../utils/triggerPins';
-import { sampleNoun } from '../../utils/triggerSample';
+import { sampleNoun, sampleSourceName } from '../../utils/triggerSample';
 
 export function TriggeredRunPanel({
   trigger,
@@ -17,8 +17,8 @@ export function TriggeredRunPanel({
   onCount,
   busy,
   error,
-  disabled,
-  onRun,
+  edited,
+  onUseSample,
 }: {
   trigger: AutomationTriggerDefaults;
   words?: AutomationWords;
@@ -26,11 +26,20 @@ export function TriggeredRunPanel({
   onCount: (n: number) => void;
   busy: boolean;
   error: string;
-  disabled?: boolean;
-  onRun: () => void;
+  /** The person typed into the advanced inputs in this dialog: Run uses them as they are. */
+  edited: boolean;
+  onUseSample: () => void;
 }) {
   const kind = triggerPinKind(trigger);
   const noun = sampleNoun(kind);
+  // The panel says what Run (the dialog's one Run button) will do.
+  const plan = edited
+    ? null
+    : noun
+      ? `Run reads the last ${Number.isFinite(count) ? count : '…'} ${noun} of ${sampleSourceName(trigger, words)} again and runs the flow on them.`
+      : kind === 'schedule'
+        ? 'Run runs the flow as if the schedule fired now.'
+        : 'Run runs the flow as if someone pressed Run now.';
   return (
     <section className="run-form-section run-triggered" aria-labelledby="run-triggered-title">
       <div className="run-form-section-header">
@@ -40,7 +49,7 @@ export function TriggeredRunPanel({
       </div>
       <div className="run-form-section-body run-triggered-body">
         <p className="run-triggered-using">Using: {triggerSentence(trigger, words)}</p>
-        {noun ? (
+        {noun && !edited ? (
           <label className="automation-inline-field run-triggered-count">
             <span>Use the last</span>
             <input
@@ -54,20 +63,23 @@ export function TriggeredRunPanel({
             />
             <span>{noun}</span>
           </label>
-        ) : kind === 'schedule' ? (
-          <p className="automation-help">As if it fired now.</p>
         ) : null}
+        {edited ? (
+          <p className="run-triggered-edited">
+            Using your edited inputs.{' '}
+            <button type="button" className="automation-link-button" onClick={onUseSample}>
+              Use the sample again
+            </button>
+          </p>
+        ) : (
+          <p className="automation-help">{busy ? 'Reading what would arrive…' : plan}</p>
+        )}
         {error ? (
           <p className="automation-problem" role="alert">
             {error}
           </p>
         ) : null}
-        <div className="run-triggered-actions">
-          <button type="button" className="modal-button primary run-cta" onClick={onRun} disabled={busy || disabled || (Boolean(noun) && !(count >= 1))}>
-            {busy ? 'Reading what would arrive…' : 'Run'}
-          </button>
-          <span className="automation-muted">A test run: nothing is turned on.</span>
-        </div>
+        <p className="automation-muted">A test run: nothing is turned on.</p>
       </div>
     </section>
   );

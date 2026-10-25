@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Run as if triggered re-samples on every Run with the current count (a first sample's inputs were reused as if edited): only typing in the advanced inputs counts as editing ("Using your edited inputs." / "Use the sample again"), fewer results say "Only N messages found", an early stop "(stopped after 20 s)"; the window has one Run button.
 - The unsaved-changes dot no longer stays after a save that followed an Automation change (the dirty check now follows the automation defaults and the description).
 - The header no longer overlaps at 1440 px and up with the automation badge: the name and badge give way first and the actions scroll as one strip.
 

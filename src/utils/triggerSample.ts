@@ -82,24 +82,55 @@ export async function fetchTriggerSample(
   return parseTriggerSample(await post(TRIGGER_SAMPLE_ENDPOINT, body));
 }
 
+/** The mailbox address / feed or webhook name a sample reads from. */
+export function sampleSourceName(trigger: AutomationTriggerDefaults, words: AutomationWords = {}): string {
+  const kind = triggerPinKind(trigger);
+  if (kind === 'email') return mailboxName(typeof trigger.config.account === 'string' ? trigger.config.account : 'default', words.mailboxes || null);
+  const cid = trigger.connection_id || '';
+  return words.connections?.find((c) => c.connection_id === cid)?.label || (connectionKind(trigger.source_id) === 'feed' ? 'the feed' : 'the webhook');
+}
+
+const LIST_PIN: Partial<Record<TriggerPinKind, string>> = { email: 'messages', feed: 'items', webhook: 'calls' };
+const SINGULAR: Record<string, string> = { messages: 'message', items: 'item', calls: 'call' };
+
+/** How many items a sample brought (null when the trigger has no list, or the answer has none). */
+export function sampleFound(trigger: AutomationTriggerDefaults, sample: TriggerSample): number | null {
+  const pin = LIST_PIN[triggerPinKind(trigger)];
+  const list = pin ? sample.inputs[pin] : undefined;
+  return Array.isArray(list) ? list.length : null;
+}
+
 /**
- * The sentence shown when the test run starts: the gateway's own summary when
- * it gives one, else built from the trigger ("the last 100 messages of me@…").
+ * The sentence shown when the test run starts: what it runs on, "Only N
+ * messages found" when fewer came back than asked, "(stopped after 20 s)"
+ * when the gateway stopped reading early.
  */
 export function testRunSentence(trigger: AutomationTriggerDefaults, count: number, sample: TriggerSample | null, words: AutomationWords = {}): string {
-  if (sample?.summary) return `Running with ${sample.summary} (test run)`;
   const kind = triggerPinKind(trigger);
-  if (kind === 'email') {
-    const box = mailboxName(typeof trigger.config.account === 'string' ? trigger.config.account : 'default', words.mailboxes || null);
-    return `Running with the last ${count} messages of ${box} (test run)`;
+  const noun = sampleNoun(kind);
+  const stopped = sample?.truncated ? ' (stopped after 20 s)' : '';
+  if (noun && sample) {
+    const found = sampleFound(trigger, sample);
+    if (found !== null && found < count) {
+      const word = found === 1 ? SINGULAR[noun] : noun;
+      if (found === 0) return `No ${noun} found${stopped}: running with none (test run)`;
+      return `Only ${found} ${word} found${stopped}: running with ${found === 1 ? 'it' : 'them'} (test run)`;
+    }
+    if (found === null && sample.summary) return `Running with ${sample.summary}${stopped} (test run)`;
   }
-  if (kind === 'feed' || kind === 'webhook') {
-    const cid = trigger.connection_id || '';
-    const label = words.connections?.find((c) => c.connection_id === cid)?.label || (connectionKind(trigger.source_id) === 'feed' ? 'the feed' : 'the webhook');
-    return `Running with the last ${count} ${sampleNoun(kind)} of ${label} (test run)`;
-  }
+  if (noun) return `Running with the last ${count} ${noun} of ${sampleSourceName(trigger, words)}${stopped} (test run)`;
   if (kind === 'schedule') return 'Running as if the schedule fired now (test run)';
   return 'Running (test run)';
+}
+
+/** Is a field's value the sampled one (JSON compared by value, so a reformat is not an edit)? */
+export function sameInputValue(a: string, b: string): boolean {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(JSON.parse(a)) === JSON.stringify(JSON.parse(b));
+  } catch {
+    return a.trim() === b.trim();
+  }
 }
 
 /**

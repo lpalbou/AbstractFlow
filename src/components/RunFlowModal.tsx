@@ -15,7 +15,7 @@ import { useFlowStore } from '../hooks/useFlow';
 import { TriggeredRunPanel } from './automation/TriggeredRunPanel';
 import { useTriggerWords } from './automation/FlowNatureBadge';
 import { TRIGGER_FILLED_PIN_IDS } from '../utils/triggerPins';
-import { DEFAULT_SAMPLE_COUNT, fetchTriggerSample, runAsIfTriggered } from '../utils/triggerSample';
+import { DEFAULT_SAMPLE_COUNT, fetchTriggerSample, runAsIfTriggered, sameInputValue } from '../utils/triggerSample';
 import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
@@ -2361,6 +2361,12 @@ export function RunFlowModal({
   const [sampleBusy, setSampleBusy] = useState(false);
   const [sampleError, setSampleError] = useState('');
   const [triggerInputsEdited, setTriggerInputsEdited] = useState(false);
+  // The values the last sample put in the advanced inputs (what "not edited" means).
+  const sampledValuesRef = useRef<Record<string, string>>({});
+  // Each opening of the dialog starts a new session: nothing is "edited" yet.
+  useEffect(() => {
+    if (isOpen) setTriggerInputsEdited(false);
+  }, [isOpen]);
   const generatedMusicContract =
     gatewayContracts?.flow_editor?.media?.generated_music || gatewayContracts?.assistant?.media?.generated_music;
   const visionProviderModelsEndpoint = discovery.vision_provider_models || '';
@@ -2656,9 +2662,15 @@ export function RunFlowModal({
   }, [isWaiting]);
 
   // Update a form field
+  // Only a value the person types in THIS dialog session makes the
+  // trigger-filled inputs "edited"; a sampled (prefilled) value never does,
+  // even when a field re-formats it.
   const handleFieldChange = useCallback((pinId: string, value: string) => {
     setFormValues(prev => ({ ...prev, [pinId]: value }));
-  }, []);
+    if (automationTrigger && TRIGGER_FILLED_PIN_IDS.has(pinId) && !sameInputValue(value, sampledValuesRef.current[pinId] ?? '')) {
+      setTriggerInputsEdited(true);
+    }
+  }, [automationTrigger]);
 
   const handleWorkspaceRootChange = useCallback(
     (next: string) => {
@@ -2965,7 +2977,10 @@ export function RunFlowModal({
         filledPinIds: triggerFilledPins.map((pin) => pin.id),
         words: triggerWords,
         sample: (body) => fetchTriggerSample(body),
-        prefill: (values) => setFormValues((prev) => ({ ...prev, ...values })),
+        prefill: (values) => {
+          sampledValuesRef.current = { ...values };
+          setFormValues((prev) => ({ ...prev, ...values }));
+        },
         start: (overrides) => handleSubmit(overrides),
       });
       if (out.started) toast(out.sentence);
@@ -7992,8 +8007,8 @@ export function RunFlowModal({
                         onCount={setSampleCount}
                         busy={sampleBusy}
                         error={sampleError}
-                        disabled={!entryNode || isRunning}
-                        onRun={() => void handleTriggeredRun()}
+                        edited={triggerInputsEdited}
+                        onUseSample={() => setTriggerInputsEdited(false)}
                       />
                     ) : null}
 
@@ -8446,13 +8461,10 @@ export function RunFlowModal({
                             <>
                               {shownFormPins.map(renderParamPin)}
                               {automationTrigger && triggerFilledPins.length ? (
-                                <details
-                                  className="run-triggered-advanced"
-                                  onInput={() => setTriggerInputsEdited(true)}
-                                >
+                                <details className="run-triggered-advanced">
                                   <summary>Advanced: edit the inputs</summary>
                                   <p className="run-form-note">
-                                    What the trigger fills. Run reads a fresh sample into these fields; once you edit them, Run uses your values.
+                                    What the trigger fills. Every Run reads a fresh sample into these fields; once you type in them, Run uses your values.
                                   </p>
                                   {triggerFilledPins.map(renderParamPin)}
                                 </details>
@@ -8893,8 +8905,10 @@ export function RunFlowModal({
                         type="button"
                         className="modal-button primary run-cta"
                         onClick={() => void (automationTrigger ? handleTriggeredRun() : handleSubmit())}
+                        aria-busy={sampleBusy || undefined}
                         disabled={
                           !entryNode ||
+                          sampleBusy ||
                           (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
                         }
                       >
