@@ -1,4 +1,5 @@
 import 'reactflow/dist/style.css';
+import { LoadingLine } from './components/ReadState';
 import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -333,7 +334,7 @@ function App() {
           <div className="connection-check-card">
             <div className="gateway-connection-kicker">AbstractFlow connection</div>
             <h3>Checking browser session</h3>
-            <p>Loading the saved Gateway sign-in for this browser.</p>
+            <LoadingLine text="Loading the saved Gateway sign-in for this browser" />
           </div>
         ) : null}
         <GatewayConnectionModal

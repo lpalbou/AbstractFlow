@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { GATEWAY_CONNECTION_PATH, GatewaySessionSignInCard } from '@abstractframework/ui-kit';
+import { GatewayHttpError } from '../utils/gatewayClient';
+import { retryRead } from '../utils/readRetry';
 
 /** What the gateway said about this browser's session (`GET /api/gateway/me`
  * on a probe, the sign-in answer after a sign-in). */
@@ -47,14 +49,17 @@ export function hasBrowserGatewaySession(status: GatewayConnectionStatus | null)
   return true;
 }
 
+/** This browser's session, from the app server; a read, tried like every gateway read (utils/readRetry.ts). */
 export async function fetchGatewayConnection(): Promise<GatewayConnectionStatus> {
-  const res = await fetch(GATEWAY_CONNECTION_PATH);
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg = data && typeof data === 'object' && (data as any).detail ? String((data as any).detail) : `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return data as GatewayConnectionStatus;
+  return retryRead(async () => {
+    const res = await fetch(GATEWAY_CONNECTION_PATH);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const msg = data && typeof data === 'object' && (data as any).detail ? String((data as any).detail) : `HTTP ${res.status}`;
+      throw new GatewayHttpError(msg, res.status, data);
+    }
+    return data as GatewayConnectionStatus;
+  });
 }
 
 export async function saveGatewayConnection(payload: {

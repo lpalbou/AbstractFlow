@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { LoadingLine } from './ReadState';
 import {
   endpointFromDescriptor,
   gatewayFetch,
@@ -278,7 +279,7 @@ export function ArtifactPlayer({
     return (
       <div className={`artifact-player ${compact ? 'compact' : ''}`}>
         {textState.loading ? (
-          <div className="artifact-player-empty">Loading artifact…</div>
+          <LoadingLine text="Loading artifact" className="artifact-player-empty" />
         ) : textState.error ? (
           <div className="artifact-player-error">
             {textState.error}
@@ -311,7 +312,7 @@ export function ArtifactPlayer({
   return (
     <div className={`artifact-player ${compact ? 'compact' : ''}`}>
       {loading ? (
-        <div className="artifact-player-empty">Loading artifact...</div>
+        <LoadingLine text="Loading artifact" className="artifact-player-empty" />
       ) : error ? (
         <div className="artifact-player-error">
           {error}

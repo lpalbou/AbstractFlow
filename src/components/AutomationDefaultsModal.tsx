@@ -51,6 +51,7 @@ import { enumWords, triggerSettingsCopy } from '../utils/triggerCopy';
 import { inputDataFromForm, inputFields, inputFormFromData, modelOptions, providerOptions, type InputField, type InputValues, type ModelCatalog } from '../utils/automationInputs';
 import { useModelCatalog } from './automation/useModelCatalog';
 import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
+import { LoadingLine, ReadFailed } from './ReadState';
 import { useAutomationFacts } from './automation/useAutomationFacts';
 import { OPEN_OBSERVER_LABEL, observerAutomationsUrl, turnedOnSentence, updatedSentence } from '../utils/automationTurnOn';
 import { linkedStatusWords, type LinkedAutomation } from '../utils/automationLink';
@@ -696,15 +697,12 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
         {turnedOn ? (
           <TurnedOnPanel title={turnedOn.title} updated={turnedOn.updated} gatewayUrl={facts.gatewayUrl} onClose={onClose} />
         ) : null}
-        {!turnedOn && support.sourcesProblem ? (
-          <p className={facts.sources.state === 'loading' ? 'automation-help' : 'automation-problem'}>
-            {support.sourcesProblem}{' '}
-            {facts.sources.state !== 'loading' ? (
-              <button type="button" className="automation-link-button" onClick={facts.reloadSources}>
-                Try again
-              </button>
-            ) : null}
-          </p>
+        {!turnedOn && support.sourcesLoading ? (
+          <LoadingLine text="Loading what this gateway can run" />
+        ) : !turnedOn && support.sourcesProblem ? (
+          <ReadFailed onRetry={facts.reloadSources} retryLabel="Try again">
+            {support.sourcesProblem}
+          </ReadFailed>
         ) : null}
 
         {sourcesReady && !turnedOn ? (
@@ -727,8 +725,9 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
                 data={support.data}
                 includeChat={false}
                 gatewayUrl={facts.gatewayUrl}
-                arrivalsNote={support.arrivalsNote}
+                arrivalsRead={support.arrivalsRead}
                 onRefreshArrivals={facts.reloadArrivals}
+                onRetrySources={facts.reloadSources}
                 unavailable={support.unavailable}
                 idPrefix="automation-trigger"
               />

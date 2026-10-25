@@ -91,7 +91,14 @@ export function parseTriggerConnectionsResponse(raw: unknown): TriggerConnection
 
 export type ConnectionsJsonFetcher = (path: string) => Promise<unknown>;
 
-const defaultFetcher: ConnectionsJsonFetcher = (path) => gatewayJson<unknown>(path);
+/**
+ * Measured on the live gateway (2026-10-25, 10 reads of three connections):
+ * 2.2 to 15.7 s. Each try gets 45 s (ADR-0039 rule 6); a GET, so a slow or
+ * failed try is tried again (utils/readRetry.ts).
+ */
+export const TRIGGER_CONNECTIONS_TIMEOUT_MS = 45_000;
+
+const defaultFetcher: ConnectionsJsonFetcher = (path) => gatewayJson<unknown>(path, { timeoutMs: TRIGGER_CONNECTIONS_TIMEOUT_MS });
 
 /**
  * The signed-in person's connections. A gateway without the route (404) is

@@ -75,9 +75,20 @@ export function sampleErrorWords(error: unknown): string {
   return `Could not read what would arrive: ${error instanceof Error ? error.message : String(error)}`;
 }
 
+/**
+ * The gateway reads a mailbox for at most 20 s and answers 504 past 30 s
+ * (routes/triggers.py `sample_trigger_inputs`): each try gets 45 s.
+ */
+export const TRIGGER_SAMPLE_TIMEOUT_MS = 45_000;
+
+/**
+ * A POST that only reads (no cursor moves, nothing marked read: the route's
+ * contract), so it is tried like a GET (`read: true`, utils/readRetry.ts).
+ */
 export async function fetchTriggerSample(
   body: { trigger: AutomationTriggerDefaults; count?: number },
-  post: (path: string, body: unknown) => Promise<unknown> = (path, b) => gatewayJson<unknown>(path, jsonRequest(b, { method: 'POST' }))
+  post: (path: string, body: unknown) => Promise<unknown> = (path, b) =>
+    gatewayJson<unknown>(path, { ...jsonRequest(b, { method: 'POST' }), read: true, timeoutMs: TRIGGER_SAMPLE_TIMEOUT_MS })
 ): Promise<TriggerSample> {
   return parseTriggerSample(await post(TRIGGER_SAMPLE_ENDPOINT, body));
 }

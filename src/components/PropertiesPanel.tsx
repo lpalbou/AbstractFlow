@@ -3,6 +3,7 @@
  */
 
 import { MailNodeSection, PublishNodeSection } from './automation/MailNodeSection';
+import { LoadingLine } from './ReadState';
 import { MAIL_NODE_TYPES, PUBLISH_NODE_TYPES } from '../utils/mailNodes';
 import React, { useCallback, useEffect, useState, useRef, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -2820,7 +2821,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     ) : !canBrowseAdapters ? (
                       <span className="property-hint">Pick a provider and model to browse compatible adapters.</span>
                     ) : loadingVisionAdapters ? (
-                      <span className="property-hint">Loading compatible adapters…</span>
+                      <LoadingLine inline text="Loading compatible adapters" className="property-hint" />
                     ) : visionAdapterOptions.length === 0 ? (
                       <span className="property-hint">No compatible adapters discovered for the current provider, model, and task.</span>
                     ) : (

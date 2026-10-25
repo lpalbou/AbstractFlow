@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { LoadingLine } from './ReadState';
 import type { Pin } from '../types/flow';
 import {
   descriptorEndpointAvailable,
@@ -490,7 +491,7 @@ export function ArtifactListInputField({
             placeholder="Optional metadata filters: kind=attachment,source=upload"
             disabled={disabled || busy}
           />
-          {loadingItems ? <div className="run-form-note">Loading artifacts...</div> : null}
+          {loadingItems ? <LoadingLine text="Loading artifacts" className="run-form-note" /> : null}
           {!loadingItems && filteredItems.length === 0 ? <div className="run-form-note">No matching artifacts.</div> : null}
           <div className="artifact-source-list">
             {filteredItems.map((item) => {

@@ -7,7 +7,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
   TRIGGER_LINK_MISSING_ID,
+  initialNewFlowStart,
+  newFlowPicker,
   parseTriggerLink,
+  settleLinkedTrigger,
+  type NewFlowStartState,
   resolveTriggerLink,
   triggerNotFoundLine,
   withoutTriggerParam,
@@ -19,6 +23,7 @@ import { parseTriggerConnectionsResponse } from './triggerConnections';
 import { CONNECTIONS_RESPONSE, LIVE_SOURCES_RESPONSE, ME_EMAIL_RESPONSE } from './triggerSources.fixtures';
 import { TriggerPicker, pickerSupport } from '../components/automation/TriggerPicker';
 import type { AutomationFacts } from '../components/automation/useAutomationFacts';
+import { NewFlowDialog } from '../components/NewFlowDialog';
 
 const FACTS: Pick<AutomationFacts, 'sources' | 'mailboxes' | 'connections'> = {
   sources: { state: 'ok', value: { status: 'ok', endpoint: 'api/gateway/triggers/sources', items: parseTriggerSourcesResponse(LIVE_SOURCES_RESPONSE) } },
@@ -124,9 +129,101 @@ describe('a trigger that is not among the connections', () => {
   });
 
   it('the New flow dialog shows the line under the picker until the picker is changed', () => {
+    const missing = settleLinkedTrigger(initialNewFlowStart(link('?trigger=conn_gone')), FACTS);
+    expect(missing).toMatchObject({ pending: null, picker: { start: 'arrives', arrival: '' }, line: 'The trigger conn_gone is not among your connections.' });
     const dialog = readFileSync(new URL('../components/NewFlowDialog.tsx', import.meta.url), 'utf8');
-    expect(dialog).toContain("const linkLine = pickerEdit === null && linked?.state === 'missing' ? linked.line : '';");
     expect(dialog).toContain('{linkLine ? <p className="automation-problem new-flow-link-line">{linkLine}</p> : null}');
-    expect(dialog).toContain("const name = nameEdit ?? (linked?.state === 'found' ? linked.name : '');");
+    // Changing the picker clears it.
+    expect(dialog).toContain("setStartState((prev) => ({ ...prev, picker: next, line: '' }))");
+  });
+});
+
+// Operator 2026-10-25 23:48: opened from the console through the gateway, the
+// dialog sat on "Loading your mailboxes and connections…" (plain text) while
+// the live gateway took 2 to 16 s to list the connections. The link must wait
+// for the lists, then be applied once; until then a spinner stands in the list.
+describe('the race: the lists arrive after the link was consumed', () => {
+  const ARRIVES_NOTHING = { start: 'arrives', arrival: '' };
+  const checkedRows = (html: string) => Array.from(html.matchAll(/<input type="radio"[^>]*checked=""[^>]*value="([^"]+)"/g)).map((m) => m[1]);
+  const pickerHtml = (state: NewFlowStartState, facts: typeof FACTS) => {
+    const support = pickerSupport(facts);
+    return renderToStaticMarkup(
+      createElement(TriggerPicker, {
+        value: newFlowPicker(state),
+        onChange: () => {},
+        data: support.data,
+        arrivalsRead: support.arrivalsRead,
+        includeChat: true,
+        gatewayUrl: 'http://gw',
+        onRefreshArrivals: () => {},
+      })
+    );
+  };
+
+  it('keeps the link pending through every loading step, then applies it once', () => {
+    const start = initialNewFlowStart(link('?trigger=conn_feed1'));
+    // 1. Nothing answered yet (the dialog opens with the link already consumed).
+    const nothing = { sources: LOADING, mailboxes: LOADING, connections: LOADING };
+    expect(settleLinkedTrigger(start, nothing)).toBe(start);
+    expect(newFlowPicker(start)).toEqual(ARRIVES_NOTHING);
+    const loadingHtml = pickerHtml(start, nothing);
+    expect(loadingHtml).toContain('class="read-loading__spinner"');
+    expect(loadingHtml).toContain('Loading your mailboxes and connections');
+    expect(loadingHtml).not.toContain('Nothing to listen to yet');
+    expect(checkedRows(loadingHtml)).toEqual([]);
+    // 2. Sources and mailboxes in, the connections still out (the slow list): still pending, still a spinner.
+    const partial = { ...FACTS, connections: LOADING };
+    expect(settleLinkedTrigger(start, partial)).toBe(start);
+    expect(pickerHtml(start, partial)).toContain('Loading your mailboxes and connections');
+    expect(pickerHtml(start, partial)).not.toContain('When mail arrives in');
+    // 3. The connections answer: picked, with a proposed title.
+    const applied = settleLinkedTrigger(start, FACTS);
+    expect(applied).toEqual({
+      picker: { start: 'arrives', arrival: 'conn:conn_feed1' },
+      name: null,
+      pending: null,
+      proposedName: 'Release notes feed digest',
+      line: '',
+    });
+    expect(checkedRows(pickerHtml(applied, FACTS))).toEqual(['conn:conn_feed1']);
+    // 4. Once: settling again changes nothing, and a later Refresh (lists loading again) keeps the pick.
+    expect(settleLinkedTrigger(applied, FACTS)).toBe(applied);
+    expect(settleLinkedTrigger(applied, nothing)).toBe(applied);
+    expect(newFlowPicker(applied)).toEqual({ start: 'arrives', arrival: 'conn:conn_feed1' });
+  });
+
+  it('a list that failed keeps the link pending; when Retry brings it, the link is applied', () => {
+    const start = initialNewFlowStart(link('?trigger=conn_feed1'));
+    const failed = { ...FACTS, connections: { state: 'error' as const, message: 'The gateway did not answer within 45 s.' } };
+    expect(settleLinkedTrigger(start, failed)).toBe(start);
+    const html = pickerHtml(start, failed);
+    expect(html).toContain('Your feeds and webhooks could not be read: The gateway did not answer within 45 s.');
+    expect(html).toMatch(/<button type="button" class="read-failed__retry">Retry<\/button>/);
+    expect(html).not.toContain('read-loading__spinner');
+    expect(settleLinkedTrigger(start, FACTS).picker).toEqual({ start: 'arrives', arrival: 'conn:conn_feed1' });
+  });
+
+  it('what the person changed while the lists loaded is kept', () => {
+    const start = initialNewFlowStart(link('?trigger=conn_feed1'));
+    const touched: NewFlowStartState = { ...start, picker: { start: 'manual', arrival: '' }, name: 'Mine' };
+    const out = settleLinkedTrigger(touched, FACTS);
+    expect(out.pending).toBeNull();
+    expect(out.picker).toEqual({ start: 'manual', arrival: '' });
+    expect(out.name).toBe('Mine');
+  });
+
+  it('the dialog opened from a link shows the spinner before the first answer, on "When something arrives"', () => {
+    const html = renderToStaticMarkup(
+      createElement(NewFlowDialog, { unsavedChanges: false, onCreate: () => {}, onCancel: () => {}, trigger: link('?trigger=conn_feed1') })
+    );
+    expect(html).toMatch(/aria-checked="true"[^>]*>.*When something arrives/);
+    expect(html).toContain('Loading your mailboxes and connections');
+    expect(html).toContain('class="read-loading__spinner"');
+    expect(html).not.toContain('Nothing to listen to yet');
+    expect(html).not.toContain('automation-problem');
+    // The dialog settles the link in render, from the same facts the picker shows.
+    const dialog = readFileSync(new URL('../components/NewFlowDialog.tsx', import.meta.url), 'utf8');
+    expect(dialog).toContain('const settled = settleLinkedTrigger(startState, facts);');
+    expect(dialog).toContain('if (settled !== startState) setStartState(settled);');
   });
 });

@@ -9,6 +9,7 @@ import type { AutomationTriggerDefaults } from '../../types/flow';
 import { triggerSentence, type AutomationWords } from '../../utils/automationChoice';
 import { triggerPinKind } from '../../utils/triggerPins';
 import { sampleNoun, sampleSourceName } from '../../utils/triggerSample';
+import { LoadingLine, ReadFailed } from '../ReadState';
 
 export function TriggeredRunPanel({
   trigger,
@@ -71,13 +72,19 @@ export function TriggeredRunPanel({
               Use the sample again
             </button>
           </p>
+        ) : busy ? (
+          // The sample is out (tried up to 3 times, ADR-0039): a spinner, never the plan or an error.
+          <LoadingLine text="Reading what would arrive" />
         ) : (
-          <p className="automation-help">{busy ? 'Reading what would arrive…' : plan}</p>
+          <p className="automation-help">{plan}</p>
         )}
-        {error ? (
-          <p className="automation-problem" role="alert">
+        {/* Failed after every try. Its retry is the dialog's one Run button
+            (operator ruling: one Run starts it), so the line says so. */}
+        {error && !busy ? (
+          <ReadFailed>
             {error}
-          </p>
+            {/[.!?]$/.test(error.trim()) ? '' : '.'} Press Run to try again.
+          </ReadFailed>
         ) : null}
         <p className="automation-muted">A test run: nothing is turned on.</p>
       </div>

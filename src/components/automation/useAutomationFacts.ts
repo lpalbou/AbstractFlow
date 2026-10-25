@@ -3,9 +3,12 @@
  * dialog: the served trigger sources, the person's mailboxes and trigger
  * connections and the central history budget. Each fact loads (and fails)
  * on its own, so a gateway without mailboxes still offers Run now; a failure
- * is shown where the fact is used, never hidden.
+ * is shown where the fact is used, never hidden. A fact stays 'loading'
+ * through the read's tries (gatewayFetch, utils/readRetry.ts) and becomes
+ * 'error' only after the last one failed (framework ADR-0039). When a reload
+ * overlaps an earlier read, only the newest answer is kept.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GatewayContracts } from '../../utils/gatewayClient';
 import { fetchGatewayConnection } from '../GatewayConnectionModal';
 import { triggerSourceCache, type TriggerSourcesResult } from '../../utils/triggerSources';
@@ -47,23 +50,27 @@ export function useAutomationFacts(gatewayContracts: GatewayContracts | null, op
   const [connections, setConnections] = useState<AutomationFacts['connections']>(LOADING);
   const [historyDefault, setHistoryDefault] = useState<AutomationFacts['historyDefault']>(LOADING);
 
+  const sourcesRead = useRef(0);
+  const arrivalsRead = useRef(0);
   const loadSources = useCallback(
     async (refresh: boolean) => {
+      const read = ++sourcesRead.current;
       setSources(LOADING);
-      setSources(
-        await settle(async () => {
-          const connection = await fetchGatewayConnection();
-          setGatewayUrl(connection.gateway_url);
-          return triggerSourceCache.load(connection.gateway_url, gatewayContracts, { refresh });
-        })
-      );
+      const fact = await settle(async () => {
+        const connection = await fetchGatewayConnection();
+        if (read === sourcesRead.current) setGatewayUrl(connection.gateway_url);
+        return triggerSourceCache.load(connection.gateway_url, gatewayContracts, { refresh });
+      });
+      if (read === sourcesRead.current) setSources(fact);
     },
     [gatewayContracts]
   );
   const loadArrivals = useCallback(async () => {
+    const read = ++arrivalsRead.current;
     setMailboxes(LOADING);
     setConnections(LOADING);
     const [m, c] = await Promise.all([settle(() => fetchMailboxes()), settle(() => fetchTriggerConnections())]);
+    if (read !== arrivalsRead.current) return;
     setMailboxes(m);
     setConnections(c);
   }, []);

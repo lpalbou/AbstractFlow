@@ -5,10 +5,11 @@ import { normalizeInterfaces } from '../utils/flowFamilies';
 import type { AutomationDefaults } from '../types/flow';
 import type { GatewayContracts } from '../utils/gatewayClient';
 import { AutomationChoiceError, automationFromChoice } from '../utils/automationChoice';
-import { choiceFromPicker, emptyPicker, type PickerState } from '../utils/automationPicker';
+import { choiceFromPicker, type PickerState } from '../utils/automationPicker';
 import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
 import { useAutomationFacts } from './automation/useAutomationFacts';
-import { resolveTriggerLink, type TriggerLink } from '../utils/triggerDeepLink';
+import { initialNewFlowStart, newFlowPicker, settleLinkedTrigger, type TriggerLink } from '../utils/triggerDeepLink';
+import { LoadingLine, ReadFailed } from './ReadState';
 
 export interface NewFlowValues {
   name: string;
@@ -64,24 +65,30 @@ export function NewFlowDialog({
   gatewayContracts?: GatewayContracts | null;
   trigger?: TriggerLink | null;
 }) {
-  // null = not touched yet: a linked trigger proposes them.
-  const [nameEdit, setName] = useState<string | null>(trigger ? null : '');
+  // What starts it and the title; a linked trigger stays pending until the
+  // lists it needs have answered, then is applied once (utils/triggerDeepLink.ts).
+  const [startState, setStartState] = useState(() => initialNewFlowStart(trigger));
   const [description, setDescription] = useState('');
   const [interfaces, setInterfaces] = useState<string[]>([]);
-  const [pickerEdit, setPicker] = useState<PickerState | null>(trigger ? null : emptyPicker('chat'));
+  const chosen = newFlowPicker(startState);
   // Loaded once a trigger is chosen (or linked): a chat flow needs nothing from the gateway here.
   const facts = useAutomationFacts(gatewayContracts, {
-    enabled: Boolean(trigger) || (pickerEdit !== null && pickerEdit.start !== null && pickerEdit.start !== 'chat'),
+    enabled: Boolean(trigger) || (chosen.start !== null && chosen.start !== 'chat'),
   });
-  const linked = trigger ? resolveTriggerLink(trigger, facts) : null;
-  const picker = pickerEdit ?? linked?.picker ?? emptyPicker('chat');
-  const name = nameEdit ?? (linked?.state === 'found' ? linked.name : '');
-  const linkLine = pickerEdit === null && linked?.state === 'missing' ? linked.line : '';
+  // The lists arrive after the link was consumed (the race): apply it now, in
+  // this render (React's adjust-state-while-rendering), so the picked row and
+  // the title appear together with the list.
+  const settled = settleLinkedTrigger(startState, facts);
+  if (settled !== startState) setStartState(settled);
+  const picker = newFlowPicker(settled);
+  const name = settled.name ?? settled.proposedName;
+  const linkLine = settled.line;
   const isAutomation = picker.start !== null && picker.start !== 'chat';
   const support = pickerSupport(facts);
+  const setName = (value: string) => setStartState((prev) => ({ ...prev, name: value }));
   // The proposed title arrives with the connections: the field keeps focus, all selected (typing replaces it).
   const nameRef = useRef<HTMLInputElement | null>(null);
-  const proposed = nameEdit === null ? name : '';
+  const proposed = settled.name === null ? settled.proposedName : '';
   useEffect(() => {
     const input = nameRef.current;
     if (!proposed || !input) return;
@@ -101,7 +108,10 @@ export function NewFlowDialog({
   const create = () => {
     if (!('error' in result)) onCreate(result);
   };
-  const choosePicker = (next: PickerState) => setPicker(next);
+  // The person's own choice wins over a pending link, and hides the link's line.
+  const choosePicker = (next: PickerState) => setStartState((prev) => ({ ...prev, picker: next, line: '' }));
+  // Until what it needs has answered, the footer says so with a spinner, not a problem.
+  const startLoading = isAutomation && (support.sourcesLoading || (picker.start === 'arrives' && support.arrivalsRead.state === 'loading'));
   return (
     <div className="modal-overlay" onClick={onCancel} role="presentation">
       {/* The Flow Library's window (same size at every width): the two are the
@@ -157,13 +167,14 @@ export function NewFlowDialog({
                       data={support.data}
                       includeChat
                       gatewayUrl={facts.gatewayUrl}
-                      arrivalsNote={support.arrivalsNote}
+                      arrivalsRead={support.arrivalsRead}
                       onRefreshArrivals={facts.reloadArrivals}
+                      onRetrySources={facts.reloadSources}
                       unavailable={support.unavailable}
                       idPrefix="new-flow-trigger"
                     />
                     {linkLine ? <p className="automation-problem new-flow-link-line">{linkLine}</p> : null}
-                    {isAutomation && support.sourcesProblem ? <p className="automation-problem">{support.sourcesProblem}</p> : null}
+                    <SourcesState isAutomation={isAutomation} picker={picker} support={support} onRetry={facts.reloadSources} />
                   </div>
                   <div className="run-form-field">
                     <label className="run-form-label" htmlFor="new-flow-name">
@@ -218,12 +229,13 @@ export function NewFlowDialog({
                         data={support.data}
                         includeChat
                         gatewayUrl={facts.gatewayUrl}
-                        arrivalsNote={support.arrivalsNote}
+                        arrivalsRead={support.arrivalsRead}
                         onRefreshArrivals={facts.reloadArrivals}
+                        onRetrySources={facts.reloadSources}
                         unavailable={support.unavailable}
                         idPrefix="new-flow-trigger"
                       />
-                      {isAutomation && support.sourcesProblem ? <p className="automation-problem">{support.sourcesProblem}</p> : null}
+                      <SourcesState isAutomation={isAutomation} picker={picker} support={support} onRetry={facts.reloadSources} />
                     </div>
                     <div className="run-form-field">
                       <label className="run-form-label" htmlFor="new-flow-name">
@@ -260,7 +272,9 @@ export function NewFlowDialog({
             )}
           </div>
           <div className="modal-actions">
-            {error && name.trim() ? (
+            {startLoading ? (
+              <LoadingLine inline text="Loading" className="modal-actions-note" />
+            ) : error && name.trim() ? (
               <span className="modal-actions-note" role="status">
                 {error}
               </span>
@@ -298,4 +312,30 @@ export function automationStart(
     if (error instanceof AutomationChoiceError) return { automation: null, problem: error.message };
     throw error;
   }
+}
+
+/**
+ * Under the picker, when "By hand" (or another start without a list) needs the
+ * served sources: a spinner while they load, the reason and Try again once the
+ * read failed. "When something arrives" shows both in place of its list.
+ */
+function SourcesState({
+  isAutomation,
+  picker,
+  support,
+  onRetry,
+}: {
+  isAutomation: boolean;
+  picker: PickerState;
+  support: ReturnType<typeof pickerSupport>;
+  onRetry: () => void;
+}) {
+  if (!isAutomation || picker.start === 'arrives') return null;
+  if (support.sourcesLoading) return <LoadingLine text="Loading what this gateway can run" />;
+  if (!support.sourcesProblem) return null;
+  return (
+    <ReadFailed onRetry={onRetry} retryLabel="Try again">
+      {support.sourcesProblem}
+    </ReadFailed>
+  );
 }

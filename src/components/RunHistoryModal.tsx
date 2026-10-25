@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LoadingLine, ReadFailed } from './ReadState';
 import type { RunSummary } from '../types/flow';
 import { extractFlowIdFromWorkflowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
 import { endpointFromDescriptor, gatewayJson, type GatewayContracts } from '../utils/gatewayClient';
@@ -86,11 +87,16 @@ function formatRunTime(iso?: string | null): string {
 export function RunHistoryModal({ isOpen, workflowId, workflowName, gatewayContracts, onClose, onSelectRun }: RunHistoryModalProps) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  // Whether the list has answered once (ADR-0039): until then, a spinner, never "No runs found".
+  const [answered, setAnswered] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
-    if (!workflowId) return;
+    if (!workflowId) {
+      setAnswered(true);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -101,6 +107,7 @@ export function RunHistoryModal({ isOpen, workflowId, workflowName, gatewayContr
       setError(e instanceof Error ? e.message : 'Failed to list runs');
     } finally {
       setLoading(false);
+      setAnswered(true);
     }
   }, [gatewayContracts, workflowId, workflowName]);
 
@@ -154,7 +161,12 @@ export function RunHistoryModal({ isOpen, workflowId, workflowName, gatewayContr
           </button>
         </div>
 
-        {error ? <p className="run-history-error">{error}</p> : null}
+        {error && !loading ? (
+          <ReadFailed onRetry={() => void load()} className="run-history-error">
+            {error}
+          </ReadFailed>
+        ) : null}
+        {!answered || (loading && runs.length === 0) ? <LoadingLine text="Loading runs" className="run-history-empty" /> : null}
 
         <ul className="run-history-list">
           {filtered.map((r) => {
@@ -193,7 +205,7 @@ export function RunHistoryModal({ isOpen, workflowId, workflowName, gatewayContr
           })}
         </ul>
 
-        {!loading && filtered.length === 0 ? (
+        {answered && !loading && !error && filtered.length === 0 ? (
           <p className="run-history-empty">No runs found for this workflow.</p>
         ) : null}
       </div>

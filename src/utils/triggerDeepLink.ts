@@ -8,16 +8,22 @@
  * Standalone (http://127.0.0.1:3005/?trigger=…) and through the gateway
  * (/apps/flow/?trigger=…) alike. Once the gateway connection is up, the
  * toolbar removes the parameter from the address (a reload does not reopen
- * it) and opens the New flow dialog with "What starts it?" on that trigger
- * and a proposed title ("<connection name> digest", "<mailbox> handling").
- * A trigger that is not among the person's connections leaves the picker on
- * "When something arrives" with one plain line saying so.
+ * it) and opens the New flow dialog with the link. The dialog keeps it
+ * PENDING (`settleLinkedTrigger`) while its lists load, showing "When
+ * something arrives" with a spinner where the list will be; once the
+ * mailboxes and connections have answered (on a public gateway that can take
+ * 15 s), it applies the link ONCE: that trigger picked and a proposed title
+ * ("<connection name> digest", "<mailbox> handling"), unless the person
+ * already changed the picker or the title. A trigger that is not among the
+ * person's connections leaves the picker on "When something arrives" with
+ * one plain line saying so. A list that could not be read keeps the link
+ * pending: its Retry applies it when the list answers.
  *
  * The ids are the ones TriggerChoice carries (utils/automationChoice.ts):
  * `{kind:'connection', connectionId}` and `{kind:'mail', account}`; the
  * picker keys them `conn:<id>` and `mail:<id>` (utils/automationPicker.ts).
  */
-import { arrivalOptions, type PickerState } from './automationPicker';
+import { arrivalOptions, emptyPicker, type PickerState } from './automationPicker';
 import { pickerSupport } from '../components/automation/TriggerPicker';
 import type { AutomationFacts } from '../components/automation/useAutomationFacts';
 
@@ -104,4 +110,50 @@ export function proposedFlowName(link: TriggerLink, data: ReturnType<typeof pick
   }
   const conn = (data.connections || []).find((c) => c.connection_id === link.connectionId);
   return `${(conn?.label || '').trim() || link.connectionId} digest`;
+}
+
+/**
+ * "What starts it?" and the title in the New flow dialog. `null` means not
+ * touched by the person: the picker shows "When something arrives" (a link)
+ * or chat (no link), the title shows `proposedName`.
+ */
+export interface NewFlowStartState {
+  picker: PickerState | null;
+  name: string | null;
+  /** The linked trigger, kept until the lists it needs have answered. */
+  pending: TriggerLink | null;
+  /** The title the link proposes (set when it is applied). */
+  proposedName: string;
+  /** Why the link picked nothing; shown until the person changes the picker. */
+  line: string;
+}
+
+export function initialNewFlowStart(link: TriggerLink | null): NewFlowStartState {
+  return { picker: link ? null : emptyPicker('chat'), name: null, pending: link, proposedName: '', line: '' };
+}
+
+/** The picker the dialog shows. */
+export function newFlowPicker(state: NewFlowStartState): PickerState {
+  return state.picker ?? ARRIVES;
+}
+
+/**
+ * Applies a pending link once its lists have answered (pure; returns `state`
+ * itself while there is nothing to do, so a render can call it every time):
+ * found = that trigger picked and a proposed title; missing = nothing picked
+ * and one line saying so. What the person already changed is kept. While the
+ * lists load, or after a read failed, the link stays pending.
+ */
+export function settleLinkedTrigger(
+  state: NewFlowStartState,
+  facts: Pick<AutomationFacts, 'sources' | 'mailboxes' | 'connections'>
+): NewFlowStartState {
+  if (!state.pending) return state;
+  const out = resolveTriggerLink(state.pending, facts);
+  if (out.state === 'waiting' || out.state === 'unreadable') return state;
+  const untouched = state.picker === null;
+  if (out.state === 'found') {
+    return { ...state, pending: null, picker: untouched ? out.picker : state.picker, proposedName: out.name, line: '' };
+  }
+  return { ...state, pending: null, picker: untouched ? out.picker : state.picker, line: untouched ? out.line : '' };
 }

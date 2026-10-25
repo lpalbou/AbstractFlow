@@ -235,7 +235,6 @@ export function useLoadedModels(
     },
     enabled: enabled && available,
     staleTime: 5_000,
-    retry: 1,
   });
 }
 
@@ -327,7 +326,6 @@ export function useContextEstimate(
     },
     enabled: enabled && available && Boolean(provider) && Boolean(model),
     staleTime: 30_000,
-    retry: 1,
   });
 }
 
@@ -433,7 +431,6 @@ export function useHostState(contracts: GatewayContracts | null | undefined, ena
     enabled: enabled && available,
     refetchInterval: enabled && available ? 5_000 : false,
     staleTime: 4_000,
-    retry: 1,
   });
 }
 
@@ -472,7 +469,6 @@ export function useSessionCaches(contracts: GatewayContracts | null | undefined,
     },
     enabled: enabled && available,
     staleTime: 5_000,
-    retry: 1,
   });
 }
 

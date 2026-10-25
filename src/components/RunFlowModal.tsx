@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import { LoadingLine } from './ReadState';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { randomId } from '@abstractframework/ui-kit';
@@ -1206,7 +1207,7 @@ function GeneratedImageCard({
   return (
     <div className={`run-generated-image ${compact ? 'run-generated-artifact-card' : ''}`}>
       {loading ? (
-        <div className="run-details-empty">Loading image artifact...</div>
+        <LoadingLine text="Loading image artifact" className="run-details-empty" />
       ) : error ? (
         <div className="run-details-error">
           {error}
@@ -1311,7 +1312,7 @@ export function GeneratedAudioCard({
   return (
     <div className={`run-generated-audio ${compact ? 'run-generated-artifact-card' : ''}`}>
       {loading ? (
-        <div className="run-details-empty">Loading audio artifact...</div>
+        <LoadingLine text="Loading audio artifact" className="run-details-empty" />
       ) : error ? (
         <div className="run-details-error">
           {error}
@@ -1383,7 +1384,7 @@ function GeneratedVideoCard({
   return (
     <div className={`run-generated-video ${compact ? 'run-generated-artifact-card' : ''}`}>
       {loading ? (
-        <div className="run-details-empty">Loading video artifact...</div>
+        <LoadingLine text="Loading video artifact" className="run-details-empty" />
       ) : error ? (
         <div className="run-details-error">
           {error}
@@ -7488,7 +7489,7 @@ export function RunFlowModal({
                             <div className="run-output-section">
                               <div className="run-output-title">Recalled content</div>
                               {rehydrateArtifactLoading ? (
-                                <div className="run-details-empty">Loading recalled content…</div>
+                                <LoadingLine text="Loading recalled content" className="run-details-empty" />
                               ) : rehydrateArtifactError ? (
                                 <div className="run-details-error">{rehydrateArtifactError}</div>
                               ) : recallIntoContextDisplay ? (

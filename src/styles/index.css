@@ -9614,3 +9614,97 @@ button.flow-nature-badge:hover:not(:disabled),
 .preflight-panel-fix:focus-visible {
   background: color-mix(in srgb, var(--warning) 30%, transparent);
 }
+
+/* Loading and failed reads (components/ReadState.tsx, framework ADR-0039):
+   a spinner and an animated "Loading…" where the content will be; the error,
+   with Retry, only once every try has failed. */
+.read-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+.read-loading--inline {
+  display: inline-flex;
+}
+.read-loading__spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: var(--accent, currentColor);
+  border-radius: 50%;
+  animation: read-loading-spin 0.9s linear infinite;
+}
+.read-loading__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Three dots that fill in turn; a fixed width so the line does not jitter. */
+.read-loading__dots {
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+}
+.read-loading__dots::after {
+  content: '…';
+  animation: read-loading-dots 1.2s steps(1, end) infinite;
+}
+.read-loading__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@keyframes read-loading-spin { to { transform: rotate(360deg); } }
+@keyframes read-loading-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .read-loading__spinner { animation-duration: 2.4s; }
+  .read-loading__dots::after { animation: none; content: '…'; }
+}
+.read-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+  color: var(--error);
+  font-size: var(--font-size-sm);
+}
+.read-failed__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.read-failed__retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.read-failed__retry:hover,
+.read-failed__retry:focus-visible {
+  text-decoration: underline;
+}
+.flow-library-kind-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  vertical-align: -1px;
+}
+.flow-library-loading,
+.flow-library-read-failed {
+  justify-content: flex-start;
+}

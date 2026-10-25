@@ -1,6 +1,7 @@
 import type { RunWorkspace } from './runWorkspaceChoice';
 import type { GatewayAuthoringCapability } from './nodeCapabilities';
 import { GATEWAY_API_PATH, gatewayApiPath, randomId } from '@abstractframework/ui-kit';
+import { RequestTimeoutError, retryRead } from './readRetry';
 
 export type GatewayQueryValue = string | number | boolean | null | undefined;
 
@@ -1126,28 +1127,61 @@ export function docsGatewayFetch(path: string, init: RequestInit = {}): Promise<
   return fetch(url, { ...init, headers, credentials: 'same-origin' });
 }
 
-export async function gatewayFetch(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<Response> {
-  const timeoutMs = typeof init?.timeoutMs === 'number' ? init.timeoutMs : 30_000;
-  const controller = typeof AbortController !== 'undefined' && timeoutMs > 0 ? new AbortController() : null;
-  const timeout = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
-  const { timeoutMs: _timeoutMs, signal, ...fetchInit } = init || {};
+export type GatewayFetchInit = RequestInit & {
+  /** Per try; 0 = none. Default 30 s. */
+  timeoutMs?: number;
+  /**
+   * A POST that only reads (it changes nothing on the gateway, e.g. the
+   * trigger sample): retried like a GET. Never set it on a write.
+   */
+  read?: boolean;
+};
+
+/**
+ * The editor's one door to the gateway (through this app's session proxy).
+ * A GET, or a request marked `read`, is tried up to 3 times while it fails
+ * transiently (utils/readRetry.ts, framework ADR-0039); a write is sent once.
+ * Each try has its own timeout; the caller's `signal` cancels at any point.
+ */
+export async function gatewayFetch(path: string, init?: GatewayFetchInit): Promise<Response> {
+  const { timeoutMs: rawTimeout, read, signal, ...fetchInit } = init || {};
+  const timeoutMs = typeof rawTimeout === 'number' ? rawTimeout : 30_000;
   const method = String(fetchInit.method || 'GET').toUpperCase();
   const headers = new Headers(fetchInit.headers || {});
   const url = gatewayRequestPath(path);
   const csrf = headers.has('X-AbstractFlow-CSRF') ? null : flowCsrfHeader(url, method);
   if (csrf) headers.set('X-AbstractFlow-CSRF', csrf);
-  const mergedSignal = signal || controller?.signal;
-  let res: Response;
-  try {
-    res = await fetch(url, { ...fetchInit, headers, signal: mergedSignal });
-  } finally {
-    if (timeout !== null) window.clearTimeout(timeout);
-  }
-  if (!res.ok) throw await gatewayErrorFromResponse(res);
-  return res;
+  const once = async (): Promise<Response> => {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    let timedOut = false;
+    const timeout =
+      controller && timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+          }, timeoutMs)
+        : null;
+    const cancel = () => controller?.abort();
+    if (signal?.aborted) cancel();
+    else signal?.addEventListener('abort', cancel, { once: true });
+    let res: Response;
+    try {
+      res = await fetch(url, { ...fetchInit, headers, signal: controller?.signal ?? signal });
+    } catch (error) {
+      if (timedOut) throw new RequestTimeoutError(timeoutMs);
+      throw error;
+    } finally {
+      if (timeout !== null) clearTimeout(timeout);
+      signal?.removeEventListener('abort', cancel);
+    }
+    if (!res.ok) throw await gatewayErrorFromResponse(res);
+    return res;
+  };
+  const isRead = method === 'GET' || method === 'HEAD' || read === true;
+  return isRead ? retryRead(once, { signal }) : once();
 }
 
-export async function gatewayJson<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+export async function gatewayJson<T>(path: string, init?: GatewayFetchInit): Promise<T> {
   const res = await gatewayFetch(path, init);
   return (await res.json()) as T;
 }

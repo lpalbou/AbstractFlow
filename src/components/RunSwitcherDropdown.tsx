@@ -4,6 +4,7 @@
  * Goal: rapidly switch between runs without leaving the Run modal.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LoadingLine, ReadFailed } from './ReadState';
 import type { RunSummary } from '../types/flow';
 import { copyWithFeedback } from '../lib/copy_feedback';
 import { filterRunSummariesByFlowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
@@ -57,12 +58,17 @@ export function RunSwitcherDropdown({
   const [open, setOpen] = useState(false);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  // Whether the list has answered once (ADR-0039): until then, a spinner, never "No runs found".
+  const [answered, setAnswered] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
-    if (!workflowId) return;
+    if (!workflowId) {
+      setAnswered(true);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -73,6 +79,7 @@ export function RunSwitcherDropdown({
       setError(e instanceof Error ? e.message : 'Failed to list runs');
     } finally {
       setLoading(false);
+      setAnswered(true);
     }
   }, [gatewayContracts, workflowId]);
 
@@ -154,7 +161,12 @@ export function RunSwitcherDropdown({
             </button>
           </div>
 
-          {error ? <div className="run-switcher-error">{error}</div> : null}
+          {error && !loading ? (
+            <ReadFailed onRetry={() => void load()} className="run-switcher-error">
+              {error}
+            </ReadFailed>
+          ) : null}
+          {!answered || (loading && runs.length === 0) ? <LoadingLine text="Loading runs" className="run-switcher-empty" /> : null}
 
           <ul className="run-switcher-list">
             {filtered.map((r) => {
@@ -206,7 +218,7 @@ export function RunSwitcherDropdown({
             })}
           </ul>
 
-          {!loading && filtered.length === 0 ? (
+          {answered && !loading && !error && filtered.length === 0 ? (
             <div className="run-switcher-empty">No runs found.</div>
           ) : null}
         </div>

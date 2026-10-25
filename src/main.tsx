@@ -42,7 +42,10 @@ function ResponsiveToaster() {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      // Reads are retried in ONE place, gatewayFetch (utils/readRetry.ts,
+      // framework ADR-0039: 3 tries, 1 s then 3 s apart); a query retry on
+      // top would multiply the tries and delay the error.
+      retry: false,
       refetchOnWindowFocus: false,
     },
   },

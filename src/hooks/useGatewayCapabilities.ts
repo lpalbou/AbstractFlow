@@ -15,7 +15,6 @@ export function useGatewayCapabilities(enabled = true) {
     queryFn: () => gatewayJson<GatewayCapabilitiesResponse>(gatewayPath('discovery/capabilities')),
     enabled,
     staleTime: 60_000,
-    retry: 1,
     // This one query gates Save, Run, Publish and the flow library. The app's
     // global default is refetchOnWindowFocus:false (main.tsx), which left a
     // single transient failure — a gateway restart, an expired session —

@@ -2464,8 +2464,9 @@ export function Toolbar() {
           flows={flowLibraryCatalog.flows}
           readonlyFlowIds={flowLibraryCatalog.bundledFlowIds}
           bundledRunTargetIds={flowLibraryCatalog.bundledRunTargetIds}
-          isLoading={flowsQuery.isLoading && flowLibraryCatalog.flows.length === 0}
-          isRefreshing={flowsQuery.isFetching && flowLibraryCatalog.flows.length > 0 && !flowsQuery.data}
+          // Until the saved flows answer (tried up to 3 times in gatewayFetch,
+          // ADR-0039): a spinner, not counts of the bundled examples alone.
+          savedPending={(gatewayCheckPending || !visualflowCrudUnavailable) && flowsQuery.data === undefined && !flowsQuery.error}
           // `flows` ALWAYS contains the ~25 bundled examples (a static glob), so
           // gating this on `length === 0` made the error branch unreachable: when
           // the session expired and the user opened the library to find their

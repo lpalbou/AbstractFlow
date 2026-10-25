@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { LoadingLine, ReadFailed } from './ReadState';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { AfSwitch } from '@abstractframework/ui-kit';
@@ -302,42 +303,36 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
     queryFn: async () => parseProviderModelCatalog(await gatewayJson<unknown>(gatewayPath(visionEndpoint, {}, { task: selectedVisionTask }))),
     enabled: isOpen && residencyControlsAvailable && isVisionCatalogTask(task) && Boolean(visionEndpoint),
     staleTime: 30_000,
-    retry: 1,
   });
   const ttsProviderCatalogQuery = useQuery({
     queryKey: ['gateway', 'model-residency', 'tts-providers', ttsModelsEndpoint],
     queryFn: async () => gatewayJson<unknown>(gatewayPath(ttsModelsEndpoint, {}, { providers_only: true })),
     enabled: isOpen && residencyControlsAvailable && task === 'tts' && Boolean(ttsModelsEndpoint),
     staleTime: 30_000,
-    retry: 1,
   });
   const ttsModelsQuery = useQuery({
     queryKey: ['gateway', 'model-residency', 'tts-models', ttsModelsEndpoint, provider],
     queryFn: async () => gatewayJson<unknown>(gatewayPath(ttsModelsEndpoint, {}, { provider: provider || undefined })),
     enabled: isOpen && residencyControlsAvailable && task === 'tts' && Boolean(ttsModelsEndpoint) && Boolean(provider),
     staleTime: 30_000,
-    retry: 1,
   });
   const sttCatalogQuery = useQuery({
     queryKey: ['gateway', 'model-residency', 'stt-models', sttModelsEndpoint, provider],
     queryFn: async () => gatewayJson<unknown>(gatewayPath(sttModelsEndpoint, {}, { provider: provider || undefined })),
     enabled: isOpen && residencyControlsAvailable && task === 'stt' && Boolean(sttModelsEndpoint),
     staleTime: 30_000,
-    retry: 1,
   });
   const musicProvidersQuery = useQuery({
     queryKey: ['gateway', 'model-residency', 'music-providers', musicProvidersEndpoint],
     queryFn: async () => gatewayJson<unknown>(gatewayPath(musicProvidersEndpoint, {}, { task: 'text_to_music' })),
     enabled: isOpen && residencyControlsAvailable && task === 'music_generation' && Boolean(musicProvidersEndpoint),
     staleTime: 30_000,
-    retry: 1,
   });
   const musicModelsQuery = useQuery({
     queryKey: ['gateway', 'model-residency', 'music-models', musicModelsEndpoint, provider],
     queryFn: async () => gatewayJson<unknown>(gatewayPath(musicModelsEndpoint, {}, { task: 'text_to_music', provider: provider || undefined })),
     enabled: isOpen && residencyControlsAvailable && task === 'music_generation' && Boolean(musicModelsEndpoint),
     staleTime: 30_000,
-    retry: 1,
   });
 
   const imagePairs = imageCatalogQuery.data || [];
@@ -872,14 +867,14 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
           Loaded-model listing is not available on this Gateway runtime.
         </div>
       ) : loadedQuery.isError ? (
-        <div className="model-residency-empty">
+        <ReadFailed className="model-residency-empty" onRetry={() => void loadedQuery.refetch()}>
           Failed to read loaded models: {loadedQuery.error instanceof Error ? loadedQuery.error.message : 'unknown error'}
-        </div>
+        </ReadFailed>
+      ) : loadedQuery.isLoading ? (
+        <LoadingLine text="Loading resident models" className="model-residency-empty" />
       ) : visibleRows.length === 0 ? (
         <div className="model-residency-empty">
-          {loadedQuery.isLoading
-            ? 'Loading resident models…'
-            : hiddenCount > 0
+          {hiddenCount > 0
               ? 'No provider-resident models reported. Switch "Cached and non-resident models" on to inspect cached and configuration rows.'
               : 'No provider-resident models reported.'}
         </div>
@@ -894,11 +889,11 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       This Gateway runtime does not advertise host state (memory) reporting.
     </div>
   ) : hostStateQuery.isError ? (
-    <div className="model-residency-empty">
+    <ReadFailed className="model-residency-empty" onRetry={() => void hostStateQuery.refetch()}>
       Failed to read host state: {hostStateQuery.error instanceof Error ? hostStateQuery.error.message : 'unknown error'}
-    </div>
+    </ReadFailed>
   ) : !hostStateQuery.data ? (
-    <div className="model-residency-empty">Loading host memory state…</div>
+    <LoadingLine text="Loading host memory state" className="model-residency-empty" />
   ) : (
     <div className="model-residency-memory">
       {memoryView.meters.length === 0 ? (
@@ -1014,10 +1009,10 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
     <div className="model-residency-empty">
       Failed to read session caches: {sessionCachesQuery.error instanceof Error ? sessionCachesQuery.error.message : 'unknown error'}
     </div>
+  ) : sessionCachesQuery.isLoading ? (
+    <LoadingLine text="Loading session caches" className="model-residency-empty" />
   ) : sessionCacheViews.length === 0 ? (
-    <div className="model-residency-empty">
-      {sessionCachesQuery.isLoading ? 'Loading session caches…' : 'No session prompt caches reported.'}
-    </div>
+    <div className="model-residency-empty">No session prompt caches reported.</div>
   ) : (
     <div className="model-residency-table-wrap">
       <table className="model-residency-table">

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LoadingLine } from '../ReadState';
 import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 
@@ -226,7 +227,7 @@ export function AfSelect({
         aria-expanded={open}
       >
         <span className={clsx('af-select-value', !showValue && 'af-select-value--placeholder')}>
-          {loading && !showValue ? 'Loading…' : triggerText}
+          {loading && !showValue ? <LoadingLine inline text="Loading" /> : triggerText}
         </span>
 
         {clearable && showValue ? (
@@ -293,7 +294,7 @@ export function AfSelect({
 
               <div className="af-select-options">
                 {loading && displayedOptions.length === 0 ? (
-                  <div className="af-select-empty">Loading…</div>
+                  <LoadingLine text="Loading" className="af-select-empty" />
                 ) : displayedOptions.length === 0 ? (
                   <div className="af-select-empty">No results</div>
                 ) : (

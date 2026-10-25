@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LoadingLine, ReadFailed } from './ReadState';
 import { AfChip, useAfMedia } from '@abstractframework/ui-kit';
 import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import type { GatewayContracts } from '../utils/gatewayClient';
@@ -37,11 +38,15 @@ export interface FlowLibraryModalProps {
   flows?: VisualFlow[];
   readonlyFlowIds?: string[];
   bundledRunTargetIds?: string[];
-  isLoading?: boolean;
-  /** Saved-flows query in flight while bundled rows already render: the
-   * header must say so or the counts understate the library (live-drive
-   * finding: "7 flows" flashed on a 120-flow library). */
-  isRefreshing?: boolean;
+  /**
+   * The saved flows have not answered yet (framework ADR-0039): the counts
+   * and the list say "Loading…" with a spinner instead of numbers or an empty
+   * state; the bundled examples stay listed below it. Counts shown before the
+   * answer understate the library (live-drive finding: "7 flows" flashed on
+   * a 120-flow library).
+   */
+  savedPending?: boolean;
+  /** The saved flows could not be read after every try: said above the list, with Retry. */
   error?: unknown;
   onClose: () => void;
   onRefresh?: () => void;
@@ -108,8 +113,7 @@ export function FlowLibraryModal({
   flows,
   readonlyFlowIds,
   bundledRunTargetIds,
-  isLoading,
-  isRefreshing,
+  savedPending = false,
   error,
   onClose,
   onRefresh,
@@ -645,8 +649,8 @@ export function FlowLibraryModal({
             <h3>Flow Library</h3>
             <div className="flow-library-subtitle">
               <span className="flow-library-count">
-                {isRefreshing ? (
-                  <>Loading saved flows…</>
+                {savedPending ? (
+                  <LoadingLine inline text="Loading saved flows" />
                 ) : (
                   <>
                     {libraryCountsSentence(rowsResult.totalCount, kindCounts)}
@@ -698,7 +702,9 @@ export function FlowLibraryModal({
             >
               {option.id === 'all' ? null : <span className="flow-library-kind-dot" aria-hidden="true" />}
               <span>{option.label}</span>
-              <span className="flow-library-kind-count">{option.count}</span>
+              <span className="flow-library-kind-count">
+                {savedPending ? <span className="read-loading__spinner flow-library-kind-spinner" aria-label="Loading" /> : option.count}
+              </span>
             </button>
           ))}
         </div>
@@ -727,7 +733,7 @@ export function FlowLibraryModal({
               onToggle={toggleListOpen}
               controls="flow-library-list"
               title={viewMode === 'all' ? 'Flows' : `${FLOW_KIND_WORDS[viewMode].label} flows`}
-              detail={isRefreshing ? null : shownCount}
+              detail={savedPending ? null : shownCount}
               className="flow-library-disclosure"
             />
           ) : null}
@@ -736,16 +742,17 @@ export function FlowLibraryModal({
               * a static glob and stay usable during a gateway outage. Blanking
               * the list would also hide them, and saying nothing would make the
               * user's own saved flows look deleted. */}
-            {error ? (
-              <div className="flow-library-empty error-text">
+            {error && !savedPending ? (
+              <ReadFailed onRetry={onRefresh} className="flow-library-empty flow-library-read-failed">
                 Could not load your saved flows
                 {error instanceof Error && error.message ? `: ${error.message}` : ''}. They are still on the
-                Gateway — reconnect and refresh. Bundled examples are listed below.
-              </div>
+                Gateway. Bundled examples are listed below.
+              </ReadFailed>
             ) : null}
-            {isLoading ? (
-              <div className="flow-library-empty">Loading flows…</div>
-            ) : rows.length === 0 ? (
+            {/* Until the saved flows answer: a spinner where they will be,
+              * never "No flows yet" (the bundled examples follow it). */}
+            {savedPending ? <LoadingLine text="Loading your saved flows" className="flow-library-empty flow-library-loading" /> : null}
+            {savedPending && rows.length === 0 ? null : rows.length === 0 ? (
               <div className={`flow-library-empty ${viewMode === 'all' ? '' : `flow-kind--${viewMode}`}`}>
                 {viewMode !== 'all' && !query.trim() ? <FlowKindIcon kind={viewMode} size="lg" /> : null}
                 <div className="flow-library-empty-title">
