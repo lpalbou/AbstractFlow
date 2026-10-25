@@ -485,12 +485,17 @@ export function Toolbar() {
   const [inspectedEvents, setInspectedEvents] = useState<ExecutionEvent[]>([]);
   const [inspectedTraceEvents, setInspectedTraceEvents] = useState<ExecutionEvent[]>([]);
   const isEmptyFlow = nodes.length === 0 && edges.length === 0;
+  const flowDescription = useFlowStore((s) => s.flowDescription);
   const currentFlowSignature = useMemo(
     () => flowSignatureFor(getFlow()),
     // flowFunctions is load-bearing: a function-only edit changes the flow's
     // saved bytes but touches no node/edge, so without it here the signature
     // never recomputes and Save stays disabled on a real change (adversary P0-1).
-    [edges, flowInterfaces, flowName, flowFunctions, getFlow, nodes]
+    // flowAutomationDefaults and flowDescription too (UX review #24): the
+    // Automation dialog changes only the defaults, so a signature memoised
+    // without them stayed stale — the flow did not read as changed, and after
+    // Save the baseline (with the defaults) never matched it: the dot stayed.
+    [edges, flowInterfaces, flowName, flowFunctions, flowAutomationDefaults, flowDescription, getFlow, nodes]
   );
   const [savedFlowSignature, setSavedFlowSignature] = useState(() => flowSignatureFor(getFlow()));
   const savedFlowIdentityRef = useRef<string | null>(flowId || null);

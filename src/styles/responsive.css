@@ -816,3 +816,51 @@ body {
     transition: none;
   }
 }
+
+/* UX review #19 (1440 px and up): with the flow's nature badge the header ran
+   under the kit's actions. The name and the badge shrink (the badge truncates,
+   its full text is its tooltip) and the action groups form the same strip as
+   below 1440 px, so nothing collides; the badge's menu is position: fixed. */
+@media (min-width: 1440px) {
+  .toolbar {
+    overflow: hidden;
+  }
+
+  .toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .toolbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .flow-name-input {
+    flex: 0 1 200px;
+    min-width: 120px;
+  }
+
+  .flow-nature-badge,
+  .flow-nature-menu-wrap {
+    flex: 0 1 auto;
+    min-width: 72px;
+    max-width: 300px;
+  }
+}
+
+/* The badge and the name give way before the action strip does (#19). */
+.flow-nature-badge,
+.flow-nature-menu-wrap {
+  flex-shrink: 20;
+  min-width: 112px;
+}
+.flow-name-input {
+  flex-shrink: 10;
+  min-width: 120px;
+}

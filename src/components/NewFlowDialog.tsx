@@ -67,17 +67,14 @@ export function NewFlowDialog({
   const facts = useAutomationFacts(gatewayContracts, { enabled: isAutomation });
   const support = pickerSupport(facts);
   const start = automationStart(picker, support);
-  const result = newFlowValues(name, description, interfaces, start);
+  // An automation flow takes the runnable agent contract (prompt, provider,
+  // model on On Flow Start); the Interfaces section is not shown for it.
+  const result = newFlowValues(name, description, isAutomation ? [AUTOMATION_DEFAULT_INTERFACE] : interfaces, start);
   const error = 'error' in result ? result.error : '';
   const create = () => {
     if (!('error' in result)) onCreate(result);
   };
-  const choosePicker = (next: PickerState) => {
-    // An automation flow needs a prompt on On Flow Start: the runnable agent
-    // interface gives it, ticked when nothing else is.
-    if (next.start && next.start !== 'chat' && interfaces.length === 0) setInterfaces([AUTOMATION_DEFAULT_INTERFACE]);
-    setPicker(next);
-  };
+  const choosePicker = (next: PickerState) => setPicker(next);
   return (
     <div className="modal-overlay" onClick={onCancel} role="presentation">
       {/* The Flow Library's window (same size at every width): the two are the
@@ -100,7 +97,7 @@ export function NewFlowDialog({
             <h3 id="new-flow-title">New flow</h3>
             <p className="new-flow-subtitle">
               {isAutomation
-                ? 'An automation flow: it opens with its trigger wired in; inputs and context are under Automation.'
+                ? 'Runs by itself when its trigger fires; set its task under Automation.'
                 : 'A flow for chat. Name it now; the description and interfaces can wait.'}
             </p>
           </div>
@@ -118,16 +115,10 @@ export function NewFlowDialog({
           }}
         >
           <div className="new-flow-body">
-            <InterfacePicker
-              value={interfaces}
-              onChange={setInterfaces}
-              title={
-                <>
-                  Interfaces <span className="new-flow-optional">optional</span>
-                </>
-              }
-              pinNote="The On Flow Start and On Flow End nodes you add get these pins; wire them so hosts get real values."
-              leading={
+            {isAutomation ? (
+              // An automation flow: no interfaces to choose (it gets the runnable
+              // agent contract on its own: On Flow Start's prompt, provider, model).
+              <div className="new-flow-automation-body">
                 <section className="new-flow-details" aria-label="Details">
                   <div className="run-form-field">
                     <span className="run-form-label" id="new-flow-start-label">
@@ -172,12 +163,73 @@ export function NewFlowDialog({
                       rows={3}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="What this workflow does, for whoever picks it in a list."
+                      placeholder="What this flow does, for whoever picks it in a list."
                     />
                   </div>
                 </section>
-              }
-            />
+              </div>
+            ) : (
+              <InterfacePicker
+                value={interfaces}
+                onChange={setInterfaces}
+                title={
+                  <>
+                    Interfaces <span className="new-flow-optional">optional</span>
+                  </>
+                }
+                pinNote="The On Flow Start and On Flow End nodes you add get these pins; wire them so hosts get real values."
+                leading={
+                  <section className="new-flow-details" aria-label="Details">
+                    <div className="run-form-field">
+                      <span className="run-form-label" id="new-flow-start-label">
+                        What starts it?
+                      </span>
+                      <TriggerPicker
+                        value={picker}
+                        onChange={choosePicker}
+                        data={support.data}
+                        includeChat
+                        timeZoneOrigin={facts.timeZone.origin}
+                        gatewayUrl={facts.gatewayUrl}
+                        arrivalsNote={support.arrivalsNote}
+                        onRefreshArrivals={facts.reloadArrivals}
+                        unavailable={support.unavailable}
+                        idPrefix="new-flow-trigger"
+                      />
+                      {isAutomation && support.sourcesProblem ? <p className="automation-problem">{support.sourcesProblem}</p> : null}
+                    </div>
+                    <div className="run-form-field">
+                      <label className="run-form-label" htmlFor="new-flow-name">
+                        Title
+                      </label>
+                      <input
+                        id="new-flow-name"
+                        className="run-form-input"
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Release notes reviewer"
+                        autoFocus
+                        required
+                      />
+                    </div>
+                    <div className="run-form-field">
+                      <label className="run-form-label" htmlFor="new-flow-description">
+                        Description <span className="new-flow-optional">optional</span>
+                      </label>
+                      <textarea
+                        id="new-flow-description"
+                        className="run-form-input"
+                        rows={3}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="What this flow does, for whoever picks it in a list."
+                      />
+                    </div>
+                  </section>
+                }
+              />
+            )}
           </div>
           <div className="modal-actions">
             {error && name.trim() ? (

@@ -44,7 +44,8 @@ import {
 } from '../utils/automationChoice';
 import { choiceFromPicker, emptyPicker, pickerFromTrigger, type PickerData, type PickerState } from '../utils/automationPicker';
 import { enumWords, triggerSettingsCopy } from '../utils/triggerCopy';
-import { inputDataFromForm, inputFields, inputFormFromData, type InputField, type InputValues } from '../utils/automationInputs';
+import { inputDataFromForm, inputFields, inputFormFromData, modelOptions, providerOptions, type InputField, type InputValues, type ModelCatalog } from '../utils/automationInputs';
+import { useModelCatalog } from './automation/useModelCatalog';
 import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
 import { useAutomationFacts } from './automation/useAutomationFacts';
 import { observerAutomationsUrl, turnedOnSentence } from '../utils/automationTurnOn';
@@ -153,13 +154,17 @@ export function InputsForm({
   onValues,
   raw,
   onRaw,
+  catalog = null,
 }: {
   fields: InputField[];
   values: InputValues;
   onValues: (next: InputValues) => void;
   raw: string;
   onRaw: (text: string) => void;
+  catalog?: ModelCatalog | null;
 }) {
+  const providerField = fields.find((f) => f.kind === 'provider');
+  const chosenProvider = providerField ? values[providerField.id] ?? '' : '';
   const set = (id: string, value: string) => onValues({ ...values, [id]: value });
   return (
     <div className="automation-inputs">
@@ -181,6 +186,20 @@ export function InputsForm({
               />
             );
             break;
+          case 'provider':
+          case 'model': {
+            const options = field.kind === 'provider' ? providerOptions(catalog, value) : modelOptions(catalog, chosenProvider, value);
+            control = (
+              <select id={id} className="run-form-select" value={value} onChange={(e) => set(field.id, e.target.value)}>
+                {options.map((o) => (
+                  <option key={o.value || '(default)'} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            );
+            break;
+          }
           case 'number':
             control = <input id={id} className="run-form-input" type="number" step="any" value={value} onChange={(e) => set(field.id, e.target.value)} />;
             break;
@@ -509,6 +528,8 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
   const seededInputs = useMemo(() => inputFormFromData(inputFieldList, existing?.input_data || {}), [inputFieldList, existing]);
   const [inputValues, setInputValues] = useState<InputValues>(seededInputs.values);
   const [rawInputs, setRawInputs] = useState(seededInputs.raw);
+  const providerInput = inputFieldList.find((f) => f.kind === 'provider');
+  const modelCatalog = useModelCatalog(gatewayContracts, providerInput ? inputValues[providerInput.id] ?? '' : '');
   const [issues, setIssues] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [turningOn, setTurningOn] = useState(false);
@@ -700,7 +721,14 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
               <h4 id="automation-inputs-title" className="automation-section-title">
                 Inputs
               </h4>
-              <InputsForm fields={inputFieldList} values={inputValues} onValues={setInputValues} raw={rawInputs} onRaw={setRawInputs} />
+              <InputsForm
+                fields={inputFieldList}
+                values={inputValues}
+                onValues={setInputValues}
+                raw={rawInputs}
+                onRaw={setRawInputs}
+                catalog={modelCatalog}
+              />
             </section>
 
             <section className="automation-section" aria-labelledby="automation-name-title">

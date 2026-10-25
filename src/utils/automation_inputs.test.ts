@@ -35,7 +35,7 @@ describe('inputs form ↔ input_data', () => {
   it('one field per On Flow Start input; prompt in words; the event is never asked', () => {
     expect(fields.map((f) => `${f.id}:${f.kind}:${f.label}`)).toEqual([
       'prompt:prompt:What each run is asked to do',
-      'provider:text:Provider',
+      'provider:provider:Provider',
       'max_cycles:number:Max cycles',
       'dry_run:boolean:Dry run',
       'options:json:Options',
@@ -72,5 +72,25 @@ describe('inputs form ↔ input_data', () => {
     expect(html).toContain('<summary>Advanced: raw JSON</summary>');
     expect(html).not.toContain('input_data');
     expect(html).not.toMatch(/>event</);
+  });
+});
+
+describe('provider and model are choices, the default first (UX review #22)', () => {
+  it('"Use the default (…)" first, the gateway\'s providers and models after, a saved value kept', async () => {
+    const { modelOptions, providerOptions } = await import('./automationInputs');
+    const catalog = { providers: [{ value: 'lmstudio', label: 'LM Studio' }, { value: 'openai', label: 'OpenAI' }], models: ['qwen3-4b'], defaultProvider: 'lmstudio', defaultModel: 'qwen3-4b' };
+    expect(providerOptions(catalog, '')).toEqual([
+      { value: '', label: 'Use the default (lmstudio)' },
+      { value: 'lmstudio', label: 'LM Studio' },
+      { value: 'openai', label: 'OpenAI' },
+    ]);
+    expect(modelOptions(catalog, '', '')[0]).toEqual({ value: '', label: 'Use the default (qwen3-4b)' });
+    expect(modelOptions(catalog, 'openai', '')[0]).toEqual({ value: '', label: 'Use the provider’s default' });
+    expect(providerOptions(null, 'custom').map((o) => o.label)).toEqual(['Use the gateway’s default', 'custom']);
+    const fields = inputFields(FLOW);
+    expect(fields.find((f) => f.id === 'provider')?.help).toBeUndefined();
+    const html = renderToStaticMarkup(createElement(InputsForm, { fields, values: {}, onValues: () => {}, raw: '', onRaw: () => {}, catalog }));
+    expect(html).toContain('Use the default (lmstudio)');
+    expect(html).not.toContain('chosen by the caller');
   });
 });

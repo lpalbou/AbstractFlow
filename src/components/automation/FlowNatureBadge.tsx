@@ -63,16 +63,30 @@ export function FlowNatureBadge({
   onTurnOn?: () => void;
   words?: AutomationWords;
 }) {
-  const [open, setOpen] = useState(false);
+  const [menuAt, setMenuAt] = useState<{ top: number; left: number } | null>(null);
+  const open = menuAt !== null;
+  const setOpen = (next: boolean | ((v: boolean) => boolean)) => {
+    if (!(typeof next === 'function' ? next(open) : next)) setMenuAt(null);
+  };
   const nature = flowNature({ automation_defaults: automation }, executable, words);
   if (nature.kind === 'none' && !onClick) return null;
-  const text = nature.kind === 'none' ? 'Automation…' : nature.text;
+  const plain = nature.kind === 'none' ? 'Automation…' : nature.text;
+  // "Automation" never truncates; the trigger sentence after it does (UX review #19).
+  const text =
+    nature.kind === 'automation' ? (
+      <>
+        <span className="flow-nature-kind">Automation</span>
+        <span className="flow-nature-rest">{`\u00a0${plain.slice('Automation'.length).trimStart()}`}</span>
+      </>
+    ) : (
+      plain
+    );
   const title =
     nature.kind === 'automation'
       ? nature.text
       : 'Make it an automation: a schedule, new mail, a feed or a webhook starts it';
   const className = `flow-nature-badge flow-nature-badge--${nature.kind}`;
-  if (!onClick) return <span className={className}>{text}</span>;
+  if (!onClick) return <span className={className} title={plain}>{text}</span>;
   // An automation gets a small menu (Automation… / Turn it on); otherwise the badge opens the dialog.
   if (nature.kind !== 'automation' || !onTurnOn) {
     return (
@@ -83,11 +97,23 @@ export function FlowNatureBadge({
   }
   return (
     <span className="flow-nature-menu-wrap">
-      <button type="button" className={className} onClick={() => setOpen((v) => !v)} title={title} aria-haspopup="menu" aria-expanded={open}>
+      <button
+        type="button"
+        className={className}
+        onClick={(e) => {
+          if (open) return setMenuAt(null);
+          // Fixed position: the header strip clips overflow (UX review #19).
+          const r = e.currentTarget.getBoundingClientRect();
+          setMenuAt({ top: r.bottom + 6, left: r.left });
+        }}
+        title={title}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
         {text}
       </button>
-      {open ? (
-        <span className="flow-nature-menu" role="menu" onMouseLeave={() => setOpen(false)}>
+      {menuAt ? (
+        <span className="flow-nature-menu" role="menu" style={{ top: menuAt.top, left: menuAt.left }} onMouseLeave={() => setOpen(false)}>
           <button
             type="button"
             role="menuitem"

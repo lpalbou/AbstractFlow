@@ -269,3 +269,22 @@ describe('Turn it on (UX review #1)', () => {
     expect(availableSentence('Release digest')).toBe('Release digest is ready for Observer and the Assistant.');
   });
 });
+
+describe('UX review #23, #24', () => {
+  it('an automation flow is created with the runnable agent contract and no Interfaces section', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('./NewFlowDialog.tsx', import.meta.url), 'utf8');
+    expect(src).toMatch(/\{isAutomation \? \(\s*\/\/[^\n]*\n[^\n]*\n\s*<div className="new-flow-automation-body">/);
+    expect(src).toContain("'Runs by itself when its trigger fires; set its task under Automation.'");
+    expect(src).toContain('isAutomation ? [AUTOMATION_DEFAULT_INTERFACE] : interfaces');
+    expect(src).not.toContain('Elo');
+  });
+
+  it('the dirty flag follows the automation defaults and the description (the dot clears after a save)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('./Toolbar.tsx', import.meta.url), 'utf8');
+    const memo = src.slice(src.indexOf('const currentFlowSignature = useMemo('), src.indexOf('const [savedFlowSignature'));
+    expect(memo).toContain('flowAutomationDefaults');
+    expect(memo).toContain('flowDescription');
+  });
+});

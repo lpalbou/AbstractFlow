@@ -9170,10 +9170,8 @@ button.flow-nature-badge:hover:not(:disabled),
   min-width: 0;
 }
 .flow-nature-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 50;
+  position: fixed;
+  z-index: 1200;
   display: flex;
   flex-direction: column;
   min-width: 180px;
@@ -9259,4 +9257,26 @@ button.flow-nature-badge:hover:not(:disabled),
 .canvas-note-action:hover:not(:disabled),
 .canvas-note-dismiss:hover:not(:disabled) {
   background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.new-flow-automation-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.flow-nature-menu-wrap .flow-nature-badge {
+  max-width: 100%;
+  min-width: 0;
+}
+.flow-nature-badge--automation {
+  display: inline-flex;
+  align-items: baseline;
+}
+.flow-nature-kind {
+  flex: none;
+}
+.flow-nature-rest {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

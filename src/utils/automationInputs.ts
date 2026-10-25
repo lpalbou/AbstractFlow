@@ -11,7 +11,19 @@ import type { JsonValue, VisualFlow } from '../types/flow';
 import { humanizeKey } from './triggerBindings';
 import { TRIGGER_EVENT_PIN_ID } from './triggerEvent';
 
-export type InputFieldKind = 'prompt' | 'text' | 'number' | 'boolean' | 'json';
+export type InputFieldKind = 'prompt' | 'text' | 'provider' | 'model' | 'number' | 'boolean' | 'json';
+
+/** The gateway's providers and models for the provider/model fields (components/automation/useModelCatalog.ts). */
+export interface ModelCatalog {
+  providers: Array<{ value: string; label: string }>;
+  models: string[];
+  /** The gateway's default text provider/model ('' when unknown). */
+  defaultProvider: string;
+  defaultModel: string;
+}
+
+const PROVIDER_TYPES = new Set(['provider', 'provider_text']);
+const MODEL_TYPES = new Set(['model', 'model_text']);
 
 export interface InputField {
   id: string;
@@ -50,9 +62,22 @@ export function inputFields(flow: Pick<VisualFlow, 'nodes'>): InputField[] {
       if (pin.id === 'prompt') {
         return { id: pin.id, label: 'What each run is asked to do', help: 'The trigger’s details are added automatically.', kind: 'prompt' as const };
       }
-      const kind: InputFieldKind = TEXT_TYPES.has(pin.type || 'string') ? 'text' : pin.type === 'number' ? 'number' : pin.type === 'boolean' ? 'boolean' : 'json';
+      const kind: InputFieldKind = PROVIDER_TYPES.has(pin.type || '')
+        ? 'provider'
+        : MODEL_TYPES.has(pin.type || '')
+          ? 'model'
+          : TEXT_TYPES.has(pin.type || 'string')
+            ? 'text'
+            : pin.type === 'number'
+              ? 'number'
+              : pin.type === 'boolean'
+                ? 'boolean'
+                : 'json';
       const label = pin.label && pin.label !== pin.id ? pin.label : humanizeKey(pin.id);
-      return { id: pin.id, label, ...(pin.description ? { help: pin.description } : {}), kind };
+      // Provider and model are choices with "Use the default (…)" first: the
+      // caller-facing pin description ("empty = gateway default") is not shown.
+      const help = kind === 'provider' || kind === 'model' ? '' : pin.description || '';
+      return { id: pin.id, label, ...(help ? { help } : {}), kind };
     });
 }
 
@@ -109,6 +134,8 @@ export function inputDataFromForm(
     switch (field.kind) {
       case 'prompt':
       case 'text':
+      case 'provider':
+      case 'model':
         out[field.id] = value;
         break;
       case 'number': {
@@ -130,4 +157,24 @@ export function inputDataFromForm(
     }
   }
   return problems.length ? { problems } : { input_data: out };
+}
+
+/** The provider field's options: "Use the default (…)" (empty value) first, then the gateway's providers. */
+export function providerOptions(catalog: ModelCatalog | null, current: string): Array<{ value: string; label: string }> {
+  const first = { value: '', label: catalog?.defaultProvider ? `Use the default (${catalog.defaultProvider})` : 'Use the gateway’s default' };
+  const list = catalog?.providers || [];
+  const extra = current && !list.some((p) => p.value === current) ? [{ value: current, label: current }] : [];
+  return [first, ...list, ...extra];
+}
+
+/** The model field's options for the chosen provider ('' = the default provider). */
+export function modelOptions(catalog: ModelCatalog | null, provider: string, current: string): Array<{ value: string; label: string }> {
+  const usesDefaultProvider = !provider || provider === catalog?.defaultProvider;
+  const first = {
+    value: '',
+    label: usesDefaultProvider && catalog?.defaultModel ? `Use the default (${catalog.defaultModel})` : usesDefaultProvider ? 'Use the gateway’s default' : 'Use the provider’s default',
+  };
+  const list = (catalog?.models || []).map((m) => ({ value: m, label: m }));
+  const extra = current && !list.some((m) => m.value === current) ? [{ value: current, label: current }] : [];
+  return [first, ...list, ...extra];
 }
