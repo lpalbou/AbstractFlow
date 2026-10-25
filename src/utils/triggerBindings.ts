@@ -13,7 +13,7 @@
  *     schema_version: 1,
  *     title?: string,
  *     trigger: { source_id, source_version, config, connection_id? },
- *     context: { mode: "independent" | "growing" },
+ *     context: { mode: "independent" | "growing", growing?: { max_tokens } },
  *     input_data: object,
  *   }
  *
@@ -64,7 +64,7 @@ function isJsonValue(value: unknown): value is JsonValue {
 
 const TOP_KEYS = new Set(['schema_version', 'title', 'trigger', 'context', 'input_data']);
 const TRIGGER_KEYS = new Set(['source_id', 'source_version', 'config', 'connection_id']);
-const CONTEXT_KEYS = new Set(['mode']);
+const CONTEXT_KEYS = new Set(['mode', 'growing']);
 
 /**
  * Structural parse of the document field. Unknown keys are rejected (so a
@@ -122,6 +122,7 @@ export function parseAutomationDefaults(raw: unknown): AutomationDefaults {
   }
 
   let mode: AutomationContextMode = 'independent';
+  let growing: { max_tokens: number } | undefined;
   if (raw.context !== undefined) {
     if (!isRecord(raw.context)) {
       issues.push({ field: 'context', message: 'must be an object' });
@@ -135,6 +136,16 @@ export function parseAutomationDefaults(raw: unknown): AutomationDefaults {
           issues.push({ field: 'context.mode', message: `must be one of ${AUTOMATION_CONTEXT_MODES.join(', ')}` });
         } else {
           mode = m as AutomationContextMode;
+        }
+      }
+      const g = raw.context.growing;
+      if (g !== undefined) {
+        if (!isRecord(g) || Object.keys(g).some((k) => k !== 'max_tokens')) {
+          issues.push({ field: 'context.growing', message: 'must be {max_tokens}' });
+        } else if (typeof g.max_tokens !== 'number' || !Number.isInteger(g.max_tokens) || g.max_tokens <= 0) {
+          issues.push({ field: 'context.growing.max_tokens', message: 'must be a positive whole number of tokens' });
+        } else {
+          growing = { max_tokens: g.max_tokens };
         }
       }
     }
@@ -154,7 +165,7 @@ export function parseAutomationDefaults(raw: unknown): AutomationDefaults {
     schema_version: AUTOMATION_DEFAULTS_SCHEMA_VERSION,
     ...(title ? { title } : {}),
     trigger: { source_id: sourceId, source_version: sourceVersion, config, ...(connectionId ? { connection_id: connectionId } : {}) },
-    context: { mode },
+    context: { mode, ...(growing && mode === 'growing' ? { growing } : {}) },
     input_data: inputData,
   };
 }

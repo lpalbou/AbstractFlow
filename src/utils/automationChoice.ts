@@ -430,3 +430,38 @@ export function browserTimeZone(): string {
 export function automationFromChoice(choice: TriggerChoice, sources: readonly TriggerSourceItem[]): AutomationDefaults {
   return { schema_version: 1, trigger: triggerFromChoice(choice, sources), context: { mode: 'independent' }, input_data: {} };
 }
+
+// ---------------------------------------------------------------------------
+// Context: independent runs, or a growing conversation with a token budget
+// ---------------------------------------------------------------------------
+
+/** 12000 -> "12,000". */
+export function formatTokens(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
+/** The budget field's text for saved context (the saved budget, else the gateway's default). */
+export function budgetText(context: AutomationDefaults['context'] | undefined, historyDefault: number | null): string {
+  const saved = context?.growing?.max_tokens;
+  if (typeof saved === 'number') return String(saved);
+  return historyDefault ? String(historyDefault) : '';
+}
+
+/**
+ * The context to save. A budget equal to the gateway's default is not
+ * written: the automation follows the ONE central default (change it there,
+ * every automation follows). An empty field means the default too.
+ */
+export function contextFromForm(
+  mode: AutomationDefaults['context']['mode'],
+  text: string,
+  historyDefault: number | null
+): { context: AutomationDefaults['context'] } | { problem: string } {
+  if (mode !== 'growing') return { context: { mode } };
+  const raw = text.replace(/[\s,_]/g, '');
+  if (!raw) return { context: { mode } };
+  const n = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isInteger(n) || n < 1) return { problem: 'Remembers up to: enter a whole number of tokens, at least 1.' };
+  if (historyDefault !== null && n === historyDefault) return { context: { mode } };
+  return { context: { mode, growing: { max_tokens: n } } };
+}

@@ -50,7 +50,7 @@ function draft(picker: PickerState, extra: Partial<Parameters<typeof automationD
     formSource: null,
     formOptions: { labels: {}, omit: [] },
     values: {},
-    mode: 'independent',
+    context: { mode: 'independent' },
     title: '',
     inputData: {},
     ...extra,
@@ -152,5 +152,35 @@ describe('the library save of an OPEN flow adds the Trigger event to its canvas 
     expect(isTriggerableFlow(useFlowStore.getState().getFlow())).toBe(true);
     expect(useFlowStore.getState().getFlow().automation_defaults).toEqual(next);
     expect(out.baseline && isTriggerableFlow(out.baseline)).toBe(true);
+  });
+});
+
+describe('context with a budget (one central default)', () => {
+  it('Growing reads the gateway default, writes a budget only when it differs, and refuses words in plain words', async () => {
+    const { budgetText, contextFromForm } = await import('../utils/automationChoice');
+    expect(budgetText(undefined, 50000)).toBe('50000');
+    expect(budgetText({ mode: 'growing', growing: { max_tokens: 8000 } }, 50000)).toBe('8000');
+    expect(contextFromForm('growing', '50,000', 50000)).toEqual({ context: { mode: 'growing' } });
+    expect(contextFromForm('growing', '', null)).toEqual({ context: { mode: 'growing' } });
+    expect(contextFromForm('growing', '12 000', 50000)).toEqual({ context: { mode: 'growing', growing: { max_tokens: 12000 } } });
+    expect(contextFromForm('independent', '12000', 50000)).toEqual({ context: { mode: 'independent' } });
+    expect(contextFromForm('growing', 'lots', 50000)).toEqual({ problem: 'Remembers up to: enter a whole number of tokens, at least 1.' });
+    const out = draft(emptyPicker('manual'), { context: { mode: 'growing', growing: { max_tokens: 12000 } } });
+    expect('next' in out && out.next.context).toEqual({ mode: 'growing', growing: { max_tokens: 12000 } });
+  });
+
+  it('the dialog never hard-codes the default: it is read from the gateway', async () => {
+    const { readFileSync } = await import('node:fs');
+    for (const file of ['./AutomationDefaultsModal.tsx', '../utils/automationChoice.ts', './automation/useAutomationFacts.ts']) {
+      expect(readFileSync(new URL(file, import.meta.url), 'utf8')).not.toMatch(/50[_,]?000/);
+    }
+  });
+
+  it('the parser keeps growing.max_tokens for growing, drops it for independent, refuses a bad one', async () => {
+    const { parseAutomationDefaults } = await import('../utils/triggerBindings');
+    const raw = (context: unknown) => ({ schema_version: 1, trigger: { source_id: 'manual', source_version: 1, config: {} }, context, input_data: {} });
+    expect(parseAutomationDefaults(raw({ mode: 'growing', growing: { max_tokens: 9000 } })).context).toEqual({ mode: 'growing', growing: { max_tokens: 9000 } });
+    expect(parseAutomationDefaults(raw({ mode: 'independent', growing: { max_tokens: 9000 } })).context).toEqual({ mode: 'independent' });
+    expect(() => parseAutomationDefaults(raw({ mode: 'growing', growing: { max_tokens: 0 } }))).toThrow(/positive whole number/);
   });
 });

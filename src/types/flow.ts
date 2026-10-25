@@ -545,7 +545,12 @@ export interface AutomationDefaults {
   schema_version: 1;
   title?: string;
   trigger: AutomationTriggerDefaults;
-  context: { mode: AutomationContextMode };
+  /**
+   * `growing.max_tokens`: how much of the earlier runs a growing automation
+   * reads. Absent = the gateway's one central default
+   * (`GET /api/gateway/automations/defaults` -> `growing_max_tokens`).
+   */
+  context: { mode: AutomationContextMode; growing?: { max_tokens: number } };
   input_data: Record<string, JsonValue>;
 }
 

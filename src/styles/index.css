@@ -9100,3 +9100,10 @@ button.flow-nature-badge:hover {
 .automation-remove {
   margin-right: auto;
 }
+.automation-tokens {
+  width: 8em !important;
+  text-align: right;
+}
+.automation-budget {
+  flex-wrap: wrap;
+}

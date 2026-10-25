@@ -19,7 +19,6 @@ import type { AutomationContextMode, AutomationDefaults, AutomationTriggerDefaul
 import type { GatewayContracts } from '../utils/gatewayClient';
 import { type AvailableTriggerSource, type TriggerSourceItem } from '../utils/triggerSources';
 import {
-  AUTOMATION_CONTEXT_MODES,
   AUTOMATION_DEFAULTS_SCHEMA_VERSION,
   DURATION_UNITS,
   assertValidAutomationDefaults,
@@ -34,6 +33,9 @@ import {
 import { TriggerEventError, isTriggerableFlow, withTriggerEvent } from '../utils/triggerEvent';
 import {
   AutomationChoiceError,
+  budgetText,
+  contextFromForm,
+  formatTokens,
   connectionSources,
   mailSource,
   manualSource,
@@ -61,10 +63,80 @@ export interface AutomationDefaultsModalProps {
   onSave: (next: AutomationDefaults | null, extra?: { graph?: AutomationGraph }) => Promise<void> | void;
 }
 
-const CONTEXT_LABELS: Record<AutomationContextMode, string> = {
-  independent: 'Independent: every run starts fresh',
-  growing: 'Growing: every run continues the same conversation',
-};
+const CONTEXT_CHOICES: Array<{ mode: AutomationContextMode; title: string; sub: string }> = [
+  { mode: 'independent', title: 'Independent', sub: 'Every run starts fresh.' },
+  { mode: 'growing', title: 'Growing', sub: 'Every run continues the same conversation.' },
+];
+
+/** Independent / Growing, and the growing budget ("Remembers up to N tokens of earlier runs"). */
+export function ContextChoice({
+  mode,
+  onMode,
+  budget,
+  onBudget,
+  historyDefault,
+  historyProblem,
+}: {
+  mode: AutomationContextMode;
+  onMode: (mode: AutomationContextMode) => void;
+  budget: string;
+  onBudget: (text: string) => void;
+  historyDefault: number | null;
+  historyProblem: string;
+}) {
+  return (
+    <div className="automation-picker">
+      <div className="automation-choices" role="radiogroup" aria-label="Context">
+        {CONTEXT_CHOICES.map((c) => (
+          <button
+            key={c.mode}
+            type="button"
+            role="radio"
+            aria-checked={mode === c.mode}
+            className={`automation-choice${mode === c.mode ? ' is-selected' : ''}`}
+            onClick={() => onMode(c.mode)}
+          >
+            <span className="automation-choice-dot" aria-hidden="true" />
+            <span className="automation-choice-text">
+              <span className="automation-choice-title">{c.title}</span>
+              <span className="automation-choice-sub">{c.sub}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      {mode === 'growing' ? (
+        <div className="automation-detail">
+          <label className="automation-inline-field automation-budget">
+            <span>Remembers up to</span>
+            <input
+              className="run-form-input automation-tokens"
+              type="text"
+              inputMode="numeric"
+              value={budget}
+              placeholder={historyDefault ? formatTokens(historyDefault) : 'the gateway’s default'}
+              onChange={(e) => onBudget(e.target.value)}
+              aria-label="Tokens of earlier runs it remembers"
+            />
+            <span>tokens of earlier runs</span>
+          </label>
+          <p className="automation-help">
+            Each run reads the most recent part of the earlier runs, up to this budget, so it can build on them; a larger
+            budget costs more tokens and time on every run.
+          </p>
+          <p className="automation-muted">
+            {historyDefault
+              ? `The gateway’s default is ${formatTokens(historyDefault)} tokens; keeping it means this automation follows the default if it changes.`
+              : historyProblem
+                ? `The gateway’s default could not be read (${historyProblem}); leave the field empty to use it.`
+                : 'Reading the gateway’s default…'}
+          </p>
+        </div>
+      ) : (
+        <p className="automation-help automation-help--choice">Nothing is carried from one run to the next: each run sees only its own trigger and inputs.</p>
+      )}
+    </div>
+  );
+}
 
 function startPinNames(flow: VisualFlow): string[] {
   const start = flow.nodes.find((n) => n.type === 'on_flow_start' || n.data?.nodeType === 'on_flow_start');
@@ -267,7 +339,7 @@ export function automationDraft(input: {
   formSource: AvailableTriggerSource | null;
   formOptions: { labels: Record<string, { label?: string; description?: string }>; omit: string[] };
   values: ConfigFormValues;
-  mode: AutomationContextMode;
+  context: AutomationDefaults['context'];
   title: string;
   inputData: unknown;
 }): { next: AutomationDefaults; graph?: AutomationGraph } | { problems: string[] } {
@@ -315,7 +387,7 @@ export function automationDraft(input: {
         schema_version: AUTOMATION_DEFAULTS_SCHEMA_VERSION,
         ...(input.title.trim() ? { title: input.title.trim() } : {}),
         trigger,
-        context: { mode: input.mode },
+        context: input.context,
         input_data: input.inputData,
       },
       sources
@@ -338,6 +410,15 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
   const [values, setValues] = useState<ConfigFormValues>({});
   const [mode, setMode] = useState<AutomationContextMode>(existing?.context?.mode || 'independent');
   const [title, setTitle] = useState(existing?.title || '');
+  const historyDefault = facts.historyDefault.state === 'ok' ? facts.historyDefault.value : null;
+  const [budget, setBudget] = useState('');
+  const [budgetSeeded, setBudgetSeeded] = useState(false);
+  // The budget field opens on the saved budget, else the gateway's one default.
+  useEffect(() => {
+    if (budgetSeeded || facts.historyDefault.state === 'loading') return;
+    setBudgetSeeded(true);
+    setBudget(budgetText(existing?.context, historyDefault));
+  }, [budgetSeeded, facts.historyDefault.state, existing, historyDefault]);
   const [inputDataText, setInputDataText] = useState(JSON.stringify(existing?.input_data || {}, null, 2));
   const [issues, setIssues] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -385,6 +466,8 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     } catch (error) {
       inputProblems.push(`Inputs: not valid JSON (${error instanceof Error ? error.message : String(error)})`);
     }
+    const ctx = contextFromForm(mode, budget, historyDefault);
+    if ('problem' in ctx) inputProblems.unshift(ctx.problem);
     const draft = automationDraft({
       flow,
       existing,
@@ -394,7 +477,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
       formSource,
       formOptions,
       values,
-      mode,
+      context: 'context' in ctx ? ctx.context : { mode },
       title,
       inputData,
     });
@@ -491,20 +574,19 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
               ) : null}
             </section>
 
-            <div className="run-form-field" style={{ marginTop: 12 }}>
-              <label className="run-form-label">Context</label>
-              <select
-                className="run-form-select"
-                value={mode}
-                onChange={(e) => setMode(e.target.value as AutomationContextMode)}
-              >
-                {AUTOMATION_CONTEXT_MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {CONTEXT_LABELS[m]}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <section className="automation-section" aria-labelledby="automation-context-title">
+              <h4 id="automation-context-title" className="automation-section-title">
+                Context
+              </h4>
+              <ContextChoice
+                mode={mode}
+                onMode={setMode}
+                budget={budget}
+                onBudget={setBudget}
+                historyDefault={historyDefault}
+                historyProblem={facts.historyDefault.state === 'error' ? facts.historyDefault.message : ''}
+              />
+            </section>
 
             <div className="run-form-field" style={{ marginTop: 12 }}>
               <label className="run-form-label">Title (optional)</label>
