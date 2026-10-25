@@ -47,6 +47,7 @@ import { enumWords, triggerSettingsCopy } from '../utils/triggerCopy';
 import { inputDataFromForm, inputFields, inputFormFromData, type InputField, type InputValues } from '../utils/automationInputs';
 import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
 import { useAutomationFacts } from './automation/useAutomationFacts';
+import { observerAutomationsUrl, turnedOnSentence } from '../utils/automationTurnOn';
 import { IconBolt } from './ToolbarIcons';
 
 export interface AutomationGraph {
@@ -63,6 +64,11 @@ export interface AutomationDefaultsModalProps {
    * needed the Trigger event node: the caller stores it with the defaults.
    */
   onSave: (next: AutomationDefaults | null, extra?: { graph?: AutomationGraph }) => Promise<void> | void;
+  /**
+   * "Turn it on": after the defaults are stored, make the flow available and
+   * create the automation (utils/automationTurnOn.ts). Throws the problem in words.
+   */
+  onTurnOn?: (next: AutomationDefaults) => Promise<{ title: string }>;
 }
 
 const CONTEXT_CHOICES: Array<{ mode: AutomationContextMode; title: string; sub: string }> = [
@@ -479,7 +485,7 @@ export function automationDraft(input: {
   }
 }
 
-export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSave }: AutomationDefaultsModalProps) {
+export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSave, onTurnOn }: AutomationDefaultsModalProps) {
   const existing = flow.automation_defaults || null;
   const facts = useAutomationFacts(gatewayContracts);
   const support = pickerSupport(facts);
@@ -505,6 +511,8 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
   const [rawInputs, setRawInputs] = useState(seededInputs.raw);
   const [issues, setIssues] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [turningOn, setTurningOn] = useState(false);
+  const [turnedOn, setTurnedOn] = useState<{ title: string } | null>(null);
 
   // Seed the picker from the saved trigger once the sources are known.
   useEffect(() => {
@@ -540,7 +548,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     // Re-seed only when the bound source changes.
   }, [formKey]);
 
-  const handleSave = async () => {
+  const handleSave = async (action: 'save' | 'turn-on' = 'save') => {
     if (!sourcesReady) return;
     const inputs = inputDataFromForm(inputFieldList, inputValues, rawInputs);
     const inputProblems: string[] = 'problems' in inputs ? [...inputs.problems] : [];
@@ -569,11 +577,18 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     setSaving(true);
     try {
       await onSave(next, graph ? { graph } : undefined);
+      if (action === 'turn-on' && onTurnOn) {
+        setTurningOn(true);
+        const on = await onTurnOn(next);
+        setTurnedOn(on);
+        return;
+      }
       onClose();
     } catch (error) {
       setIssues([error instanceof Error ? error.message : String(error)]);
     } finally {
       setSaving(false);
+      setTurningOn(false);
     }
   };
 
@@ -610,10 +625,13 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
           </div>
         </div>
         <p className="automation-intro">
-          When the trigger fires, this flow runs with these inputs. Create or pause it in Observer or the Assistant.
+          When the trigger fires, this flow runs with these inputs. Turn it on here; pause or stop it in Observer or the Assistant.
         </p>
 
-        {support.sourcesProblem ? (
+        {turnedOn ? (
+          <TurnedOnPanel title={turnedOn.title} gatewayUrl={facts.gatewayUrl} onClose={onClose} />
+        ) : null}
+        {!turnedOn && support.sourcesProblem ? (
           <p className={facts.sources.state === 'loading' ? 'automation-help' : 'automation-problem'}>
             {support.sourcesProblem}{' '}
             {facts.sources.state !== 'loading' ? (
@@ -624,7 +642,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
           </p>
         ) : null}
 
-        {sourcesReady ? (
+        {sourcesReady && !turnedOn ? (
           <>
             <section className="automation-section" aria-labelledby="automation-start-title">
               <h4 id="automation-start-title" className="automation-section-title">
@@ -704,6 +722,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
           </>
         ) : null}
 
+        {turnedOn ? null : (
         <div className="automation-footer">
           {issues.length ? (
             <ul className="automation-issues" role="alert">
@@ -721,11 +740,37 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
             <button className="modal-button cancel" onClick={onClose} disabled={saving}>
               Cancel
             </button>
-            <button className="modal-button primary" onClick={handleSave} disabled={saving || !sourcesReady}>
+            <button className={`modal-button${onTurnOn ? ' cancel' : ' primary'}`} onClick={() => void handleSave('save')} disabled={saving || !sourcesReady}>
               Save
             </button>
+            {onTurnOn ? (
+              <button className="modal-button primary" onClick={() => void handleSave('turn-on')} disabled={saving || !sourcesReady}>
+                {turningOn ? 'Turning it on…' : 'Turn it on'}
+              </button>
+            ) : null}
           </div>
         </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** After "Turn it on": one sentence and where to see it. */
+export function TurnedOnPanel({ title, gatewayUrl, onClose }: { title: string; gatewayUrl: string; onClose: () => void }) {
+  const observer = observerAutomationsUrl(gatewayUrl);
+  return (
+    <div className="automation-on" role="status">
+      <p className="automation-on-sentence">{turnedOnSentence(title)}</p>
+      <div className="modal-actions">
+        {observer ? (
+          <a className="modal-button cancel automation-on-link" href={observer} target="_blank" rel="noreferrer">
+            Open Observer
+          </a>
+        ) : null}
+        <button className="modal-button primary" onClick={onClose}>
+          Done
+        </button>
       </div>
     </div>
   );

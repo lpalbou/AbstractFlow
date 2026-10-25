@@ -43,6 +43,8 @@ export interface FlowLibraryModalProps {
   /** Store (or with null, remove) the flow's `automation_defaults`. */
   /** `graph`: the flow with the Trigger event node the dialog added (stored with the defaults). */
   onUpdateAutomationDefaults: (flowId: string, next: AutomationDefaults | null, graph?: AutomationGraph) => Promise<void> | void;
+  /** "Turn it on" for a library flow: make it available, then create the automation. */
+  onTurnOnAutomation?: (flowId: string, flowName: string, next: AutomationDefaults) => Promise<{ title: string }>;
   /** For trigger-source discovery (the endpoint comes from the capabilities). */
   gatewayContracts: GatewayContracts | null;
   onDuplicateFlow: (flowId: string) => Promise<void> | void;
@@ -104,6 +106,7 @@ export function FlowLibraryModal({
   onUpdateDescription,
   onUpdateInterfaces,
   onUpdateAutomationDefaults,
+  onTurnOnAutomation,
   gatewayContracts,
   onDuplicateFlow,
   onDeleteFlow,
@@ -1058,6 +1061,7 @@ export function FlowLibraryModal({
             gatewayContracts={gatewayContracts}
             onClose={() => setIsEditingAutomation(false)}
             onSave={(next, extra) => onUpdateAutomationDefaults(selectedFlow.id, next, extra?.graph)}
+            onTurnOn={onTurnOnAutomation ? (next) => onTurnOnAutomation(selectedFlow.id, selectedFlow.name, next) : undefined}
           />
         </div>
       ) : null}

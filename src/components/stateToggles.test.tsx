@@ -90,13 +90,13 @@ describe('state toggles: node settings are switches', () => {
 });
 
 describe('state toggles: dialog options are switches', () => {
-  it('Publish: "Reload gateway bundles" is a switch, on by default', () => {
+  it('Make it available: "Load it into the gateway now" is a switch, on by default (under Details)', () => {
     const html = renderToStaticMarkup(
       createElement(PublishFlowModal, { isOpen: true, flowId: 'f1', flowName: 'demo', onClose: () => {} })
     );
     const tag = switchMarkup(html, 'reload-gateway');
     expect(tag).toContain('aria-checked="true"');
-    expect(tag).toContain('>Reload gateway bundles<');
+    expect(tag).toContain('>Load it into the gateway now<');
     expect(html).not.toContain('type="checkbox"');
   });
 });

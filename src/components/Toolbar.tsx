@@ -15,7 +15,9 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
 import { RunHistoryModal } from './RunHistoryModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
-import { PublishFlowModal } from './PublishFlowModal';
+import { PublishFlowModal, publishFlow } from './PublishFlowModal';
+import { AUTOMATIONS_ENDPOINT, TurnOnError, turnOnAutomation, turnOnErrorWords, turnedOnSentence, observerAutomationsUrl } from '../utils/automationTurnOn';
+import { fetchGatewayConnection } from './GatewayConnectionModal';
 import { WorkflowLifecycleModal } from './WorkflowLifecycleModal';
 import { ModelResidencyPanel } from './ModelResidencyPanel';
 import { AfTooltip } from './AfTooltip';
@@ -1166,6 +1168,68 @@ export function Toolbar() {
     },
   });
 
+  // "Turn it on" (UX review #1): save the open flow when it is the one, make
+  // it available (publish), then create the automation from its defaults.
+  const turnOn = useCallback(
+    async (which: { kind: 'open' } | { kind: 'library'; flowId: string; flowName: string }, next: AutomationDefaults) => {
+      let id: string;
+      let name: string;
+      if (which.kind === 'open') {
+        const flow = getFlow();
+        name = flow.name.trim();
+        if (!name) throw new TurnOnError('save', 'Give the flow a name first, then turn it on.');
+        try {
+          const saved = await saveMutation.mutateAsync({ flow: { ...flow, automation_defaults: next }, existingFlowId: flowId });
+          id = (typeof saved.id === 'string' && saved.id) || flowId || '';
+        } catch (error) {
+          throw new TurnOnError('save', turnOnErrorWords('save', error));
+        }
+        if (!id) throw new TurnOnError('save', 'The flow could not be saved, so it was not turned on.');
+      } else {
+        id = which.flowId;
+        name = which.flowName;
+      }
+      const on = await turnOnAutomation({
+        defaults: next,
+        flowId: id,
+        flowName: name,
+        requestId: `flow-turn-on-${id}-${Date.now()}`,
+        publish: (fid) => publishFlow(fid, { reload_gateway: true }, gatewayContracts),
+        create: (body) => gatewayJson<{ automation_id: string }>(AUTOMATIONS_ENDPOINT, jsonRequest(body, { method: 'POST' })),
+      });
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
+      return on;
+    },
+    [flowId, gatewayContracts, getFlow, queryClient, saveMutation]
+  );
+
+  // The header badge's Turn it on: the open flow's saved automation, said in a toast with the link.
+  const turnOnOpenFlow = useCallback(async () => {
+    const defaults = useFlowStore.getState().flowAutomationDefaults;
+    if (!defaults) {
+      setShowOpenFlowAutomation(true);
+      return;
+    }
+    const pending = toast.loading('Turning it on…');
+    try {
+      const on = await turnOn({ kind: 'open' }, defaults);
+      const observer = observerAutomationsUrl((await fetchGatewayConnection().catch(() => ({ gateway_url: '' }))).gateway_url);
+      toast.success(
+        <span>
+          {turnedOnSentence(on.title)}{' '}
+          {observer ? (
+            <a href={observer} target="_blank" rel="noreferrer">
+              Open Observer
+            </a>
+          ) : null}
+        </span>,
+        { id: pending, duration: 10000 }
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error), { id: pending, duration: 10000 });
+    }
+  }, [turnOn]);
+
   const saveGate: SaveGateInput = {
     savePending: saveMutation.isPending,
     isEmptyFlow,
@@ -1918,8 +1982,8 @@ export function Toolbar() {
     : loadedBundledRunTarget
       ? 'Bundled workflow families are already shipped as WorkflowBundles'
     : needsSaveFirst
-      ? 'Save the flow first to publish it'
-      : 'Publish as WorkflowBundle (.flow)';
+      ? 'Save the flow first to make it available'
+      : 'Make it available to Observer and the Assistant';
   const lifecycleTooltip = loadedBundledRunTarget
     ? 'Bundled workflow families use their shipped bundle lifecycle'
     : needsSaveFirst
@@ -1948,6 +2012,7 @@ export function Toolbar() {
           executable={isExecutableFlow({ interfaces: flowInterfaces })}
           words={natureWords}
           onClick={() => setShowOpenFlowAutomation(true)}
+          onTurnOn={() => void turnOnOpenFlow()}
         />
 
         {/* The action groups. On desktop this wrapper is display: contents (the
@@ -2072,14 +2137,14 @@ export function Toolbar() {
         <div className="toolbar-group" role="group" aria-label="Gateway actions">
           <ToolbarAction
             tooltip={publishTooltip}
-            label="Publish WorkflowBundle"
+            label="Make it available"
             onClick={handlePublish}
             disabled={isRunning || !flowId || Boolean(loadedBundledRunTarget) || visualflowPublishUnavailable}
             iconOnly={false}
             className="primary publish-button"
           >
             <IconPackage />
-            <span>Publish</span>
+            <span>Make it available</span>
           </ToolbarAction>
           <ToolbarAction
             tooltip={lifecycleTooltip}
@@ -2155,6 +2220,7 @@ export function Toolbar() {
           <AutomationDefaultsModal
             flow={getFlow()}
             gatewayContracts={gatewayContracts}
+            onTurnOn={(next) => turnOn({ kind: 'open' }, next)}
             onClose={() => setShowOpenFlowAutomation(false)}
             onSave={(next, extra) => {
               // The open document: saved with the flow (Save), like any edit;
@@ -2259,6 +2325,7 @@ export function Toolbar() {
           onUpdateDescription={handleUpdateDescription}
           onUpdateInterfaces={handleUpdateInterfaces}
           onUpdateAutomationDefaults={handleUpdateAutomationDefaults}
+          onTurnOnAutomation={(id, name, next) => turnOn({ kind: 'library', flowId: id, flowName: name }, next)}
           gatewayContracts={gatewayContracts}
           onDuplicateFlow={handleDuplicateFlow}
           onDeleteFlow={handleDeleteFlow}

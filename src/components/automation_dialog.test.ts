@@ -190,9 +190,82 @@ describe('title and copy (item 5)', () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(new URL('./AutomationDefaultsModal.tsx', import.meta.url), 'utf8');
     expect(src).toContain('<h3 id="automation-dialog-title">Automation</h3>');
-    expect(src).toContain('When the trigger fires, this flow runs with these inputs. Create or pause it in Observer or the Assistant.');
+    expect(src).toContain('When the trigger fires, this flow runs with these inputs. Turn it on here; pause or stop it in Observer or the Assistant.');
     expect(src).not.toMatch(/fixed UTC intervals|Automation defaults<|input_data \(JSON|Refresh sources|Choose a trigger source/);
     const nodes = readFileSync(new URL('../types/nodes.ts', import.meta.url), 'utf8');
     expect(nodes).not.toContain('Automation defaults');
+  });
+});
+
+describe('Turn it on (UX review #1)', () => {
+  it('publishes, then creates the automation from the saved defaults; says it is on in one sentence', async () => {
+    const { turnOnAutomation, turnedOnSentence, observerAutomationsUrl } = await import('../utils/automationTurnOn');
+    const defaults = {
+      schema_version: 1 as const,
+      trigger: { source_id: 'feed.item', source_version: 1, config: {}, connection_id: 'conn_feed1' },
+      context: { mode: 'growing' as const, growing: { max_tokens: 12000 } },
+      input_data: { prompt: 'Summarise the new items.' },
+    };
+    const calls: string[] = [];
+    let body: unknown = null;
+    const on = await turnOnAutomation({
+      defaults,
+      flowId: 'flow-1',
+      flowName: 'Release digest',
+      requestId: 'req-1',
+      publish: async (id) => (calls.push(`publish ${id}`), { bundle_ref: 'Release-digest@0.0.1' }),
+      create: async (b) => (calls.push('create'), (body = b), { automation_id: 'auto-1' }),
+    });
+    expect(calls).toEqual(['publish flow-1', 'create']);
+    expect(body).toEqual({
+      request_id: 'req-1',
+      title: 'Release digest',
+      target: { bundle_ref: 'Release-digest@0.0.1', flow_id: 'flow-1', input_data: { prompt: 'Summarise the new items.' } },
+      trigger: defaults.trigger,
+      context: defaults.context,
+    });
+    expect(turnedOnSentence(on.title)).toBe('Release digest is on. See it in Observer or the Assistant.');
+    expect(observerAutomationsUrl('http://gw:8080/')).toBe('http://gw:8080/apps/observer/#automations');
+  });
+
+  it('failures are plain words, never reason codes', async () => {
+    const { turnOnAutomation, TurnOnError } = await import('../utils/automationTurnOn');
+    const { GatewayHttpError } = await import('../utils/gatewayClient');
+    const base = {
+      defaults: { schema_version: 1 as const, trigger: { source_id: 'manual', source_version: 1, config: {} }, context: { mode: 'independent' as const }, input_data: {} },
+      flowId: 'f',
+      flowName: 'F',
+      requestId: 'r',
+    };
+    const refused = (code: string) => async () => {
+      throw new GatewayHttpError('HTTP 422', 422, { detail: { reason_code: code, message: 'raw' } });
+    };
+    await expect(turnOnAutomation({ ...base, publish: async () => ({ bundle_ref: 'F@0.0.0' }), create: refused('connection_not_found') })).rejects.toThrow(
+      'That feed or webhook is not one of yours on this gateway any more'
+    );
+    await expect(turnOnAutomation({ ...base, publish: async () => ({ bundle_ref: 'F@0.0.0' }), create: refused('email_account_not_found') })).rejects.toThrow(
+      'That mailbox is not connected any more'
+    );
+    const failed = await turnOnAutomation({
+      ...base,
+      publish: async () => {
+        throw new GatewayHttpError('HTTP 401', 401, null);
+      },
+      create: async () => ({ automation_id: 'x' }),
+    }).catch((e) => e);
+    expect(failed).toBeInstanceOf(TurnOnError);
+    expect(failed.message).toBe('Your gateway session expired: reconnect from the top bar, then try again.');
+  });
+
+  it('Make it available: one sentence, ids and versions only under Details', async () => {
+    const { createElement } = await import('react');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { PublishFlowModal, availableSentence } = await import('./PublishFlowModal');
+    const html = renderToStaticMarkup(createElement(PublishFlowModal, { isOpen: true, flowId: 'f1', flowName: 'Release digest', onClose: () => {} }));
+    expect(html).toContain('>Make it available</h3>');
+    expect(html).toContain('<summary>Details</summary>');
+    const beforeDetails = html.slice(0, html.indexOf('<details'));
+    expect(beforeDetails).not.toMatch(/bundle|WorkflowBundle|\.flow|version/i);
+    expect(availableSentence('Release digest')).toBe('Release digest is ready for Observer and the Assistant.');
   });
 });

@@ -52,26 +52,64 @@ export function FlowNatureBadge({
   automation,
   executable,
   onClick,
+  onTurnOn,
   words,
 }: {
   automation: AutomationDefaults | null | undefined;
   executable: boolean;
+  /** Open the Automation dialog. */
   onClick?: () => void;
+  /** Turn the saved automation on (in the badge's menu when there is one). */
+  onTurnOn?: () => void;
   words?: AutomationWords;
 }) {
+  const [open, setOpen] = useState(false);
   const nature = flowNature({ automation_defaults: automation }, executable, words);
   if (nature.kind === 'none' && !onClick) return null;
   const text = nature.kind === 'none' ? 'Automation…' : nature.text;
   const title =
     nature.kind === 'automation'
-      ? 'What starts it, its context and inputs'
+      ? nature.text
       : 'Make it an automation: a schedule, new mail, a feed or a webhook starts it';
   const className = `flow-nature-badge flow-nature-badge--${nature.kind}`;
-  return onClick ? (
-    <button type="button" className={className} onClick={onClick} title={title}>
-      {text}
-    </button>
-  ) : (
-    <span className={className}>{text}</span>
+  if (!onClick) return <span className={className}>{text}</span>;
+  // An automation gets a small menu (Automation… / Turn it on); otherwise the badge opens the dialog.
+  if (nature.kind !== 'automation' || !onTurnOn) {
+    return (
+      <button type="button" className={className} onClick={onClick} title={title}>
+        {text}
+      </button>
+    );
+  }
+  return (
+    <span className="flow-nature-menu-wrap">
+      <button type="button" className={className} onClick={() => setOpen((v) => !v)} title={title} aria-haspopup="menu" aria-expanded={open}>
+        {text}
+      </button>
+      {open ? (
+        <span className="flow-nature-menu" role="menu" onMouseLeave={() => setOpen(false)}>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onClick();
+            }}
+          >
+            Automation…
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onTurnOn();
+            }}
+          >
+            Turn it on
+          </button>
+        </span>
+      ) : null}
+    </span>
   );
 }

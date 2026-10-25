@@ -17,7 +17,7 @@ type PublishFlowRequest = {
   reload_gateway?: boolean;
 };
 
-type PublishFlowResponse = {
+export type PublishFlowResponse = {
   ok: boolean;
   bundle_id: string;
   bundle_version: string;
@@ -27,7 +27,7 @@ type PublishFlowResponse = {
   gateway_reload_error?: string | null;
 };
 
-async function publishFlow(
+export async function publishFlow(
   flowId: string,
   payload: PublishFlowRequest,
   contracts: GatewayContracts | null | undefined
@@ -79,107 +79,110 @@ export function PublishFlowModal({
   if (!isOpen) return null;
 
   const canSubmit = Boolean(flowId) && !isSubmitting;
+  const name = flowName.trim() || 'This flow';
+
+  const submit = async () => {
+    if (!flowId) return;
+    setIsSubmitting(true);
+    try {
+      const payload: PublishFlowRequest = {};
+      const bid = sanitizeBundleId(bundleId);
+      if (bid) payload.bundle_id = bid;
+      const bver = (bundleVersion || '').trim();
+      if (bver) payload.bundle_version = bver;
+      payload.reload_gateway = Boolean(reloadGateway);
+      const res = await publishFlow(flowId, payload, gatewayContracts);
+      setResult(res);
+      onPublished?.(res);
+      if (payload.reload_gateway && !res.gateway_reloaded) {
+        toast.error('It was saved, but the gateway did not load it yet: try again in a moment.');
+      }
+    } catch (e) {
+      toast.error(`It could not be made available: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Publish WorkflowBundle</h3>
-        <p>
-          Creates a new <code>.flow</code> bundle version (history preserved) and installs it directly into the gateway
-          bundle registry. Leave the version empty to auto-bump.
-        </p>
-
-        <div className="run-form-field">
-          <label className="run-form-label">bundle_id</label>
-          <input
-            className="run-form-input"
-            type="text"
-            value={bundleId}
-            onChange={(e) => setBundleId(e.target.value)}
-            placeholder={defaultBundleId || 'my-agent'}
-            disabled={isSubmitting}
-          />
-          <span className="property-hint">Stable workflow identity (no version suffix). Default: flow name.</span>
-        </div>
-
-        <div className="run-form-field" style={{ marginTop: 12 }}>
-          <label className="run-form-label">bundle_version (optional)</label>
-          <input
-            className="run-form-input"
-            type="text"
-            value={bundleVersion}
-            onChange={(e) => setBundleVersion(e.target.value)}
-            placeholder="Auto-bump (recommended)"
-            disabled={isSubmitting}
-          />
-          <span className="property-hint">Leave empty to auto-bump (e.g., 0.0.1 → 0.0.2).</span>
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <AfSwitch
-            variant="row"
-            label="Reload gateway bundles"
-            description="Load the new version into the gateway right after publishing."
-            action="reload-gateway"
-            checked={reloadGateway}
-            busy={isSubmitting}
-            onChange={setReloadGateway}
-          />
-        </div>
-
+      <div className="modal publish-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="publish-title">
+        <h3 id="publish-title">Make it available</h3>
         {result ? (
-          <div style={{ marginTop: 16 }}>
-            <div className="property-hint">
-              Published <code>{result.bundle_ref}</code>
-              {result.gateway_reloaded ? ' (gateway reloaded)' : ''}
+          <p className="automation-on-sentence" role="status">
+            {availableSentence(name)}
+          </p>
+        ) : (
+          <p className="automation-intro">
+            Makes the saved {name} available to Observer and the Assistant, so people and automations can run it. Each time keeps the earlier ones.
+          </p>
+        )}
+
+        <details className="automation-more publish-details">
+          <summary>Details</summary>
+          <div className="automation-more-body">
+            <div className="run-form-field automation-field">
+              <label className="run-form-label" htmlFor="publish-bundle-id">
+                Name in the gateway
+              </label>
+              <input
+                id="publish-bundle-id"
+                className="run-form-input"
+                type="text"
+                value={bundleId}
+                onChange={(e) => setBundleId(e.target.value)}
+                placeholder={defaultBundleId || 'my-agent'}
+                disabled={isSubmitting}
+              />
+              <span className="property-hint">Stays the same from one time to the next; the flow’s name by default.</span>
             </div>
-            <div className="property-hint">
-              Path: <code>{result.bundle_path}</code>
+            <div className="run-form-field automation-field">
+              <label className="run-form-label" htmlFor="publish-bundle-version">
+                Version <span className="new-flow-optional">optional</span>
+              </label>
+              <input
+                id="publish-bundle-version"
+                className="run-form-input"
+                type="text"
+                value={bundleVersion}
+                onChange={(e) => setBundleVersion(e.target.value)}
+                placeholder="Next version (recommended)"
+                disabled={isSubmitting}
+              />
             </div>
-            {result.gateway_reload_error ? (
-              <div className="property-hint" style={{ color: 'var(--warning)' }}>
-                Gateway reload error: <code>{result.gateway_reload_error}</code>
+            <AfSwitch
+              variant="row"
+              label="Load it into the gateway now"
+              description="Off: it is stored and loaded at the gateway's next start."
+              action="reload-gateway"
+              checked={reloadGateway}
+              busy={isSubmitting}
+              onChange={setReloadGateway}
+            />
+            {result ? (
+              <div className="property-hint">
+                {result.bundle_ref} · {result.bundle_path}
               </div>
             ) : null}
           </div>
-        ) : null}
+        </details>
 
         <div className="modal-actions">
           <button className="modal-button cancel" onClick={onClose} disabled={isSubmitting}>
-            Close
+            {result ? 'Done' : 'Cancel'}
           </button>
-          <button
-            className="modal-button"
-            disabled={!canSubmit}
-            onClick={async () => {
-              if (!flowId) return;
-              setIsSubmitting(true);
-              try {
-                const payload: PublishFlowRequest = {};
-                const bid = sanitizeBundleId(bundleId);
-                if (bid) payload.bundle_id = bid;
-                const bver = (bundleVersion || '').trim();
-                if (bver) payload.bundle_version = bver;
-                payload.reload_gateway = Boolean(reloadGateway);
-
-                const res = await publishFlow(flowId, payload, gatewayContracts);
-                setResult(res);
-                onPublished?.(res);
-                toast.success(`Published ${res.bundle_ref}`);
-                if (payload.reload_gateway && !res.gateway_reloaded) {
-                  toast.error('Published, but failed to reload gateway bundles');
-                }
-              } catch (e) {
-                toast.error(e instanceof Error ? e.message : 'Failed to publish bundle');
-              } finally {
-                setIsSubmitting(false);
-              }
-            }}
-          >
-            {isSubmitting ? 'Publishing…' : 'Publish'}
-          </button>
+          {result ? null : (
+            <button className="modal-button primary" disabled={!canSubmit} onClick={() => void submit()}>
+              {isSubmitting ? 'Making it available…' : 'Make it available'}
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+/** "Release digest is ready for Observer and the Assistant." */
+export function availableSentence(name: string): string {
+  return `${name} is ready for Observer and the Assistant.`;
 }
