@@ -1,26 +1,23 @@
 /**
- * "Automation defaults" editor for one flow (Flow Library > Automation).
+ * The Automation dialog of one flow (Flow Library > Automation…, the editor
+ * header's nature badge): what starts it, its context and its inputs.
  *
- * The trigger sources come from the gateway (utils/triggerSources.ts); the
- * config form is rendered from the chosen source's `config_schema`
- * (utils/triggerBindings.ts). Nothing here knows schedule@1 or manual@1.
+ * "What starts it?" is the human picker shared with the New flow dialog
+ * (components/automation/TriggerPicker.tsx; operator 2026-10-25): a schedule
+ * in the person's time zone (schedule@2), one of their mailboxes, one of
+ * their feeds or webhooks, or by hand. The chosen source's other settings
+ * come from its own `config_schema` (utils/triggerBindings.ts) under "More
+ * settings"; a setting the form cannot render is edited as JSON on its own,
+ * it never blocks the source.
  *
- * Sources with a trigger connection (feeds, webhooks) listen to one
- * of the author's trigger CONNECTIONS (utils/triggerConnections.ts): a
- * selector lists them, "New connection…" opens the gateway console's
- * Triggers page on that source, and the choice is saved as
- * `trigger.connection_id`. Such a source needs a triggerable flow (On Flow
- * Start declares the `event` input, utils/triggerEvent.ts).
+ * Saving a trigger on a flow that cannot receive the event yet adds the
+ * Trigger event node itself (utils/triggerEvent.ts) and hands the new graph
+ * to the caller: the person is never asked to do it.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AutomationContextMode, AutomationDefaults, JsonValue, VisualFlow } from '../types/flow';
+import { useEffect, useMemo, useState } from 'react';
+import type { AutomationContextMode, AutomationDefaults, AutomationTriggerDefaults, VisualFlow } from '../types/flow';
 import type { GatewayContracts } from '../utils/gatewayClient';
-import { fetchGatewayConnection } from './GatewayConnectionModal';
-import {
-  triggerSourceCache,
-  type AvailableTriggerSource,
-  type TriggerSourcesResult,
-} from '../utils/triggerSources';
+import { type AvailableTriggerSource, type TriggerSourceItem } from '../utils/triggerSources';
 import {
   AUTOMATION_CONTEXT_MODES,
   AUTOMATION_DEFAULTS_SCHEMA_VERSION,
@@ -29,27 +26,39 @@ import {
   configFormFields,
   configFromFormValues,
   formValuesFromConfig,
-  unsupportedSchemaKeywords,
   AutomationDefaultsError,
   type AutomationDefaultsIssue,
   type ConfigFormField,
   type ConfigFormValues,
 } from '../utils/triggerBindings';
+import { TriggerEventError, isTriggerableFlow, withTriggerEvent } from '../utils/triggerEvent';
 import {
-  connectionOptionLabel,
-  connectionProblem,
-  connectionsForSource,
-  consoleNewConnectionUrl,
-  fetchTriggerConnections,
-  type TriggerConnectionsResult,
-} from '../utils/triggerConnections';
-import { isTriggerableFlow, triggerEventRequirement } from '../utils/triggerEvent';
+  AutomationChoiceError,
+  connectionSources,
+  mailSource,
+  manualSource,
+  scheduleSource,
+  triggerFromChoice,
+} from '../utils/automationChoice';
+import { choiceFromPicker, emptyPicker, pickerFromTrigger, type PickerData, type PickerState } from '../utils/automationPicker';
+import { enumWords, triggerSettingsCopy } from '../utils/triggerCopy';
+import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
+import { useAutomationFacts } from './automation/useAutomationFacts';
+
+export interface AutomationGraph {
+  nodes: VisualFlow['nodes'];
+  edges: VisualFlow['edges'];
+}
 
 export interface AutomationDefaultsModalProps {
   flow: VisualFlow;
   gatewayContracts: GatewayContracts | null;
   onClose: () => void;
-  onSave: (next: AutomationDefaults | null) => Promise<void> | void;
+  /**
+   * Store (or with null, remove) the defaults. `graph` is set when the flow
+   * needed the Trigger event node: the caller stores it with the defaults.
+   */
+  onSave: (next: AutomationDefaults | null, extra?: { graph?: AutomationGraph }) => Promise<void> | void;
 }
 
 const CONTEXT_LABELS: Record<AutomationContextMode, string> = {
@@ -58,7 +67,7 @@ const CONTEXT_LABELS: Record<AutomationContextMode, string> = {
 };
 
 function startPinNames(flow: VisualFlow): string[] {
-  const start = flow.nodes.find((n) => n.type === 'on_flow_start');
+  const start = flow.nodes.find((n) => n.type === 'on_flow_start' || n.data?.nodeType === 'on_flow_start');
   const outputs = (start?.data?.outputs || []) as Array<{ id: string; type?: string }>;
   return outputs.filter((pin) => pin.type !== 'execution').map((pin) => pin.id);
 }
@@ -67,22 +76,33 @@ function ConfigField({
   field,
   values,
   onChange,
-  current,
 }: {
   field: ConfigFormField;
   values: ConfigFormValues;
   onChange: (key: string, value: string) => void;
-  current: Record<string, JsonValue>;
 }) {
   const value = values[field.key] ?? '';
-  const label = `${field.label}${field.required ? ' *' : ''}`;
+  const id = `automation-setting-${field.key.replace(/\W+/g, '-')}`;
+  if (field.kind === 'group') {
+    return (
+      <details className="automation-group" open={(field.children || []).some((c) => (values[c.key] ?? '') !== '')}>
+        <summary>{field.label}</summary>
+        <div className="automation-group-body">
+          {(field.children || []).map((child) => (
+            <ConfigField key={child.key} field={child} values={values} onChange={onChange} />
+          ))}
+        </div>
+      </details>
+    );
+  }
   let control: JSX.Element;
   switch (field.kind) {
     case 'duration':
       control = (
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="automation-inline-row">
           <input
-            className="run-form-input"
+            id={id}
+            className="run-form-input automation-amount"
             type="number"
             min={1}
             step={1}
@@ -92,7 +112,7 @@ function ConfigField({
           />
           <select
             className="run-form-select"
-            value={values[`${field.key}#unit`] ?? ''}
+            value={values[`${field.key}#unit`] || 'm'}
             onChange={(e) => onChange(`${field.key}#unit`, e.target.value)}
             aria-label={`${field.label} unit`}
           >
@@ -107,11 +127,11 @@ function ConfigField({
       break;
     case 'enum':
       control = (
-        <select className="run-form-select" value={value} onChange={(e) => onChange(field.key, e.target.value)}>
-          <option value="">(not set)</option>
+        <select id={id} className="run-form-select" value={value} onChange={(e) => onChange(field.key, e.target.value)}>
+          <option value="">Default</option>
           {(field.options || []).map((opt) => (
             <option key={JSON.stringify(opt)} value={JSON.stringify(opt)}>
-              {typeof opt === 'string' ? opt : JSON.stringify(opt)}
+              {enumWords(opt)}
             </option>
           ))}
         </select>
@@ -119,10 +139,10 @@ function ConfigField({
       break;
     case 'boolean':
       control = (
-        <select className="run-form-select" value={value} onChange={(e) => onChange(field.key, e.target.value)}>
-          <option value="">(not set)</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
+        <select id={id} className="run-form-select" value={value} onChange={(e) => onChange(field.key, e.target.value)}>
+          <option value="">Default</option>
+          <option value="true">Yes</option>
+          <option value="false">No</option>
         </select>
       );
       break;
@@ -130,6 +150,7 @@ function ConfigField({
     case 'number':
       control = (
         <input
+          id={id}
           className="run-form-input"
           type="number"
           step={field.kind === 'integer' ? 1 : 'any'}
@@ -138,77 +159,195 @@ function ConfigField({
         />
       );
       break;
-    case 'readonly':
+    case 'list':
       control = (
-        <pre className="property-hint" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-          {`Not editable here. Schema: ${JSON.stringify(field.schema)}\nValue: ${
-            current[field.key] === undefined ? '(not set)' : JSON.stringify(current[field.key])
-          }`}
-        </pre>
+        <textarea
+          id={id}
+          className="run-form-input property-textarea"
+          rows={2}
+          value={value}
+          placeholder="One per line"
+          onChange={(e) => onChange(field.key, e.target.value)}
+        />
+      );
+      break;
+    case 'json':
+      control = (
+        <textarea
+          id={id}
+          className="run-form-input property-textarea code"
+          rows={3}
+          value={value}
+          onChange={(e) => onChange(field.key, e.target.value)}
+          aria-describedby={`${id}-json`}
+        />
       );
       break;
     default:
       control = (
         <input
+          id={id}
           className="run-form-input"
           type="text"
           value={value}
-          placeholder={field.kind === 'datetime' ? '2026-09-27T08:00:00Z (UTC)' : ''}
+          placeholder={field.kind === 'datetime' ? '2026-11-02T08:00:00Z' : ''}
           onChange={(e) => onChange(field.key, e.target.value)}
         />
       );
   }
   return (
-    <div className="run-form-field" style={{ marginTop: 10 }}>
-      <label className="run-form-label">{label}</label>
+    <div className="run-form-field automation-field">
+      <label className="run-form-label" htmlFor={id}>
+        {field.label}
+        {field.required ? <span className="automation-required"> (required)</span> : null}
+      </label>
       {control}
       {field.description ? <span className="property-hint">{field.description}</span> : null}
+      {field.kind === 'json' ? (
+        <span className="property-hint" id={`${id}-json`}>
+          Written as JSON.
+        </span>
+      ) : null}
     </div>
   );
 }
 
+/** The source a picker state binds (null: nothing chosen, or not served). */
+function pickedSource(
+  picker: PickerState,
+  sources: readonly TriggerSourceItem[],
+  connections: Array<{ connection_id: string; source_id: string; source_version: number }> | null
+): AvailableTriggerSource | null {
+  if (picker.start === 'schedule') return picker.legacy ? null : scheduleSource(sources);
+  if (picker.start === 'manual') return manualSource(sources);
+  if (picker.start === 'arrives') {
+    if (picker.arrival.startsWith('mail:')) return mailSource(sources);
+    const conn = connections?.find((c) => `conn:${c.connection_id}` === picker.arrival);
+    return conn ? connectionSources(sources).find((s) => s.id === conn.source_id && s.version === conn.source_version) || null : null;
+  }
+  return null;
+}
+
+/** A problem in words, named by the setting's label rather than its path. */
+export function issueText(issue: AutomationDefaultsIssue, fields: ConfigFormField[]): string {
+  const flat: ConfigFormField[] = [];
+  const walk = (list: ConfigFormField[]) => list.forEach((f) => (f.kind === 'group' ? (flat.push(f), walk(f.children || [])) : flat.push(f)));
+  walk(fields);
+  const path = issue.field.replace(/^trigger\.config\./, '');
+  const field = flat
+    .filter((f) => path === f.key || path.startsWith(`${f.key}.`))
+    .sort((a, b) => b.key.length - a.key.length)[0];
+  if (field) return `${field.label}: ${issue.message}`;
+  if (issue.field === 'trigger.connection_id') return `Connection: ${issue.message}`;
+  if (issue.field.startsWith('input_data')) return `Inputs: ${issue.message}`;
+  if (issue.field.startsWith('context')) return `Context: ${issue.message}`;
+  if (issue.field.startsWith('trigger')) return `Trigger: ${issue.message}`;
+  return issue.message;
+}
+
+function nextNodeId(nodes: VisualFlow['nodes']): string {
+  const max = nodes.reduce((m, n) => {
+    const hit = /^node-(\d+)$/.exec(n.id);
+    return hit ? Math.max(m, Number(hit[1])) : m;
+  }, 0);
+  return `node-${max + 1}`;
+}
+
+/**
+ * What Save stores, from the dialog's state (pure, tested): the validated
+ * defaults and, when the flow cannot receive the event yet, the graph with
+ * the Trigger event node added. Or the problems, in words.
+ */
+export function automationDraft(input: {
+  flow: VisualFlow;
+  existing: AutomationDefaults | null;
+  picker: PickerState;
+  keepsSaved: boolean;
+  data: PickerData;
+  formSource: AvailableTriggerSource | null;
+  formOptions: { labels: Record<string, { label?: string; description?: string }>; omit: string[] };
+  values: ConfigFormValues;
+  mode: AutomationContextMode;
+  title: string;
+  inputData: unknown;
+}): { next: AutomationDefaults; graph?: AutomationGraph } | { problems: string[] } {
+  const { flow, existing, picker, data, formSource, formOptions, values } = input;
+  const sources = data.sources;
+  const found: string[] = [];
+  const copy = triggerSettingsCopy(formSource?.id || '');
+  const fields = formSource && !copy.noForm ? configFormFields(formSource.config_schema, formOptions) : [];
+  let trigger: AutomationTriggerDefaults | null = null;
+  if (picker.legacy) trigger = picker.legacy.trigger;
+  else if (input.keepsSaved && existing) trigger = existing.trigger;
+  else {
+    const picked = choiceFromPicker(picker, data);
+    if ('problem' in picked) found.push(picked.problem);
+    else if (picked.choice.kind !== 'chat') {
+      try {
+        trigger = triggerFromChoice(picked.choice, sources);
+      } catch (error) {
+        if (!(error instanceof AutomationChoiceError)) throw error;
+        found.push(error.message);
+      }
+    }
+  }
+  if (trigger && fields.length && formSource) {
+    const built = configFromFormValues(formSource.config_schema, values, {}, { ...formOptions, validate: false });
+    found.push(...built.issues.map((i) => issueText(i, fields)));
+    // The picker owns its settings (mailbox, schedule); the form adds the rest.
+    trigger = { ...trigger, config: { ...built.config, ...trigger.config } };
+  }
+  let graph: AutomationGraph | undefined;
+  if (trigger && !isTriggerableFlow(flow)) {
+    try {
+      const next = withTriggerEvent(flow.nodes as never, flow.edges as never, { breakNodeId: nextNodeId(flow.nodes), edgeId: `edge-trigger-event-${nextNodeId(flow.nodes)}` });
+      graph = { nodes: next.nodes as never, edges: next.edges as never };
+    } catch (error) {
+      if (!(error instanceof TriggerEventError)) throw error;
+      found.push(error.message);
+    }
+  }
+  if (!trigger && !found.length) found.push('Choose what starts it.');
+  if (found.length || !trigger) return { problems: found };
+  try {
+    const next = assertValidAutomationDefaults(
+      {
+        schema_version: AUTOMATION_DEFAULTS_SCHEMA_VERSION,
+        ...(input.title.trim() ? { title: input.title.trim() } : {}),
+        trigger,
+        context: { mode: input.mode },
+        input_data: input.inputData,
+      },
+      sources
+    );
+    return graph ? { next, graph } : { next };
+  } catch (error) {
+    if (error instanceof AutomationDefaultsError) return { problems: error.issues.map((i) => issueText(i, fields)) };
+    throw error;
+  }
+}
+
 export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSave }: AutomationDefaultsModalProps) {
   const existing = flow.automation_defaults || null;
-  const [discovery, setDiscovery] = useState<TriggerSourcesResult | null>(null);
-  const [discoveryError, setDiscoveryError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sourceKey, setSourceKey] = useState(
-    existing ? `${existing.trigger.source_id}@${existing.trigger.source_version}` : ''
-  );
+  const facts = useAutomationFacts(gatewayContracts);
+  const support = pickerSupport(facts);
+  const sources = support.data.sources;
+  const sourcesReady = facts.sources.state === 'ok' && facts.sources.value.status === 'ok';
+  const [picker, setPicker] = useState<PickerState>(emptyPicker(null));
+  const [seeded, setSeeded] = useState(false);
   const [values, setValues] = useState<ConfigFormValues>({});
   const [mode, setMode] = useState<AutomationContextMode>(existing?.context?.mode || 'independent');
   const [title, setTitle] = useState(existing?.title || '');
   const [inputDataText, setInputDataText] = useState(JSON.stringify(existing?.input_data || {}, null, 2));
-  const [issues, setIssues] = useState<AutomationDefaultsIssue[]>([]);
+  const [issues, setIssues] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [gatewayUrl, setGatewayUrl] = useState('');
-  const [connections, setConnections] = useState<TriggerConnectionsResult | null>(null);
-  const [connectionsError, setConnectionsError] = useState('');
-  const [connectionsLoading, setConnectionsLoading] = useState(false);
-  const [connectionId, setConnectionId] = useState(existing?.trigger.connection_id || '');
 
-  const load = useCallback(
-    async (refresh: boolean) => {
-      setLoading(true);
-      setDiscoveryError('');
-      try {
-        const connection = await fetchGatewayConnection();
-        setGatewayUrl(connection.gateway_url);
-        const result = await triggerSourceCache.load(connection.gateway_url, gatewayContracts, { refresh });
-        setDiscovery(result);
-      } catch (error) {
-        setDiscovery(null);
-        setDiscoveryError(error instanceof Error ? error.message : String(error));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [gatewayContracts]
-  );
-
+  // Seed the picker from the saved trigger once the sources are known.
   useEffect(() => {
-    void load(false);
-  }, [load]);
+    if (seeded || !sourcesReady) return;
+    setSeeded(true);
+    if (existing) setPicker(pickerFromTrigger(existing.trigger, support.data));
+  }, [seeded, sourcesReady, existing, support.data]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -218,125 +357,59 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose, saving]);
 
-  const items = discovery?.status === 'ok' ? discovery.items : [];
-  const selected = useMemo(
-    () =>
-      items.find((s): s is AvailableTriggerSource => s.available && `${s.id}@${s.version}` === sourceKey) || null,
-    [items, sourceKey]
-  );
-  // A schema the editor cannot fully check makes the source unbindable here.
-  const unsupported = useMemo(() => (selected ? unsupportedSchemaKeywords(selected.config_schema) : []), [selected]);
+  const source = pickedSource(picker, sources, support.data.connections as never);
+  // A saved trigger the picker cannot show (an older or third-party source) is kept until replaced.
+  const keepsSaved = Boolean(existing && seeded && picker.start === null);
+  const savedSource = existing ? sources.find((s): s is AvailableTriggerSource => s.available && s.id === existing.trigger.source_id && s.version === existing.trigger.source_version) || null : null;
+  const formSource = source || (picker.legacy || keepsSaved ? savedSource : null);
+  const copy = triggerSettingsCopy(formSource?.id || '');
+  const formOptions = useMemo(() => ({ labels: copy.labels, omit: copy.omit }), [copy]);
   const fields = useMemo(
-    () => (selected && !unsupported.length ? configFormFields(selected.config_schema) : []),
-    [selected, unsupported]
+    () => (formSource && !copy.noForm ? configFormFields(formSource.config_schema, formOptions) : []),
+    [formSource, copy, formOptions]
   );
-  const currentConfig = useMemo(
-    () =>
-      existing && selected && existing.trigger.source_id === selected.id && existing.trigger.source_version === selected.version
-        ? existing.trigger.config
-        : {},
-    [existing, selected]
-  );
-
-  // Seed the form from the saved config when its source is (re)selected.
+  const savedConfig = existing && formSource && existing.trigger.source_id === formSource.id && existing.trigger.source_version === formSource.version ? existing.trigger.config : null;
+  const formKey = formSource ? `${formSource.id}@${formSource.version}` : '';
   useEffect(() => {
-    if (!selected) {
-      setValues({});
-      return;
-    }
-    const seeded = formValuesFromConfig(selected.config_schema, currentConfig);
-    for (const field of configFormFields(selected.config_schema)) {
-      if (field.kind === 'duration' && !seeded[`${field.key}#unit`]) seeded[`${field.key}#unit`] = 'm';
-    }
-    setValues(seeded);
-  }, [selected, currentConfig]);
-
-  const needsConnection = Boolean(selected?.uses_trigger_connection);
-  const loadConnections = useCallback(async () => {
-    setConnectionsLoading(true);
-    setConnectionsError('');
-    try {
-      setConnections(await fetchTriggerConnections());
-    } catch (error) {
-      setConnections(null);
-      setConnectionsError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setConnectionsLoading(false);
-    }
-  }, []);
-  useEffect(() => {
-    if (needsConnection && !connections && !connectionsLoading && !connectionsError) void loadConnections();
-  }, [needsConnection, connections, connectionsLoading, connectionsError, loadConnections]);
-  const sourceConnections = useMemo(
-    () => (selected && connections?.status === 'ok' ? connectionsForSource(connections.connections, selected) : []),
-    [selected, connections]
-  );
-  const triggerable = isTriggerableFlow(flow);
-  const eventRequirement = selected ? triggerEventRequirement(selected) : 'optional';
-  const blockedByEvent = eventRequirement === 'required' && !triggerable;
-  let newConnectionHref = '';
-  if (selected && needsConnection && gatewayUrl) newConnectionHref = consoleNewConnectionUrl(gatewayUrl, selected.id);
-
-  const savedSourceMissing =
-    existing && discovery?.status === 'ok' && !selected && sourceKey === `${existing.trigger.source_id}@${existing.trigger.source_version}`;
+    if (!formKey) return;
+    setValues(savedConfig && formSource ? formValuesFromConfig(formSource.config_schema, savedConfig, formOptions) : {});
+    // Re-seed only when the bound source changes.
+  }, [formKey]);
 
   const handleSave = async () => {
-    if (!selected || unsupported.length || discovery?.status !== 'ok') return;
-    const found: AutomationDefaultsIssue[] = [];
+    if (!sourcesReady) return;
     let inputData: unknown;
+    const inputProblems: string[] = [];
     try {
       inputData = JSON.parse(inputDataText.trim() || '{}');
     } catch (error) {
-      found.push({ field: 'input_data', message: `is not valid JSON (${error instanceof Error ? error.message : String(error)})` });
+      inputProblems.push(`Inputs: not valid JSON (${error instanceof Error ? error.message : String(error)})`);
     }
-    const { config, issues: configIssues } = configFromFormValues(selected.config_schema, values, currentConfig);
-    found.push(...configIssues);
-    if (needsConnection) {
-      if (connections?.status !== 'ok') {
-        found.push({ field: 'trigger.connection_id', message: connections?.reason || 'your trigger connections could not be read: refresh them' });
-      } else {
-        const problem = connectionProblem(connectionId || undefined, connections.connections, selected);
-        if (problem) found.push({ field: 'trigger.connection_id', message: problem });
-      }
-    }
-    if (blockedByEvent) {
-      found.push({ field: 'flow', message: 'this source starts the flow with its event: open the flow, select On Flow Start and use "Add trigger event"' });
-    }
-    if (found.length) {
-      setIssues(found);
+    const draft = automationDraft({
+      flow,
+      existing,
+      picker,
+      keepsSaved,
+      data: support.data,
+      formSource,
+      formOptions,
+      values,
+      mode,
+      title,
+      inputData,
+    });
+    if ('problems' in draft || inputProblems.length) {
+      setIssues([...('problems' in draft ? draft.problems : []), ...inputProblems]);
       return;
     }
-    let next: AutomationDefaults;
-    try {
-      next = assertValidAutomationDefaults(
-        {
-          schema_version: AUTOMATION_DEFAULTS_SCHEMA_VERSION,
-          ...(title.trim() ? { title: title.trim() } : {}),
-          trigger: {
-            source_id: selected.id,
-            source_version: selected.version,
-            config,
-            ...(needsConnection && connectionId ? { connection_id: connectionId } : {}),
-          },
-          context: { mode },
-          input_data: inputData,
-        },
-        discovery.items
-      );
-    } catch (error) {
-      if (error instanceof AutomationDefaultsError) {
-        setIssues(error.issues);
-        return;
-      }
-      throw error;
-    }
+    const { next, graph } = draft;
     setIssues([]);
     setSaving(true);
     try {
-      await onSave(next);
+      await onSave(next, graph ? { graph } : undefined);
       onClose();
     } catch (error) {
-      setIssues([{ field: '', message: error instanceof Error ? error.message : String(error) }]);
+      setIssues([error instanceof Error ? error.message : String(error)]);
     } finally {
       setSaving(false);
     }
@@ -348,17 +421,18 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
       await onSave(null);
       onClose();
     } catch (error) {
-      setIssues([{ field: '', message: error instanceof Error ? error.message : String(error) }]);
+      setIssues([error instanceof Error ? error.message : String(error)]);
     } finally {
       setSaving(false);
     }
   };
 
   const pins = startPinNames(flow);
+  const savedLabel = existing ? sources.find((s) => s.id === existing.trigger.source_id)?.label || 'another trigger' : '';
 
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
-      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Automation defaults">
+      <div className="modal automation-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Automation defaults">
         <h3>Automation defaults</h3>
         <p className="property-hint">
           What an automation created from <strong>{flow.name}</strong> starts with: its trigger, context and inputs.
@@ -366,126 +440,56 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
           Assistant. Schedules are fixed UTC intervals.
         </p>
 
-        {loading ? <div className="property-hint">Loading trigger sources from the gateway…</div> : null}
-        {discoveryError ? (
-          <div className="property-hint" style={{ color: 'var(--error, #e74c3c)' }}>
-            Trigger-source discovery failed: {discoveryError}
-          </div>
-        ) : null}
-        {discovery?.status === 'unavailable' ? (
-          <div className="property-hint" style={{ color: 'var(--warning)' }}>
-            {discovery.reason}
-          </div>
+        {support.sourcesProblem ? (
+          <p className={facts.sources.state === 'loading' ? 'automation-help' : 'automation-problem'}>
+            {support.sourcesProblem}{' '}
+            {facts.sources.state !== 'loading' ? (
+              <button type="button" className="automation-link-button" onClick={facts.reloadSources}>
+                Try again
+              </button>
+            ) : null}
+          </p>
         ) : null}
 
-        {discovery?.status === 'ok' ? (
+        {sourcesReady ? (
           <>
-            <div className="run-form-field" style={{ marginTop: 12 }}>
-              <label className="run-form-label">Trigger</label>
-              <select className="run-form-select" value={sourceKey} onChange={(e) => setSourceKey(e.target.value)}>
-                <option value="">Choose a trigger source…</option>
-                {items.map((s) =>
-                  s.available ? (
-                    <option key={`${s.id}@${s.version}`} value={`${s.id}@${s.version}`}>
-                      {s.label} ({s.id} v{s.version})
-                    </option>
-                  ) : (
-                    <option key={`${s.id}@${s.version ?? '?'}`} value="" disabled>
-                      {s.label} — unavailable: {s.unavailable_reason}
-                    </option>
-                  )
-                )}
-              </select>
-              {savedSourceMissing ? (
-                <span className="property-hint" style={{ color: 'var(--warning)' }}>
-                  The saved trigger {existing?.trigger.source_id} v{existing?.trigger.source_version} is not served by
-                  this gateway. Choose another source or remove the defaults.
-                </span>
+            <section className="automation-section" aria-labelledby="automation-start-title">
+              <h4 id="automation-start-title" className="automation-section-title">
+                What starts it?
+              </h4>
+              {keepsSaved ? (
+                <p className="automation-help">
+                  Now: {savedLabel} <span className="automation-muted">· choose below to replace it</span>
+                </p>
               ) : null}
-            </div>
-
-            {selected
-              ? fields.map((field) => (
-                  <ConfigField
-                    key={field.key}
-                    field={field}
-                    values={values}
-                    current={currentConfig}
-                    onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
-                  />
-                ))
-              : null}
-            {selected && needsConnection ? (
-              <div className="run-form-field" style={{ marginTop: 10 }}>
-                <label className="run-form-label">Connection *</label>
-                {connectionsLoading ? <span className="property-hint">Loading your connections…</span> : null}
-                {connectionsError ? (
-                  <span className="property-hint" style={{ color: 'var(--error, #e74c3c)' }}>
-                    Your trigger connections could not be read: {connectionsError}
-                  </span>
-                ) : null}
-                {connections?.status === 'unavailable' ? (
-                  <span className="property-hint" style={{ color: 'var(--warning)' }}>
-                    {connections.reason}
-                  </span>
-                ) : null}
-                {connections?.status === 'ok' ? (
-                  <select
-                    className="run-form-select"
-                    aria-label="Connection"
-                    value={connectionId}
-                    onChange={(e) => setConnectionId(e.target.value)}
-                  >
-                    <option value="">
-                      {sourceConnections.length ? 'Choose a connection…' : `No ${selected.label} connection yet`}
-                    </option>
-                    {connectionId && !sourceConnections.some((c) => c.connection_id === connectionId) ? (
-                      <option value={connectionId}>{connectionId} (not one of yours on this gateway)</option>
-                    ) : null}
-                    {sourceConnections.map((c) => (
-                      <option key={c.connection_id} value={c.connection_id}>
-                        {connectionOptionLabel(c)}
-                      </option>
+              <TriggerPicker
+                value={picker}
+                onChange={setPicker}
+                data={support.data}
+                includeChat={false}
+                timeZoneOrigin={facts.timeZone.origin}
+                gatewayUrl={facts.gatewayUrl}
+                arrivalsNote={support.arrivalsNote}
+                onRefreshArrivals={facts.reloadArrivals}
+                unavailable={support.unavailable}
+                idPrefix="automation-trigger"
+              />
+              {fields.length ? (
+                <details className="automation-more">
+                  <summary>{copy.title}</summary>
+                  <div className="automation-more-body">
+                    {fields.map((field) => (
+                      <ConfigField
+                        key={field.key}
+                        field={field}
+                        values={values}
+                        onChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
+                      />
                     ))}
-                  </select>
-                ) : null}
-                <span className="property-hint">
-                  {newConnectionHref ? (
-                    <a href={newConnectionHref} target="_blank" rel="noreferrer">
-                      New connection…
-                    </a>
-                  ) : null}{' '}
-                  Connections (your mailbox, a feed address, a webhook) are created once on the gateway console&apos;s
-                  Triggers page; refresh this list after creating one.{' '}
-                  <button type="button" className="modal-button cancel" onClick={() => void loadConnections()} disabled={connectionsLoading}>
-                    Refresh connections
-                  </button>
-                </span>
-              </div>
-            ) : null}
-            {selected && eventRequirement !== 'optional' ? (
-              <div
-                className="property-hint"
-                style={{ marginTop: 8, color: triggerable ? undefined : eventRequirement === 'required' ? 'var(--error, #e74c3c)' : 'var(--warning)' }}
-              >
-                {triggerable
-                  ? 'Triggerable: each run receives the event on On Flow Start → event (type, subject, time, data; a feed or webhook batch in data.events).'
-                  : eventRequirement === 'required'
-                    ? 'This flow cannot receive the event yet: open it, select On Flow Start and use "Add trigger event", then save the flow.'
-                    : 'Tip: open the flow, select On Flow Start and use "Add trigger event" to read the event (type, subject, time, data).'}
-              </div>
-            ) : null}
-            {selected && unsupported.length ? (
-              <div className="property-hint" style={{ color: 'var(--error, #e74c3c)', marginTop: 8 }}>
-                This source cannot be bound in the editor: its settings schema uses JSON Schema keywords the editor
-                cannot check ({unsupported.join('; ')}).
-              </div>
-            ) : null}
-            {selected && !unsupported.length && fields.length === 0 ? (
-              <div className="property-hint" style={{ marginTop: 8 }}>
-                This source has no settings.
-              </div>
-            ) : null}
+                  </div>
+                </details>
+              ) : null}
+            </section>
 
             <div className="run-form-field" style={{ marginTop: 12 }}>
               <label className="run-form-label">Context</label>
@@ -528,28 +532,23 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
         ) : null}
 
         {issues.length ? (
-          <ul className="property-hint" style={{ color: 'var(--error, #e74c3c)', marginTop: 12 }}>
+          <ul className="automation-issues" role="alert">
             {issues.map((issue, i) => (
-              <li key={i}>
-                {issue.field ? <code>{issue.field}</code> : null} {issue.message}
-              </li>
+              <li key={i}>{issue}</li>
             ))}
           </ul>
         ) : null}
 
         <div className="modal-actions">
+          {existing ? (
+            <button className="modal-button cancel automation-remove" onClick={handleRemove} disabled={saving}>
+              Remove automation
+            </button>
+          ) : null}
           <button className="modal-button cancel" onClick={onClose} disabled={saving}>
             Cancel
           </button>
-          {existing ? (
-            <button className="modal-button cancel" onClick={handleRemove} disabled={saving}>
-              Remove defaults
-            </button>
-          ) : null}
-          <button className="modal-button" onClick={() => void load(true)} disabled={saving || loading}>
-            Refresh sources
-          </button>
-          <button className="modal-button" onClick={handleSave} disabled={saving || !selected || unsupported.length > 0 || blockedByEvent}>
+          <button className="modal-button primary" onClick={handleSave} disabled={saving || !sourcesReady}>
             Save
           </button>
         </div>

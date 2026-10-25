@@ -176,7 +176,7 @@ export const EMAIL_RECEIVED_V1 = {
       every: { type: 'string', format: 'duration', pattern: '^[1-9][0-9]*[smhd]$' },
       max_batch: { type: 'integer', minimum: 1, maximum: 50 },
       start_at: { type: 'string', format: 'date-time' },
-      auto_submitted: { type: 'string', enum: ['skip', 'include'], default: 'skip' },
+      auto_submitted: { type: 'string', enum: ['skip', 'admit'], default: 'skip' },
       filter: {
         type: 'object',
         additionalProperties: false,

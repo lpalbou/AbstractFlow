@@ -9006,3 +9006,97 @@ button.flow-nature-badge:hover {
     max-width: 180px;
   }
 }
+
+/* The Automation dialog: sections, More settings, nested groups, problems. */
+.automation-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  max-width: min(720px, 100%);
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+}
+.automation-modal h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.automation-intro {
+  margin: 0 0 4px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+.automation-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--ui-border-1);
+}
+.automation-section-title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+.automation-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.automation-inline-row {
+  display: flex;
+  gap: 8px;
+}
+.automation-required {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.automation-more,
+.automation-group {
+  border-radius: 10px;
+}
+.automation-more > summary,
+.automation-group > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  list-style-position: inside;
+}
+.automation-more > summary:hover,
+.automation-group > summary:hover {
+  color: var(--text-primary);
+}
+.automation-more-body,
+.automation-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+.automation-group {
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-1);
+}
+.automation-issues {
+  margin: 14px 0 0;
+  padding: 10px 12px 10px 28px;
+  border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+.automation-modal .modal-actions {
+  position: sticky;
+  bottom: -24px;
+  margin: 16px -24px -24px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--ui-border-1);
+  background: var(--bg-secondary);
+}
+.automation-remove {
+  margin-right: auto;
+}

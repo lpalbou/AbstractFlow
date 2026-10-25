@@ -47,7 +47,7 @@ import { waitNotificationText } from '../utils/waitClassification';
 import { duplicateFlowFamily, type DuplicateFamilyIO } from '../utils/duplicateFlowFamily';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
 import { INTERFACE_PINS_ADDED_NOTICE, isExecutableFlow } from '../utils/flowFamilies';
-import { AutomationDefaultsModal } from './AutomationDefaultsModal';
+import { AutomationDefaultsModal, type AutomationGraph } from './AutomationDefaultsModal';
 import { FlowNatureBadge, useTriggerWords } from './automation/FlowNatureBadge';
 import { triggerSentence } from '../utils/automationChoice';
 import {
@@ -118,12 +118,14 @@ async function updateFlowInterfaces(flowId: string, interfaces: string[], contra
 async function updateFlowAutomationDefaults(
   flowId: string,
   automationDefaults: AutomationDefaults | null,
-  contracts: GatewayContracts | null
+  contracts: GatewayContracts | null,
+  graph?: AutomationGraph
 ): Promise<VisualFlow> {
   const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || 'api/gateway/visualflows/{flow_id}';
+  // `graph`: the Trigger event node the Automation dialog added, stored in the same PUT.
   return gatewayJson<VisualFlow>(
     gatewayPath(endpoint, { flow_id: flowId }),
-    jsonRequest({ automation_defaults: automationDefaults }, { method: 'PUT' })
+    jsonRequest({ automation_defaults: automationDefaults, ...(graph ? { nodes: graph.nodes, edges: graph.edges } : {}) }, { method: 'PUT' })
   );
 }
 
@@ -1010,7 +1012,7 @@ export function Toolbar() {
   );
 
   const handleUpdateAutomationDefaults = useCallback(
-    async (id: string, next: AutomationDefaults | null) => {
+    async (id: string, next: AutomationDefaults | null, graph?: AutomationGraph) => {
       if (bundledFlowIdSet.has(id)) {
         toast.error('Bundled flows are read-only. Load or duplicate first.');
         return;
@@ -1021,11 +1023,12 @@ export function Toolbar() {
         id,
         next,
         hasUnsavedChanges,
-        put: () => updateFlowAutomationDefaults(id, next, gatewayContracts),
+        addTriggerEvent: Boolean(graph),
+        put: () => updateFlowAutomationDefaults(id, next, gatewayContracts, graph),
       });
       if (baseline) setSavedFlowSignature(flowSignatureFor(baseline));
       queryClient.invalidateQueries({ queryKey: ['flows'] });
-      toast.success(next ? 'Automation defaults saved' : 'Automation defaults removed');
+      toast.success(next ? 'Automation saved' : 'Automation removed');
     },
     [bundledFlowIdSet, gatewayContracts, hasUnsavedChanges, queryClient]
   );
@@ -2153,9 +2156,11 @@ export function Toolbar() {
             flow={getFlow()}
             gatewayContracts={gatewayContracts}
             onClose={() => setShowOpenFlowAutomation(false)}
-            onSave={(next) => {
-              // The open document: saved with the flow (Save), like any edit.
+            onSave={(next, extra) => {
+              // The open document: saved with the flow (Save), like any edit;
+              // the Trigger event node is added to the canvas the same way.
               setFlowAutomationDefaults(next);
+              if (extra?.graph) useFlowStore.getState().addTriggerEvent();
             }}
           />
         ) : null}

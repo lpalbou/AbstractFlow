@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AfChip, useAfMedia } from '@abstractframework/ui-kit';
 import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import type { GatewayContracts } from '../utils/gatewayClient';
-import { AutomationDefaultsModal } from './AutomationDefaultsModal';
+import { AutomationDefaultsModal, type AutomationGraph } from './AutomationDefaultsModal';
 import { triggerNeedsWords, useAutomationWords } from './automation/FlowNatureBadge';
 import { triggerSentence } from '../utils/automationChoice';
 import { BUNDLED_COMPOSED_ONLY_IDS } from '../utils/bundledFlows';
@@ -41,7 +41,8 @@ export interface FlowLibraryModalProps {
   onUpdateDescription: (flowId: string, nextDescription: string) => Promise<void> | void;
   onUpdateInterfaces: (flowId: string, nextInterfaces: string[]) => Promise<void> | void;
   /** Store (or with null, remove) the flow's `automation_defaults`. */
-  onUpdateAutomationDefaults: (flowId: string, next: AutomationDefaults | null) => Promise<void> | void;
+  /** `graph`: the flow with the Trigger event node the dialog added (stored with the defaults). */
+  onUpdateAutomationDefaults: (flowId: string, next: AutomationDefaults | null, graph?: AutomationGraph) => Promise<void> | void;
   /** For trigger-source discovery (the endpoint comes from the capabilities). */
   gatewayContracts: GatewayContracts | null;
   onDuplicateFlow: (flowId: string) => Promise<void> | void;
@@ -1056,7 +1057,7 @@ export function FlowLibraryModal({
             flow={selectedFlow}
             gatewayContracts={gatewayContracts}
             onClose={() => setIsEditingAutomation(false)}
-            onSave={(next) => onUpdateAutomationDefaults(selectedFlow.id, next)}
+            onSave={(next, extra) => onUpdateAutomationDefaults(selectedFlow.id, next, extra?.graph)}
           />
         </div>
       ) : null}

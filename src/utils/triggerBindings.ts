@@ -164,10 +164,10 @@ export function parseAutomationDefaults(raw: unknown): AutomationDefaults {
 // ---------------------------------------------------------------------------
 
 /**
- * Keywords this editor understands. A property schema using anything else is
- * shown read-only (as JSON) in the form, and the whole config is still
- * validated for the keywords below; the gateway re-validates everything when
- * an automation is created.
+ * Keywords the form renders as fields (operator 2026-10-25: a schema with a
+ * keyword the editor does not know never blocks the whole source; that
+ * PROPERTY is edited as JSON, and the gateway re-validates everything when an
+ * automation is created).
  */
 const FORM_KEYWORDS = new Set([
   'type',
@@ -182,23 +182,28 @@ const FORM_KEYWORDS = new Set([
   'minLength',
   'maxLength',
   'examples',
+  'x-secret',
 ]);
+/** Extra keywords of a list (array of strings) field. */
+const LIST_KEYWORDS = new Set([...FORM_KEYWORDS, 'items', 'minItems', 'maxItems', 'uniqueItems']);
+/** Extra keywords of a group (object with properties) field. */
+const GROUP_KEYWORDS = new Set([...FORM_KEYWORDS, 'properties', 'required', 'additionalProperties']);
 
 /** Keywords the validator implements (annotations included). */
 const VALIDATED_KEYWORDS = new Set([
-  ...FORM_KEYWORDS,
+  ...LIST_KEYWORDS,
   'properties',
   'required',
   'additionalProperties',
   '$schema',
   '$comment',
 ]);
-const VALIDATED_FORMATS = new Set(['date-time', 'duration']);
+const VALIDATED_FORMATS = new Set(['date-time', 'duration', 'email', 'uri']);
 
 /**
  * JSON Schema keywords (and formats) in `schema` that this editor does NOT
- * implement, as `path: keyword`. A config_schema using any of them cannot be
- * checked here, so its source is refused rather than validated partially.
+ * check, as `path: keyword`. Informational: the properties using them are
+ * edited as JSON and checked by the gateway, never refused here.
  */
 export function unsupportedSchemaKeywords(schema: unknown, path = 'config_schema'): string[] {
   if (!isRecord(schema)) return [`${path}: not an object`];
@@ -224,11 +229,13 @@ export function unsupportedSchemaKeywords(schema: unknown, path = 'config_schema
   if (isRecord(schema.additionalProperties)) {
     found.push(...unsupportedSchemaKeywords(schema.additionalProperties, `${path}.additionalProperties`));
   }
+  if (isRecord(schema.items)) found.push(...unsupportedSchemaKeywords(schema.items, `${path}.items`));
   return found;
 }
 
 // RFC 3339 date-time (the JSON Schema `date-time` format), checked by shape.
 const DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function typeMatches(type: string, value: unknown): boolean {
   switch (type) {
@@ -251,15 +258,25 @@ function typeMatches(type: string, value: unknown): boolean {
   }
 }
 
+const TYPE_WORDS: Record<string, string> = {
+  integer: 'a whole number',
+  number: 'a number',
+  string: 'text',
+  boolean: 'yes or no',
+  object: 'a group of settings',
+  array: 'a list',
+  null: 'empty',
+};
+
 function validateValue(schema: unknown, value: unknown, path: string, issues: AutomationDefaultsIssue[]): void {
   if (!isRecord(schema)) return;
   const type = schema.type;
   if (typeof type === 'string' && !typeMatches(type, value)) {
-    issues.push({ field: path, message: `must be ${type === 'integer' ? 'an integer' : `a ${type}`}` });
+    issues.push({ field: path, message: `must be ${TYPE_WORDS[type] || `a ${type}`}` });
     return;
   }
   if (Array.isArray(type) && !type.some((t) => typeof t === 'string' && typeMatches(t, value))) {
-    issues.push({ field: path, message: `must be one of types ${type.join(', ')}` });
+    issues.push({ field: path, message: `must be one of: ${type.map((t) => TYPE_WORDS[String(t)] || t).join(', ')}` });
     return;
   }
   if (Array.isArray(schema.enum) && !schema.enum.some((e) => JSON.stringify(e) === JSON.stringify(value))) {
@@ -267,13 +284,19 @@ function validateValue(schema: unknown, value: unknown, path: string, issues: Au
   }
   if (typeof value === 'string') {
     if (typeof schema.pattern === 'string' && !new RegExp(schema.pattern, 'u').test(value)) {
-      issues.push({ field: path, message: `must match ${schema.pattern}` });
+      issues.push({ field: path, message: `does not have the expected form (${schema.pattern})` });
     }
     if (schema.format === 'date-time' && (!DATE_TIME_RE.test(value) || Number.isNaN(Date.parse(value)))) {
-      issues.push({ field: path, message: 'must be an RFC 3339 timestamp (e.g. 2026-09-27T08:00:00Z)' });
+      issues.push({ field: path, message: 'must be a date and time such as 2026-09-27T08:00:00Z' });
+    }
+    if (schema.format === 'email' && !EMAIL_RE.test(value)) {
+      issues.push({ field: path, message: `"${value}" is not an email address` });
+    }
+    if (schema.format === 'uri' && !/^[a-z][a-z0-9+.-]*:\/\/\S+$/i.test(value)) {
+      issues.push({ field: path, message: `"${value}" is not a web address` });
     }
     if (typeof schema.minLength === 'number' && value.length < schema.minLength) {
-      issues.push({ field: path, message: `must be at least ${schema.minLength} characters` });
+      issues.push({ field: path, message: schema.minLength === 1 ? 'cannot be empty' : `must be at least ${schema.minLength} characters` });
     }
     if (typeof schema.maxLength === 'number' && value.length > schema.maxLength) {
       issues.push({ field: path, message: `must be at most ${schema.maxLength} characters` });
@@ -281,11 +304,23 @@ function validateValue(schema: unknown, value: unknown, path: string, issues: Au
   }
   if (typeof value === 'number') {
     if (typeof schema.minimum === 'number' && value < schema.minimum) {
-      issues.push({ field: path, message: `must be >= ${schema.minimum}` });
+      issues.push({ field: path, message: `must be at least ${schema.minimum}` });
     }
     if (typeof schema.maximum === 'number' && value > schema.maximum) {
-      issues.push({ field: path, message: `must be <= ${schema.maximum}` });
+      issues.push({ field: path, message: `must be at most ${schema.maximum}` });
     }
+  }
+  if (Array.isArray(value)) {
+    if (typeof schema.minItems === 'number' && value.length < schema.minItems) {
+      issues.push({ field: path, message: schema.minItems === 1 ? 'needs at least one entry' : `needs at least ${schema.minItems} entries` });
+    }
+    if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) {
+      issues.push({ field: path, message: `takes at most ${schema.maxItems} entries` });
+    }
+    if (schema.uniqueItems === true && new Set(value.map((v) => JSON.stringify(v))).size !== value.length) {
+      issues.push({ field: path, message: 'lists the same entry twice' });
+    }
+    if (isRecord(schema.items)) value.forEach((item, i) => validateValue(schema.items, item, `${path}.${i}`, issues));
   }
   if (isRecord(value)) {
     const props = isRecord(schema.properties) ? schema.properties : {};
@@ -296,21 +331,17 @@ function validateValue(schema: unknown, value: unknown, path: string, issues: Au
     }
     for (const [key, child] of Object.entries(value)) {
       if (key in props) validateValue(props[key], child, `${path}.${key}`, issues);
-      else if (schema.additionalProperties === false) issues.push({ field: `${path}.${key}`, message: 'is not allowed by the source' });
+      else if (schema.additionalProperties === false) issues.push({ field: `${path}.${key}`, message: 'is not a setting of this trigger' });
       else if (isRecord(schema.additionalProperties)) validateValue(schema.additionalProperties, child, `${path}.${key}`, issues);
     }
   }
 }
 
-/** Validate a trigger config against the source's `config_schema`. */
+/**
+ * Validate a trigger config against the source's `config_schema`, on the
+ * keywords this editor implements (the rest are the gateway's to check).
+ */
 export function validateTriggerConfig(schema: JsonSchema, config: unknown): AutomationDefaultsIssue[] {
-  const unsupported = unsupportedSchemaKeywords(schema);
-  if (unsupported.length) {
-    return [{
-      field: 'trigger.config',
-      message: `this source's settings cannot be checked here: its config_schema uses unsupported JSON Schema keywords (${unsupported.join('; ')})`,
-    }];
-  }
   const issues: AutomationDefaultsIssue[] = [];
   validateValue(schema, config, 'trigger.config', issues);
   return issues;
@@ -345,7 +376,11 @@ export function validateAutomationDefaults(
   const connectionIssue = source.uses_trigger_connection
     ? (defaults.trigger.connection_id ? null : { field: 'trigger.connection_id', message: `trigger source "${source_id}" listens to a connection: choose one` })
     : (defaults.trigger.connection_id ? { field: 'trigger.connection_id', message: `trigger source "${source_id}" takes no connection` } : null);
-  return [...(connectionIssue ? [connectionIssue] : []), ...validateTriggerConfig(source.config_schema, config)];
+  // The gateway folds `trigger.connection_id` into the binding's config
+  // (automation_defaults.fold_connection_id): validate what it will check.
+  const declares = isRecord(source.config_schema.properties) && 'connection_id' in source.config_schema.properties;
+  const checked = declares && defaults.trigger.connection_id ? { ...config, connection_id: defaults.trigger.connection_id } : config;
+  return [...(connectionIssue ? [connectionIssue] : []), ...validateTriggerConfig(source.config_schema, checked)];
 }
 
 /** Parse + validate; throws `AutomationDefaultsError` listing every issue. */
@@ -378,9 +413,15 @@ export const DURATION_UNITS = ['s', 'm', 'h', 'd'] as const;
 export const DURATION_PATTERN = '^[1-9][0-9]*[smhd]$';
 export type DurationUnit = (typeof DURATION_UNITS)[number];
 
-export type ConfigFieldKind = 'string' | 'datetime' | 'duration' | 'integer' | 'number' | 'boolean' | 'enum' | 'readonly';
+/**
+ * `list`: an array of strings (one per line); `group`: an object with its own
+ * properties (a section of fields); `json`: a property using a keyword the
+ * form does not render, edited as JSON for that property only.
+ */
+export type ConfigFieldKind = 'string' | 'datetime' | 'duration' | 'integer' | 'number' | 'boolean' | 'enum' | 'list' | 'group' | 'json';
 
 export interface ConfigFormField {
+  /** Dotted path inside the config (`filter.from_in`). */
   key: string;
   label: string;
   description?: string;
@@ -388,18 +429,34 @@ export interface ConfigFormField {
   required: boolean;
   /** `enum` options (JSON-encoded for the <select>). */
   options?: JsonValue[];
-  /** The property schema (shown as JSON for `readonly` fields). */
+  /** `group` fields. */
+  children?: ConfigFormField[];
+  /** The property schema. */
   schema: JsonSchema;
 }
 
 /**
- * Form field string values. `duration` fields use `{key}` for the amount and
- * `{key}#unit` for the unit. An empty string means "not set" (omitted).
+ * Form field string values, keyed by dotted path. `duration` fields use
+ * `{key}` for the amount and `{key}#unit` for the unit; `list` fields one
+ * entry per line; `json` fields JSON text. An empty string means "not set".
  */
 export type ConfigFormValues = Record<string, string>;
 
+function onlyKeywords(schema: Record<string, unknown>, allowed: Set<string>): boolean {
+  return Object.keys(schema).every((k) => allowed.has(k));
+}
+
 function fieldKind(schema: Record<string, unknown>): ConfigFieldKind {
-  if (Object.keys(schema).some((k) => !FORM_KEYWORDS.has(k))) return 'readonly';
+  if (schema.type === 'array') {
+    const items = schema.items;
+    if (onlyKeywords(schema, LIST_KEYWORDS) && isRecord(items) && items.type === 'string' && onlyKeywords(items, FORM_KEYWORDS) && !Array.isArray(items.enum)) return 'list';
+    return 'json';
+  }
+  if (schema.type === 'object') {
+    if (onlyKeywords(schema, GROUP_KEYWORDS) && isRecord(schema.properties) && Object.keys(schema.properties).length) return 'group';
+    return 'json';
+  }
+  if (!onlyKeywords(schema, FORM_KEYWORDS)) return 'json';
   if (Array.isArray(schema.enum)) return 'enum';
   switch (schema.type) {
     case 'string':
@@ -413,36 +470,74 @@ function fieldKind(schema: Record<string, unknown>): ConfigFieldKind {
     case 'boolean':
       return 'boolean';
     default:
-      return 'readonly';
+      return 'json';
   }
 }
 
-/** Form fields for an object `config_schema` (one per property, schema order). */
-export function configFormFields(schema: JsonSchema): ConfigFormField[] {
+/** A setting's name for a person: the schema title, else its key in sentence case ("max_batch" -> "Max batch"). */
+export function humanizeKey(key: string): string {
+  const words = key.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim().toLowerCase();
+  return words ? words[0].toUpperCase() + words.slice(1) : key;
+}
+
+/**
+ * Form fields for an object `config_schema` (one per property, schema
+ * order; groups nest). `labels` names known settings in plain words
+ * (keyed by dotted path); `omit` hides settings another control owns.
+ */
+export function configFormFields(
+  schema: JsonSchema,
+  options: {
+    prefix?: string;
+    labels?: Record<string, { label?: string; description?: string }>;
+    omit?: readonly string[];
+    /** configFromFormValues only: false = build the config, leave the checks to the caller. */
+    validate?: boolean;
+  } = {}
+): ConfigFormField[] {
   const props = isRecord(schema.properties) ? schema.properties : {};
   const required = new Set(Array.isArray(schema.required) ? schema.required.filter((k): k is string => typeof k === 'string') : []);
-  return Object.entries(props).map(([key, raw]) => {
-    const prop = (isRecord(raw) ? raw : {}) as JsonSchema;
-    const kind = isRecord(raw) ? fieldKind(raw) : 'readonly';
-    return {
-      key,
-      label: typeof prop.title === 'string' && prop.title.trim() ? prop.title : key,
-      ...(typeof prop.description === 'string' && prop.description.trim() ? { description: prop.description } : {}),
-      kind,
-      required: required.has(key),
-      ...(kind === 'enum' && Array.isArray(prop.enum) ? { options: prop.enum } : {}),
-      schema: prop,
-    };
-  });
+  const omit = new Set(options.omit || []);
+  return Object.entries(props)
+    .filter(([key]) => !omit.has(options.prefix ? `${options.prefix}.${key}` : key))
+    .map(([name, raw]) => {
+      const key = options.prefix ? `${options.prefix}.${name}` : name;
+      const prop = (isRecord(raw) ? raw : {}) as JsonSchema;
+      const kind = isRecord(raw) ? fieldKind(raw) : 'json';
+      const copy = options.labels?.[key];
+      const title = typeof prop.title === 'string' && prop.title.trim() ? prop.title : '';
+      const description = copy?.description || (typeof prop.description === 'string' && prop.description.trim() ? prop.description : '');
+      return {
+        key,
+        label: copy?.label || title || humanizeKey(name),
+        ...(description ? { description } : {}),
+        kind,
+        required: required.has(name),
+        ...(kind === 'enum' && Array.isArray(prop.enum) ? { options: prop.enum } : {}),
+        ...(kind === 'group' ? { children: configFormFields(prop, { ...options, prefix: key }) } : {}),
+        schema: prop,
+      };
+    });
 }
 
 const DURATION_RE = /^([1-9][0-9]*)([smhd])$/;
 
-/** Existing config → form values (for editing saved defaults). */
-export function formValuesFromConfig(schema: JsonSchema, config: Record<string, JsonValue>): ConfigFormValues {
-  const values: ConfigFormValues = {};
-  for (const field of configFormFields(schema)) {
-    const value = config[field.key];
+function getPath(config: Record<string, JsonValue>, key: string): JsonValue | undefined {
+  let node: JsonValue | undefined = config;
+  for (const part of key.split('.')) {
+    if (!isRecord(node)) return undefined;
+    node = (node as Record<string, JsonValue>)[part];
+  }
+  return node;
+}
+
+function fieldValues(fields: ConfigFormField[], config: Record<string, JsonValue>, values: ConfigFormValues): void {
+  for (const field of fields) {
+    const value = getPath(config, field.key);
+    if (field.kind === 'group') {
+      fieldValues(field.children || [], config, values);
+      continue;
+    }
     if (value === undefined) continue;
     if (field.kind === 'duration' && typeof value === 'string') {
       const m = DURATION_RE.exec(value);
@@ -452,31 +547,37 @@ export function formValuesFromConfig(schema: JsonSchema, config: Record<string, 
       } else {
         values[field.key] = value;
       }
-    } else if (field.kind === 'enum' || field.kind === 'readonly') {
+    } else if (field.kind === 'list' && Array.isArray(value)) {
+      values[field.key] = value.map((v) => String(v)).join('\n');
+    } else if (field.kind === 'enum') {
       values[field.key] = JSON.stringify(value);
+    } else if (field.kind === 'json') {
+      values[field.key] = JSON.stringify(value, null, 2);
     } else {
       values[field.key] = String(value);
     }
   }
+}
+
+/** Existing config → form values (for editing saved defaults). */
+export function formValuesFromConfig(
+  schema: JsonSchema,
+  config: Record<string, JsonValue>,
+  options: Parameters<typeof configFormFields>[1] = {}
+): ConfigFormValues {
+  const values: ConfigFormValues = {};
+  fieldValues(configFormFields(schema, options), config, values);
   return values;
 }
 
-/**
- * Form values → config, then validated against the schema. Empty values are
- * omitted (the source applies its defaults). `readonly` fields keep the value
- * already in `previous` (they cannot be edited here).
- */
-export function configFromFormValues(
-  schema: JsonSchema,
-  values: ConfigFormValues,
-  previous: Record<string, JsonValue> = {}
-): { config: Record<string, JsonValue>; issues: AutomationDefaultsIssue[] } {
-  const config: Record<string, JsonValue> = {};
-  const issues: AutomationDefaultsIssue[] = [];
-  for (const field of configFormFields(schema)) {
+function fieldConfig(fields: ConfigFormField[], values: ConfigFormValues, issues: AutomationDefaultsIssue[]): Record<string, JsonValue> {
+  const out: Record<string, JsonValue> = {};
+  for (const field of fields) {
+    const name = field.key.split('.').slice(-1)[0];
     const path = `trigger.config.${field.key}`;
-    if (field.kind === 'readonly') {
-      if (previous[field.key] !== undefined) config[field.key] = previous[field.key];
+    if (field.kind === 'group') {
+      const child = fieldConfig(field.children || [], values, issues);
+      if (Object.keys(child).length) out[name] = child;
       continue;
     }
     const raw = (values[field.key] ?? '').trim();
@@ -484,30 +585,59 @@ export function configFromFormValues(
     switch (field.kind) {
       case 'string':
       case 'datetime':
-        config[field.key] = raw;
+        out[name] = raw;
         break;
       case 'duration': {
         const unit = (values[`${field.key}#unit`] ?? '').trim();
-        if (/^[0-9]+$/.test(raw) && (DURATION_UNITS as readonly string[]).includes(unit)) config[field.key] = `${raw}${unit}`;
-        else config[field.key] = raw; // validated below against the schema's own pattern
+        if (/^[0-9]+$/.test(raw) && (DURATION_UNITS as readonly string[]).includes(unit)) out[name] = `${raw}${unit}`;
+        else out[name] = raw; // validated below against the schema's own pattern
         break;
       }
       case 'integer':
       case 'number': {
         const n = Number(raw);
         if (!Number.isFinite(n)) issues.push({ field: path, message: 'must be a number' });
-        else config[field.key] = n;
+        else out[name] = n;
         break;
       }
       case 'boolean':
-        config[field.key] = raw === 'true';
+        out[name] = raw === 'true';
         break;
       case 'enum':
-        config[field.key] = JSON.parse(raw) as JsonValue;
+        out[name] = JSON.parse(raw) as JsonValue;
+        break;
+      case 'list':
+        out[name] = raw.split(/\n|,/).map((v) => v.trim()).filter(Boolean);
+        break;
+      case 'json':
+        try {
+          out[name] = JSON.parse(raw) as JsonValue;
+        } catch (error) {
+          issues.push({ field: path, message: `is not valid JSON (${error instanceof Error ? error.message : String(error)})` });
+        }
         break;
     }
   }
-  issues.push(...validateTriggerConfig(schema, config));
+  return out;
+}
+
+/**
+ * Form values → config, then validated against the schema. Empty values are
+ * omitted (the source applies its defaults); an empty group is omitted.
+ * Settings the form does not show (`omit`) keep their value from `previous`.
+ */
+export function configFromFormValues(
+  schema: JsonSchema,
+  values: ConfigFormValues,
+  previous: Record<string, JsonValue> = {},
+  options: Parameters<typeof configFormFields>[1] = {}
+): { config: Record<string, JsonValue>; issues: AutomationDefaultsIssue[] } {
+  const issues: AutomationDefaultsIssue[] = [];
+  const config = fieldConfig(configFormFields(schema, options), values, issues);
+  for (const key of options.omit || []) {
+    if (!key.includes('.') && previous[key] !== undefined && config[key] === undefined) config[key] = previous[key];
+  }
+  if (options.validate !== false) issues.push(...validateTriggerConfig(schema, config));
   return { config, issues };
 }
 

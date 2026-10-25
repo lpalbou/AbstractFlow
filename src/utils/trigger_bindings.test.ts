@@ -81,7 +81,7 @@ describe('schema-driven form → schedule@1 config', () => {
       'trigger.config.cron',
       'trigger.config.start_at',
     ]);
-    expect(validateTriggerConfig(SCHEDULE.config_schema, { count: 2.5 })[0].message).toBe('must be an integer');
+    expect(validateTriggerConfig(SCHEDULE.config_schema, { count: 2.5 })[0].message).toBe('must be a whole number');
   });
 
   it('accepts a one-shot (no `every`) and an empty config (source defaults)', () => {
@@ -90,7 +90,7 @@ describe('schema-driven form → schedule@1 config', () => {
   });
 });
 
-describe('a config_schema the editor cannot fully check is refused, never half-validated', () => {
+describe('a config_schema with keywords the editor does not check never blocks the source (operator 2026-10-25)', () => {
   // Review 41's nested schema: every keyword here is outside the implemented subset.
   const NESTED: JsonSchema = {
     type: 'object',
@@ -105,35 +105,34 @@ describe('a config_schema the editor cannot fully check is refused, never half-v
     },
   };
 
-  it('names every unsupported keyword and format, at its path', () => {
+  it('names every keyword and format it does not check, at its path (string arrays and email are checked now)', () => {
     expect(unsupportedSchemaKeywords(NESTED)).toEqual([
       'config_schema: anyOf',
       'config_schema.properties.mode: oneOf',
-      'config_schema.properties.list: items',
-      'config_schema.properties.list: minItems',
       'config_schema.properties.n: exclusiveMinimum',
       'config_schema.properties.n: multipleOf',
       'config_schema.properties.ref: $ref',
-      'config_schema.properties.email: format "email"',
     ]);
   });
 
-  it('rejects any config against such a schema, even one it would otherwise accept', () => {
-    for (const config of [{ mode: 'zzz' }, { list: ['x'] }, { n: 0 }, { ref: 42 }, {}, { ok: 3 }]) {
-      const issues = validateTriggerConfig(NESTED, config);
-      expect(issues).toHaveLength(1);
-      expect(issues[0].field).toBe('trigger.config');
-      expect(issues[0].message).toContain('cannot be checked here');
-      expect(issues[0].message).toContain('oneOf');
-    }
+  it('checks the keywords it knows and leaves the others to the gateway', () => {
+    expect(validateTriggerConfig(NESTED, {})).toEqual([]);
+    expect(validateTriggerConfig(NESTED, { mode: 'zzz', ref: 42, n: 0 })).toEqual([]);
+    expect(validateTriggerConfig(NESTED, { list: [] }).map((i) => i.message)).toEqual(['needs at least one entry']);
+    expect(validateTriggerConfig(NESTED, { list: ['x'] }).map((i) => i.field)).toEqual(['trigger.config.list.0']);
+    expect(validateTriggerConfig(NESTED, { email: 'nope' }).map((i) => i.message)).toEqual(['"nope" is not an email address']);
+    expect(validateTriggerConfig(NESTED, { ok: 0 }).map((i) => i.message)).toEqual(['must be at least 1']);
   });
 
-  it('makes defaults bound to such a source invalid', () => {
+  it('defaults bound to such a source are valid; the property it cannot render is a JSON field of its own', () => {
     const sources = parseTriggerSourcesResponse({
       items: [{ ...TRIGGER_SOURCES_RESPONSE.items[2], id: 'nested', config_schema: NESTED }],
     });
-    const bound = defaults({ trigger: { source_id: 'nested', source_version: 1, config: {} } });
-    expect(() => assertValidAutomationDefaults(bound, sources)).toThrow('cannot be checked here');
+    const bound = defaults({ trigger: { source_id: 'nested', source_version: 1, config: { mode: 'a' } } });
+    expect(assertValidAutomationDefaults(bound, sources).trigger.config).toEqual({ mode: 'a' });
+    expect(fields(NESTED)).toEqual(['mode:json', 'list:json', 'n:json', 'ref:json', 'email:string', 'ok:integer']);
+    expect(configFromFormValues(NESTED, { mode: '"b"', ok: '2' }).config).toEqual({ mode: 'b', ok: 2 });
+    expect(configFromFormValues(NESTED, { mode: '{bad' }).issues[0].message).toMatch(/^is not valid JSON/);
   });
 
   it('the served schedule@1 / manual@1 / fixture schemas are fully supported', () => {
@@ -168,13 +167,13 @@ describe('schema-driven form → manual@1 config', () => {
 });
 
 describe('a source unknown to Flow is bound purely from its descriptor', () => {
-  it('renders enum/integer fields and shows unsupported schema features read-only', () => {
-    expect(fields(FIXTURE.config_schema)).toEqual(['channel:enum', 'limit:integer', 'filter:readonly']);
+  it('renders enum/integer fields and a nested object as a group of fields', () => {
+    expect(fields(FIXTURE.config_schema)).toEqual(['channel:enum', 'limit:integer', 'filter:group']);
     const filter = configFormFields(FIXTURE.config_schema).find((f) => f.key === 'filter')!;
-    expect(filter.schema).toEqual({ type: 'object', properties: { tag: { type: 'string' } } });
+    expect(filter.children?.map((c) => `${c.key}:${c.kind}`)).toEqual(['filter.tag:string']);
   });
 
-  it('validates required, enum and bounds from the schema; read-only values are kept', () => {
+  it('validates required, enum and bounds from the schema; group values round-trip', () => {
     const missing = configFromFormValues(FIXTURE.config_schema, { limit: '11' });
     expect(missing.issues.map((i) => i.field).sort()).toEqual(['trigger.config.channel', 'trigger.config.limit']);
 
