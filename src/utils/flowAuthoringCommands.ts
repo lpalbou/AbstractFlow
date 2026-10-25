@@ -4,6 +4,7 @@ import { createNodeData, getAllNodeTemplates, getNodeTemplate, type NodeTemplate
 import { interfaceBoundaryPins, withInterfacePins } from './flowFamilies';
 import { subflowPinPatchForSelectedFlow } from './subflowPins';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from './validation';
+import { loopEndFix } from './loopEndsRun';
 
 /** Deterministic JSON text (sorted keys) — local to avoid a document<->commands import cycle. */
 function stableJson(value: unknown): string {
@@ -507,7 +508,7 @@ function commandOrderRank(kind: string): number {
   if (kind === 'add_node') return 0;
   // disconnect shares the connect rank so "disconnect a->b, connect c->b"
   // batches apply in the order the model emitted them (stable sort).
-  if (kind === 'connect' || kind === 'disconnect') return 2;
+  if (kind === 'connect' || kind === 'disconnect' || kind === 'fix_loop_end') return 2;
   // remove_function ranks with the destructive edits: a batch that rewrites
   // call-site expressions AND removes the function must apply the rewrites
   // first or the removal is refused for call sites the same batch clears.
@@ -1876,6 +1877,36 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       touched.add(source);
       touched.add(target);
       applied.push(`Connected ${source}.${sourceHandle} -> ${target}.${targetHandle}`);
+      continue;
+    }
+
+    if (kind === 'fix_loop_end') {
+      // A loop whose body ends at On Flow End stops after its first item
+      // (utils/loopEndsRun.ts): remove the body's wires into that On Flow End
+      // and wire the loop's `done` to it. The canvas's "Fix the loop".
+      const loopId = resolveNodeId(command.loop || command.loopNodeId || command.loop_node_id, idMap);
+      const endId = resolveNodeId(command.end || command.endNodeId || command.end_node_id, idMap);
+      if (!loopId || !endId) {
+        errors.push('fix_loop_end requires loop and end');
+        continue;
+      }
+      const fix = loopEndFix(nodes, edges, loopId, endId);
+      if (!fix) {
+        errors.push(`fix_loop_end: ${loopId}'s body does not end at ${endId}, or its done already leads elsewhere`);
+        continue;
+      }
+      const kept = edges.filter((edge) => !fix.removeEdgeIds.includes(edge.id));
+      if (!validateConnection(nodes, kept, fix.connect)) {
+        errors.push(`fix_loop_end: ${loopId}.done cannot be wired to ${endId}`);
+        continue;
+      }
+      const used = new Set(kept.map((edge) => edge.id));
+      let edgeId = `edge-${loopId}-done-${endId}`;
+      for (let n = 2; used.has(edgeId); n += 1) edgeId = `edge-${loopId}-done-${endId}-${n}`;
+      edges = [...kept, { id: edgeId, ...fix.connect, animated: true }];
+      touched.add(loopId);
+      touched.add(endId);
+      applied.push(`Wired ${loopId}.done -> ${endId} (removed ${fix.removeEdgeIds.length} body wire${fix.removeEdgeIds.length === 1 ? '' : 's'} into it)`);
       continue;
     }
 

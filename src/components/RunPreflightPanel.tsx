@@ -1,7 +1,9 @@
 import { useCallback, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
+import type { RunPreflightIssue } from '../utils/preflight';
 
-type PreflightIssue = { id: string; nodeId: string; nodeLabel: string; message: string };
+type PreflightIssue = RunPreflightIssue;
 
 export function RunPreflightPanel({
   onFocusNode,
@@ -11,6 +13,8 @@ export function RunPreflightPanel({
   const issues = useFlowStore((s) => s.preflightIssues) as PreflightIssue[];
   const clear = useFlowStore((s) => s.clearPreflightIssues);
   const setExecutingNodeId = useFlowStore((s) => s.setExecutingNodeId);
+  const setIssues = useFlowStore((s) => s.setPreflightIssues);
+  const fixLoopEnd = useFlowStore((s) => s.fixLoopEnd);
 
   // Avoid accumulating timeouts when the user clicks multiple issues quickly.
   const clearTimer = useRef<number | null>(null);
@@ -52,18 +56,32 @@ export function RunPreflightPanel({
 
       <div className="preflight-panel-list" role="list">
         {issues.map((it) => (
-          <button
-            key={it.id}
-            type="button"
-            className="preflight-panel-item"
-            onClick={() => onClickIssue(it)}
-            title="Click to locate this node"
-          >
-            <div className="preflight-panel-item-top">
-              <span className="preflight-panel-item-node">{it.nodeLabel}</span>
-            </div>
-            <div className="preflight-panel-item-msg">{it.message}</div>
-          </button>
+          <div key={it.id} className="preflight-panel-row" role="listitem">
+            <button
+              type="button"
+              className="preflight-panel-item"
+              onClick={() => onClickIssue(it)}
+              title="Click to locate this node"
+            >
+              <div className="preflight-panel-item-top">
+                <span className="preflight-panel-item-node">{it.nodeLabel}</span>
+              </div>
+              <div className="preflight-panel-item-msg">{it.message}</div>
+            </button>
+            {it.fix?.kind === 'loop_end' ? (
+              <button
+                type="button"
+                className="preflight-panel-fix"
+                onClick={() => {
+                  const { loopId, endId } = it.fix!;
+                  if (fixLoopEnd(loopId, endId)) setIssues(issues.filter((x) => x.id !== it.id));
+                  else toast.error('The loop could not be fixed: it changed since this check.');
+                }}
+              >
+                Fix the loop
+              </button>
+            ) : null}
+          </div>
         ))}
       </div>
     </div>

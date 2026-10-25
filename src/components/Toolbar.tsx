@@ -54,7 +54,8 @@ import { AutomationDefaultsModal, type AutomationGraph } from './AutomationDefau
 import { FlowNatureBadge, useTriggerWords } from './automation/FlowNatureBadge';
 import { OPEN_AUTOMATION_EVENT } from './automation/CanvasNote';
 import { triggerSentence } from '../utils/automationChoice';
-import { automationSaveWarning, triggerPinKind } from '../utils/triggerPins';
+import { triggerPinKind } from '../utils/triggerPins';
+import { flowSaveWarning } from '../utils/loopEndsRun';
 import { takePendingTestRun, testRunDoneSentence } from '../utils/triggerSample';
 import {
   interfacesFromPutResponse,
@@ -1153,8 +1154,9 @@ export function Toolbar() {
       // is neither set nor left stranded.
       if (savedId && savedId !== variables.existingFlowId) saveJustSucceededRef.current = true;
       queryClient.invalidateQueries({ queryKey: ['flows'] });
-      // A triggered flow with nothing on On Flow End's response is saved, with a word on it.
-      const warning = automationSaveWarning(variables.flow);
+      // A triggered flow with nothing on On Flow End's response, or a loop whose
+      // body ends at On Flow End, is saved, with a word on it.
+      const warning = flowSaveWarning(variables.flow);
       if (warning) toast(warning, { duration: 8000 });
       else toast.success('Flow saved!');
     },

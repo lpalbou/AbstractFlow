@@ -2245,3 +2245,48 @@
   right: -6px;
   left: auto;
 }
+
+/* A loop whose body ends at On Flow End (components/nodes/LoopEndsRunCallout.tsx):
+   shown on the loop and on that On Flow End, with its one-click fix. */
+.node-loop-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 6px 8px 0;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--warning) 75%, transparent);
+  background: color-mix(in srgb, var(--warning) 14%, var(--flow-card-ground));
+  color: var(--text-primary);
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+  white-space: normal;
+  text-transform: none;
+  cursor: default;
+}
+
+.node-loop-warning-text::before {
+  content: '\26A0\FE0E  ';
+  color: var(--warning);
+}
+
+.node-loop-warning-hint {
+  color: var(--text-secondary);
+}
+
+.node-loop-warning-fix {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--warning) 80%, transparent);
+  background: color-mix(in srgb, var(--warning) 22%, transparent);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.node-loop-warning-fix:hover,
+.node-loop-warning-fix:focus-visible {
+  background: color-mix(in srgb, var(--warning) 34%, transparent);
+}

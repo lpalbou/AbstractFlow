@@ -9,6 +9,7 @@ import { gatewayAuthoringCapabilityStatus } from './gatewayClient';
 import { interfaceBoundaryPins, interfacePinTypeMatches, missingInterfacePins } from './flowFamilies';
 import { getArtifactConnectionError, getConfiguredArtifactInputError } from './mediaArtifacts';
 import { gatewayCapabilityForNodeType } from './nodeCapabilities';
+import { loopEndsRunIssues, loopEndsRunMessage } from './loopEndsRun';
 
 export type RunPreflightIssue = {
   id: string;
@@ -18,6 +19,8 @@ export type RunPreflightIssue = {
   /** 'warning' issues are ADVISORY: shown in the panel, never blocking Run.
    * Absent = blocking (the historical behavior for definite defects). */
   severity?: 'warning';
+  /** A one-click fix the panel offers next to the issue ("Fix the loop", utils/loopEndsRun.ts). */
+  fix?: { kind: 'loop_end'; loopId: string; endId: string };
 };
 
 export type RunPreflightOptions = {
@@ -467,6 +470,23 @@ export function computeRunPreflightIssues(
     if (n.data.nodeType !== 'loop_limit' || !reachable.has(n.id)) continue;
     const wired = edges.some((e) => e.source === n.id && e.sourceHandle === 'limit_reached');
     if (!wired) push(n, "'limit reached' is not wired: when the limit is hit, this path ends (at the top level that ends the run; inside a loop body it returns to the loop)", 'warning');
+  }
+
+  // A loop whose body ends at On Flow End: the run ends after its first item
+  // (utils/loopEndsRun.ts). Advisory: an early exit can be meant.
+  for (const issue of loopEndsRunIssues(nodes, edges)) {
+    const loop = nodesById.get(issue.loopId);
+    if (!loop) continue;
+    const message = loopEndsRunMessage(loop.data.nodeType);
+    const label = isNonEmptyString(loop.data.label) ? loop.data.label.trim() : loop.id;
+    issues.push({
+      id: `${loop.id}:${issue.endId}:loop-ends-run`,
+      nodeId: loop.id,
+      nodeLabel: label,
+      message,
+      severity: 'warning',
+      ...(issue.fixable ? { fix: { kind: 'loop_end' as const, loopId: issue.loopId, endId: issue.endId } } : {}),
+    });
   }
 
   // Flow function library checks (tier 2): the runtime refuses these at

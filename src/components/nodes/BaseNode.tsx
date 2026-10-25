@@ -33,6 +33,7 @@ import { hasSecretLikeValue } from '../../utils/flowAuthoringCommands';
 import { useFlowStore } from '../../hooks/useFlow';
 import { isCollapsibleOperator } from '../../utils/operatorNodes';
 import { HiddenConnectionsBadge } from './HiddenConnectionsBadge';
+import { LoopEndsRunCallout, canWarnLoopEndsRun } from './LoopEndsRunCallout';
 import { NodeStatusGlyph } from './NodeStatusGlyph';
 import { categoryColorVar, colorSectionForCategory, nodeSemanticCategory } from '../../utils/nodeCategoryColors';
 import { useModels, useProviders } from '../../hooks/useProviders';
@@ -3953,6 +3954,8 @@ export const BaseNode = memo(function BaseNode({
           </div>
         )}
       </div>
+
+      {canWarnLoopEndsRun(data.nodeType) ? <LoopEndsRunCallout nodeId={id} /> : null}
 
       {/* Body with pins */}
       <div className="node-body">

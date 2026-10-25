@@ -9399,3 +9399,30 @@ button.flow-nature-badge:hover:not(:disabled),
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
 }
+
+/* Run preflight: an issue with a one-click fix ("Fix the loop"). */
+.preflight-panel-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preflight-panel-row > .preflight-panel-item {
+  width: 100%;
+}
+
+.preflight-panel-fix {
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--warning) 80%, transparent);
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.preflight-panel-fix:hover,
+.preflight-panel-fix:focus-visible {
+  background: color-mix(in srgb, var(--warning) 30%, transparent);
+}

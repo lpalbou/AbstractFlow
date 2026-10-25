@@ -323,6 +323,12 @@ interface FlowState {
   addTriggerEvent: () => string | null;
   /** On Flow Start gets a trigger's typed pins, On Flow End the automation's (utils/triggerPins.ts); one undo step. */
   addTriggerPins: (kind: TriggerPinKind) => boolean;
+  /**
+   * "Fix the loop" (utils/loopEndsRun.ts): the loop's body stops wiring into
+   * that On Flow End and its `done` is wired to it, through the
+   * `fix_loop_end` authoring command (one undo step). False when it cannot apply.
+   */
+  fixLoopEnd: (loopId: string, endId: string) => boolean;
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
   disconnectPin: (nodeId: string, handleId: string, isInput: boolean) => void;
@@ -1159,6 +1165,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (nodes === state.nodes) return false;
     get()._captureHistory();
     set({ nodes });
+    return true;
+  },
+
+  fixLoopEnd: (loopId, endId) => {
+    const before = get();
+    const result = get().applyAuthoringCommands([{ op: 'fix_loop_end', loop: loopId, end: endId }]);
+    if (result.applied.length === 0) return false;
+    // The fix is a canvas action: the selection stays what it was.
+    const selected = before.selectedNode ? get().nodes.find((n) => n.id === before.selectedNode?.id) || null : null;
+    const edge = before.selectedEdge && get().edges.some((e) => e.id === before.selectedEdge?.id) ? before.selectedEdge : null;
+    set({ selectedNode: selected, selectedEdge: edge });
     return true;
   },
 

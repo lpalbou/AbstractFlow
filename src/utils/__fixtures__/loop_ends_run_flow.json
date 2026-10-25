@@ -1,0 +1,730 @@
+{
+  "id": "67c4ef6e",
+  "name": "loop ends run (reported 2026-10-25)",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "messages",
+            "label": "messages",
+            "type": "array",
+            "description": "The new mail of this run: from, to, subject, date, body_text, attachments (name, size, file).",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The message id."
+                  },
+                  "from": {
+                    "type": "string",
+                    "description": "Who sent it."
+                  },
+                  "to": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Who it was sent to."
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "body_text": {
+                    "type": "string",
+                    "description": "The message as plain text."
+                  },
+                  "attachments": {
+                    "type": "array",
+                    "description": "Its attachments: name, size and the stored file (artifact).",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "size": {
+                          "type": "integer"
+                        },
+                        "artifact": {
+                          "type": "object"
+                        },
+                        "index": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "mailbox",
+            "label": "mailbox",
+            "type": "string",
+            "description": "The address of the mailbox it arrived in (its id when it has no address)."
+          },
+          {
+            "id": "event",
+            "label": "event",
+            "type": "object",
+            "description": "Everything about what started the run, as one object (the raw event).",
+            "schema": {
+              "type": "object",
+              "title": "Trigger event",
+              "description": "The event that started this run (CloudEvents 1.0). Empty when the run was started by hand.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique id of the event."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "What happened, e.g. abstractframework.feed.item."
+                },
+                "source": {
+                  "type": "string",
+                  "description": "Where it came from (the trigger source / connection)."
+                },
+                "subject": {
+                  "type": "string",
+                  "description": "What it is about (an email subject, a feed item title, a webhook subject)."
+                },
+                "time": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When it happened."
+                },
+                "datacontenttype": {
+                  "type": "string"
+                },
+                "data": {
+                  "type": "object",
+                  "description": "The event's content. Connection sources (feeds, webhooks): a batch {count, events}; email: {count, messages}; schedules: the tick and its series.",
+                  "properties": {
+                    "count": {
+                      "type": "integer",
+                      "description": "How many items this run received (connection sources, email)."
+                    },
+                    "events": {
+                      "type": "array",
+                      "description": "The received items, oldest first (connection sources).",
+                      "items": {
+                        "type": "object",
+                        "description": "One received item (CloudEvents): a feed item, a webhook call...",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "subject": {
+                            "type": "string",
+                            "description": "The item title / id, the webhook subject."
+                          },
+                          "time": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "data": {
+                            "type": "object",
+                            "description": "Feed item: title, link, published, summary. Webhook call: body (JSON) or body_text.",
+                            "properties": {
+                              "title": {
+                                "type": "string"
+                              },
+                              "link": {
+                                "type": "string"
+                              },
+                              "published": {
+                                "type": "string"
+                              },
+                              "summary": {
+                                "type": "string"
+                              },
+                              "body": {
+                                "description": "A webhook call's JSON body."
+                              },
+                              "body_text": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "messages": {
+                      "type": "array",
+                      "description": "email.received: the messages (from, subject, date...); bodies ride input_data.emails."
+                    },
+                    "series": {
+                      "type": "object",
+                      "description": "Schedules only: which run of the schedule this is (run #1, #2, \u2026).",
+                      "properties": {
+                        "rule": {
+                          "type": "string",
+                          "description": "The schedule rule (e.g. every 1d at 08:00 Europe/Paris)."
+                        },
+                        "occurrence": {
+                          "type": "integer",
+                          "description": "The run number: 1 for run #1, 2 for run #2, \u2026"
+                        },
+                        "scheduled_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When this run was due."
+                        },
+                        "next_at": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time",
+                          "description": "When the next run is due, or null when the schedule ends."
+                        },
+                        "coalesced": {
+                          "type": "integer",
+                          "description": "Missed ticks folded into this run (0 when none)."
+                        }
+                      }
+                    }
+                  }
+                },
+                "bindingid": {
+                  "type": "string"
+                },
+                "connectionid": {
+                  "type": "string",
+                  "description": "The trigger connection that received it."
+                },
+                "correlationid": {
+                  "type": "string"
+                },
+                "dedupekey": {
+                  "type": "string"
+                },
+                "sequence": {
+                  "type": "integer",
+                  "description": "Position in the connection's event stream."
+                },
+                "abstracttrust": {
+                  "type": "string",
+                  "description": "How far the content can be trusted (e.g. external)."
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "node-2",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1008,
+        "y": 32
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "What the person sees as the run\u2019s result."
+          },
+          {
+            "id": "notify",
+            "label": "notify",
+            "type": "object",
+            "description": "Optional {title, body} (or true): raises an alert on the watch, the tray and the Assistant.",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "False marks the run failed: it is retried, then an alert says so."
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "node-3",
+      "type": "loop",
+      "position": {
+        "x": 224,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "loop",
+        "label": "ForEach",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      }
+    },
+    {
+      "id": "node-4",
+      "type": "answer_user",
+      "position": {
+        "x": 432,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Show Message",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "node-7",
+      "type": "mail_forward",
+      "position": {
+        "x": 688,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "mail_forward",
+        "label": "Forward",
+        "icon": "&#x2709;",
+        "headerColor": "#D97706",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "mailbox",
+            "label": "mailbox",
+            "type": "string",
+            "description": "Which mailbox (its id). Empty: the trigger\u2019s mailbox, else your main one."
+          },
+          {
+            "id": "id",
+            "label": "email",
+            "type": "email",
+            "description": "The email to forward.",
+            "schema": {
+              "type": "object",
+              "title": "Email",
+              "x-abstract-type": "email",
+              "description": "One email: id, mailbox, folder, thread_id, from, to, cc, subject, date, body_text, body_html, attachments, seen, flagged, labels.",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Where the message is (what the mail nodes act on)."
+                },
+                "message_id": {
+                  "type": "string",
+                  "description": "The email\u2019s Message-ID."
+                },
+                "mailbox": {
+                  "type": "string",
+                  "description": "The mailbox it is in (its address)."
+                },
+                "folder": {
+                  "type": "string",
+                  "description": "The folder it is in (e.g. INBOX)."
+                },
+                "thread_id": {
+                  "type": "string",
+                  "description": "The conversation it belongs to."
+                },
+                "from": {
+                  "type": "string",
+                  "description": "Who sent it."
+                },
+                "to": {
+                  "type": "array",
+                  "description": "Who it was sent to.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cc": {
+                  "type": "array",
+                  "description": "Who was copied.",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "subject": {
+                  "type": "string",
+                  "description": "Its subject."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "When it was sent (date and time)."
+                },
+                "body_text": {
+                  "type": "string",
+                  "description": "The message as plain text."
+                },
+                "body_html": {
+                  "type": "string",
+                  "description": "The message as HTML, when it has one."
+                },
+                "attachments": {
+                  "type": "array",
+                  "description": "Its attachments: index, name, size, type (Get attachment reads one by index).",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "index": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "size": {
+                        "type": "integer"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "artifact": {
+                        "type": [
+                          "object",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                },
+                "seen": {
+                  "type": "boolean",
+                  "description": "Whether it was read."
+                },
+                "flagged": {
+                  "type": "boolean",
+                  "description": "Whether it is flagged."
+                },
+                "labels": {
+                  "type": "array",
+                  "description": "Its labels.",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "to",
+            "label": "to",
+            "type": "array",
+            "description": "Recipients (addresses)."
+          },
+          {
+            "id": "note",
+            "label": "note",
+            "type": "string",
+            "description": "A note above the forwarded message."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "What the mail server answered."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "False when the mail action was refused (the result says why)."
+          },
+          {
+            "id": "message_id",
+            "label": "message_id",
+            "type": "string",
+            "description": "The Message-ID of the forwarded email."
+          }
+        ],
+        "pinDefaults": {
+          "note": "Forwarded by a flow"
+        }
+      }
+    },
+    {
+      "id": "node-8",
+      "type": "literal_string",
+      "position": {
+        "x": 304,
+        "y": -288
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "someone@example.com"
+      }
+    },
+    {
+      "id": "node-9",
+      "type": "make_array",
+      "position": {
+        "x": 544,
+        "y": -224
+      },
+      "data": {
+        "nodeType": "make_array",
+        "label": "Make Array",
+        "icon": "[]",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ],
+        "collapsed": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1792942945295",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1792942947247",
+      "source": "node-1",
+      "sourceHandle": "messages",
+      "target": "node-3",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1792942962517",
+      "source": "node-3",
+      "sourceHandle": "loop",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1792942967740",
+      "source": "node-3",
+      "sourceHandle": "item",
+      "target": "node-4",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1792950444634",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1792950448592",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1792950495234",
+      "source": "node-1",
+      "sourceHandle": "mailbox",
+      "target": "node-7",
+      "targetHandle": "mailbox",
+      "animated": false
+    },
+    {
+      "id": "edge-1792950502467",
+      "source": "node-3",
+      "sourceHandle": "item",
+      "target": "node-7",
+      "targetHandle": "id",
+      "animated": false
+    },
+    {
+      "id": "edge-1792950557271",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-9",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1792950561479",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "to",
+      "animated": false
+    },
+    {
+      "id": "edge-1792950575913",
+      "source": "node-7",
+      "sourceHandle": "success",
+      "target": "node-2",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "edge-1792950579088",
+      "source": "node-7",
+      "sourceHandle": "result",
+      "target": "node-2",
+      "targetHandle": "notify",
+      "animated": false
+    }
+  ],
+  "automation_defaults": {
+    "schema_version": 1,
+    "trigger": {
+      "source_id": "email.received",
+      "source_version": 1,
+      "config": {
+        "account": "my-mailbox"
+      }
+    },
+    "context": {
+      "mode": "independent"
+    },
+    "input_data": {}
+  }
+}
