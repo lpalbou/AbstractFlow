@@ -100,6 +100,8 @@ import {
 } from '../utils/subflowPins';
 import { inferSchemaForNodeOutput } from '../utils/outputSchemaInference';
 import { startHasTriggerEvent } from '../utils/triggerEvent';
+import { wiredSourceType } from '../utils/relays';
+import { BREAK_EMAIL_HINT, hasEmailFields, withEmailFields } from '../utils/emailType';
 import {
   EDITOR_DATA_PIN_TYPES,
   FLOW_IO_EDITOR_DATA_PIN_TYPES,
@@ -3686,8 +3688,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	              return lines.join('\n');
 	            };
 
+	            // Fed by an Email (through relays too): every Email field, typed, in one click.
+	            const fedByEmail = wiredSourceType(nodes, edges, node.id, 'object') === 'email';
 	            return (
 	              <>
+                {fedByEmail && !hasEmailFields(data.outputs) && (
+                  <>
+                    <button
+                      type="button"
+                      className="array-add-button schema-sync-button"
+                      onClick={() => updateNodeData(node.id, withEmailFields(data))}
+                    >
+                      Use the Email fields
+                    </button>
+                    <span className="property-hint">{BREAK_EMAIL_HINT}</span>
+                  </>
+                )}
                 {!inputEdge && (
                   <span className="property-hint">
                     Connect an object to the <code>object</code> input to auto-discover fields, or add fields manually below.

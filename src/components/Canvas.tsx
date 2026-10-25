@@ -33,8 +33,8 @@ import { wireLoopGlimpse } from '../utils/execGlimpse';
 import { GlimpseCard } from './GlimpseCard';
 import { RouteChoiceMenu } from './RouteChoiceMenu';
 import { ConnectionDropMenu } from './ConnectionDropMenu';
-import { dropChoicesFor } from '../utils/relays';
-import { NodeTemplate, getNodeTemplate } from '../types/nodes';
+import { dropChoiceCopy, dropChoiceNode, dropChoicesFor, type DropChoice } from '../utils/relays';
+import { NodeTemplate, getAllNodeTemplates, getNodeTemplate } from '../types/nodes';
 import { PALETTE_ADD_NODE_EVENT, addPaletteNodeAtCentre } from '../utils/paletteAdd';
 import type { FlowNodeData, PinConnectionFeedback, PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
@@ -935,7 +935,8 @@ function CanvasBody() {
   );
 
   // A wire released on empty canvas (not on a pin, not on a node) opens the
-  // drop menu there: an If/Else for a boolean, a relay, and for an object a Break Object.
+  // drop menu there: an If/Else for a boolean, Break Email for an Email, ForEach
+  // for a list, a relay, and for an object a Break Object (utils/relays.ts dropChoicesFor).
   const handleConnectEnd = useCallback((event: globalThis.MouseEvent | TouchEvent) => {
     setActiveConnection(null);
     const from = dragStartRef.current;
@@ -954,30 +955,27 @@ function CanvasBody() {
     const { from, at } = wireDrop;
     const create = (choice: string) => {
       setWireDrop(null);
-      const template = getNodeTemplate(choice === 'relay' ? 'reroute' : choice === 'if' ? 'if' : 'break_object');
+      const made = dropChoiceNode(choice as DropChoice, from.handleType);
+      const template = made.label
+        ? getAllNodeTemplates().find((t) => t.type === made.type && t.label === made.label)
+        : getNodeTemplate(made.type);
       const instance = reactFlowInstance.current;
       if (!template || !instance) return;
       const flowPoint = instance.screenToFlowPosition(at);
       // A relay is centred on the drop point; a node opens from it.
       const position = choice === 'relay' ? { x: flowPoint.x - 9, y: flowPoint.y - 9 } : flowPoint;
-      const newPin = choice === 'relay' ? (from.handleType === 'source' ? 'in' : 'out') : choice === 'if' ? 'condition' : 'object';
       const id = addNodeAndConnect(template, position, {
         from: { nodeId: from.nodeId, handleId: from.handleId, side: from.handleType },
-        newPin,
+        newPin: made.pin,
       });
       if (!id) toast.error('That wire cannot be connected here');
-      // Break Object needs its fields chosen: open its properties.
+      // Break Object needs its fields chosen: open its properties (Break Email comes with them).
       else if (choice === 'break_object') useFlowStore.getState().selectNodeById(id);
-    };
-    const labels: Record<string, { label: string; hint: string }> = {
-      if: { label: 'If/Else', hint: 'Branch on this condition: wire its true and false outputs to the next steps' },
-      relay: { label: 'Relay', hint: 'A dot to route this wire; connect it to as many inputs as needed' },
-      break_object: { label: 'Break Object', hint: 'Expose fields of this object as separate outputs' },
     };
     return (
       <ConnectionDropMenu
         title={`Create from ${from.handleType === 'source' ? 'this output' : 'this input'}`}
-        choices={dropChoicesFor(from.pinType, from.handleType).map((id) => ({ id, ...labels[id] }))}
+        choices={dropChoicesFor(from.pinType, from.handleType).map((id) => ({ id, ...dropChoiceCopy(id, from.pinType) }))}
         at={at}
         onChoose={create}
         onCancel={() => setWireDrop(null)}

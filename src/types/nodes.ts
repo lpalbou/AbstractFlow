@@ -5,7 +5,7 @@
 import type { NodeType, FlowNodeData, JsonValue, Pin } from './flow';
 import { generatePythonTransformCode, upsertPythonAvailableVariablesComments } from '../utils/codegen';
 import { NODE_GATEWAY_CAPABILITIES, type GatewayAuthoringCapability } from '../utils/nodeCapabilities';
-import { EMAIL_FIELDS, emailFieldPins, emailPin, emailsPin } from '../utils/emailType';
+import { BREAK_EMAIL_LABEL, breakEmailInputPin, emailFieldPins, emailPin, emailsPin } from '../utils/emailType';
 
 // Node template used in the palette
 export interface NodeTemplate {
@@ -1735,6 +1735,21 @@ const DATA_NODES: NodeTemplate[] = [
     category: 'data',
   },
   {
+    // Break Object already set up for one Email (operator 2026-10-25): every
+    // Email field as an output with its real type, no field picking. The same
+    // node type (the runtime knows break_object); also offered where a wire
+    // from an Email pin is dropped on empty canvas.
+    type: 'break_object',
+    icon: '&#x1F9E9;', // Puzzle piece
+    label: BREAK_EMAIL_LABEL,
+    preset: true,
+    description: 'Expose this email’s fields as outputs: from, to, cc, subject, date, body_text, attachments, seen, flagged, labels…',
+    headerColor: '#3498DB',
+    inputs: [breakEmailInputPin()],
+    outputs: emailFieldPins(),
+    category: 'data',
+  },
+  {
     // Visual only (operator 2026-10-11): a dot that lets one output feed several
     // inputs along a tidy path. The runtime rewires every chain source -> target
     // before compiling (abstractruntime visual/reroute_lowering.py), as if the
@@ -3074,7 +3089,8 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'edit_json_schema' && { literalValue: {} }),
     ...(template.type === 'literal_array' && { literalValue: [] }),
     ...(template.type === 'tool_parameters' && { toolParametersConfig: { tool: '' } }),
-    ...(template.type === 'break_object' && { breakConfig: { selectedPaths: template.label === 'Email fields' ? [...EMAIL_FIELDS] : [] } }),
+    // A preset Break Object (Email fields, Break Email) comes with its fields chosen.
+    ...(template.type === 'break_object' && { breakConfig: { selectedPaths: template.outputs.map((p) => p.id) } }),
     ...(template.type === 'concat' && { concatConfig: { separator: ' ' } }),
     ...(template.type === 'switch' && { switchConfig: { cases: [] } }),
     ...(template.type === 'on_event' && { eventConfig: { name: 'my_event', scope: 'session' } }),

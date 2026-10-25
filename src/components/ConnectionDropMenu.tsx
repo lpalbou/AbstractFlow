@@ -2,8 +2,10 @@ import { useEffect, useRef } from 'react';
 
 /**
  * What to create where a dragged wire was released on empty canvas (operator
- * 2026-10-11): a relay, and for an object, a Break Object. The choice is
- * created at the drop point and wired to the pin the drag started from.
+ * 2026-10-11): a relay, and for an object, a Break Object; for a boolean an
+ * If/Else, for an Email Break Email, for a list ForEach (utils/relays.ts
+ * dropChoicesFor). The choice is created at the drop point and wired to the
+ * pin the drag started from.
  */
 export interface ConnectionDropChoice {
   id: string;

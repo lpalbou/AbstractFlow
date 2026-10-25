@@ -93,3 +93,41 @@ export function emailFieldPins(fields: readonly EmailField[] = EMAIL_FIELDS): Pi
     return { id: f, label: f, type, description: doc.description, ...(doc.schema ? { schema: doc.schema } : {}) } as Pin;
   });
 }
+
+/**
+ * "Break Email" (operator 2026-10-25): a Break Object already set up for one
+ * Email, every field an output with its real type (id string, to array, seen
+ * boolean, attachments array, labels array…). Offered where a wire from an
+ * Email pin is dropped on empty canvas, in the palette beside Break Object,
+ * and, for a Break Object fed by an Email, as "Use the Email fields".
+ */
+export const BREAK_EMAIL_LABEL = 'Break Email';
+export const BREAK_EMAIL_HINT = 'Expose this email’s fields: from, subject, date, body, …';
+
+/** The Break Object's input, typed Email (hover lists the fields). */
+export function breakEmailInputPin(): Pin {
+  return emailPin('object', 'email', 'The email to read.');
+}
+
+/**
+ * A Break Object's data with every Email field as an output: the Email fields
+ * first (in EMAIL_FIELDS order), then any other field it already had (kept, so
+ * its wires stay); the `object` input typed Email.
+ */
+export function withEmailFields<T extends { inputs: Pin[]; outputs: Pin[]; breakConfig?: { selectedPaths?: string[] } }>(
+  data: T
+): Pick<T, 'inputs' | 'outputs' | 'breakConfig'> {
+  const fields = emailFieldPins();
+  const ids = new Set<string>(EMAIL_FIELDS);
+  const others = data.outputs.filter((p) => p.type !== 'execution' && !ids.has(p.id));
+  const outputs = [...fields, ...others];
+  const hasInput = data.inputs.some((p) => p.id === 'object');
+  const inputs = hasInput ? data.inputs.map((p) => (p.id === 'object' ? breakEmailInputPin() : p)) : [...data.inputs, breakEmailInputPin()];
+  return { inputs, outputs, breakConfig: { ...(data.breakConfig || {}), selectedPaths: outputs.map((p) => p.id) } } as Pick<T, 'inputs' | 'outputs' | 'breakConfig'>;
+}
+
+/** Whether a Break Object already exposes every Email field with its type. */
+export function hasEmailFields(outputs: readonly Pin[]): boolean {
+  const fields = emailFieldPins();
+  return fields.every((f) => outputs.some((p) => p.id === f.id && p.type === f.type));
+}

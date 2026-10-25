@@ -1,4 +1,4 @@
-import { EMAIL_SCHEMA } from './emailType';
+import { BREAK_EMAIL_HINT, BREAK_EMAIL_LABEL, EMAIL_SCHEMA } from './emailType';
 /**
  * Relays (operator 2026-10-11): a dot on the canvas that lets one output feed
  * several inputs along a tidy path. Visual only: the runtime rewires every
@@ -10,7 +10,7 @@ import { EMAIL_SCHEMA } from './emailType';
  * relay feeds; an unfed relay is `any`.
  */
 import type { Edge, Node } from 'reactflow';
-import type { FlowNodeData, Pin, PinType } from '../types/flow';
+import type { FlowNodeData, NodeType, Pin, PinType } from '../types/flow';
 
 export const RELAY_TYPE = 'reroute';
 
@@ -56,20 +56,92 @@ export function withRelayTypes(nodes: Node<FlowNodeData>[], edges: Edge[]): Node
   return changed ? next : nodes;
 }
 
-export type DropChoice = 'if' | 'relay' | 'break_object';
+export type DropChoice = 'if' | 'relay' | 'break_object' | 'break_email' | 'foreach';
+
+/**
+ * The typed lists ForEach takes as its `items` (an array of something): a plain
+ * array, a list of emails, of files, of KG assertions, of tool names.
+ */
+export const LIST_PIN_TYPES: ReadonlySet<PinType> = new Set<PinType>([
+  'array',
+  'emails',
+  'artifacts',
+  'artifacts_image',
+  'artifacts_audio',
+  'artifacts_text',
+  'artifacts_video',
+  'assertions',
+  'tools',
+]);
 
 /**
  * What the wire-drop menu offers for a pin a drag started from and released on
  * empty canvas: from a boolean output, an If/Else on that condition first (the
- * usual next step, operator 2026-10-17); a relay for any data pin; from an
- * object (or any) output, a Break Object too. Execution pins get nothing
+ * usual next step, operator 2026-10-17); from an Email output, Break Email
+ * (every field, typed, operator 2026-10-25); from a list output, ForEach over
+ * it (the only loop a list feeds directly: For counts numbers, While tests a
+ * condition, Loop Limit caps a repeating path); a relay for any data pin; from
+ * an object (or any) output, a Break Object too. Execution pins get nothing
  * (relays carry data only).
  */
 export function dropChoicesFor(pinType: PinType | undefined, side: 'source' | 'target'): DropChoice[] {
   if (!pinType || pinType === 'execution') return [];
-  const choices: DropChoice[] = side === 'source' && pinType === 'boolean' ? ['if', 'relay'] : ['relay'];
-  if (side === 'source' && (pinType === 'object' || pinType === 'any')) choices.push('break_object');
-  return choices;
+  if (side !== 'source') return ['relay'];
+  if (pinType === 'boolean') return ['if', 'relay'];
+  if (pinType === 'email') return ['break_email', 'relay'];
+  if (LIST_PIN_TYPES.has(pinType)) return ['foreach', 'relay'];
+  return pinType === 'object' || pinType === 'any' ? ['relay', 'break_object'] : ['relay'];
+}
+
+/** A drop choice's name and plain-words hint in the menu (the hint can name what the pin carries). */
+export function dropChoiceCopy(choice: DropChoice, pinType?: PinType): { label: string; hint: string } {
+  switch (choice) {
+    case 'if':
+      return { label: 'If/Else', hint: 'Branch on this condition: wire its true and false outputs to the next steps' };
+    case 'relay':
+      return { label: 'Relay', hint: 'A dot to route this wire; connect it to as many inputs as needed' };
+    case 'break_object':
+      return { label: 'Break Object', hint: 'Expose fields of this object as separate outputs' };
+    case 'break_email':
+      return { label: BREAK_EMAIL_LABEL, hint: BREAK_EMAIL_HINT };
+    case 'foreach': {
+      const each = pinType === 'emails' ? 'email' : 'item';
+      return { label: 'ForEach', hint: `Run the next steps once for each ${each}: wire them to loop, and what comes after the last ${each} to done` };
+    }
+  }
+}
+
+/** The node a drop choice creates (by type, and label for a preset) and its pin the dragged wire connects to. */
+export function dropChoiceNode(choice: DropChoice, side: 'source' | 'target'): { type: NodeType; label?: string; pin: string } {
+  switch (choice) {
+    case 'relay':
+      return { type: RELAY_TYPE as NodeType, pin: side === 'source' ? 'in' : 'out' };
+    case 'if':
+      return { type: 'if', pin: 'condition' };
+    case 'break_object':
+      return { type: 'break_object', pin: 'object' };
+    case 'break_email':
+      return { type: 'break_object', label: BREAK_EMAIL_LABEL, pin: 'object' };
+    case 'foreach':
+      return { type: 'loop', pin: 'items' };
+  }
+}
+
+/**
+ * The type a wired input receives: the output feeding it, followed through
+ * relays (an unwired input, or an unfed relay, gives undefined).
+ */
+export function wiredSourceType(nodes: Node<FlowNodeData>[], edges: Edge[], nodeId: string, pinId: string): PinType | undefined {
+  const wire = edges.find((e) => e.target === nodeId && e.targetHandle === pinId);
+  if (!wire) return undefined;
+  const source = nodes.find((n) => n.id === wire.source);
+  if (!source) return undefined;
+  if (isRelay(source)) {
+    const type = relaySourceType(source.id, new Map(nodes.map((n) => [n.id, n])), edges);
+    return type === 'any' && !edges.some((e) => e.target === source.id) ? undefined : type;
+  }
+  const pin = source.data.outputs.find((p) => p.id === wire.sourceHandle);
+  return pin && pin.type !== 'execution' ? pin.type : undefined;
 }
 
 /**
