@@ -1,5 +1,3 @@
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import type { Edge, Node } from 'reactflow';
 import { beforeEach, describe, expect, it } from 'vitest';
 import reported from './__fixtures__/loop_ends_run_flow.json';
@@ -9,7 +7,6 @@ import { applyFlowAuthoringCommands } from './flowAuthoringCommands';
 import { flowSaveWarning, loopEndFix, loopEndsRunIssues, loopEndsRunMessage, loopEndsRunSaveWarning } from './loopEndsRun';
 import { computeRunPreflightIssues } from './preflight';
 import { useFlowStore } from '../hooks/useFlow';
-import { LoopEndsRunCalloutView } from '../components/nodes/LoopEndsRunCallout';
 
 const FOREACH_TEXT =
   "This loop stops after its first item: its body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire out.";
@@ -157,12 +154,4 @@ describe('Fix the loop on the canvas', () => {
     expect(loopEndsRunIssues(useFlowStore.getState().nodes, useFlowStore.getState().edges)).toEqual([]);
   });
 
-  it('the warning shows the text and the button; without a fix, what to do instead', () => {
-    const html = renderToStaticMarkup(createElement(LoopEndsRunCalloutView, { message: FOREACH_TEXT, fixable: true, onFix: () => {} }));
-    expect(html.replace(/&#x27;/g, "'")).toContain(FOREACH_TEXT);
-    expect(html).toContain('>Fix the loop</button>');
-    const blocked = renderToStaticMarkup(createElement(LoopEndsRunCalloutView, { message: FOREACH_TEXT, fixable: false, onFix: () => {} }));
-    expect(blocked).not.toContain('Fix the loop');
-    expect(blocked).toContain('Done already leads to another node');
-  });
 });

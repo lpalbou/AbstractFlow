@@ -454,10 +454,10 @@ finishes, the next item starts, and `done` runs after the last one. **On Flow En
 wherever it is reached, inside a loop body too. A body that reaches On Flow End therefore stops
 after the first item: a ForEach over five emails shows one message.
 
-The editor flags this shape on the loop and on that On Flow End: "This loop stops after its first
-item: its body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire
-out." (For and While say "first pass"). The same sentence appears when you save and in the run
-checks. **Fix the loop**, next to the warning, removes the body's wires into On Flow End and wires
+The editor says so when you save and in the run checks: "This loop stops after its first item: its
+body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire out." (For and
+While say "first pass"). The canvas itself stays quiet: the shape is legitimate when the first match
+should end the run. **Fix the loop**, next to the warning, removes the body's wires into On Flow End and wires
 the loop's `done` to it, in one undo step; the data wires into On Flow End stay, and carry the last
 item's values. When `done` already leads to another node, the fix is not offered: remove the
 body's wire into On Flow End and end the path after `done` with On Flow End yourself. An On Flow

@@ -80,7 +80,7 @@ Gateway with automations enabled, then press **Try again**.
 
 ## Why Does My ForEach Run Only Once?
 
-Its body (the steps wired to `loop`) reaches On Flow End, and On Flow End ends the run wherever it is reached. Wire the loop's `done` to On Flow End instead; the body's last node needs no wire out. The editor shows this on the loop with **Fix the loop**, which does exactly that. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
+Its body (the steps wired to `loop`) reaches On Flow End, and On Flow End ends the run wherever it is reached. Wire the loop's `done` to On Flow End instead; the body's last node needs no wire out. The run checks say so and offer **Fix the loop**, which does exactly that. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
 
 ## Why Does A Node Show "N hidden"?
 

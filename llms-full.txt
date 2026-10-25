@@ -805,10 +805,10 @@ finishes, the next item starts, and `done` runs after the last one. **On Flow En
 wherever it is reached, inside a loop body too. A body that reaches On Flow End therefore stops
 after the first item: a ForEach over five emails shows one message.
 
-The editor flags this shape on the loop and on that On Flow End: "This loop stops after its first
-item: its body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire
-out." (For and While say "first pass"). The same sentence appears when you save and in the run
-checks. **Fix the loop**, next to the warning, removes the body's wires into On Flow End and wires
+The editor says so when you save and in the run checks: "This loop stops after its first item: its
+body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire out." (For and
+While say "first pass"). The canvas itself stays quiet: the shape is legitimate when the first match
+should end the run. **Fix the loop**, next to the warning, removes the body's wires into On Flow End and wires
 the loop's `done` to it, in one undo step; the data wires into On Flow End stay, and carry the last
 item's values. When `done` already leads to another node, the fix is not offered: remove the
 body's wire into On Flow End and end the path after `done` with On Flow End yourself. An On Flow
@@ -5932,7 +5932,7 @@ Gateway with automations enabled, then press **Try again**.
 
 ## Why Does My ForEach Run Only Once?
 
-Its body (the steps wired to `loop`) reaches On Flow End, and On Flow End ends the run wherever it is reached. Wire the loop's `done` to On Flow End instead; the body's last node needs no wire out. The editor shows this on the loop with **Fix the loop**, which does exactly that. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
+Its body (the steps wired to `loop`) reaches On Flow End, and On Flow End ends the run wherever it is reached. Wire the loop's `done` to On Flow End instead; the body's last node needs no wire out. The run checks say so and offer **Fix the loop**, which does exactly that. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
 
 ## Why Does A Node Show "N hidden"?
 
@@ -6077,9 +6077,9 @@ See [VisualFlow JSON > Interfaces](visualflow.md#interfaces).
 
 See [Web editor > Hidden Connections](web-editor.md#hidden-connections).
 
-### A loop shows "This loop stops after its first item"
+### The run checks say "This loop stops after its first item"
 
-The loop's body reaches On Flow End, so the run ends after the first item (For and While: the first pass). Press **Fix the loop** on the warning: the body's wires into On Flow End are removed and the loop's `done` is wired to it (one undo step). When the warning says `done` already leads to another node, remove the body's wire into On Flow End and end the path after `done` with On Flow End. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
+The loop's body reaches On Flow End, so the run ends after the first item (For and While: the first pass). Press **Fix the loop** next to the check: the body's wires into On Flow End are removed and the loop's `done` is wired to it (one undo step). When the warning says `done` already leads to another node, remove the body's wire into On Flow End and end the path after `done` with On Flow End. See [Web editor > A loop whose body ends the run](web-editor.md#a-loop-whose-body-ends-the-run).
 
 ### Run preflight warns about interface pins
 
@@ -6198,7 +6198,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New flow with a trigger** shows no Interfaces section and says "Runs by itself when its trigger fires: what arrives is on On Flow Start, build the steps on the canvas.". **Provider** and **Model** inputs are lists from the gateway with **Use the default (…)** first.
 - **Trigger list** grouped (Your mailboxes / feeds / webhooks), paused or failing ones shown with their state, **Add a feed or webhook…**; weekly schedules wait for a day; the time zone can be chosen; times read "08:00" (24-hour) everywhere; "50,000 tokens"; no "occurrence" in the copy; library rows show "3 nodes · 1 edge" instead of ids.
 - **Settings schemas never block a trigger.** Lists of strings render one per line, nested objects as a section, and a setting using a keyword the editor does not render is a JSON field of its own (checked by the gateway) instead of refusing the whole trigger. `email` and `uri` formats and `items`/`minItems`/`maxItems`/`uniqueItems` are checked.
-- **A loop whose body ends the run is flagged, with a one-click fix.** When a ForEach, For or While body reaches On Flow End (which ends the run after the first item), the loop and that On Flow End show "This loop stops after its first item: its body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire out." The same sentence appears on save and in the run checks (advisory). **Fix the loop** removes the body's wires into On Flow End and wires `done` to it, in one undo step (also the `fix_loop_end` authoring command); it is not offered when `done` already leads elsewhere.
+- **A loop whose body ends the run is flagged, with a one-click fix.** When a ForEach, For or While body reaches On Flow End (which ends the run after the first item), the save notice and the run checks say "This loop stops after its first item: its body ends at On Flow End. Wire Done to On Flow End; the body's last node needs no wire out." The same sentence appears on save and in the run checks (advisory). **Fix the loop** removes the body's wires into On Flow End and wires `done` to it, in one undo step (also the `fix_loop_end` authoring command); it is not offered when `done` already leads elsewhere.
 - **Break Email.** Dropping a wire from an Email output on empty canvas offers **Break Email** ("Expose this email's fields: from, subject, date, body, …"): a Break Object with every Email field as a typed output, wired, no field picking. It is also in the palette after Break Object, and a Break Object fed by an Email offers **Use the Email fields** in Properties. Break Object for plain objects is unchanged.
 - **ForEach from a list drop.** Dropping a wire from a list output (array, Email list, file lists, assertions, tools) on empty canvas offers **ForEach** with that list on its `items` (an Email list gives Email items), beside Relay.
 
