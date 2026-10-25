@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { InterfacePicker } from './InterfacePicker';
 import { IconFilePlus } from './ToolbarIcons';
 import { normalizeInterfaces } from '../utils/flowFamilies';
@@ -8,6 +8,7 @@ import { AutomationChoiceError, automationFromChoice } from '../utils/automation
 import { choiceFromPicker, emptyPicker, type PickerState } from '../utils/automationPicker';
 import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
 import { useAutomationFacts } from './automation/useAutomationFacts';
+import { resolveTriggerLink, type TriggerLink } from '../utils/triggerDeepLink';
 
 export interface NewFlowValues {
   name: string;
@@ -44,26 +45,54 @@ export function newFlowValues(
  * Creating a workflow starts here (operator 2026-10-11): its title, an optional
  * description and the optional interfaces it declares — before an empty canvas.
  * When the open flow has unsaved changes, the dialog says they will be lost.
+ *
+ * `trigger` (a `?trigger=` link, utils/triggerDeepLink.ts): "What starts it?"
+ * opens on that trigger once the person's connections are loaded, with a
+ * proposed title; until the person changes the picker or the title, both
+ * follow the loaded facts.
  */
 export function NewFlowDialog({
   unsavedChanges,
   onCreate,
   onCancel,
   gatewayContracts = null,
+  trigger = null,
 }: {
   unsavedChanges: boolean;
   onCreate: (values: NewFlowValues) => void;
   onCancel: () => void;
   gatewayContracts?: GatewayContracts | null;
+  trigger?: TriggerLink | null;
 }) {
-  const [name, setName] = useState('');
+  // null = not touched yet: a linked trigger proposes them.
+  const [nameEdit, setName] = useState<string | null>(trigger ? null : '');
   const [description, setDescription] = useState('');
   const [interfaces, setInterfaces] = useState<string[]>([]);
-  const [picker, setPicker] = useState<PickerState>(emptyPicker('chat'));
+  const [pickerEdit, setPicker] = useState<PickerState | null>(trigger ? null : emptyPicker('chat'));
+  // Loaded once a trigger is chosen (or linked): a chat flow needs nothing from the gateway here.
+  const facts = useAutomationFacts(gatewayContracts, {
+    enabled: Boolean(trigger) || (pickerEdit !== null && pickerEdit.start !== null && pickerEdit.start !== 'chat'),
+  });
+  const linked = trigger ? resolveTriggerLink(trigger, facts) : null;
+  const picker = pickerEdit ?? linked?.picker ?? emptyPicker('chat');
+  const name = nameEdit ?? (linked?.state === 'found' ? linked.name : '');
+  const linkLine = pickerEdit === null && linked?.state === 'missing' ? linked.line : '';
   const isAutomation = picker.start !== null && picker.start !== 'chat';
-  // Loaded once a trigger is chosen: a chat flow needs nothing from the gateway here.
-  const facts = useAutomationFacts(gatewayContracts, { enabled: isAutomation });
   const support = pickerSupport(facts);
+  // The proposed title arrives with the connections: the field keeps focus, all selected (typing replaces it).
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const proposed = nameEdit === null ? name : '';
+  useEffect(() => {
+    const input = nameRef.current;
+    if (!proposed || !input) return;
+    // Never pull focus from a field the person moved to while the list loaded.
+    const active = document.activeElement;
+    if (active && active !== input && active !== document.body) return;
+    input.focus({ preventScroll: true });
+    input.select();
+    // Below the loaded list of arrivals: bring it into view (the picked row stays above it).
+    input.scrollIntoView?.({ block: 'nearest' });
+  }, [proposed]);
   const start = automationStart(picker, support);
   // An automation flow is the person's own workflow: no interface, no
   // prompt; On Flow Start carries what arrives (operator ruling 2026-10-25).
@@ -133,6 +162,7 @@ export function NewFlowDialog({
                       unavailable={support.unavailable}
                       idPrefix="new-flow-trigger"
                     />
+                    {linkLine ? <p className="automation-problem new-flow-link-line">{linkLine}</p> : null}
                     {isAutomation && support.sourcesProblem ? <p className="automation-problem">{support.sourcesProblem}</p> : null}
                   </div>
                   <div className="run-form-field">
@@ -140,6 +170,7 @@ export function NewFlowDialog({
                       Title
                     </label>
                     <input
+                      ref={nameRef}
                       id="new-flow-name"
                       className="run-form-input"
                       type="text"
@@ -199,6 +230,7 @@ export function NewFlowDialog({
                         Title
                       </label>
                       <input
+                        ref={nameRef}
                         id="new-flow-name"
                         className="run-form-input"
                         type="text"

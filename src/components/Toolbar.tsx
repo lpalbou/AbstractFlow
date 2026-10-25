@@ -74,6 +74,7 @@ import {
   parseBundleDeepLink,
   type BundleManifestView,
 } from '../utils/bundleDeepLink';
+import { parseTriggerLink, withoutTriggerParam, type TriggerLink } from '../utils/triggerDeepLink';
 import { useDeepLinkBanner } from '../hooks/deepLinkBanner';
 import { deepLinkLoadingName, isAbortError, useFlowLoading } from '../hooks/flowLoading';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
@@ -463,6 +464,8 @@ export function Toolbar() {
   const [showLifecycleModal, setShowLifecycleModal] = useState(false);
   const [showModelResidency, setShowModelResidency] = useState(false);
   const [showNewFlowModal, setShowNewFlowModal] = useState(false);
+  // A `?trigger=` link (utils/triggerDeepLink.ts): New flow opens on that trigger.
+  const [newFlowTrigger, setNewFlowTrigger] = useState<TriggerLink | null>(null);
   // The Automation dialog for the OPEN flow (header badge; a new automation flow).
   const [showOpenFlowAutomation, setShowOpenFlowAutomation] = useState(false);
   const [confirmPrompt, setConfirmPrompt] = useState<ConfirmPrompt | null>(null);
@@ -896,6 +899,26 @@ export function Toolbar() {
       }
     })();
   }, [adoptLoadedDocument, beginFlowLoading, finishFlowLoading, gatewayCapabilitiesQuery.isLoading, gatewayContracts, loadFlow, resetLoadedDocument, setFlowId, showDeepLinkBanner]);
+
+  // `?trigger=<connection id>` / `?trigger=mail:<mailbox id>` (the console's
+  // Triggers page, utils/triggerDeepLink.ts): once per page load, after the
+  // gateway answered its capability probe (the editor mounts only once
+  // connected). The parameter leaves the address at once, so a reload does not
+  // reopen the dialog; New flow opens with What starts it? on that trigger.
+  const triggerLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (triggerLinkHandledRef.current || gatewayCapabilitiesQuery.isLoading || typeof window === 'undefined') return;
+    triggerLinkHandledRef.current = true;
+    const link = parseTriggerLink(window.location.search);
+    if (!link) return;
+    window.history.replaceState(window.history.state, '', withoutTriggerParam(window.location.href));
+    if ('error' in link) {
+      toast.error(link.error, { duration: 10000 });
+      return;
+    }
+    setNewFlowTrigger(link);
+    setShowNewFlowModal(true);
+  }, [gatewayCapabilitiesQuery.isLoading]);
 
   // Handle loading a flow
   const handleLoadFlow = useCallback(
@@ -1924,6 +1947,7 @@ export function Toolbar() {
   const createNewFlow = useCallback(
     (values: NewFlowValues) => {
       setShowNewFlowModal(false);
+      setNewFlowTrigger(null);
       clearRunState();
       resetLoadedDocument();
       // Name, description, interfaces and the nodes those interfaces need.
@@ -1941,13 +1965,14 @@ export function Toolbar() {
   // New flow: always the dialog (title, description, interfaces); it warns when
   // the open flow has unsaved changes.
   const handleNew = useCallback(() => {
+    setNewFlowTrigger(null);
     setShowNewFlowModal(true);
   }, []);
 
   // The canvas start screen's Create Flow / Open Flow (utils/flowStart.ts):
   // the same dialogs, under the same rule, as the toolbar's own buttons.
   useEffect(() => {
-    const openNew = () => setShowNewFlowModal(true);
+    const openNew = () => handleNew();
     const openLibrary = () => {
       if (visualflowCrudUnavailable) toast.error(saveUnavailableReason);
       else setShowFlowLibrary(true);
@@ -1958,7 +1983,7 @@ export function Toolbar() {
       window.removeEventListener(NEW_FLOW_EVENT, openNew);
       window.removeEventListener(OPEN_FLOW_EVENT, openLibrary);
     };
-  }, [saveUnavailableReason, visualflowCrudUnavailable]);
+  }, [handleNew, saveUnavailableReason, visualflowCrudUnavailable]);
 
   // Duplicate the current flow in-place (keeps current editor state as the source).
   const handleDuplicateCurrent = useCallback(() => {
@@ -2324,8 +2349,12 @@ export function Toolbar() {
           <NewFlowDialog
             gatewayContracts={gatewayContracts}
             unsavedChanges={hasUnsavedChanges}
+            trigger={newFlowTrigger}
             onCreate={createNewFlow}
-            onCancel={() => setShowNewFlowModal(false)}
+            onCancel={() => {
+              setShowNewFlowModal(false);
+              setNewFlowTrigger(null);
+            }}
           />
         ) : null}
         {showOpenFlowAutomation ? (

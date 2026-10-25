@@ -58,6 +58,17 @@ While the flow loads (from a link or from **Open**), a loading screen covers the
 
 If the workflow cannot be opened, Flow says why: "This workflow isn't on this gateway any more." when the Gateway no longer has it, the Gateway's own reason when it refuses (for example a workflow an admin made unavailable to users), and "Sign in to the gateway to open …" when the session is missing. The link is read once per page load; reloading the page opens the workflow again.
 
+## Open Flow From A Trigger
+
+The Gateway console's **Triggers** page can open a new flow already set up for one of your trigger connections. The link is the editor's address (standalone, e.g. `http://127.0.0.1:3005/`, or through the Gateway, `/apps/flow/`) with one parameter:
+
+```text
+/apps/flow/?trigger=<connection_id>        a feed or webhook connection
+/apps/flow/?trigger=mail:<mailbox_id>      a mailbox (the account id from GET /api/gateway/me/email)
+```
+
+Once signed in, Flow removes the parameter from the address (a reload does not reopen it) and opens **New flow** with **What starts it?** on *When something arrives* and that trigger picked from your connections, and the title field focused with a proposed name you can change: "<connection name> digest" for a feed or webhook, "<mailbox address> handling" for a mailbox. If the trigger is not one of your connections, the dialog opens on *When something arrives* with nothing picked and says "The trigger <id> is not among your connections." A link with an empty `trigger` says what it needs.
+
 ## About
 
 The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About card: the AbstractFlow version, the AbstractFramework and AbstractGateway versions, links to the website, source, docs, issues, feedback and contact, and one author/licence line. When the card opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`); it shows only the framework and gateway versions, never a package list. If that request fails, the AbstractGateway line reads `unavailable (...)` with the HTTP status or error.

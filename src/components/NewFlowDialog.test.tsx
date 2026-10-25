@@ -45,7 +45,7 @@ describe('New flow dialog', () => {
 
   it('New Flow always opens the dialog, and Create sets the title, description and interfaces', () => {
     const toolbar = readFileSync(new URL('./Toolbar.tsx', import.meta.url), 'utf8');
-    expect(toolbar).toMatch(/const handleNew = useCallback\(\(\) => \{\s*setShowNewFlowModal\(true\);\s*\}, \[\]\);/);
+    expect(toolbar).toMatch(/const handleNew = useCallback\(\(\) => \{\s*setNewFlowTrigger\(null\);\s*setShowNewFlowModal\(true\);\s*\}, \[\]\);/);
     expect(toolbar).toContain('useFlowStore.getState().createFlow(values);');
   });
 });
