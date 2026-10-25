@@ -102,8 +102,9 @@ already in place. The **Automation** dialog (the header badge, or Flow Library
 > **Automation…**) sets what starts it, the context (independent runs, or a
 growing conversation that remembers up to the gateway's default token budget)
 and the inputs, as a form built from `On Flow Start`; **Turn it on** makes the flow
-available and creates the automation. A new automation flow already has an
-Agent wired between start and end. See
+available and creates the automation. A triggered flow is your own workflow:
+it opens with only `On Flow Start` (what arrives: `messages`, `items`,
+`calls`, … typed) and `On Flow End` (`response`, `notify`, `success`). See
 [Web editor > Automations](docs/web-editor.md#automations) and
 [The Trigger Event](docs/web-editor.md#the-trigger-event).
 

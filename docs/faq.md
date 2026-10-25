@@ -55,14 +55,13 @@ wait inside a run that has already started and do not start runs. See
 
 ## How Does A Workflow Read The Event That Started It?
 
-A workflow created with a trigger (**New Flow** > *What starts it?*), or saved
-with one in the Automation dialog, already reads it. Otherwise select the
-workflow's **On Flow Start** and press **Add trigger event**. The
-node gets an `event` output, and a **Trigger event** node wired to it exposes
-`type`, `subject`, `time`, `data`, `count`, `events` and `series`. A feed or a
-webhook delivers a batch: loop over `events`, or add a path such as
-`data.events.0.data.title`. When you run the workflow by hand, `event` is
-empty. See [Web editor > The Trigger Event](web-editor.md#the-trigger-event).
+From `On Flow Start`: a workflow created with a trigger (or saved with one in
+the Automation dialog) has typed outputs for what arrived: `messages` and
+`mailbox` for mail, `items` and `feed` for a feed, `calls` for a webhook,
+`scheduled_at` and `occurrence` for a schedule, plus `event` (the whole raw
+event). Put what the person should see on `On Flow End`'s `response`, and
+`notify` for an alert. See [Web editor > What arrives, what the person
+sees](web-editor.md#what-arrives-what-the-person-sees).
 
 ## Where Do I Create A Feed Or Webhook Connection?
 

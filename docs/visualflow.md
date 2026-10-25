@@ -76,6 +76,8 @@ A runnable workflow can carry the defaults of the automations created from it in
 
 ### The trigger event
 
+A triggered run also fills named `On Flow Start` outputs from `input_data` (declared by the editor when a trigger is chosen; the runtime's contract: [AbstractRuntime > Occurrence inputs and outputs](https://github.com/lpalbou/abstractruntime/blob/main/docs/automations.md#occurrence-inputs-and-outputs-the-flow-contract)): mail `messages` (`[{id, from, to, subject, date, body_text, attachments}]`) and `mailbox`; feed `items` (`[{id, title, link, published, summary, author}]`) and `feed` (`{title, url}`); webhook `calls` (`[{id, received_at, headers, body}]`); schedule `scheduled_at` and `occurrence`. `On Flow End` gives back `response` (the run's result), `notify` (`{title, body}`: an attention alert) and `success`.
+
 A run started by a trigger (an automation occurrence) receives the event as `input_data.event`, a CloudEvents 1.0 envelope: `id`, `type`, `source`, `subject`, `time`, `datacontenttype`, `data`, plus `bindingid`, `connectionid`, `correlationid`, `dedupekey`, `sequence` and `abstracttrust`; schedules add `data.series` (`rule`, `occurrence`, `scheduled_at`, `next_at`, `coalesced`). A workflow is **triggerable** when its `On Flow Start` declares the `event` output (type `object`):
 
 ```json
