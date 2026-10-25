@@ -9313,3 +9313,35 @@ button.flow-nature-badge:hover:not(:disabled),
 .automation-zone {
   max-width: 240px;
 }
+
+/* Run as if triggered (the Run dialog of a flow with an automation trigger). */
+.run-triggered-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.run-triggered-using {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.run-triggered-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.run-triggered-advanced {
+  margin-top: 10px;
+}
+.run-triggered-advanced > summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+/* The triggered-run panel leads the run form, before Your inputs. */
+.run-form-fields > .run-form-section.run-triggered {
+  order: -2;
+  border-color: color-mix(in srgb, var(--flow-hue-yellow) 55%, transparent);
+}

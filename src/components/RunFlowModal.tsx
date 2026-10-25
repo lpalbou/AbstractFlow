@@ -12,6 +12,10 @@ import { randomId } from '@abstractframework/ui-kit';
 import { copyWithFeedback } from '../lib/copy_feedback';
 import { MEDIA_NEEDS_HTTPS, mediaAvailable } from '../lib/secure-context';
 import { useFlowStore } from '../hooks/useFlow';
+import { TriggeredRunPanel } from './automation/TriggeredRunPanel';
+import { useTriggerWords } from './automation/FlowNatureBadge';
+import { TRIGGER_FILLED_PIN_IDS } from '../utils/triggerPins';
+import { DEFAULT_SAMPLE_COUNT, fetchTriggerSample, runAsIfTriggered } from '../utils/triggerSample';
 import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
@@ -2340,6 +2344,23 @@ export function RunFlowModal({
     () => formInputPins.filter((pin) => pin.id !== 'thinking' || thinkingSupported),
     [formInputPins, thinkingSupported]
   );
+  // A flow with an automation trigger runs "as if triggered" (operator ruling
+  // 2026-10-25): what the trigger fills is sampled by the gateway and those
+  // inputs sit under "Advanced: edit the inputs"; the person's own stay above.
+  const automationTrigger = useFlowStore((st) => st.flowAutomationDefaults?.trigger) || null;
+  const triggerWords = useTriggerWords(automationTrigger);
+  const triggerFilledPins = useMemo(
+    () => (automationTrigger ? visibleFormInputPins.filter((pin) => TRIGGER_FILLED_PIN_IDS.has(pin.id)) : []),
+    [automationTrigger, visibleFormInputPins]
+  );
+  const shownFormPins = useMemo(
+    () => (automationTrigger ? visibleFormInputPins.filter((pin) => !TRIGGER_FILLED_PIN_IDS.has(pin.id)) : visibleFormInputPins),
+    [automationTrigger, visibleFormInputPins]
+  );
+  const [sampleCount, setSampleCount] = useState(DEFAULT_SAMPLE_COUNT);
+  const [sampleBusy, setSampleBusy] = useState(false);
+  const [sampleError, setSampleError] = useState('');
+  const [triggerInputsEdited, setTriggerInputsEdited] = useState(false);
   const generatedMusicContract =
     gatewayContracts?.flow_editor?.media?.generated_music || gatewayContracts?.assistant?.media?.generated_music;
   const visionProviderModelsEndpoint = discovery.vision_provider_models || '';
@@ -2804,7 +2825,7 @@ export function RunFlowModal({
   );
 
   // Submit the form
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback((overrides?: Record<string, unknown>) => {
     // Build input data from form values
     const inputData: Record<string, unknown> = {};
 
@@ -2906,6 +2927,8 @@ export function RunFlowModal({
       inputData.context = existingContext;
     }
 
+    // "Run as if triggered": the sampled trigger inputs win over the form's.
+    if (overrides) Object.assign(inputData, overrides);
     // The run's workspaces ride the start body (absent = Use my default); never input_data.
     onRun(inputData, runWorkspace ? { workspace: runWorkspace } : {});
     if (followUpContext) setFollowUpContext(null);
@@ -2926,6 +2949,31 @@ export function RunFlowModal({
     durablePromptCacheBindingInput,
     durablePromptCacheBindingParsed,
   ]);
+
+  // Run as if triggered: sample what the trigger would deliver, prefill the
+  // advanced inputs with it, then start the normal run with those inputs.
+  // Inputs the person edited under Advanced are used as they are.
+  const handleTriggeredRun = useCallback(async () => {
+    if (!automationTrigger) return handleSubmit();
+    setSampleError('');
+    setSampleBusy(true);
+    try {
+      const out = await runAsIfTriggered({
+        trigger: automationTrigger,
+        count: sampleCount,
+        edited: triggerInputsEdited,
+        filledPinIds: triggerFilledPins.map((pin) => pin.id),
+        words: triggerWords,
+        sample: (body) => fetchTriggerSample(body),
+        prefill: (values) => setFormValues((prev) => ({ ...prev, ...values })),
+        start: (overrides) => handleSubmit(overrides),
+      });
+      if (out.started) toast(out.sentence);
+      else setSampleError(out.problem);
+    } finally {
+      setSampleBusy(false);
+    }
+  }, [automationTrigger, handleSubmit, sampleCount, triggerFilledPins, triggerInputsEdited, triggerWords]);
 
   type StepStatus = 'running' | 'completed' | 'waiting' | 'failed';
   type Step = {
@@ -7936,30 +7984,50 @@ export function RunFlowModal({
                       </div>
                     </details>
 
+                    {automationTrigger ? (
+                      <TriggeredRunPanel
+                        trigger={automationTrigger}
+                        words={triggerWords}
+                        count={sampleCount}
+                        onCount={setSampleCount}
+                        busy={sampleBusy}
+                        error={sampleError}
+                        disabled={!entryNode || isRunning}
+                        onRun={() => void handleTriggeredRun()}
+                      />
+                    ) : null}
+
                     {/* Workflow Parameters — the primary launch card (leads the
                         view via CSS order; infrastructure cards follow). */}
                     <div className="run-form-section run-form-params">
                       <div className="run-form-section-header">
                         <div className="run-form-section-title">
                           <span className="run-form-section-icon"><SlidersGlyph /></span>
-                          Workflow Parameters
+                          {automationTrigger ? 'Your inputs' : 'Workflow Parameters'}
                         </div>
                         <span className="run-form-section-actions run-form-section-meta">
-                          {visibleFormInputPins.length > 0
-                            ? `${visibleFormInputPins.length} input${visibleFormInputPins.length === 1 ? '' : 's'}`
+                          {shownFormPins.length > 0
+                            ? `${shownFormPins.length} input${shownFormPins.length === 1 ? '' : 's'}`
                             : 'no inputs'}
                         </span>
                       </div>
                       <div className="run-form-section-body">
-                        {visibleFormInputPins.length === 0 ? (
-                          <div className="run-form-empty">
-                            <span className="run-form-empty-icon"><PlaySolidGlyph /></span>
-                            <span className="run-form-empty-title">This flow has no input parameters</span>
-                            <span className="run-form-empty-sub">Press Run to execute it as-is.</span>
-                          </div>
+                        {shownFormPins.length === 0 ? (
+                          automationTrigger ? (
+                            <div className="run-form-empty">
+                              <span className="run-form-empty-title">This flow takes no inputs besides what arrives.</span>
+                            </div>
+                          ) : (
+                            <div className="run-form-empty">
+                              <span className="run-form-empty-icon"><PlaySolidGlyph /></span>
+                              <span className="run-form-empty-title">This flow has no input parameters</span>
+                              <span className="run-form-empty-sub">Press Run to execute it as-is.</span>
+                            </div>
+                          )
                         ) : null}
 
-                        {visibleFormInputPins.map(pin => {
+                        {(() => {
+                          const renderParamPin = (pin: (typeof visibleFormInputPins)[number]) => {
                           const inputType = getInputTypeForPin(pin.type);
                           const value = formValues[pin.id] || '';
 
@@ -8373,7 +8441,25 @@ export function RunFlowModal({
                               )}
                             </div>
                           );
-                        })}
+                        };
+                          return (
+                            <>
+                              {shownFormPins.map(renderParamPin)}
+                              {automationTrigger && triggerFilledPins.length ? (
+                                <details
+                                  className="run-triggered-advanced"
+                                  onInput={() => setTriggerInputsEdited(true)}
+                                >
+                                  <summary>Advanced: edit the inputs</summary>
+                                  <p className="run-form-note">
+                                    What the trigger fills. Run reads a fresh sample into these fields; once you edit them, Run uses your values.
+                                  </p>
+                                  {triggerFilledPins.map(renderParamPin)}
+                                </details>
+                              ) : null}
+                            </>
+                          );
+                        })()}
 
                         {/* Compact session control (user report): the session id
                             is plumbing, not a parameter — show a copy chip, hide
@@ -8806,7 +8892,7 @@ export function RunFlowModal({
                       <button
                         type="button"
                         className="modal-button primary run-cta"
-                        onClick={handleSubmit}
+                        onClick={() => void (automationTrigger ? handleTriggeredRun() : handleSubmit())}
                         disabled={
                           !entryNode ||
                           (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
