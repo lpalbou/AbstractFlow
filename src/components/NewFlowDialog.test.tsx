@@ -33,6 +33,16 @@ describe('New flow dialog', () => {
     expect(dirty).toContain('creating a new flow discards them');
   });
 
+  // Operator ruling 2026-10-25: a schedule is a property of an automation, set in Observer or the
+  // Assistant, never in Flow. What starts it: a chat, something arriving, or by hand.
+  it('What starts it? offers a chat, something arriving or by hand, never a schedule', () => {
+    const html = renderToStaticMarkup(createElement(NewFlowDialog, { unsavedChanges: false, onCreate: () => {}, onCancel: () => {} }));
+    const choices = Array.from(html.matchAll(/role="radio"[^>]*>[\s\S]*?class="automation-choice-title">([^<]+)</g)).map((m) => m[1]);
+    expect(choices).toEqual(['A person, in a chat', 'When something arrives', 'By hand (Run now only)']);
+    expect(html).toContain('On a schedule? Schedules are set in Observer or the Assistant.');
+    expect(html).not.toMatch(/Every day, every week|Time zone/);
+  });
+
   it('New Flow always opens the dialog, and Create sets the title, description and interfaces', () => {
     const toolbar = readFileSync(new URL('./Toolbar.tsx', import.meta.url), 'utf8');
     expect(toolbar).toMatch(/const handleNew = useCallback\(\(\) => \{\s*setShowNewFlowModal\(true\);\s*\}, \[\]\);/);

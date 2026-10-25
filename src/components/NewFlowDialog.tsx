@@ -127,8 +127,6 @@ export function NewFlowDialog({
                       onChange={choosePicker}
                       data={support.data}
                       includeChat
-                      timeZoneOrigin={facts.timeZone.origin}
-                timeZoneChoices={facts.timeZone.choices}
                       gatewayUrl={facts.gatewayUrl}
                       arrivalsNote={support.arrivalsNote}
                       onRefreshArrivals={facts.reloadArrivals}
@@ -188,8 +186,6 @@ export function NewFlowDialog({
                         onChange={choosePicker}
                         data={support.data}
                         includeChat
-                        timeZoneOrigin={facts.timeZone.origin}
-                timeZoneChoices={facts.timeZone.choices}
                         gatewayUrl={facts.gatewayUrl}
                         arrivalsNote={support.arrivalsNote}
                         onRefreshArrivals={facts.reloadArrivals}

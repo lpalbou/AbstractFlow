@@ -95,8 +95,9 @@ adds its typed pins to `On Flow Start` and `On Flow End`, and Run preflight
 warns about missing, unconnected, or mistyped interface pins. See [VisualFlow JSON > Interfaces](docs/visualflow.md#interfaces).
 
 A workflow can also be an automation. **New Flow** asks *What starts it?*: a
-person in a chat, a schedule (in your time zone), something arriving (one of
-your mailboxes, feeds or webhooks, listed by name) or Run now only; a trigger
+person in a chat, something arriving (one of your mailboxes, feeds or
+webhooks, listed by name) or Run now only (a schedule is set on the automation
+in Observer or the Assistant, never in Flow); a trigger
 choice creates the flow with its trigger and the wired **Trigger event** node
 already in place. The **Automation** dialog (the header badge, or Flow Library
 > **Automation…**) sets what starts it, the context (independent runs, or a

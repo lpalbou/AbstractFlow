@@ -13,8 +13,8 @@ import { FLOW_KINDS, flowKind, flowKindCounts, type FlowKind, type FlowKindCount
  * - BROWSE (empty query): first-level rows, families expandable in place.
  * - LOOKUP (non-empty query): family nesting suspends; matches render flat
  *   with a "used by" context subtitle on helpers.
- * The view is All or one kind (flowKinds.ts: chat / scheduled / triggered /
- * other, by what starts the flow). All groups its rows under one heading row
+ * The view is All or one kind (flowKinds.ts: chat / triggered / other, by
+ * what starts the flow). All groups its rows under one heading row
  * per kind (collapsible); a kind filter is a plain list of EVERY flow of that
  * kind (a subflow of that kind too, with its "in …" context), so the list
  * always shows as many flows as its pill counts.

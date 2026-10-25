@@ -4,8 +4,6 @@
  *
  * - `GET /api/gateway/me/email` -> `accounts`: the person's mailboxes
  *   (`{account_id, primary, address, configured, can_read, enabled}`);
- * - `GET /api/gateway/accounts/me/preferences` -> `time_zone.effective`: the
- *   account's clock (the person's choice, else the gateway host's);
  * - `GET /api/gateway/automations/defaults` -> `growing_max_tokens`: how much
  *   of its earlier runs a growing automation reads, the ONE central default
  *   (abstractruntime `session_history.HISTORY_REPLAY_MAX_TOKENS`). Flow never
@@ -17,7 +15,6 @@ import type { Mailbox } from './automationChoice';
 import { GatewayHttpError, gatewayJson } from './gatewayClient';
 
 export const ME_EMAIL_ENDPOINT = 'api/gateway/me/email';
-export const MY_PREFERENCES_ENDPOINT = 'api/gateway/accounts/me/preferences';
 export const AUTOMATION_DEFAULTS_ENDPOINT = 'api/gateway/automations/defaults';
 
 export type GatewayJsonFetcher = (path: string) => Promise<unknown>;
@@ -62,31 +59,6 @@ export async function fetchMailboxes(
     if (error instanceof GatewayHttpError && error.status === 404) {
       return { status: 'unavailable', reason: 'Mailboxes are not available on this gateway.' };
     }
-    throw error;
-  }
-}
-
-/** The zones the account may pick (`time_zone.choices`, IANA names); [] when the gateway does not say. */
-export async function fetchTimeZoneChoices(fetchJson: GatewayJsonFetcher = defaultFetcher): Promise<string[]> {
-  try {
-    const raw = await fetchJson(MY_PREFERENCES_ENDPOINT);
-    const block = isRecord(raw) ? raw.time_zone : undefined;
-    return isRecord(block) && Array.isArray(block.choices) ? block.choices.filter((z): z is string => typeof z === 'string' && Boolean(z)) : [];
-  } catch (error) {
-    if (error instanceof GatewayHttpError && error.status === 404) return [];
-    throw error;
-  }
-}
-
-/** The account's time zone (`time_zone.effective`), or null when the gateway does not say. */
-export async function fetchAccountTimeZone(fetchJson: GatewayJsonFetcher = defaultFetcher): Promise<string | null> {
-  try {
-    const raw = await fetchJson(MY_PREFERENCES_ENDPOINT);
-    const block = isRecord(raw) ? raw.time_zone : undefined;
-    if (isRecord(block) && typeof block.effective === 'string' && block.effective.trim()) return block.effective.trim();
-    return null;
-  } catch (error) {
-    if (error instanceof GatewayHttpError && error.status === 404) return null;
     throw error;
   }
 }

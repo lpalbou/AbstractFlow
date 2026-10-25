@@ -2704,15 +2704,13 @@ button.primary:hover:not(:disabled) {
   font-size: var(--font-size-xs);
 }
 
-/* Flow kinds (2026-10-25): chat / scheduled / triggered / other, by what
-   starts a flow (utils/flowKinds.ts). One hue per kind from categories.css
+/* Flow kinds (2026-10-25): chat / triggered / other, by what starts a flow
+   (utils/flowKinds.ts; no scheduled kind: schedules are set in Observer or
+   the Assistant, an older save's schedule is triggered). One hue per kind from categories.css
    (its light and dark steps); words never take the raw hue (amber on a light
    surface fails contrast): --kind-ink is the hue mixed toward the text. */
 .flow-kind--chat {
   --kind-hue: var(--flow-hue-blue);
-}
-.flow-kind--scheduled {
-  --kind-hue: var(--flow-hue-violet);
 }
 .flow-kind--triggered {
   --kind-hue: var(--flow-hue-yellow);
@@ -2721,7 +2719,6 @@ button.primary:hover:not(:disabled) {
   --kind-hue: color-mix(in srgb, var(--text-muted) 85%, transparent);
 }
 .flow-kind--chat,
-.flow-kind--scheduled,
 .flow-kind--triggered,
 .flow-kind--other {
   --kind-ink: color-mix(in srgb, var(--kind-hue) 62%, var(--text-primary));
@@ -9111,21 +9108,6 @@ body.af-schema-editor-open .af-tooltip-bubble {
   border-radius: 10px;
   background: var(--ui-surface-2);
 }
-.automation-schedule {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.automation-schedule-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.automation-schedule-row .run-form-select,
-.automation-schedule-row .run-form-input {
-  width: auto;
-}
 .automation-inline-field {
   display: inline-flex;
   align-items: center;
@@ -9135,28 +9117,6 @@ body.af-schema-editor-open .af-tooltip-bubble {
 }
 .automation-amount {
   width: 5.5em !important;
-}
-.automation-days {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.automation-day {
-  min-width: 44px;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border-1);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-.automation-day.is-on {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--text-primary);
 }
 .automation-arrivals {
   display: flex;
@@ -9384,12 +9344,6 @@ button.flow-nature-badge:hover {
 .automation-choice.is-selected:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent) 14%, var(--ui-surface-1));
 }
-.automation-day:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
-}
-.automation-day.is-on:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-}
 button.flow-nature-badge:hover:not(:disabled),
 .automation-link-button:hover:not(:disabled) {
   background: transparent;
@@ -9549,14 +9503,6 @@ button.flow-nature-badge:hover:not(:disabled),
 .automation-link-button,
 .canvas-note-action {
   color: var(--info);
-}
-.automation-time {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.automation-zone {
-  max-width: 240px;
 }
 
 /* Run as if triggered (the Run dialog of a flow with an automation trigger). */

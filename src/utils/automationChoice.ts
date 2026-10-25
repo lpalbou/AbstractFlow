@@ -2,19 +2,22 @@
  * What starts a flow, in human words (operator 2026-10-25: "the list of
  * triggers is absolutely not actionable by a human").
  *
- * The person picks a CHOICE ("On a schedule: every day at 08:00", "When mail
- * arrives in me@example.org", "When Release notes has a new item", "By hand");
- * this module maps it to and from `automation_defaults.trigger`:
+ * The person picks a CHOICE ("When mail arrives in me@example.org", "When
+ * Release notes has a new item", "By hand"); this module maps it to and from
+ * `automation_defaults.trigger`:
  *
- *   schedule  -> schedule@2 {kind: daily|weekly|monthly|every|once, at, days,
- *                day, every, time_zone}; schedule@1 is never written for a new
- *                automation, but an old flow's schedule@1 is read and shown;
  *   mail      -> the source whose descriptor says `connection_provider:
  *                email_accounts` (email.received), `config.account` = the
  *                mailbox id (`GET /api/gateway/me/email` -> accounts);
  *   connection-> a feed / webhook source (`uses_trigger_connection`), the
  *                connection saved as `trigger.connection_id`;
  *   manual    -> the source whose capability kind is `manual`.
+ *
+ * Flow never sets a schedule (operator ruling 2026-10-25: a schedule is a
+ * property of an automation, set in Observer or the Assistant; Flow designs
+ * and tests workflows). A flow saved earlier with a schedule trigger
+ * (schedule@1 or @2) still loads: it is described in words
+ * (triggerSentence) and kept until the person picks another start.
  *
  * Source ids and versions never reach the main text of the UI; the copy
  * here is what the person reads.
@@ -43,17 +46,22 @@ export type ScheduleRule =
   | { repeat: 'every'; amount: number; unit: 'm' | 'h' }
   | { repeat: 'once'; date: string; at: string };
 
-export type ScheduleRepeat = ScheduleRule['repeat'];
-
 export type TriggerChoice =
-  | { kind: 'schedule'; rule: ScheduleRule; timeZone: string }
   | { kind: 'mail'; account: string }
   | { kind: 'connection'; connectionId: string; sourceId: string; sourceVersion: number }
   | { kind: 'manual' };
 
 /** The New flow question adds "A person, in a chat" (no automation). */
 export type StartChoice = { kind: 'chat' } | TriggerChoice;
-export type StartKind = 'chat' | 'schedule' | 'arrives' | 'manual';
+export type StartKind = 'chat' | 'arrives' | 'manual';
+
+/** Where a schedule is set (never in Flow), said wherever a schedule shows. */
+export const SCHEDULE_ELSEWHERE = 'Schedules are set in Observer or the Assistant.';
+
+/** Is this saved trigger a schedule (an older save: Flow no longer offers one)? */
+export function isScheduleTrigger(trigger: Pick<AutomationTriggerDefaults, 'source_id'> | null | undefined): boolean {
+  return Boolean(trigger && trigger.source_id === 'schedule');
+}
 
 /** One of the person's mailboxes (`GET /api/gateway/me/email` -> `accounts`). */
 export interface Mailbox {
@@ -74,20 +82,12 @@ export class AutomationChoiceError extends Error {
   }
 }
 
-const HHMM_RE = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 function available(sources: readonly TriggerSourceItem[]): AvailableTriggerSource[] {
   return sources.filter((s): s is AvailableTriggerSource => s.available);
 }
 
 function latest(list: AvailableTriggerSource[]): AvailableTriggerSource | null {
   return list.reduce<AvailableTriggerSource | null>((best, s) => (!best || s.version > best.version ? s : best), null);
-}
-
-/** schedule@2: the calendar schedule (time zone aware). Null when the gateway does not serve it. */
-export function scheduleSource(sources: readonly TriggerSourceItem[]): AvailableTriggerSource | null {
-  return available(sources).find((s) => s.capabilities.kind === 'time' && s.version === 2 && s.id === 'schedule') || null;
 }
 
 /** The mailbox-backed source (email.received). */
@@ -106,43 +106,8 @@ export function connectionSources(sources: readonly TriggerSourceItem[]): Availa
 }
 
 // ---------------------------------------------------------------------------
-// Schedule rule <-> schedule@2 config
+// A saved schedule (an older save) in words
 // ---------------------------------------------------------------------------
-
-/** Plain-words problems with a rule (empty = valid). */
-export function scheduleRuleProblems(rule: ScheduleRule, timeZone: string): string[] {
-  const out: string[] = [];
-  if (rule.repeat !== 'every') {
-    if (!HHMM_RE.test(rule.at)) out.push('Choose a time of day.');
-    if (!timeZone.trim()) out.push('The time zone is missing.');
-  }
-  if (rule.repeat === 'weekly' && !rule.days.length) out.push('Choose at least one day of the week.');
-  if (rule.repeat === 'monthly' && rule.day !== 'last' && !(Number.isInteger(rule.day) && rule.day >= 1 && rule.day <= 31)) {
-    out.push('Choose a day of the month between 1 and 31, or the last day.');
-  }
-  if (rule.repeat === 'every' && !(Number.isInteger(rule.amount) && rule.amount >= 1)) out.push('Enter how often, as a whole number of at least 1.');
-  if (rule.repeat === 'once' && !DATE_RE.test(rule.date)) out.push('Choose the date.');
-  return out;
-}
-
-/** The schedule@2 config of a rule. Throws on an invalid rule. */
-export function scheduleConfig(rule: ScheduleRule, timeZone: string): Record<string, JsonValue> {
-  const problems = scheduleRuleProblems(rule, timeZone);
-  if (problems.length) throw new AutomationChoiceError(problems.join(' '));
-  const zone = timeZone.trim();
-  switch (rule.repeat) {
-    case 'daily':
-      return { kind: 'daily', at: rule.at, time_zone: zone };
-    case 'weekly':
-      return { kind: 'weekly', days: WEEKDAYS.filter((d) => rule.days.includes(d)), at: rule.at, time_zone: zone };
-    case 'monthly':
-      return { kind: 'monthly', day: rule.day, at: rule.at, time_zone: zone };
-    case 'every':
-      return { kind: 'every', every: `${rule.amount}${rule.unit}` };
-    case 'once':
-      return { kind: 'once', at: `${rule.date}T${rule.at}`, time_zone: zone };
-  }
-}
 
 const EVERY_RE = /^([1-9][0-9]*)([smhd])$/;
 
@@ -163,7 +128,7 @@ function everyRule(every: string): ScheduleRule | null {
   return null;
 }
 
-/** A schedule@2 config back to a rule (null when the editor cannot show it). */
+/** A schedule@2 config back to a rule, for its sentence (null when it cannot be said). */
 export function ruleFromScheduleConfig(config: Record<string, JsonValue>): { rule: ScheduleRule; timeZone: string | null } | null {
   const zone = typeof config.time_zone === 'string' ? config.time_zone : null;
   const at = typeof config.at === 'string' ? config.at : '';
@@ -188,25 +153,6 @@ export function ruleFromScheduleConfig(config: Record<string, JsonValue>): { rul
       return null;
   }
   return null;
-}
-
-/** A fresh rule of each kind, for the editor's repeat selector. */
-export function defaultRule(repeat: ScheduleRepeat, today: Date = new Date()): ScheduleRule {
-  switch (repeat) {
-    case 'daily':
-      return { repeat: 'daily', at: '08:00' };
-    case 'weekly':
-      return { repeat: 'weekly', days: ['mon'], at: '08:00' };
-    case 'monthly':
-      return { repeat: 'monthly', day: 1, at: '08:00' };
-    case 'every':
-      return { repeat: 'every', amount: 1, unit: 'h' };
-    case 'once': {
-      const d = new Date(today.getTime() + 24 * 3600 * 1000);
-      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      return { repeat: 'once', date: iso, at: '09:00' };
-    }
-  }
 }
 
 function joinWords(words: string[]): string {
@@ -269,11 +215,6 @@ export function legacyScheduleSentence(config: Record<string, JsonValue>): strin
  */
 export function triggerFromChoice(choice: TriggerChoice, sources: readonly TriggerSourceItem[]): AutomationTriggerDefaults {
   switch (choice.kind) {
-    case 'schedule': {
-      const source = scheduleSource(sources);
-      if (!source) throw new AutomationChoiceError('This gateway cannot run calendar schedules yet: update the gateway.');
-      return { source_id: source.id, source_version: source.version, config: scheduleConfig(choice.rule, choice.timeZone) };
-    }
     case 'mail': {
       const source = mailSource(sources);
       if (!source) throw new AutomationChoiceError('This gateway cannot watch mailboxes.');
@@ -294,21 +235,14 @@ export function triggerFromChoice(choice: TriggerChoice, sources: readonly Trigg
   }
 }
 
-/** What a saved trigger is, as a choice (null: a source the picker does not know). */
-export function choiceFromTrigger(
-  trigger: AutomationTriggerDefaults,
-  sources: readonly TriggerSourceItem[],
-  fallbackTimeZone: string
-): TriggerChoice | { kind: 'legacy-schedule'; sentence: string; seed: ScheduleRule | null } | null {
+/**
+ * What a saved trigger is, as a choice. Null: one the picker does not offer
+ * (a schedule from an older save, an unknown source): the dialog keeps it
+ * and says it in words until the person picks another start.
+ */
+export function choiceFromTrigger(trigger: AutomationTriggerDefaults, sources: readonly TriggerSourceItem[]): TriggerChoice | null {
+  if (isScheduleTrigger(trigger)) return null;
   const source = available(sources).find((s) => s.id === trigger.source_id && s.version === trigger.source_version);
-  if (trigger.source_id === 'schedule' && trigger.source_version === 1) {
-    const seed = typeof trigger.config.every === 'string' ? everyRule(trigger.config.every) : null;
-    return { kind: 'legacy-schedule', sentence: legacyScheduleSentence(trigger.config), seed };
-  }
-  if (trigger.source_id === 'schedule' && trigger.source_version === 2) {
-    const parsed = ruleFromScheduleConfig(trigger.config);
-    return parsed ? { kind: 'schedule', rule: parsed.rule, timeZone: parsed.timeZone || fallbackTimeZone } : null;
-  }
   if (!source) return null;
   if (source.capabilities.kind === 'manual') return { kind: 'manual' };
   if (source.connection_provider === 'email_accounts' && source.needs_connection) {
@@ -359,13 +293,10 @@ export function connectionSentence(label: string, sourceId: string): string {
 }
 
 /** One line of plain help under the chosen trigger. */
-export function choiceHelp(choice: { kind: StartChoice['kind'] | 'legacy-schedule'; sourceId?: string }): string {
+export function choiceHelp(choice: { kind: StartChoice['kind']; sourceId?: string }): string {
   switch (choice.kind) {
     case 'chat':
       return 'Someone writes to it in the Assistant or Code, and each message runs the flow.';
-    case 'schedule':
-    case 'legacy-schedule':
-      return 'Runs on this clock, even when nobody is around.';
     case 'mail':
       return 'Runs every time a new message lands in that mailbox; the flow receives the messages.';
     case 'connection':
@@ -384,7 +315,7 @@ export interface AutomationWords {
   connections?: readonly TriggerConnection[] | null;
 }
 
-/** The trigger of saved defaults in words ("Every day at 08:00 (Europe/Paris)", "When mail arrives in me@x"). */
+/** The trigger of saved defaults in words ("When mail arrives in me@x"; an older save's "Every day at 08:00 (Paris)"). */
 export function triggerSentence(trigger: AutomationTriggerDefaults, words: AutomationWords = {}): string {
   const { source_id, source_version, config } = trigger;
   if (source_id === 'schedule' && source_version === 1) return legacyScheduleSentence(config);
@@ -419,15 +350,6 @@ export function flowNature(
 /** Does this choice deliver content as the run's event (the flow needs the Trigger event node)? */
 export function choiceDeliversEvent(choice: StartChoice): boolean {
   return choice.kind === 'mail' || choice.kind === 'connection';
-}
-
-/** The person's time zone: the account's (from the gateway) else this browser's. */
-export function browserTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
 }
 
 /** Fresh automation defaults for a choice (independent runs, no inputs yet). */

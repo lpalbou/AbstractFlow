@@ -1,6 +1,9 @@
 // The Flow Library's kinds (operator 2026-10-25: "a person sees at a glance
-// which flows are which"): Chat / Scheduled / Triggered / Other, by what
-// starts a flow, the filter counts, and the All view's kind headings.
+// which flows are which"): Chat / Triggered / Other, by what starts a flow,
+// the filter counts, and the All view's kind headings. No Scheduled kind
+// (operator ruling 2026-10-25: a schedule is set in Observer or the
+// Assistant, never in Flow): a schedule from an earlier save is Triggered,
+// said in words.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -53,7 +56,7 @@ function flow(
 const AGENT = 'abstractcode.agent.v1';
 const daily = automation('schedule', 2, { kind: 'daily', at: '08:00', time_zone: 'Europe/Paris' });
 
-// Every kind, a legacy schedule, each trigger, a subflow and a draft.
+// Every kind, schedules from earlier saves (@2 and @1), each trigger, a subflow and a draft.
 const catalog: VisualFlow[] = [
   flow('assistant', { interfaces: [AGENT], refs: ['helper'], updated: '2026-10-20T10:00:00Z' }),
   flow('morning-brief', { automation: daily, updated: '2026-10-25T07:00:00Z' }),
@@ -81,12 +84,12 @@ describe('flow kinds', () => {
     const kinds = Object.fromEntries(catalog.map((f) => [f.id, flowKind(f)]));
     expect(kinds).toEqual({
       assistant: 'chat',
-      'morning-brief': 'scheduled',
-      'old-hourly': 'scheduled',
+      'morning-brief': 'triggered',
+      'old-hourly': 'triggered',
       'mail-triage': 'triggered',
       'release-notes': 'triggered',
       cleanup: 'triggered',
-      'chat-turned-automation': 'scheduled',
+      'chat-turned-automation': 'triggered',
       helper: 'other',
       draft: 'other',
     });
@@ -94,11 +97,12 @@ describe('flow kinds', () => {
 
   it('counts every flow once, subflows included, and says the counts in words', () => {
     const counts = flowKindCounts(catalog);
-    expect(counts).toEqual({ chat: 1, scheduled: 3, triggered: 3, other: 2 });
+    expect(counts).toEqual({ chat: 1, triggered: 6, other: 2 });
+    expect(FLOW_KINDS).toEqual(['chat', 'triggered', 'other']);
     expect(FLOW_KINDS.reduce((sum, kind) => sum + counts[kind], 0)).toBe(catalog.length);
-    expect(libraryCountsSentence(catalog.length, counts)).toBe('9 flows: 1 chat, 3 scheduled, 3 triggered and 2 other');
-    expect(libraryCountsSentence(2, { chat: 2, scheduled: 0, triggered: 0, other: 0 })).toBe('2 flows: 2 chat');
-    expect(libraryCountsSentence(0, { chat: 0, scheduled: 0, triggered: 0, other: 0 })).toBe('0 flows');
+    expect(libraryCountsSentence(catalog.length, counts)).toBe('9 flows: 1 chat, 6 triggered and 2 other');
+    expect(libraryCountsSentence(2, { chat: 2, triggered: 0, other: 0 })).toBe('2 flows: 2 chat');
+    expect(libraryCountsSentence(0, { chat: 0, triggered: 0, other: 0 })).toBe('0 flows');
   });
 
   it('says what starts each flow in words', () => {
@@ -117,6 +121,7 @@ describe('flow kinds', () => {
     expect(flowStartHelp(byId.get('cleanup')!)).toBe('Runs only when someone presses Run now in Observer or the Assistant.');
     expect(flowStartHelp(byId.get('mail-triage')!)).toMatch(/new message lands in that mailbox/);
     expect(flowStartHelp(byId.get('helper')!, ['assistant'])).toMatch(/step of the flows that use it/);
+    expect(flowStartHelp(byId.get('morning-brief')!)).toBe('Runs on this clock, saved with an earlier version of the flow. Schedules are set in Observer or the Assistant.');
   });
 
   it('All: one heading per kind in order, first-level rows below, subflows counted as nested', () => {
@@ -125,13 +130,12 @@ describe('flow kinds', () => {
     expect(outline).toEqual([
       '#chat:1',
       'assistant',
-      '#scheduled:3',
+      '#triggered:6',
       'chat-turned-automation',
-      'morning-brief',
-      'old-hourly',
-      '#triggered:3',
       'cleanup',
       'mail-triage',
+      'morning-brief',
+      'old-hourly',
       'release-notes',
       '#other:1',
       'draft',
@@ -142,11 +146,10 @@ describe('flow kinds', () => {
   });
 
   it('All: a folded heading hides its rows and keeps the others', () => {
-    const result = rowsFor('all', { collapsed: ['scheduled', 'triggered'] });
+    const result = rowsFor('all', { collapsed: ['triggered'] });
     expect(result.rows.map((row) => (row.kind === 'group' ? `#${row.group}${row.groupCollapsed ? '-' : '+'}` : row.flow?.id))).toEqual([
       '#chat+',
       'assistant',
-      '#scheduled-',
       '#triggered-',
       '#other+',
       'draft',
@@ -172,7 +175,7 @@ describe('flow kinds', () => {
   it('search: grouped by kind in All, flat in a kind filter', () => {
     const all = rowsFor('all', { query: 'mail' });
     expect(all.rows.map((row) => (row.kind === 'group' ? `#${row.group}` : row.flow?.id))).toEqual(['#triggered', 'mail-triage']);
-    const filtered = rowsFor('scheduled', { query: 'mail' });
+    const filtered = rowsFor('chat', { query: 'mail' });
     expect(filtered.rows).toEqual([]);
     const helper = rowsFor('all', { query: 'formats' });
     expect(helper.rows.map((row) => (row.kind === 'group' ? `#${row.group}` : row.flow?.id))).toEqual(['#other', 'helper']);
@@ -204,11 +207,12 @@ describe('flow kinds', () => {
         onDeleteFlow: () => undefined,
       })
     );
-    expect(html).toContain('9 flows: 1 chat, 3 scheduled, 3 triggered and 2 other');
+    expect(html).toContain('9 flows: 1 chat, 6 triggered and 2 other');
     const pills = Array.from(html.matchAll(/class="flow-library-kind-pill[^"]*"[^>]*data-kind="(all|chat|scheduled|triggered|other)"[^>]*>(.*?)<\/button>/g)).map(
       (m) => `${m[1]}=${m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}`
     );
-    expect(pills).toEqual(['all=All 9', 'chat=Chat 1', 'scheduled=Scheduled 3', 'triggered=Triggered 3', 'other=Other 2']);
+    expect(pills).toEqual(['all=All 9', 'chat=Chat 1', 'triggered=Triggered 6', 'other=Other 2']);
+    expect(html).not.toMatch(/Scheduled|flow-kind--scheduled|data-kind="scheduled"/);
     for (const kind of FLOW_KINDS) expect(html).toContain(`data-group="${kind}"`);
     expect(html).toContain(FLOW_KIND_WORDS.other.about);
     expect(html).toContain('Every day at 08:00 (Paris)');

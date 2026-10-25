@@ -92,7 +92,7 @@ export function FlowNatureBadge({
   const title =
     nature.kind === 'automation'
       ? nature.text
-      : 'Make it an automation: a schedule, new mail, a feed or a webhook starts it';
+      : 'Make it an automation: new mail, a feed, a webhook or Run now starts it';
   const className = `flow-nature-badge flow-nature-badge--${nature.kind}`;
   if (!onClick) return <span className={className} title={plain}>{text}</span>;
   // An automation gets a small menu (Automation… / Turn it on); otherwise the badge opens the dialog.

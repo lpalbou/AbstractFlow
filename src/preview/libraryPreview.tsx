@@ -18,7 +18,7 @@ import '../styles/space.css';
  * dangling ref), driven by URL params so chrome-headless screenshots can
  * iterate on every state without click automation.
  *
- * Params: ?view=all|chat|scheduled|triggered|other  &q=<query>  &expand=id1,id2
+ * Params: ?view=all|chat|triggered|other  &q=<query>  &expand=id1,id2
  *         &select=<id>  &collapse=kind1,kind2  &theme=<id>
  * Served by `vite dev` only (root html entries are not part of the build).
  */
@@ -51,7 +51,7 @@ function syntheticFlow(
   } as VisualFlow;
 }
 
-/** Automation defaults for the Scheduled / Triggered fixtures. */
+/** Automation defaults for the Triggered fixtures. */
 function automation(source_id: string, source_version: number, config: Record<string, unknown>, connection_id?: string): VisualFlow['automation_defaults'] {
   return {
     schema_version: 1,
@@ -63,7 +63,8 @@ function automation(source_id: string, source_version: number, config: Record<st
 
 const fixtures: VisualFlow[] = [
   ...listBundledFlows(),
-  // One flow of each start (the library's kinds): a schedule, mail, a feed, Run now.
+  // One flow of each trigger: mail, a feed, Run now, and two schedules from
+  // earlier saves (Triggered, said in words: Flow no longer sets schedules).
   syntheticFlow('morning-brief', {
     name: 'Morning brief',
     description: 'Reads the overnight news and writes a five-line brief.',

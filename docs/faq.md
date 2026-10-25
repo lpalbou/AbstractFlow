@@ -44,31 +44,36 @@ requires to `On Flow Start` and `On Flow End`; you then wire them. See
 [VisualFlow JSON > Interfaces](visualflow.md#interfaces) for every interface
 and its pins.
 
-## What Is The Difference Between A Runnable Flow, A Scheduled Flow And A Triggered Flow?
+## What Is The Difference Between A Runnable Flow And A Triggered Flow?
 
 What starts it. A runnable (chat) flow declares an interface and runs when a
-person or an app asks; a scheduled flow runs by itself on a clock; a triggered
-flow runs by itself when mail, a feed item or a webhook call arrives, with
-typed `On Flow Start` pins for it. There is no separate automation kind: an
-automation is a published flow plus what starts it. The Flow Library groups
-flows this way (Chat, Scheduled, Triggered, Other). See [Web editor > Kinds of
+person or an app asks; a triggered flow runs by itself when mail, a feed item
+or a webhook call arrives, with typed `On Flow Start` pins for it, or when
+someone presses Run now. There is no separate automation kind: an automation
+is a published flow plus what starts it. The Flow Library groups flows this
+way (Chat, Triggered, Other). There is no scheduled kind: schedules are not
+set in Flow (next question). See [Web editor > Kinds of
 flows](web-editor.md#kinds-of-flows).
 
-## How Do I Run A Workflow Every Few Minutes?
+## How Do I Run A Workflow Every Few Minutes, Or Every Morning?
 
-Create an automation from the published workflow on the gateway
-(`POST /api/gateway/automations`, or any client that manages automations). In the editor, you can store the automation's defaults (trigger,
-interval, context mode, inputs) in Flow Library > **Automation**; they are
-published with the workflow. The `On Schedule`, `On Event` and `Delay` nodes
-wait inside a run that has already started and do not start runs. See
-[Web editor > Automations](web-editor.md#automations).
+Give its automation a schedule in Observer or the Assistant (or with
+`POST /api/gateway/automations`). A schedule is a property of the automation,
+not of the workflow: Flow designs and tests workflows and never sets one. In
+the editor, design the workflow, pick what else starts it if anything (mail, a
+feed, a webhook, or by hand) and press **Turn it on** in the Automation dialog;
+then set the schedule in Observer or the Assistant. A flow saved earlier with a
+schedule keeps it and shows it in words. The `On Schedule`, `On Event` and
+`Delay` nodes wait inside a run that has already started and do not start
+runs. See [Web editor > Automations](web-editor.md#automations).
 
 ## How Does A Workflow Read The Event That Started It?
 
 From `On Flow Start`: a workflow created with a trigger (or saved with one in
 the Automation dialog) has typed outputs for what arrived: `messages` and
 `mailbox` for mail, `items` and `feed` for a feed, `calls` for a webhook,
-`scheduled_at` and `occurrence` for a schedule, plus `event` (the whole raw
+`scheduled_at` and `occurrence` for a schedule (set in Observer or the
+Assistant), plus `event` (the whole raw
 event). Put what the person should see on `On Flow End`'s `response`, and
 `notify` for an alert. See [Web editor > What arrives, what the person
 sees](web-editor.md#what-arrives-what-the-person-sees).

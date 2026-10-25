@@ -9,12 +9,9 @@ import {
   connectionKind,
   connectionSentence,
   connectionSources,
-  defaultRule,
   mailSource,
   readableMailboxes,
-  scheduleRuleProblems,
   type Mailbox,
-  type ScheduleRule,
   type StartChoice,
   type StartKind,
   type TriggerChoice,
@@ -22,22 +19,21 @@ import {
 import type { TriggerSourceItem } from './triggerSources';
 import type { TriggerConnection } from './triggerConnections';
 
+/**
+ * What the person picked. `start: null` on a saved flow = a start the picker
+ * does not offer (a schedule from an older save): the Automation dialog keeps
+ * the saved trigger until another start is picked.
+ */
 export interface PickerState {
   start: StartKind | null;
-  rule: ScheduleRule;
-  /** The schedule's clock when the person picked one; '' = their account's (or this browser's). */
-  timeZone?: string;
   /** `mail:<account_id>` or `conn:<connection_id>`. */
   arrival: string;
-  /** An old flow's schedule@1, kept as is until the person edits the schedule. */
-  legacy: { trigger: AutomationTriggerDefaults; sentence: string } | null;
 }
 
 export interface PickerData {
   sources: readonly TriggerSourceItem[];
   mailboxes: readonly Mailbox[] | null;
   connections: readonly TriggerConnection[] | null;
-  timeZone: string;
 }
 
 export type ArrivalGroup = 'mailboxes' | 'feeds' | 'webhooks' | 'other';
@@ -74,7 +70,7 @@ export function connectionStateWords(conn: Pick<TriggerConnection, 'status' | 'l
 }
 
 export function emptyPicker(start: StartKind | null = null): PickerState {
-  return { start, rule: defaultRule('daily'), arrival: '', legacy: null };
+  return { start, arrival: '' };
 }
 
 /** The things that can start a flow when they receive something, by their names. */
@@ -130,12 +126,6 @@ export function choiceFromPicker(state: PickerState, data: PickerData): { choice
       return { choice: { kind: 'chat' } };
     case 'manual':
       return { choice: { kind: 'manual' } };
-    case 'schedule': {
-      const zone = state.timeZone || data.timeZone;
-      const problems = scheduleRuleProblems(state.rule, zone);
-      if (problems.length) return { problem: problems.join(' ') };
-      return { choice: { kind: 'schedule', rule: state.rule, timeZone: zone } };
-    }
     case 'arrives': {
       if (!state.arrival) return { problem: 'Choose what it listens to.' };
       const option = arrivalOptions(data).find((o) => o.key === state.arrival);
@@ -147,15 +137,11 @@ export function choiceFromPicker(state: PickerState, data: PickerData): { choice
   }
 }
 
-/** Seed the picker from saved defaults. */
+/** Seed the picker from saved defaults (nothing picked for a start it does not offer, e.g. an older schedule). */
 export function pickerFromTrigger(trigger: AutomationTriggerDefaults, data: PickerData): PickerState {
-  const read = choiceFromTrigger(trigger, data.sources, data.timeZone);
+  const read = choiceFromTrigger(trigger, data.sources);
   if (!read) return emptyPicker(null);
   switch (read.kind) {
-    case 'legacy-schedule':
-      return { start: 'schedule', rule: read.seed || defaultRule('daily'), arrival: '', legacy: { trigger, sentence: read.sentence } };
-    case 'schedule':
-      return { start: 'schedule', rule: read.rule, arrival: '', legacy: null, ...(read.timeZone !== data.timeZone ? { timeZone: read.timeZone } : {}) };
     case 'mail':
       return { ...emptyPicker('arrives'), arrival: `mail:${read.account}` };
     case 'connection':

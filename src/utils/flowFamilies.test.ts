@@ -171,7 +171,7 @@ describe('library rows', () => {
     });
     expect(result.rows.map((row) => row.flow?.id)).toEqual(['deep-research']);
     expect(result.executableCount).toBe(1);
-    expect(result.kindCounts).toEqual({ chat: 1, scheduled: 0, triggered: 0, other: 4 });
+    expect(result.kindCounts).toEqual({ chat: 1, triggered: 0, other: 4 });
     expect(result.totalCount).toBe(5);
   });
 

@@ -1,29 +1,32 @@
 /**
  * What kind of flow this is, by what starts it (operator 2026-10-25: the
  * library must say at a glance which flows are which). The words are the
- * New flow question's ("What starts it?": A person, in a chat / On a
- * schedule / When something arrives / By hand):
+ * New flow question's ("What starts it?": A person, in a chat / When
+ * something arrives / By hand):
  *
  *   chat       declares a runnable interface: a person or an app runs it in
  *              a conversation;
- *   scheduled  `automation_defaults` with a schedule trigger (schedule@1 or @2);
- *   triggered  `automation_defaults` with any other trigger: mail, a feed, a
- *              webhook, or Run now (a manual trigger is an automation with no
+ *   triggered  `automation_defaults` with a trigger: mail, a feed, a webhook,
+ *              or Run now (a manual trigger is an automation with no
  *              interface, created by the New flow automation path and run from
- *              Observer or the Assistant, never from a chat);
+ *              Observer or the Assistant, never from a chat). A schedule
+ *              trigger from an earlier save is triggered too, said in words
+ *              ("Every day at 08:00 (Paris)"): Flow no longer offers schedules
+ *              (operator ruling 2026-10-25: a schedule is a property of an
+ *              automation, set in Observer or the Assistant);
  *   other      neither: parts of other flows, and flows nothing starts yet.
  *
  * Automation defaults win over an interface (the editor header's badge says
  * "Automation · …" for such a flow, flowNature in automationChoice.ts).
  */
-import type { AutomationTriggerDefaults, VisualFlow } from '../types/flow';
-import { choiceHelp, connectionKind, triggerSentence, type AutomationWords } from './automationChoice';
+import type { VisualFlow } from '../types/flow';
+import { SCHEDULE_ELSEWHERE, choiceHelp, connectionKind, isScheduleTrigger, triggerSentence, type AutomationWords } from './automationChoice';
 import { isExecutableFlow } from './flowFamilies';
 
-export type FlowKind = 'chat' | 'scheduled' | 'triggered' | 'other';
+export type FlowKind = 'chat' | 'triggered' | 'other';
 
-/** Display order: the three ways a flow starts, then the rest. */
-export const FLOW_KINDS: readonly FlowKind[] = ['chat', 'scheduled', 'triggered', 'other'];
+/** Display order: the two ways a flow starts, then the rest. */
+export const FLOW_KINDS: readonly FlowKind[] = ['chat', 'triggered', 'other'];
 
 export interface FlowKindWords {
   /** Filter pill, group heading and detail-pane kind word. */
@@ -40,11 +43,6 @@ export const FLOW_KIND_WORDS: Record<FlowKind, FlowKindWords> = {
     about: 'A person or an app runs them in a conversation.',
     empty: 'No chat flows yet. Press New flow and choose “A person, in a chat”.',
   },
-  scheduled: {
-    label: 'Scheduled',
-    about: 'They run by themselves, on a clock.',
-    empty: 'No scheduled flows yet. Press New flow and choose “On a schedule”.',
-  },
   triggered: {
     label: 'Triggered',
     about: 'They run by themselves when something arrives, or when someone presses Run now.',
@@ -57,13 +55,9 @@ export const FLOW_KIND_WORDS: Record<FlowKind, FlowKindWords> = {
   },
 };
 
-function isScheduleTrigger(trigger: AutomationTriggerDefaults | undefined): boolean {
-  return Boolean(trigger && trigger.source_id === 'schedule');
-}
-
 /** The kind of a flow (see the module comment). */
 export function flowKind(flow: Pick<VisualFlow, 'interfaces' | 'automation_defaults'>): FlowKind {
-  if (flow.automation_defaults) return isScheduleTrigger(flow.automation_defaults.trigger) ? 'scheduled' : 'triggered';
+  if (flow.automation_defaults) return 'triggered';
   if (isExecutableFlow(flow)) return 'chat';
   return 'other';
 }
@@ -72,12 +66,12 @@ export type FlowKindCounts = Record<FlowKind, number>;
 
 /** How many flows of each kind (every flow counts once, subflows included). */
 export function flowKindCounts(flows: readonly Pick<VisualFlow, 'interfaces' | 'automation_defaults'>[]): FlowKindCounts {
-  const counts: FlowKindCounts = { chat: 0, scheduled: 0, triggered: 0, other: 0 };
+  const counts: FlowKindCounts = { chat: 0, triggered: 0, other: 0 };
   for (const flow of flows) counts[flowKind(flow)] += 1;
   return counts;
 }
 
-/** "147 flows: 32 chat, 2 scheduled, 1 triggered and 112 other" (kinds with none are left out). */
+/** "147 flows: 32 chat, 3 triggered and 112 other" (kinds with none are left out). */
 export function libraryCountsSentence(total: number, counts: FlowKindCounts): string {
   const head = `${total} flow${total === 1 ? '' : 's'}`;
   const parts = FLOW_KINDS.filter((kind) => counts[kind] > 0).map((kind) => `${counts[kind]} ${FLOW_KIND_WORDS[kind].label.toLowerCase()}`);
@@ -104,7 +98,7 @@ export function flowStartSentence(
   usedBy: readonly string[] = []
 ): string {
   const kind = flowKind(flow);
-  if ((kind === 'scheduled' || kind === 'triggered') && flow.automation_defaults) {
+  if (kind === 'triggered' && flow.automation_defaults) {
     return triggerSentence(flow.automation_defaults.trigger, words);
   }
   if (kind === 'chat') return 'Runs when you ask';
@@ -116,8 +110,8 @@ export function flowStartHelp(flow: Pick<VisualFlow, 'interfaces' | 'automation_
   const kind = flowKind(flow);
   const trigger = flow.automation_defaults?.trigger;
   if (kind === 'chat') return choiceHelp({ kind: 'chat' });
-  if (kind === 'scheduled') return choiceHelp({ kind: 'schedule' });
   if (kind === 'triggered' && trigger) {
+    if (isScheduleTrigger(trigger)) return `Runs on this clock, saved with an earlier version of the flow. ${SCHEDULE_ELSEWHERE}`;
     if (trigger.source_id === 'manual') return choiceHelp({ kind: 'manual' });
     if (trigger.source_id.startsWith('email')) return choiceHelp({ kind: 'mail' });
     if (connectionKind(trigger.source_id) !== 'other' || trigger.connection_id) return choiceHelp({ kind: 'connection', sourceId: trigger.source_id });

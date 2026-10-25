@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { automationDraft, issueText } from './AutomationDefaultsModal';
 import { configFormFields, configFromFormValues, formValuesFromConfig } from '../utils/triggerBindings';
 import { triggerSettingsCopy } from '../utils/triggerCopy';
-import { emptyPicker, type PickerData, type PickerState } from '../utils/automationPicker';
+import { emptyPicker, pickerFromTrigger, type PickerData, type PickerState } from '../utils/automationPicker';
 import { parseMailboxes } from '../utils/automationGateway';
 import { parseTriggerSourcesResponse, type AvailableTriggerSource } from '../utils/triggerSources';
 import { parseTriggerConnectionsResponse } from '../utils/triggerConnections';
@@ -23,7 +23,6 @@ const DATA: PickerData = {
   sources: SOURCES,
   mailboxes: parseMailboxes(ME_EMAIL_RESPONSE),
   connections: parseTriggerConnectionsResponse(CONNECTIONS_RESPONSE),
-  timeZone: 'Europe/Paris',
 };
 const EMAIL = source('email.received');
 const EMAIL_OPTIONS = { labels: triggerSettingsCopy('email.received').labels, omit: triggerSettingsCopy('email.received').omit };
@@ -113,16 +112,21 @@ describe('Save (defects 1 and 2)', () => {
     expect(out.next.trigger).toEqual({ source_id: 'feed.item', source_version: 1, config: {}, connection_id: 'conn_feed1' });
   });
 
-  it('a weekly schedule validates against schedule@2 (string arrays, oneOf left to the gateway)', () => {
-    const out = draft({ ...emptyPicker('schedule'), rule: { repeat: 'weekly', days: ['tue'], at: '06:45' } });
-    if (!('next' in out)) throw new Error(out.problems.join('; '));
-    expect(out.next.trigger).toEqual({ source_id: 'schedule', source_version: 2, config: { kind: 'weekly', days: ['tue'], at: '06:45', time_zone: 'Europe/Paris' } });
-  });
-
-  it('an old schedule@1 is kept as it is until the schedule is changed', () => {
-    const old = { source_id: 'schedule', source_version: 1, config: { every: '2m' } };
-    const out = draft({ ...emptyPicker('schedule'), legacy: { trigger: old, sentence: 'Every 2 minutes' } });
-    expect('next' in out && out.next.trigger).toEqual(old);
+  // Operator ruling 2026-10-25: schedules are set in Observer or the Assistant, never in Flow.
+  // A flow saved earlier with a schedule loads, keeps it, and can be given another start.
+  it.each([
+    ['schedule@2', { source_id: 'schedule', source_version: 2, config: { kind: 'weekly', days: ['tue'], at: '06:45', time_zone: 'Europe/Paris' } }],
+    ['schedule@1', { source_id: 'schedule', source_version: 1, config: { every: '2m' } }],
+  ])('a %s from an earlier save is kept as it is until another start is picked', (_name, saved) => {
+    const existing = { schema_version: 1 as const, trigger: saved, context: { mode: 'independent' as const }, input_data: {} };
+    const picker = pickerFromTrigger(saved, DATA);
+    expect(picker.start).toBeNull();
+    const kept = draft(picker, { existing, keepsSaved: true });
+    if (!('next' in kept)) throw new Error(kept.problems.join('; '));
+    expect(kept.next.trigger).toEqual(saved);
+    const replaced = draft(emptyPicker('manual'), { existing, keepsSaved: false });
+    if (!('next' in replaced)) throw new Error(replaced.problems.join('; '));
+    expect(replaced.next.trigger).toEqual({ source_id: 'manual', source_version: 1, config: {} });
   });
 
   it('nothing chosen is said in words; a flow with two starts says why the event cannot be added', () => {
@@ -193,6 +197,8 @@ describe('title and copy (item 5)', () => {
     expect(src).toContain('<h3 id="automation-dialog-title">Automation</h3>');
     expect(src).toContain('When the trigger fires, this flow runs with these inputs. Turn it on here; pause or stop it in Observer or the Assistant.');
     expect(src).not.toMatch(/fixed UTC intervals|Automation defaults<|input_data \(JSON|Refresh sources|Choose a trigger source/);
+    // A schedule from an earlier save is said in words, with where schedules are set now.
+    expect(src).toContain('a schedule from an earlier save, kept as it is. ${SCHEDULE_ELSEWHERE} Choose below to replace it.');
     const nodes = readFileSync(new URL('../types/nodes.ts', import.meta.url), 'utf8');
     expect(nodes).not.toContain('Automation defaults');
   });

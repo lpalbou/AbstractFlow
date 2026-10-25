@@ -3,9 +3,11 @@
  * header's nature badge): what starts it, its context and its inputs.
  *
  * "What starts it?" is the human picker shared with the New flow dialog
- * (components/automation/TriggerPicker.tsx; operator 2026-10-25): a schedule
- * in the person's time zone (schedule@2), one of their mailboxes, one of
- * their feeds or webhooks, or by hand. The chosen source's other settings
+ * (components/automation/TriggerPicker.tsx; operator 2026-10-25): one of
+ * their mailboxes, one of their feeds or webhooks, or by hand. Never a
+ * schedule (operator ruling 2026-10-25: set in Observer or the Assistant); a
+ * flow saved earlier with a schedule keeps it, said in words, until the
+ * person picks another start. The chosen source's other settings
  * come from its own `config_schema` (utils/triggerBindings.ts) under "More
  * settings"; a setting the form cannot render is edited as JSON on its own,
  * it never blocks the source.
@@ -39,8 +41,10 @@ import {
   connectionSources,
   mailSource,
   manualSource,
-  scheduleSource,
+  SCHEDULE_ELSEWHERE,
+  isScheduleTrigger,
   triggerFromChoice,
+  triggerSentence,
 } from '../utils/automationChoice';
 import { choiceFromPicker, emptyPicker, pickerFromTrigger, type PickerData, type PickerState } from '../utils/automationPicker';
 import { enumWords, triggerSettingsCopy } from '../utils/triggerCopy';
@@ -409,7 +413,6 @@ function pickedSource(
   sources: readonly TriggerSourceItem[],
   connections: Array<{ connection_id: string; source_id: string; source_version: number }> | null
 ): AvailableTriggerSource | null {
-  if (picker.start === 'schedule') return picker.legacy ? null : scheduleSource(sources);
   if (picker.start === 'manual') return manualSource(sources);
   if (picker.start === 'arrives') {
     if (picker.arrival.startsWith('mail:')) return mailSource(sources);
@@ -461,8 +464,7 @@ export function automationDraft(input: {
   const copy = triggerSettingsCopy(formSource?.id || '');
   const fields = formSource && !copy.noForm ? configFormFields(formSource.config_schema, formOptions) : [];
   let trigger: AutomationTriggerDefaults | null = null;
-  if (picker.legacy) trigger = picker.legacy.trigger;
-  else if (input.keepsSaved && existing) trigger = existing.trigger;
+  if (input.keepsSaved && existing) trigger = existing.trigger;
   else {
     const picked = choiceFromPicker(picker, data);
     if ('problem' in picked) found.push(picked.problem);
@@ -478,7 +480,7 @@ export function automationDraft(input: {
   if (trigger && fields.length && formSource) {
     const built = configFromFormValues(formSource.config_schema, values, {}, { ...formOptions, validate: false });
     found.push(...built.issues.map((i) => issueText(i, fields)));
-    // The picker owns its settings (mailbox, schedule); the form adds the rest.
+    // The picker owns its settings (the mailbox); the form adds the rest.
     trigger = { ...trigger, config: { ...built.config, ...trigger.config } };
   }
   // What arrives goes on On Flow Start as the trigger's typed pins (and On
@@ -587,10 +589,11 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
   }, [onClose, saving]);
 
   const source = pickedSource(picker, sources, support.data.connections as never);
-  // A saved trigger the picker cannot show (an older or third-party source) is kept until replaced.
+  // A saved trigger the picker does not offer (a schedule from an older save,
+  // a third-party source) is kept until another start is picked.
   const keepsSaved = Boolean(existing && seeded && picker.start === null);
   const savedSource = existing ? sources.find((s): s is AvailableTriggerSource => s.available && s.id === existing.trigger.source_id && s.version === existing.trigger.source_version) || null : null;
-  const formSource = source || (picker.legacy || keepsSaved ? savedSource : null);
+  const formSource = source || (keepsSaved ? savedSource : null);
   const copy = triggerSettingsCopy(formSource?.id || '');
   const formOptions = useMemo(() => ({ labels: copy.labels, omit: copy.omit }), [copy]);
   const fields = useMemo(
@@ -661,7 +664,12 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
     }
   };
 
-  const savedLabel = existing ? sources.find((s) => s.id === existing.trigger.source_id)?.label || 'another trigger' : '';
+  const savedSchedule = isScheduleTrigger(existing?.trigger);
+  const savedLabel = !existing
+    ? ''
+    : savedSchedule
+      ? triggerSentence(existing.trigger, { mailboxes: support.data.mailboxes, connections: support.data.connections })
+      : sources.find((s) => s.id === existing.trigger.source_id)?.label || 'another trigger';
 
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
@@ -706,8 +714,11 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
                 What starts it?
               </h4>
               {keepsSaved ? (
-                <p className="automation-help">
-                  Now: {savedLabel} <span className="automation-muted">· choose below to replace it</span>
+                <p className="automation-help automation-kept-trigger">
+                  Now: {savedLabel}{' '}
+                  <span className="automation-muted">
+                    {savedSchedule ? `· a schedule from an earlier save, kept as it is. ${SCHEDULE_ELSEWHERE} Choose below to replace it.` : '· choose below to replace it'}
+                  </span>
                 </p>
               ) : null}
               <TriggerPicker
@@ -715,8 +726,6 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
                 onChange={setPicker}
                 data={support.data}
                 includeChat={false}
-                timeZoneOrigin={facts.timeZone.origin}
-                timeZoneChoices={facts.timeZone.choices}
                 gatewayUrl={facts.gatewayUrl}
                 arrivalsNote={support.arrivalsNote}
                 onRefreshArrivals={facts.reloadArrivals}

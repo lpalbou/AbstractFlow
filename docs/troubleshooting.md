@@ -161,7 +161,7 @@ it through the interface receives missing or mistyped values.
 | That connection is not one of yours on this gateway: choose another. / Connection: … | The source reads from a connection and none of yours is selected, or the saved one was deleted or belongs to another source. | Pick another one under **When something arrives**, or create one with **Set up a new one…**, then **Refresh**. |
 | unknown trigger field(s) ['connection_id'] (HTTP 422) | The Gateway does not accept `trigger.connection_id` in `automation_defaults` yet. | Update the Gateway to a release with trigger connections. |
 | unknown context field(s) ['growing'] (HTTP 422) | You changed **Remembers up to** and the Gateway does not accept `context.growing.max_tokens` yet. | Keep the default budget, or update the Gateway. |
-| This gateway cannot run calendar schedules yet. | The Gateway serves only the older fixed-interval schedule. | Update the Gateway; an existing older schedule keeps working. |
+| I cannot find "On a schedule" in What starts it? | Flow does not set schedules: a schedule is a property of the automation. | Set it in Observer or the Assistant. A flow saved earlier with a schedule keeps it ("Now: Every day at 08:00 (Paris) · a schedule from an earlier save"). |
 | Mailboxes are not available on this gateway. / Your mailboxes could not be read: … | The Gateway has no mail routes, or reading `GET /api/gateway/me/email` failed. | Connect a mailbox in the console (**Add a mailbox…**) or check the Gateway. |
 
 ### Edited example flows do not appear in the Flow Library

@@ -176,7 +176,9 @@ flowchart LR
   Flow change. Answers are cached per Gateway URL; **Try again** re-fetches
   after a failure. The person never sees source ids: the trigger picker
   (`src/utils/automationChoice.ts`, `automationPicker.ts`) maps human choices
-  (a schedule, a mailbox, a feed or webhook, Run now) to the served sources.
+  (a mailbox, a feed or webhook, Run now) to the served sources. Flow never
+  writes a schedule (a property of the automation, set in Observer or the
+  Assistant); a schedule saved by an older flow is read and said in words.
 - **Validation** (`src/utils/triggerBindings.ts`): the field's shape is
   checked (unknown keys refused, so no automation id or credential is stored in
   a workflow), then the trigger settings are checked against the source's

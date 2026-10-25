@@ -86,17 +86,11 @@ describe('re-review #6, #11, #12, #17', () => {
     expect(runResponse({ result: { response: 'x' } })).toBe('x');
   });
 
-  it('time zones are cities with their offset, the person\'s first', async () => {
-    const { zoneChoicesFor, zoneLabel, zoneCity } = await import('./timeZones');
-    const winter = new Date('2026-01-15T12:00:00Z');
-    expect(zoneLabel('Europe/Paris', winter)).toBe('Paris (UTC+1)');
-    expect(zoneLabel('America/New_York', winter)).toBe('New York (UTC−5)');
-    expect(zoneLabel('Asia/Kolkata', winter)).toBe('Kolkata (UTC+5:30)');
+  it('a saved schedule names its clock by the city, never the raw zone id', async () => {
+    const { zoneCity } = await import('./timeZones');
+    expect(zoneCity('Europe/Paris')).toBe('Paris');
     expect(zoneCity('America/Argentina/Buenos_Aires')).toBe('Buenos Aires');
-    const list = zoneChoicesFor('Europe/Lisbon', winter);
-    expect(list[0]).toEqual({ zone: 'Europe/Lisbon', label: 'Lisbon (UTC)' });
-    expect(list.length).toBeLessThan(60);
-    expect(list.map((z) => z.label).join(' ')).not.toMatch(/Factory|Zulu|W-SU/);
+    expect(zoneCity('Etc/UTC')).toBe('UTC');
   });
 
   it('no example value reads as if filled; Advanced raw JSON only when there are inputs', async () => {

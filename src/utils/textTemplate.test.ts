@@ -91,5 +91,6 @@ describe('String Template folds', () => {
     );
     expect(html).toContain('collapsed-template-icon');
     expect(html).not.toContain('{{');
-  });
+    // The dynamic import of the node components takes ~4 s cold; the full suite's load pushed it past 5 s.
+  }, 30000);
 });

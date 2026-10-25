@@ -919,7 +919,7 @@ export function FlowLibraryModal({
                         type="button"
                         className="flow-library-link flow-library-preview-action"
                         onClick={() => setIsEditingAutomation(true)}
-                        title="Make it an automation: a schedule, new mail, a feed or a webhook starts it"
+                        title="Make it an automation: new mail, a feed, a webhook or Run now starts it"
                       >
                         Make it an automation…
                       </button>
@@ -933,8 +933,8 @@ export function FlowLibraryModal({
                   </div>
                 ) : null}
 
-                {/* Scheduled / Triggered: the automation, with its settings. */}
-                {selectedKind === 'scheduled' || selectedKind === 'triggered' ? (
+                {/* Triggered: the automation, with its settings. */}
+                {selectedKind === 'triggered' ? (
                   <div className="flow-library-preview-section">
                     <div className="flow-library-preview-key">Automation</div>
                     <div className="flow-library-preview-val flow-library-preview-inline">
