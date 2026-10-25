@@ -6,24 +6,36 @@ import {
   type FlowFamilyIndex,
   type FlowFamilyIndexOptions,
 } from './flowFamilies';
+import { FLOW_KINDS, flowKind, flowKindCounts, type FlowKind, type FlowKindCounts } from './flowKinds';
 
 /**
  * Pure row model for the Flow Library list (backlog 0144). Two modes:
  * - BROWSE (empty query): first-level rows, families expandable in place.
- * - LOOKUP (non-empty query): grouping suspends; matches render flat with a
- *   "used by" context subtitle on helpers.
- * The executable toggle filters BOTH modes (the operator keeps the all-flows
- * view one click away).
+ * - LOOKUP (non-empty query): family nesting suspends; matches render flat
+ *   with a "used by" context subtitle on helpers.
+ * The view is All or one kind (flowKinds.ts: chat / scheduled / triggered /
+ * other, by what starts the flow). All groups its rows under one heading row
+ * per kind (collapsible); a kind filter is a plain list of EVERY flow of that
+ * kind (a subflow of that kind too, with its "in …" context), so the list
+ * always shows as many flows as its pill counts.
  */
 
-export type LibraryViewMode = 'all' | 'executable';
+export type LibraryViewMode = 'all' | FlowKind;
 export type LibrarySortMode = 'recent' | 'name_asc' | 'name_desc';
 
 export interface LibraryRow {
   /** Unique per row INSTANCE (a shared helper renders once per parent). */
   key: string;
-  kind: 'top' | 'child' | 'cycle' | 'missing';
-  /** Absent only for kind=missing (a reference to a flow that does not exist). */
+  kind: 'group' | 'top' | 'child' | 'cycle' | 'missing';
+  /** kind=group: the flow kind this heading introduces. */
+  group?: FlowKind;
+  /** kind=group: rows in the group (its first-level flows, or its matches). */
+  groupCount?: number;
+  /** kind=group: flows of this kind that live only inside other flows (browse mode). */
+  groupNested?: number;
+  /** kind=group: the heading is folded (its rows are not listed). */
+  groupCollapsed?: boolean;
+  /** Absent for kind=missing (a reference to a flow that does not exist) and kind=group. */
   flow?: VisualFlow;
   /** Missing reference id (kind=missing). */
   missingId?: string;
@@ -50,6 +62,8 @@ export interface LibraryRowsOptions {
   viewMode: LibraryViewMode;
   sortMode: LibrarySortMode;
   expandedIds: ReadonlySet<string>;
+  /** All view: the kind headings folded by the person. */
+  collapsedGroups?: ReadonlySet<FlowKind>;
   familyIndexOptions?: FlowFamilyIndexOptions;
 }
 
@@ -90,6 +104,8 @@ export interface LibraryRowsResult {
   totalCount: number;
   topLevelCount: number;
   executableCount: number;
+  /** Flows of each kind (every flow once, subflows included): the filter pills. */
+  kindCounts: FlowKindCounts;
 }
 
 /** Children of one parent, sorted name-asc (reference order is canvas geometry, not meaning). */
@@ -108,49 +124,37 @@ export function buildLibraryRows(
   options: LibraryRowsOptions
 ): LibraryRowsResult {
   const byId = new Map(flows.map((flow) => [flow.id, flow]));
-  const executable = new Set(flows.filter((flow) => isExecutableFlow(flow)).map((flow) => flow.id));
+  const kindOf = new Map(flows.map((flow) => [flow.id, flowKind(flow)]));
   const counts = {
     totalCount: flows.length,
     topLevelCount: index.firstLevelIds.size,
-    executableCount: executable.size,
+    executableCount: flows.filter((flow) => isExecutableFlow(flow)).length,
+    kindCounts: flowKindCounts(flows),
   };
-  const inViewMode = (id: string) => options.viewMode === 'all' || executable.has(id);
+  const view = options.viewMode;
+  const inView = (id: string) => view === 'all' || kindOf.get(id) === view;
+  const collapsed = options.collapsedGroups || new Set<FlowKind>();
   const q = options.query.trim().toLowerCase();
-
-  if (q) {
-    // LOOKUP mode: flat, all matches (helpers included), context subtitles.
-    const matches = sortFlows(
-      flows.filter((flow) => inViewMode(flow.id) && matchesQuery(flow, q)),
-      options.sortMode
-    );
-    return {
-      ...counts,
-      rows: matches.map((flow) => {
-        // Unique parent NAMES: several saved copies of one workflow (same
-        // name, different ids) otherwise render "in deep-research, deep-research".
-        const parents = Array.from(
-          new Set((index.inboundBy.get(flow.id) || []).map((id) => byId.get(id)?.name || id))
-        ).sort((a, b) => safeLower(a).localeCompare(safeLower(b)));
-        return {
-          key: `flat:${flow.id}`,
-          kind: 'top' as const,
-          flow,
-          depth: 0,
-          expandable: false,
-          expanded: false,
-          ...(parents.length > 0 ? { contextParents: parents } : {}),
-          ...(index.familyRootIds.has(flow.id) ? { familySize: (index.familyMembers.get(flow.id) || []).length } : {}),
-        };
-      }),
-    };
-  }
-
-  // BROWSE mode: first-level rows; expanded families walk in place.
   const rows: LibraryRow[] = [];
-  const topFlows = sortFlows(
-    flows.filter((flow) => index.firstLevelIds.has(flow.id) && inViewMode(flow.id)),
-    options.sortMode
-  );
+
+  /** One flat row (lookup matches; a kind filter's subflows). */
+  const flatRow = (flow: VisualFlow): LibraryRow => {
+    // Unique parent NAMES: several saved copies of one workflow (same
+    // name, different ids) otherwise render "in deep-research, deep-research".
+    const parents = Array.from(
+      new Set((index.inboundBy.get(flow.id) || []).map((id) => byId.get(id)?.name || id))
+    ).sort((a, b) => safeLower(a).localeCompare(safeLower(b)));
+    return {
+      key: `flat:${flow.id}`,
+      kind: 'top' as const,
+      flow,
+      depth: 0,
+      expandable: false,
+      expanded: false,
+      ...(parents.length > 0 ? { contextParents: parents } : {}),
+      ...(index.familyRootIds.has(flow.id) ? { familySize: (index.familyMembers.get(flow.id) || []).length } : {}),
+    };
+  };
 
   const pushChildren = (parentId: string, depth: number, ancestorPath: string[], pathKey: string) => {
     const parentFlow = byId.get(parentId);
@@ -204,7 +208,8 @@ export function buildLibraryRows(
     // does not exist IS one of the parent's refs) — no second pass.
   };
 
-  for (const flow of topFlows) {
+  /** A first-level row and, when unfolded, its family (browse mode). */
+  const pushTop = (flow: VisualFlow) => {
     const isRoot = index.familyRootIds.has(flow.id);
     const expanded = isRoot && options.expandedIds.has(flow.id);
     const missingCount = (index.missingRefsBy.get(flow.id) || []).length;
@@ -219,6 +224,60 @@ export function buildLibraryRows(
       ...(missingCount > 0 ? { missingCount } : {}),
     });
     if (expanded) pushChildren(flow.id, 1, [flow.id], flow.id);
+  };
+
+  const pushGroup = (kind: FlowKind, count: number, nested: number) => {
+    rows.push({
+      key: `group:${kind}`,
+      kind: 'group',
+      group: kind,
+      groupCount: count,
+      ...(nested > 0 ? { groupNested: nested } : {}),
+      groupCollapsed: collapsed.has(kind),
+      depth: 0,
+      expandable: false,
+      expanded: false,
+    });
+  };
+
+  if (q) {
+    // LOOKUP mode: flat, all matches (helpers included), context subtitles;
+    // All groups the matches by kind.
+    const matches = sortFlows(
+      flows.filter((flow) => inView(flow.id) && matchesQuery(flow, q)),
+      options.sortMode
+    );
+    if (view !== 'all') return { ...counts, rows: matches.map(flatRow) };
+    for (const kind of FLOW_KINDS) {
+      const ofKind = matches.filter((flow) => kindOf.get(flow.id) === kind);
+      if (!ofKind.length) continue;
+      pushGroup(kind, ofKind.length, 0);
+      if (!collapsed.has(kind)) rows.push(...ofKind.map(flatRow));
+    }
+    return { ...counts, rows };
+  }
+
+  if (view !== 'all') {
+    // A kind: every flow of that kind. First-level ones keep their family
+    // unfolding; one living only inside other flows says where ("in …").
+    for (const flow of sortFlows(flows.filter((f) => inView(f.id)), options.sortMode)) {
+      if (index.firstLevelIds.has(flow.id)) pushTop(flow);
+      else rows.push(flatRow(flow));
+    }
+    return { ...counts, rows };
+  }
+
+  // BROWSE All: one heading per kind, its first-level rows below; expanded
+  // families walk in place.
+  const topFlows = sortFlows(
+    flows.filter((flow) => index.firstLevelIds.has(flow.id)),
+    options.sortMode
+  );
+  for (const kind of FLOW_KINDS) {
+    const ofKind = topFlows.filter((flow) => kindOf.get(flow.id) === kind);
+    if (!ofKind.length) continue;
+    pushGroup(kind, ofKind.length, counts.kindCounts[kind] - ofKind.length);
+    if (!collapsed.has(kind)) for (const flow of ofKind) pushTop(flow);
   }
 
   return { ...counts, rows };

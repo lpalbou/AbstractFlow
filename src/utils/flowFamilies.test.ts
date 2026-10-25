@@ -133,7 +133,14 @@ describe('library rows', () => {
       sortMode: 'name_asc',
       expandedIds: new Set(),
     });
-    expect(collapsed.rows.map((row) => row.flow?.id)).toEqual(['deep-research', 'other-root', 'standalone']);
+    // All: one heading per kind, its first-level rows below it.
+    expect(collapsed.rows.map((row) => (row.kind === 'group' ? `group:${row.group}` : row.flow?.id))).toEqual([
+      'group:chat',
+      'deep-research',
+      'group:other',
+      'other-root',
+      'standalone',
+    ]);
 
     const expanded = buildLibraryRows(catalog, index, {
       query: '',
@@ -141,11 +148,13 @@ describe('library rows', () => {
       sortMode: 'name_asc',
       expandedIds: new Set(['deep-research']),
     });
-    const ids = expanded.rows.map((row) => `${row.kind}:${row.flow?.id || row.missingId}`);
+    const ids = expanded.rows.map((row) => `${row.kind}:${row.flow?.id || row.missingId || row.group}`);
     expect(ids).toEqual([
+      'group:chat',
       'top:deep-research',
       'child:deep-plan',
       'child:shared-helper',
+      'group:other',
       'top:other-root',
       'top:standalone',
     ]);
@@ -153,15 +162,16 @@ describe('library rows', () => {
     expect(shared?.sharedCount).toBe(2);
   });
 
-  it('executable view keeps only entrypoint-class declarers at the top', () => {
+  it('the chat view keeps only entrypoint-class declarers, as a plain list', () => {
     const result = buildLibraryRows(catalog, index, {
       query: '',
-      viewMode: 'executable',
+      viewMode: 'chat',
       sortMode: 'name_asc',
       expandedIds: new Set(),
     });
     expect(result.rows.map((row) => row.flow?.id)).toEqual(['deep-research']);
     expect(result.executableCount).toBe(1);
+    expect(result.kindCounts).toEqual({ chat: 1, scheduled: 0, triggered: 0, other: 4 });
     expect(result.totalCount).toBe(5);
   });
 
@@ -172,7 +182,7 @@ describe('library rows', () => {
       sortMode: 'name_asc',
       expandedIds: new Set(),
     });
-    expect(result.rows.map((row) => row.flow?.id)).toEqual(['standalone']);
+    expect(result.rows.filter((row) => row.kind !== 'group').map((row) => row.flow?.id)).toEqual(['standalone']);
 
     const helperHit = buildLibraryRows(catalog, index, {
       query: 'shared-helper',
@@ -223,8 +233,9 @@ describe('library rows', () => {
       sortMode: 'name_asc',
       expandedIds: new Set(),
     });
-    expect(rows.rows[0].missingCount).toBe(1);
-    expect(rows.rows[0].expandable).toBe(true);
+    const parentRow = rows.rows.find((row) => row.kind === 'top');
+    expect(parentRow?.missingCount).toBe(1);
+    expect(parentRow?.expandable).toBe(true);
   });
 });
 

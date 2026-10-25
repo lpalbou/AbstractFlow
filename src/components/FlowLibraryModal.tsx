@@ -4,12 +4,10 @@ import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import type { GatewayContracts } from '../utils/gatewayClient';
 import { AutomationDefaultsModal, type AutomationGraph, type AutomationLinkApi } from './AutomationDefaultsModal';
 import { triggerNeedsWords, useAutomationWords } from './automation/FlowNatureBadge';
-import { triggerSentence } from '../utils/automationChoice';
 import { graphSize } from '../utils/flowLibraryRows';
 import { BUNDLED_COMPOSED_ONLY_IDS } from '../utils/bundledFlows';
 import {
   buildFlowFamilyIndex,
-  isExecutableFlow,
   knownInterface,
   normalizeInterfaces,
 } from '../utils/flowFamilies';
@@ -18,7 +16,17 @@ import {
   type LibrarySortMode,
   type LibraryViewMode,
 } from '../utils/flowLibraryRows';
+import {
+  FLOW_KINDS,
+  FLOW_KIND_WORDS,
+  flowKind,
+  flowStartHelp,
+  flowStartSentence,
+  libraryCountsSentence,
+  type FlowKind,
+} from '../utils/flowKinds';
 import { FlowLibraryList } from './FlowLibraryList';
+import { FlowKindIcon } from './FlowKindIcon';
 import { ListDisclosure } from './ListDisclosure';
 import { InterfacePicker } from './InterfacePicker';
 import { LIBRARY_STACKED_QUERY, useListOpen } from '../utils/listOpen';
@@ -60,12 +68,13 @@ function renderInterfaces(interfaces: string[]): string {
 }
 
 
+/** "25 October 2026 at 19:54" (the detail pane's dates, in the reader's locale). */
 function formatDateTime(value: unknown): string {
   if (typeof value !== 'string' || !value) return '';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   try {
-    return d.toLocaleString();
+    return d.toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' });
   } catch {
     return d.toISOString();
   }
@@ -127,6 +136,8 @@ export function FlowLibraryModal({
   const [query, setQuery] = useState('');
   const [sortMode, setSortMode] = useState<LibrarySortMode>('recent');
   const [viewMode, setViewMode] = useState<LibraryViewMode>('all');
+  // All view: kind headings the person folded.
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<FlowKind>>(new Set());
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
   // Instance selection: shared helpers render N rows for one flow; keyboard
@@ -177,9 +188,25 @@ export function FlowLibraryModal({
   }, [allFlows]);
 
   const rowsResult = useMemo(
-    () => buildLibraryRows(allFlows, familyIndex, { query, viewMode, sortMode, expandedIds: expandedKeys }),
-    [allFlows, familyIndex, query, viewMode, sortMode, expandedKeys]
+    () => buildLibraryRows(allFlows, familyIndex, { query, viewMode, sortMode, expandedIds: expandedKeys, collapsedGroups }),
+    [allFlows, familyIndex, query, viewMode, sortMode, expandedKeys, collapsedGroups]
   );
+  /** Names of the flows using a flow, for the Other rows' "Runs inside …". */
+  const usedByOf = useCallback(
+    (flowId: string) =>
+      Array.from(new Set((familyIndex.inboundBy.get(flowId) || []).map((id) => flowById.get(id)?.name || id))).sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [familyIndex, flowById]
+  );
+  const toggleGroup = useCallback((kind: FlowKind) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  }, []);
   const rows = rowsResult.rows;
   /**
    * Rows carrying a real selectable flow, in visible order — the keyboard
@@ -230,12 +257,15 @@ export function FlowLibraryModal({
     const visibleIds = new Set(navigableRows.map((row) => row.flow?.id));
     setSelectedFlowId((prev) => {
       if (prev && (visibleIds.has(prev) || (query.trim() && flowById.has(prev)))) return prev;
+      // Folding the selection's kind heading keeps the preview where it is.
+      const prevFlow = prev ? flowById.get(prev) : undefined;
+      if (prevFlow && viewMode === 'all' && collapsedGroups.has(flowKind(prevFlow))) return prev;
       const fallback =
         currentFlowId && visibleIds.has(currentFlowId) ? currentFlowId : navigableRows[0].flow?.id || null;
       if (fallback !== prev) setSelectedRowKey(null);
       return fallback;
     });
-  }, [isOpen, navigableRows, flowById, currentFlowId, query]);
+  }, [isOpen, navigableRows, flowById, currentFlowId, query, viewMode, collapsedGroups]);
 
   // Focus search on open.
   useEffect(() => {
@@ -574,6 +604,10 @@ export function FlowLibraryModal({
 
   const jumpToFlow = useCallback(
     (flowId: string) => {
+      const target = flowById.get(flowId);
+      // A kind filter that hides the target would leave the list empty of it.
+      if (target && viewMode !== 'all' && flowKind(target) !== viewMode) setViewMode('all');
+      setCollapsedGroups(new Set());
       setSelectedFlowId(flowId);
       setSelectedRowKey(null);
       // Uses/Used-by links may target a flow buried under collapsed parents:
@@ -581,7 +615,7 @@ export function FlowLibraryModal({
       // (adversary find — the preview updated while the list showed nothing).
       revealAncestorPath(flowId);
     },
-    [revealAncestorPath]
+    [flowById, revealAncestorPath, viewMode]
   );
 
   const selectRow = useCallback((flowId: string, rowKey: string) => {
@@ -591,10 +625,17 @@ export function FlowLibraryModal({
 
   if (!isOpen) return null;
 
-  const executableToggleTitle =
-    'Runnable = declares a framework-executable interface (today: Runnable agent v1). Helpers and drafts stay visible in All.';
   const shownCount = navigableRows.length;
-  const filtering = Boolean(query.trim()) || viewMode === 'executable';
+  const filtering = Boolean(query.trim()) || viewMode !== 'all';
+  const kindCounts = rowsResult.kindCounts;
+  const selectedKind = selectedFlow ? flowKind(selectedFlow) : null;
+  const selectedUsedByNames = selectedUsedBy.map((parent) => parent.name || parent.id);
+  const selectedInterfaces = selectedFlow ? normalizeInterfaces(selectedFlow.interfaces) : [];
+  const canEditMeta = !selectedFlowReadonly && !isRenaming && !isEditingDescription && !isEditingInterfaces;
+  const filterOptions: Array<{ id: LibraryViewMode; label: string; count: number }> = [
+    { id: 'all', label: 'All', count: rowsResult.totalCount },
+    ...FLOW_KINDS.map((kind) => ({ id: kind as LibraryViewMode, label: FLOW_KIND_WORDS[kind].label, count: kindCounts[kind] })),
+  ];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -608,8 +649,7 @@ export function FlowLibraryModal({
                   <>Loading saved flows…</>
                 ) : (
                   <>
-                    {rowsResult.totalCount} flow{rowsResult.totalCount === 1 ? '' : 's'} ·{' '}
-                    {rowsResult.topLevelCount} top-level · {rowsResult.executableCount} runnable
+                    {libraryCountsSentence(rowsResult.totalCount, kindCounts)}
                     {filtering ? ` · ${shownCount} shown` : ''}
                   </>
                 )}
@@ -623,26 +663,6 @@ export function FlowLibraryModal({
           </div>
 
           <div className="flow-library-controls">
-            <div className="flow-library-view-toggle" role="tablist" aria-label="Library view" title={executableToggleTitle}>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'all'}
-                className={`flow-library-view-option ${viewMode === 'all' ? 'active' : ''}`}
-                onClick={() => setViewMode('all')}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'executable'}
-                className={`flow-library-view-option ${viewMode === 'executable' ? 'active' : ''}`}
-                onClick={() => setViewMode('executable')}
-              >
-                Runnable
-              </button>
-            </div>
             <input
               ref={searchRef}
               className="flow-library-search"
@@ -661,6 +681,26 @@ export function FlowLibraryModal({
               <option value="name_desc">Name (Z–A)</option>
             </select>
           </div>
+        </div>
+
+        {/* What starts it: All, then one pill per kind with its count. */}
+        <div className="flow-library-kinds" role="tablist" aria-label="Kinds of flows">
+          {filterOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="tab"
+              aria-selected={viewMode === option.id}
+              className={`flow-library-kind-pill ${option.id === 'all' ? '' : `flow-kind--${option.id}`} ${viewMode === option.id ? 'active' : ''}`}
+              data-kind={option.id}
+              onClick={() => setViewMode(option.id)}
+              title={option.id === 'all' ? 'Every flow, grouped by what starts it' : FLOW_KIND_WORDS[option.id].about}
+            >
+              {option.id === 'all' ? null : <span className="flow-library-kind-dot" aria-hidden="true" />}
+              <span>{option.label}</span>
+              <span className="flow-library-kind-count">{option.count}</span>
+            </button>
+          ))}
         </div>
 
         {/* Editing interfaces takes the whole body: interface list | details
@@ -686,7 +726,7 @@ export function FlowLibraryModal({
               open={listOpen}
               onToggle={toggleListOpen}
               controls="flow-library-list"
-              title="Flows"
+              title={viewMode === 'all' ? 'Flows' : `${FLOW_KIND_WORDS[viewMode].label} flows`}
               detail={isRefreshing ? null : shownCount}
               className="flow-library-disclosure"
             />
@@ -706,19 +746,30 @@ export function FlowLibraryModal({
             {isLoading ? (
               <div className="flow-library-empty">Loading flows…</div>
             ) : rows.length === 0 ? (
-              <div className="flow-library-empty">
-                <div className="flow-library-empty-title">No flows found</div>
+              <div className={`flow-library-empty ${viewMode === 'all' ? '' : `flow-kind--${viewMode}`}`}>
+                {viewMode !== 'all' && !query.trim() ? <FlowKindIcon kind={viewMode} size="lg" /> : null}
+                <div className="flow-library-empty-title">
+                  {query.trim()
+                    ? 'No flows found'
+                    : viewMode === 'all'
+                      ? 'No flows yet. Press New flow and choose what starts it.'
+                      : FLOW_KIND_WORDS[viewMode].empty}
+                </div>
                 <div className="flow-library-empty-sub">
-                  {viewMode === 'executable' ? (
-                    <>
-                      No runnable workflows match.{' '}
-                      <button type="button" className="flow-library-link" onClick={() => setViewMode('all')}>
-                        Show all flows
-                      </button>
-                    </>
-                  ) : (
-                    'Try a different search query.'
-                  )}
+                  {query.trim() ? (
+                    viewMode !== 'all' ? (
+                      <>
+                        No {FLOW_KIND_WORDS[viewMode].label.toLowerCase()} flow matches.{' '}
+                        <button type="button" className="flow-library-link" onClick={() => setViewMode('all')}>
+                          Search all flows
+                        </button>
+                      </>
+                    ) : (
+                      'Try a different search.'
+                    )
+                  ) : viewMode !== 'all' ? (
+                    FLOW_KIND_WORDS[viewMode].about
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -732,18 +783,20 @@ export function FlowLibraryModal({
                 selfReferencingIds={familyIndex.selfReferencingIds}
                 cyclePromotedIds={familyIndex.cyclePromotedIds}
                 duplicateNames={duplicateNames}
-                hideRunnableBadge={viewMode === 'executable'}
                 natureWords={natureWords}
+                usedByOf={usedByOf}
                 onSelect={selectRow}
                 onLoad={onLoadFlow}
                 onToggleExpand={toggleExpand}
+                onToggleGroup={toggleGroup}
               />
             )}
           </div>
 
-          <div className="flow-library-preview">
-            {selectedFlow ? (
+          <div className={`flow-library-preview ${selectedKind ? `flow-kind--${selectedKind}` : ''}`}>
+            {selectedFlow && selectedKind ? (
               <>
+                {/* Name, then what kind of flow it is and what starts it. */}
                 <div className="flow-library-preview-top">
                   <div className="flow-library-preview-title">
                     {isRenaming ? (
@@ -786,28 +839,69 @@ export function FlowLibraryModal({
                       </div>
                     )}
                   </div>
+                  <div className="flow-library-preview-kind">
+                    <FlowKindIcon kind={selectedKind} size="md" />
+                    <div className="flow-library-preview-kind-text">
+                      <div className="flow-library-preview-kind-label">{FLOW_KIND_WORDS[selectedKind].label}</div>
+                      <div className="flow-library-preview-start">{flowStartSentence(selectedFlow, natureWords, selectedUsedByNames)}</div>
+                      <div className="flow-library-preview-help">{flowStartHelp(selectedFlow, selectedUsedByNames)}</div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flow-library-preview-meta">
-                  <div className="flow-library-preview-row">
-                    <span className="flow-library-preview-key">Updated</span>
-                    <span className="flow-library-preview-val">{formatDateTime(selectedFlow.updated_at) || '—'}</span>
-                  </div>
-                  <div className="flow-library-preview-row">
-                    <span className="flow-library-preview-key">Created</span>
-                    <span className="flow-library-preview-val">{formatDateTime(selectedFlow.created_at) || '—'}</span>
-                  </div>
-                  <div className="flow-library-preview-row">
-                    <span className="flow-library-preview-key">Graph</span>
-                    <span className="flow-library-preview-val">
-                      {graphSize(selectedFlow)}
-                    </span>
-                  </div>
-                  <div className="flow-library-preview-row">
-                    <span className="flow-library-preview-key">Interfaces</span>
-                    <span className="flow-library-preview-val flow-library-preview-inline">
-                      <span>{renderInterfaces(normalizeInterfaces(selectedFlow.interfaces))}</span>
-                      {!selectedFlowReadonly && !isRenaming && !isEditingDescription && !isEditingInterfaces ? (
+                <div className="flow-library-preview-desc">
+                  {isEditingDescription ? (
+                    <textarea
+                      className="flow-library-description"
+                      value={descriptionDraft}
+                      onChange={(e) => setDescriptionDraft(e.target.value)}
+                      placeholder="Add a helpful description for this workflow…"
+                      rows={6}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setIsEditingDescription(false);
+                          setDescriptionDraft('');
+                        }
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                          commitDescription();
+                        }
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <>
+                      {!selectedFlowReadonly ? (
+                        <button
+                          type="button"
+                          className="flow-library-edit-icon desc"
+                          onClick={beginEditDescription}
+                          aria-label="Edit flow description"
+                          title="Edit description"
+                        >
+                          <EditIcon />
+                        </button>
+                      ) : null}
+                      <div className={`flow-library-preview-desc-text ${selectedFlow.description?.trim() ? '' : 'empty'}`}>
+                        {selectedFlow.description?.trim() ? selectedFlow.description.trim() : 'No description.'}
+                      </div>
+                      {selectedFlowReadonly ? (
+                        <div className="flow-library-readonly-note">
+                          {selectedFlowBundleTarget
+                            ? 'Bundled workflow family. Load it to run the shipped bundle, or Duplicate/Rename to copy the whole family (subflows included, references remapped) into editable storage.'
+                            : 'Bundled example. Load it as an unsaved draft, or Duplicate/Rename it into Gateway storage to edit.'}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+
+                {/* Chat: its interfaces. An Other flow can declare one (that makes it a chat flow). */}
+                {selectedKind === 'chat' || selectedInterfaces.length > 0 ? (
+                  <div className="flow-library-preview-section">
+                    <div className="flow-library-preview-key">Interfaces</div>
+                    <div className="flow-library-preview-val flow-library-preview-inline">
+                      <span>{renderInterfaces(selectedInterfaces)}</span>
+                      {canEditMeta ? (
                         <button
                           type="button"
                           className="flow-library-edit-icon meta"
@@ -818,34 +912,51 @@ export function FlowLibraryModal({
                           <EditIcon size={13} />
                         </button>
                       ) : null}
-                    </span>
+                    </div>
+                    {selectedKind === 'chat' && !selectedFlowReadonly && !isEditing ? (
+                      // The Automation dialog stays one click away for a chat flow (it was the Automation row's pencil).
+                      <button
+                        type="button"
+                        className="flow-library-link flow-library-preview-action"
+                        onClick={() => setIsEditingAutomation(true)}
+                        title="Make it an automation: a schedule, new mail, a feed or a webhook starts it"
+                      >
+                        Make it an automation…
+                      </button>
+                    ) : null}
                   </div>
+                ) : selectedKind === 'other' && canEditMeta ? (
+                  <div className="flow-library-preview-section">
+                    <button type="button" className="flow-library-link flow-library-preview-action" onClick={beginEditInterfaces}>
+                      Declare an interface…
+                    </button>
+                  </div>
+                ) : null}
 
-                  <div className="flow-library-preview-row">
-                    <span className="flow-library-preview-key">Automation</span>
-                    <span className="flow-library-preview-val flow-library-preview-inline">
+                {/* Scheduled / Triggered: the automation, with its settings. */}
+                {selectedKind === 'scheduled' || selectedKind === 'triggered' ? (
+                  <div className="flow-library-preview-section">
+                    <div className="flow-library-preview-key">Automation</div>
+                    <div className="flow-library-preview-val flow-library-preview-inline">
                       <span>
-                        {selectedFlow.automation_defaults
-                          ? triggerSentence(selectedFlow.automation_defaults.trigger, natureWords)
-                          : isExecutableFlow(selectedFlow)
-                            ? '—'
-                            : 'Declare a runnable interface first'}
+                        {selectedFlow.automation_defaults?.context?.mode === 'growing'
+                          ? 'Every run continues the same conversation.'
+                          : 'Every run starts fresh.'}
                       </span>
-                      {!selectedFlowReadonly && !isEditing && (isExecutableFlow(selectedFlow) || selectedFlow.automation_defaults) ? (
+                      {!selectedFlowReadonly && !isEditing ? (
                         <button
                           type="button"
                           className="flow-library-edit-icon meta"
                           onClick={() => setIsEditingAutomation(true)}
                           aria-label="Automation…"
-                          title="Automation…"
+                          title="Automation…: what starts it, how runs remember, turn it on"
                         >
                           <EditIcon size={13} />
                         </button>
                       ) : null}
-                    </span>
+                    </div>
                   </div>
-
-                </div>
+                ) : null}
 
                 {selectedUses.length > 0 || selectedUsedBy.length > 0 ? (
                   <div className="flow-library-family">
@@ -895,51 +1006,25 @@ export function FlowLibraryModal({
                   </div>
                 ) : null}
 
-                <div className="flow-library-preview-desc">
-                  {isEditingDescription ? (
-                    <textarea
-                      className="flow-library-description"
-                      value={descriptionDraft}
-                      onChange={(e) => setDescriptionDraft(e.target.value)}
-                      placeholder="Add a helpful description for this workflow…"
-                      rows={6}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          setIsEditingDescription(false);
-                          setDescriptionDraft('');
-                        }
-                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                          commitDescription();
-                        }
-                      }}
-                      autoFocus
-                    />
-                  ) : (
-                    <>
-                      {!selectedFlowReadonly ? (
-                        <button
-                          type="button"
-                          className="flow-library-edit-icon desc"
-                          onClick={beginEditDescription}
-                          aria-label="Edit flow description"
-                          title="Edit description"
-                        >
-                          <EditIcon />
-                        </button>
-                      ) : null}
-                      <div className="flow-library-preview-desc-text">
-                        {selectedFlow.description?.trim() ? selectedFlow.description.trim() : 'No description.'}
-                      </div>
-                      {selectedFlowReadonly ? (
-                        <div className="flow-library-readonly-note">
-                          {selectedFlowBundleTarget
-                            ? 'Bundled workflow family. Load it to run the shipped bundle, or Duplicate/Rename to copy the whole family (subflows included, references remapped) into editable storage.'
-                            : 'Bundled example. Load it as an unsaved draft, or Duplicate/Rename it into Gateway storage to edit.'}
-                        </div>
-                      ) : null}
-                    </>
-                  )}
-                </div>
+                {/* Dates and size last, small. */}
+                <dl className="flow-library-preview-facts">
+                  {formatDateTime(selectedFlow.updated_at) ? (
+                    <div>
+                      <dt>Updated</dt>
+                      <dd>{formatDateTime(selectedFlow.updated_at)}</dd>
+                    </div>
+                  ) : null}
+                  {formatDateTime(selectedFlow.created_at) ? (
+                    <div>
+                      <dt>Created</dt>
+                      <dd>{formatDateTime(selectedFlow.created_at)}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt>Size</dt>
+                    <dd>{graphSize(selectedFlow)}</dd>
+                  </div>
+                </dl>
               </>
             ) : (
               <div className="flow-library-empty">Select a flow to preview.</div>

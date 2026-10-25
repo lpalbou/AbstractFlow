@@ -6,6 +6,11 @@ import { listBundledFlows } from '../utils/bundledFlows';
 import type { VisualFlow } from '../types/flow';
 import '@abstractframework/ui-kit/theme.css';
 import '../styles/index.css';
+// The app's stylesheet stack (main.tsx order): category hues, then the
+// narrow / touch adaptations, so the harness renders as the editor does.
+import '../styles/categories.css';
+import '../styles/responsive.css';
+import '../styles/space.css';
 
 /**
  * Dev-only harness: renders the Flow Library modal with the bundled deep-research
@@ -13,7 +18,8 @@ import '../styles/index.css';
  * dangling ref), driven by URL params so chrome-headless screenshots can
  * iterate on every state without click automation.
  *
- * Params: ?view=all|executable  &q=<query>  &expand=id1,id2  &select=<id>
+ * Params: ?view=all|chat|scheduled|triggered|other  &q=<query>  &expand=id1,id2
+ *         &select=<id>  &collapse=kind1,kind2  &theme=<id>
  * Served by `vite dev` only (root html entries are not part of the build).
  */
 
@@ -25,6 +31,7 @@ function syntheticFlow(
     refs?: string[];
     description?: string;
     updated?: string;
+    automation?: VisualFlow['automation_defaults'];
   } = {}
 ): VisualFlow {
   return {
@@ -32,6 +39,7 @@ function syntheticFlow(
     name: options.name ?? id,
     description: options.description,
     interfaces: options.interfaces,
+    ...(options.automation ? { automation_defaults: options.automation } : {}),
     updated_at: options.updated ?? '2026-07-11T10:00:00Z',
     nodes: (options.refs || []).map((target, index) => ({
       id: `${id}-sub-${index}`,
@@ -43,8 +51,49 @@ function syntheticFlow(
   } as VisualFlow;
 }
 
+/** Automation defaults for the Scheduled / Triggered fixtures. */
+function automation(source_id: string, source_version: number, config: Record<string, unknown>, connection_id?: string): VisualFlow['automation_defaults'] {
+  return {
+    schema_version: 1,
+    trigger: { source_id, source_version, config, ...(connection_id ? { connection_id } : {}) },
+    context: { mode: 'independent' },
+    input_data: {},
+  } as VisualFlow['automation_defaults'];
+}
+
 const fixtures: VisualFlow[] = [
   ...listBundledFlows(),
+  // One flow of each start (the library's kinds): a schedule, mail, a feed, Run now.
+  syntheticFlow('morning-brief', {
+    name: 'Morning brief',
+    description: 'Reads the overnight news and writes a five-line brief.',
+    automation: automation('schedule', 2, { kind: 'daily', at: '08:00', time_zone: 'Europe/Paris' }),
+    updated: '2026-10-25T07:10:00Z',
+  }),
+  syntheticFlow('weekly-review', {
+    name: 'Weekly review',
+    description: 'Summarises the week’s runs every Friday.',
+    automation: automation('schedule', 2, { kind: 'weekly', days: ['fri'], at: '17:30', time_zone: 'Europe/Paris' }),
+    updated: '2026-10-20T16:00:00Z',
+  }),
+  syntheticFlow('mail-triage', {
+    name: 'Mail triage',
+    description: 'Sorts each new message and drafts a reply when one is needed.',
+    automation: automation('email.received', 1, { account: 'default' }),
+    updated: '2026-10-24T12:00:00Z',
+  }),
+  syntheticFlow('release-notes', {
+    name: 'Release notes reviewer',
+    description: 'Reviews every new release note of the feed.',
+    automation: automation('feed.item', 1, {}, 'conn-release'),
+    updated: '2026-10-22T09:30:00Z',
+  }),
+  syntheticFlow('cleanup-by-hand', {
+    name: 'Workspace cleanup',
+    description: 'Archives old runs. Only when someone presses Run now.',
+    automation: automation('manual', 1, {}),
+    updated: '2026-10-18T11:00:00Z',
+  }),
   syntheticFlow('report-pipeline', {
     name: 'report-pipeline',
     interfaces: ['abstractcode.agent.v1'],
@@ -108,7 +157,8 @@ const fixtures: VisualFlow[] = [
 }
 
 const params = new URLSearchParams(window.location.search);
-const view = params.get('view') === 'executable' ? 'executable' : 'all';
+const view = params.get('view') || 'all';
+const collapse = (params.get('collapse') || '').split(',').filter(Boolean);
 const query = params.get('q') || '';
 const expand = (params.get('expand') || '').split(',').filter(Boolean);
 const select = params.get('select') || null;
@@ -146,9 +196,11 @@ root.render(
 // state internally, so the harness drives it through the real DOM controls
 // (the same paths a user exercises).
 window.setTimeout(() => {
-  if (view === 'executable') {
-    const buttons = Array.from(document.querySelectorAll('.flow-library-view-option'));
-    (buttons[1] as HTMLButtonElement | undefined)?.click();
+  if (view !== 'all') {
+    (document.querySelector(`.flow-library-kind-pill[data-kind="${CSS.escape(view)}"]`) as HTMLButtonElement | null)?.click();
+  }
+  for (const kind of collapse) {
+    (document.querySelector(`.flow-library-group[data-group="${CSS.escape(kind)}"]`) as HTMLButtonElement | null)?.click();
   }
   if (query) {
     const input = document.querySelector('.flow-library-search') as HTMLInputElement | null;

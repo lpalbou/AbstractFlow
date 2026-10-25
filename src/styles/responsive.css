@@ -696,7 +696,7 @@ body {
   .pin-legend-toggle,
   .modal-button,
   .flow-library-link,
-  .flow-library-view-toggle button {
+  .flow-library-kind-pill {
     min-height: 44px;
   }
 

@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { AfChip, AfChipButton, DisclosureList, type AfChipTone, type DisclosureRow } from '@abstractframework/ui-kit';
 import type { LibraryRow } from '../utils/flowLibraryRows';
-import { isExecutableFlow } from '../utils/flowFamilies';
-import { flowNature, type AutomationWords } from '../utils/automationChoice';
+import type { AutomationWords } from '../utils/automationChoice';
 import { graphSize } from '../utils/flowLibraryRows';
+import { FLOW_KIND_WORDS, flowKind, flowStartSentence, type FlowKind } from '../utils/flowKinds';
+import { FlowKindIcon } from './FlowKindIcon';
 
 /**
  * Flow Library rows — a CONSUMER of the uic kit DisclosureList (the
@@ -18,7 +19,6 @@ import { graphSize } from '../utils/flowLibraryRows';
  */
 const BADGE_TONES: Record<string, AfChipTone> = {
   current: 'success',
-  runnable: 'success',
   family: 'info',
   bundled: 'info',
   shared: 'warning',
@@ -42,24 +42,30 @@ export interface FlowLibraryListProps {
   /** Names carried by MORE than one flow: rows disambiguate with the short id
    * (operator confusion case: three saved copies all named deep-research). */
   duplicateNames?: ReadonlySet<string>;
-  /** In the runnable-only view the runnable badge is redundant noise. */
-  hideRunnableBadge?: boolean;
-  /** Mailbox addresses / connection names for the rows' "Automation · …" line. */
+  /** Mailbox addresses / connection names for the rows' start sentence. */
   natureWords?: AutomationWords;
+  /** Names of the flows that use a flow (an Other row says "Runs inside …"). */
+  usedByOf?: (flowId: string) => string[];
   onSelect: (flowId: string, rowKey: string) => void;
   onLoad: (flowId: string) => void;
   onToggleExpand: (rowKey: string) => void;
+  /** Fold / unfold a kind heading (All view). */
+  onToggleGroup?: (kind: FlowKind) => void;
 }
 
-function formatDateTime(value: unknown): string {
+/** "Today 19:54", "25 Oct", "25 Oct 2025": the list's quiet date. */
+export function formatRowDate(value: unknown, now: Date = new Date()): string {
   if (typeof value !== 'string' || !value) return '';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   try {
-    // Short form for the list: seconds are noise at library scale.
-    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+    if (d.toDateString() === now.toDateString()) {
+      return `Today ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return d.toLocaleDateString(undefined, sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
   } catch {
-    return d.toISOString();
+    return d.toISOString().slice(0, 10);
   }
 }
 
@@ -80,11 +86,12 @@ export function FlowLibraryList({
   selfReferencingIds,
   cyclePromotedIds,
   duplicateNames,
-  hideRunnableBadge,
   natureWords,
+  usedByOf,
   onSelect,
   onLoad,
   onToggleExpand,
+  onToggleGroup,
 }: FlowLibraryListProps) {
   const kitRows = useMemo<DisclosureRow<LibraryRow>[]>(
     () =>
@@ -95,9 +102,10 @@ export function FlowLibraryList({
         depth: row.depth,
         expandable: row.expandable,
         expanded: row.expanded,
-        // Missing/cycle rows are diagnostics, not selectable flows.
+        // Missing/cycle rows are diagnostics and kind headings are headings:
+        // neither is a selectable flow.
         selectable: row.kind === 'top' || row.kind === 'child',
-        textValue: row.flow?.name || row.missingId || row.key,
+        textValue: row.flow?.name || row.missingId || (row.group ? FLOW_KIND_WORDS[row.group].label : row.key),
         data: row,
       })),
     [rows]
@@ -118,6 +126,41 @@ export function FlowLibraryList({
 
   const renderRow = (kitRow: DisclosureRow<LibraryRow>) => {
     const row = kitRow.data as LibraryRow;
+
+    if (row.kind === 'group' && row.group) {
+      const words = FLOW_KIND_WORDS[row.group];
+      const open = !row.groupCollapsed;
+      const nested = row.groupNested || 0;
+      return (
+        <button
+          type="button"
+          tabIndex={-1}
+          className={`flow-library-group flow-kind--${row.group}`}
+          data-group={row.group}
+          aria-expanded={open}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleGroup?.(row.group as FlowKind);
+          }}
+          title={open ? `Fold ${words.label}` : `Show ${words.label}`}
+        >
+          <FlowKindIcon kind={row.group} size="sm" />
+          <span className="flow-library-group-text">
+            <span className="flow-library-group-title">
+              {words.label}
+              <span className="flow-library-group-count">{row.groupCount}</span>
+            </span>
+            <span className="flow-library-group-about">
+              {words.about}
+              {nested > 0 ? ` ${nested} more live inside other flows.` : ''}
+            </span>
+          </span>
+          <svg className="flow-library-group-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {open ? <path d="M6 9l6 6 6-6" /> : <path d="M9 18l6-6-6-6" />}
+          </svg>
+        </button>
+      );
+    }
 
     if (row.kind === 'missing') {
       return (
@@ -161,18 +204,24 @@ export function FlowLibraryList({
     const isCurrent = Boolean(currentFlowId && flow.id === currentFlowId);
     const isReadonly = readonlyFlowIds.has(flow.id);
     const isBundleTarget = bundledRunTargetIds.has(flow.id);
-    const executable = isExecutableFlow(flow);
-    const metaUpdated = formatDateTime(flow.updated_at) || formatDateTime(flow.created_at);
+    const updatedRaw = flow.updated_at || flow.created_at;
+    const metaUpdated = formatRowDate(updatedRaw);
     const description = flow.description?.trim() || '';
-    const nature = flowNature(flow, executable, natureWords);
+    const kind = flowKind(flow);
+    const usedBy = row.contextParents || usedByOf?.(flow.id) || [];
+    // A subflow row under its parent needs no "Runs inside <the parent above>".
+    const sentence = row.kind === 'child' && kind === 'other' ? '' : flowStartSentence(flow, natureWords, usedBy);
 
     return (
       <div
-        className={`flow-library-row ${row.kind === 'child' ? 'child' : ''}`}
+        className={`flow-library-row flow-kind--${kind} ${row.kind === 'child' ? 'child' : ''}`}
         data-flow-id={flow.id}
         data-row-key={row.key}
+        data-kind={kind}
         title="Double click to load"
       >
+        <FlowKindIcon kind={kind} size={row.kind === 'child' ? 'sm' : 'md'} title={FLOW_KIND_WORDS[kind].label} />
+        <div className="flow-library-row-main">
         <div className="flow-library-item-top">
           <div className="flow-library-item-name">
             {flow.name || flow.id}
@@ -187,15 +236,6 @@ export function FlowLibraryList({
             {isCurrent ? (
               <AfChip tone={BADGE_TONES.current} size="sm" title="Currently open on the canvas">
                 current
-              </AfChip>
-            ) : null}
-            {executable && !hideRunnableBadge ? (
-              <AfChip
-                tone={BADGE_TONES.runnable}
-                size="sm"
-                title="Declares a framework-executable interface (runnable as a specialized workflow by hosts)"
-              >
-                runnable
               </AfChip>
             ) : null}
             {typeof row.familySize === 'number' && row.familySize > 0 ? (
@@ -270,30 +310,24 @@ export function FlowLibraryList({
             ) : null}
           </div>
         </div>
-        {nature.kind !== 'none' ? (
-          <div className={`flow-library-item-nature flow-library-item-nature--${nature.kind}`}>
-            {nature.kind === 'automation' ? (
-              <>
-                <span className="flow-library-item-nature-kind">Automation</span>
-                {nature.text.slice('Automation'.length)}
-              </>
-            ) : (
-              nature.text
-            )}
-          </div>
-        ) : null}
+        {sentence ? <div className="flow-library-item-start">{sentence}</div> : null}
         <div className="flow-library-item-sub">
           <span className={`flow-library-item-desc ${description ? '' : 'empty'}`}>
             {description || 'No description'}
           </span>
-          {metaUpdated ? <span className="flow-library-item-updated">{metaUpdated}</span> : null}
+          {metaUpdated ? (
+            <time className="flow-library-item-updated" dateTime={String(updatedRaw)} title={`Updated ${new Date(String(updatedRaw)).toLocaleString()}`}>
+              {metaUpdated}
+            </time>
+          ) : null}
         </div>
-        {row.contextParents && row.contextParents.length > 0 ? (
+        {row.contextParents && row.contextParents.length > 0 && kind !== 'other' ? (
           <div className="flow-library-item-context">
             in {row.contextParents.slice(0, 3).join(', ')}
             {row.contextParents.length > 3 ? ` +${row.contextParents.length - 3}` : ''}
           </div>
         ) : null}
+        </div>
       </div>
     );
   };

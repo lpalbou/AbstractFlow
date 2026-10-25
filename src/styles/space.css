@@ -135,6 +135,12 @@
   .flow-library-tree .af-disclosure__chevron--spacer {
     display: none;
   }
+
+  /* The sheet is the scroller here: kind headings stay in the flow. */
+  .flow-library-tree .af-disclosure__row:has(.flow-library-group) {
+    position: static;
+    background: transparent;
+  }
 }
 
 /* Tablets: the stacked sheet is taller than the screen, so its action row
@@ -303,10 +309,9 @@
     font-size: var(--font-size-sm, 12px);
   }
 
-  .flow-library-preview-row {
-    flex-wrap: wrap;
-    column-gap: 10px;
-    row-gap: 2px;
+  .flow-library-item-start,
+  .flow-library-preview-help {
+    font-size: var(--font-size-body, 14px);
   }
 
   .flow-library-preview-val {

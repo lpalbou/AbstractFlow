@@ -2323,8 +2323,8 @@ button.primary:hover:not(:disabled) {
 }
 
 .flow-library-item-updated {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xxs);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -2361,21 +2361,6 @@ button.primary:hover:not(:disabled) {
   margin-top: 4px;
 }
 
-.flow-library-preview-meta {
-  border-top: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
-  padding-top: 12px;
-  display: grid;
-  gap: 9px;
-}
-
-.flow-library-preview-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: var(--font-size-sm);
-}
-
 .flow-library-preview-key {
   color: var(--text-muted);
   font-size: var(--font-size-xxs);
@@ -2386,8 +2371,7 @@ button.primary:hover:not(:disabled) {
 
 .flow-library-preview-val {
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
 }
 
 .flow-library-preview-val.flow-library-preview-inline {
@@ -2538,41 +2522,7 @@ button.primary:hover:not(:disabled) {
   font-size: var(--font-size-sm);
 }
 
-/* Family grouping (backlog 0144): view toggle, disclosure rows, badges. */
-/* Segmented control: inset track, raised active thumb (surface + shadow),
-   not an accent-tinted text box. */
-.flow-library-view-toggle {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-primary) 55%, transparent);
-}
-
-.flow-library-view-option {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  padding: 5px 14px;
-  border-radius: 999px;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 120ms ease, background 120ms ease;
-}
-
-.flow-library-view-option:hover {
-  color: var(--text-secondary);
-}
-
-.flow-library-view-option.active {
-  background: color-mix(in srgb, var(--text-primary) 10%, var(--bg-secondary));
-  color: var(--text-primary);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--bg-primary) 60%, transparent);
-}
-
+/* Family grouping (backlog 0144): disclosure rows, badges. */
 /* Children read as SUBORDINATE, not shifted peers: tree rail + lighter name.
    Depth indentation is the kit's (padding-left over --af-disclosure-depth). */
 .flow-library-tree .af-disclosure__row[data-depth]:not([data-depth='0']) {
@@ -2638,8 +2588,8 @@ button.primary:hover:not(:disabled) {
 /* Short-id disambiguator for same-name flows (three deep-research copies). */
 .flow-library-item-id-hint {
   margin-left: 8px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xxs);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
   font-weight: 400;
   color: var(--text-muted);
 }
@@ -2665,8 +2615,10 @@ button.primary:hover:not(:disabled) {
   flex: 0 0 auto;
 }
 
+/* The counts sentence wraps (Refresh moves under it) rather than clip on a phone. */
 .flow-library-subtitle {
-  white-space: nowrap;
+  flex-wrap: wrap;
+  row-gap: 2px;
 }
 
 /* A second rendered instance of the SELECTED flow (shared helpers): quiet
@@ -2684,9 +2636,8 @@ button.primary:hover:not(:disabled) {
 }
 
 .flow-library-item-context {
-  font-size: var(--font-size-xxs);
+  font-size: var(--font-size-xs);
   color: var(--text-muted);
-  font-family: var(--font-mono);
 }
 
 .flow-library-family {
@@ -2751,6 +2702,312 @@ button.primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--error, #e74c3c) 8%, transparent);
   color: var(--text-primary);
   font-size: var(--font-size-xs);
+}
+
+/* Flow kinds (2026-10-25): chat / scheduled / triggered / other, by what
+   starts a flow (utils/flowKinds.ts). One hue per kind from categories.css
+   (its light and dark steps); words never take the raw hue (amber on a light
+   surface fails contrast): --kind-ink is the hue mixed toward the text. */
+.flow-kind--chat {
+  --kind-hue: var(--flow-hue-blue);
+}
+.flow-kind--scheduled {
+  --kind-hue: var(--flow-hue-violet);
+}
+.flow-kind--triggered {
+  --kind-hue: var(--flow-hue-yellow);
+}
+.flow-kind--other {
+  --kind-hue: color-mix(in srgb, var(--text-muted) 85%, transparent);
+}
+.flow-kind--chat,
+.flow-kind--scheduled,
+.flow-kind--triggered,
+.flow-kind--other {
+  --kind-ink: color-mix(in srgb, var(--kind-hue) 62%, var(--text-primary));
+}
+
+.flow-kind-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--kind-hue) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kind-hue) 30%, transparent);
+  color: var(--kind-ink);
+}
+.flow-kind-icon--sm {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+}
+.flow-kind-icon--lg {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+.flow-kind-glyph {
+  width: 58%;
+  height: 58%;
+}
+
+/* Kind filters: one row of pills under the header (scrolls sideways on a
+   narrow screen rather than wrapping). */
+.flow-library-kinds {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  margin-top: -2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.flow-library-kinds::-webkit-scrollbar {
+  display: none;
+}
+.flow-library-kind-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--ui-border-1);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+.flow-library-kind-pill:hover {
+  border-color: var(--ui-border-2);
+  color: var(--text-primary);
+}
+.flow-library-kind-pill:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.flow-library-kind-pill.active {
+  border-color: color-mix(in srgb, var(--kind-hue, var(--text-primary)) 55%, transparent);
+  background: color-mix(in srgb, var(--kind-hue, var(--text-primary)) 13%, var(--bg-secondary));
+  color: var(--text-primary);
+}
+.flow-library-kind-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kind-hue);
+}
+/* Phones: the five pills wrap rather than slide out of sight. */
+@media (max-width: 767.98px) {
+  .flow-library-kinds {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .flow-library-kind-pill {
+    padding: 4px 10px;
+    gap: 6px;
+  }
+}
+.flow-library-kind-count {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Kind headings (All): a full-width fold button sitting in a static tree
+   row; sticky at the top of the list while its rows scroll by. */
+.flow-library-tree .af-disclosure__row:has(.flow-library-group) {
+  position: sticky;
+  top: -8px;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--bg-primary) 35%, var(--bg-secondary));
+  cursor: default;
+}
+.flow-library-tree .af-disclosure__row:has(.flow-library-group):not(:first-child) {
+  margin-top: 10px;
+}
+.flow-library-tree .af-disclosure__row:has(.flow-library-group) .af-disclosure__chevron--spacer {
+  display: none;
+}
+.flow-library-group {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 8px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border-1);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.flow-library-group:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+.flow-library-group-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.flow-library-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.flow-library-group-count {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.flow-library-group-about {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.flow-library-group-chevron {
+  flex: none;
+  color: var(--text-muted);
+}
+.flow-library-group:hover .flow-library-group-chevron {
+  color: var(--text-primary);
+}
+
+/* Leaf rows keep the expander's width so every kind tile sits in one column. */
+.flow-library-tree .af-disclosure__chevron--spacer {
+  width: 22px;
+}
+
+/* A flow row: kind tile | name, start sentence, description and date. */
+.flow-library-row[data-kind] {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+}
+.flow-library-row[data-kind] > .flow-kind-icon {
+  margin-top: 1px;
+}
+.flow-library-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.flow-library-item-start {
+  overflow: hidden;
+  color: var(--kind-ink);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.flow-library-row.flow-kind--other .flow-library-item-start {
+  color: var(--text-secondary);
+}
+.flow-library-row[data-kind] .flow-library-item-sub {
+  color: var(--text-muted);
+}
+
+/* Detail pane: the kind and its start sentence first, facts last. */
+.flow-library-preview-kind {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--kind-hue) 26%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--kind-hue) 7%, transparent);
+}
+.flow-library-preview-kind-text {
+  flex: 1;
+  min-width: 0;
+}
+.flow-library-preview-kind-label {
+  color: var(--kind-ink);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.flow-library-preview-start {
+  margin-top: 2px;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.flow-library-preview-help {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+.flow-library-preview-desc-text.empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.flow-library-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+.flow-library-preview-action {
+  align-self: flex-start;
+  margin: 0 -6px;
+}
+.flow-library-preview-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: auto 0 0;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+.flow-library-preview-facts > div {
+  display: flex;
+  gap: 6px;
+}
+.flow-library-preview-facts dd {
+  margin: 0;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Empty filter: the kind's tile, the sentence, what the kind is. */
+.flow-library-empty[class*='flow-kind--'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+}
+.flow-library-empty[class*='flow-kind--'] .flow-library-empty-title {
+  max-width: 34ch;
+  margin: 0;
 }
 
 .error-text {
@@ -8993,14 +9250,6 @@ button.flow-nature-badge:hover {
   border-style: dashed;
   color: var(--text-muted);
 }
-.flow-library-item-nature {
-  margin-top: 2px;
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
-}
-.flow-library-item-nature--automation {
-  color: var(--accent);
-}
 @media (max-width: 767.98px) {
   .flow-nature-badge {
     max-width: 180px;
@@ -9154,13 +9403,6 @@ button.flow-nature-badge:hover:not(:disabled),
 /* An automation reads as the Automation dialog's amber, not the accent (red in some themes reads as an error). */
 .flow-nature-badge--automation {
   border-color: color-mix(in srgb, var(--flow-hue-yellow) 70%, transparent);
-}
-.flow-library-item-nature--automation {
-  color: var(--text-secondary);
-}
-.flow-library-item-nature-kind {
-  color: var(--flow-hue-yellow);
-  font-weight: 600;
 }
 
 /* The header badge's menu (Automation… / Turn it on) and the Turned on panel. */
