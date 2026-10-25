@@ -37,21 +37,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-const STORAGE_PREFIX = 'abstractflow_automation_';
 
 /** This browser's memory of which automation a flow turned on. */
 export const browserMemory: AutomationLinkDeps['remember'] = {
   get: (flowId) => {
     try {
-      return window.localStorage.getItem(STORAGE_PREFIX + flowId);
+      return window.localStorage.getItem(`abstractflow_automation_${flowId}`);
     } catch {
       return null;
     }
   },
   set: (flowId, automationId) => {
     try {
-      if (automationId) window.localStorage.setItem(STORAGE_PREFIX + flowId, automationId);
-      else window.localStorage.removeItem(STORAGE_PREFIX + flowId);
+      if (automationId) window.localStorage.setItem(`abstractflow_automation_${flowId}`, automationId);
+      else window.localStorage.removeItem(`abstractflow_automation_${flowId}`);
     } catch {
       // Private mode / blocked storage: the title scan still finds it.
     }
