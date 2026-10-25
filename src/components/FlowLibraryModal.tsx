@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AfChip, useAfMedia } from '@abstractframework/ui-kit';
 import type { AutomationDefaults, VisualFlow } from '../types/flow';
 import type { GatewayContracts } from '../utils/gatewayClient';
-import { AutomationDefaultsModal, type AutomationGraph } from './AutomationDefaultsModal';
+import { AutomationDefaultsModal, type AutomationGraph, type AutomationLinkApi } from './AutomationDefaultsModal';
 import { triggerNeedsWords, useAutomationWords } from './automation/FlowNatureBadge';
 import { triggerSentence } from '../utils/automationChoice';
 import { graphSize } from '../utils/flowLibraryRows';
@@ -45,7 +45,9 @@ export interface FlowLibraryModalProps {
   /** `graph`: the flow with the Trigger event node the dialog added (stored with the defaults). */
   onUpdateAutomationDefaults: (flowId: string, next: AutomationDefaults | null, graph?: AutomationGraph) => Promise<void> | void;
   /** "Turn it on" for a library flow: make it available, then create the automation. */
-  onTurnOnAutomation?: (flowId: string, flowName: string, next: AutomationDefaults) => Promise<{ title: string }>;
+  onTurnOnAutomation?: (flowId: string, flowName: string, next: AutomationDefaults) => Promise<{ title: string; updated?: boolean }>;
+  /** The automation a library flow already has (find / turn off / back on). */
+  automationLink?: (flowId: string, flowName: string) => AutomationLinkApi;
   /** For trigger-source discovery (the endpoint comes from the capabilities). */
   gatewayContracts: GatewayContracts | null;
   onDuplicateFlow: (flowId: string) => Promise<void> | void;
@@ -108,6 +110,7 @@ export function FlowLibraryModal({
   onUpdateInterfaces,
   onUpdateAutomationDefaults,
   onTurnOnAutomation,
+  automationLink,
   gatewayContracts,
   onDuplicateFlow,
   onDeleteFlow,
@@ -192,6 +195,11 @@ export function FlowLibraryModal({
   }, [flowById, selectedFlowId]);
   const selectedFlowReadonly = Boolean(selectedFlow && readonlyFlowIdSet.has(selectedFlow.id));
   const selectedFlowBundleTarget = Boolean(selectedFlow && bundledRunTargetIdSet.has(selectedFlow.id));
+  const selectedLinkApi = useMemo(
+    () => (automationLink && selectedFlow ? automationLink(selectedFlow.id, selectedFlow.name) : undefined),
+    // One object per selected flow: the Automation dialog re-reads the link when it changes.
+    [selectedFlow?.id, selectedFlow?.name]
+  );
 
   /** Family facts of the selection for the preview + delete warning. */
   const selectedUsedBy = useMemo(() => {
@@ -1062,6 +1070,7 @@ export function FlowLibraryModal({
             onClose={() => setIsEditingAutomation(false)}
             onSave={(next, extra) => onUpdateAutomationDefaults(selectedFlow.id, next, extra?.graph)}
             onTurnOn={onTurnOnAutomation ? (next) => onTurnOnAutomation(selectedFlow.id, selectedFlow.name, next) : undefined}
+            link={selectedLinkApi}
           />
         </div>
       ) : null}

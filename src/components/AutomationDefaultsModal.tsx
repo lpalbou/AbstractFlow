@@ -48,7 +48,8 @@ import { inputDataFromForm, inputFields, inputFormFromData, modelOptions, provid
 import { useModelCatalog } from './automation/useModelCatalog';
 import { TriggerPicker, pickerSupport } from './automation/TriggerPicker';
 import { useAutomationFacts } from './automation/useAutomationFacts';
-import { observerAutomationsUrl, turnedOnSentence } from '../utils/automationTurnOn';
+import { OPEN_OBSERVER_LABEL, observerAutomationsUrl, turnedOnSentence, updatedSentence } from '../utils/automationTurnOn';
+import { linkedStatusWords, type LinkedAutomation } from '../utils/automationLink';
 import { IconBolt } from './ToolbarIcons';
 
 export interface AutomationGraph {
@@ -69,7 +70,14 @@ export interface AutomationDefaultsModalProps {
    * "Turn it on": after the defaults are stored, make the flow available and
    * create the automation (utils/automationTurnOn.ts). Throws the problem in words.
    */
-  onTurnOn?: (next: AutomationDefaults) => Promise<{ title: string }>;
+  onTurnOn?: (next: AutomationDefaults) => Promise<{ title: string; updated?: boolean }>;
+  /** The automation this flow already has: the dialog offers Update / Turn it off instead of a second one. */
+  link?: AutomationLinkApi;
+}
+
+export interface AutomationLinkApi {
+  find: () => Promise<LinkedAutomation | null>;
+  setOn: (on: boolean) => Promise<void>;
 }
 
 const CONTEXT_CHOICES: Array<{ mode: AutomationContextMode; title: string; sub: string }> = [
@@ -499,7 +507,7 @@ export function automationDraft(input: {
   }
 }
 
-export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSave, onTurnOn }: AutomationDefaultsModalProps) {
+export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSave, onTurnOn, link }: AutomationDefaultsModalProps) {
   const existing = flow.automation_defaults || null;
   const facts = useAutomationFacts(gatewayContracts);
   const support = pickerSupport(facts);
@@ -528,7 +536,34 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
   const [issues, setIssues] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [turningOn, setTurningOn] = useState(false);
-  const [turnedOn, setTurnedOn] = useState<{ title: string } | null>(null);
+  const [turnedOn, setTurnedOn] = useState<{ title: string; updated?: boolean } | null>(null);
+  const [linked, setLinked] = useState<LinkedAutomation | null>(null);
+  const [linkNote, setLinkNote] = useState('');
+  useEffect(() => {
+    let alive = true;
+    if (!link) return undefined;
+    link
+      .find()
+      .then((l) => alive && setLinked(l))
+      .catch(() => alive && setLinked(null)); // Turn it on itself never duplicates (it re-checks)
+    return () => {
+      alive = false;
+    };
+  }, [link]);
+  const switchOn = async (on: boolean) => {
+    if (!link) return;
+    setSaving(true);
+    setIssues([]);
+    try {
+      await link.setOn(on);
+      setLinkNote(on ? 'It is on again.' : 'It is off (paused). Turn it back on here or in Observer.');
+      setLinked(await link.find());
+    } catch (error) {
+      setIssues([error instanceof Error ? error.message : String(error)]);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Seed the picker from the saved trigger once the sources are known.
   useEffect(() => {
@@ -645,7 +680,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
         </p>
 
         {turnedOn ? (
-          <TurnedOnPanel title={turnedOn.title} gatewayUrl={facts.gatewayUrl} onClose={onClose} />
+          <TurnedOnPanel title={turnedOn.title} updated={turnedOn.updated} gatewayUrl={facts.gatewayUrl} onClose={onClose} />
         ) : null}
         {!turnedOn && support.sourcesProblem ? (
           <p className={facts.sources.state === 'loading' ? 'automation-help' : 'automation-problem'}>
@@ -755,10 +790,33 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
               ))}
             </ul>
           ) : null}
+          {linked || linkNote ? (
+            <p className="automation-linked" role="status">
+              {linked ? (
+                <>
+                  <strong>{linkedStatusWords(linked)}</strong> · see it in Observer
+                  {facts.gatewayUrl ? (
+                    <>
+                      {' '}
+                      <a href={observerAutomationsUrl(facts.gatewayUrl) || undefined} target="_blank" rel="noreferrer">
+                        {OPEN_OBSERVER_LABEL}
+                      </a>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+              {linkNote ? <span className="automation-muted"> {linkNote}</span> : null}
+            </p>
+          ) : null}
           <div className="modal-actions">
-            {existing ? (
+            {existing && !linked ? (
               <button className="modal-button cancel automation-remove" onClick={handleRemove} disabled={saving}>
-                Remove automation
+                Remove the trigger
+              </button>
+            ) : null}
+            {linked && (linked.status === 'active' || linked.status === 'paused') ? (
+              <button className="modal-button cancel automation-remove" onClick={() => void switchOn(linked.status !== 'active')} disabled={saving}>
+                {linked.status === 'active' ? 'Turn it off' : 'Turn it back on'}
               </button>
             ) : null}
             <button className="modal-button cancel" onClick={onClose} disabled={saving}>
@@ -769,7 +827,7 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
             </button>
             {onTurnOn ? (
               <button className="modal-button primary" onClick={() => void handleSave('turn-on')} disabled={saving || !sourcesReady}>
-                {turningOn ? 'Turning it on…' : 'Turn it on'}
+                {turningOn ? (linked ? 'Updating…' : 'Turning it on…') : linked ? 'Update the automation' : 'Turn it on'}
               </button>
             ) : null}
           </div>
@@ -781,15 +839,15 @@ export function AutomationDefaultsModal({ flow, gatewayContracts, onClose, onSav
 }
 
 /** After "Turn it on": one sentence and where to see it. */
-export function TurnedOnPanel({ title, gatewayUrl, onClose }: { title: string; gatewayUrl: string; onClose: () => void }) {
+export function TurnedOnPanel({ title, updated, gatewayUrl, onClose }: { title: string; updated?: boolean; gatewayUrl: string; onClose: () => void }) {
   const observer = observerAutomationsUrl(gatewayUrl);
   return (
     <div className="automation-on" role="status">
-      <p className="automation-on-sentence">{turnedOnSentence(title)}</p>
+      <p className="automation-on-sentence">{updated ? updatedSentence(title) : turnedOnSentence(title)}</p>
       <div className="modal-actions">
         {observer ? (
           <a className="modal-button cancel automation-on-link" href={observer} target="_blank" rel="noreferrer">
-            Open Observer
+            {OPEN_OBSERVER_LABEL}
           </a>
         ) : null}
         <button className="modal-button primary" onClick={onClose}>

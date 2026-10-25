@@ -100,6 +100,14 @@ export function observerAutomationsUrl(gatewayUrl: string): string | null {
   return base ? `${base}/apps/observer/#automations` : null;
 }
 
+/** The Observer link's words: from a standalone editor the gateway may ask to sign in first. */
+export const OPEN_OBSERVER_LABEL = 'Open Observer (you may be asked to sign in)';
+
+/** After an update of the automation this flow already has. */
+export function updatedSentence(title: string): string {
+  return `${title} is updated: its next run uses this version.`;
+}
+
 /** The success sentence ("Release digest is on. See it in Observer or the Assistant."). */
 export function turnedOnSentence(title: string): string {
   return `${title} is on. See it in Observer or the Assistant.`;

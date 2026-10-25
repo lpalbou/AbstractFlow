@@ -16,7 +16,8 @@ import { RunFlowModal } from './RunFlowModal';
 import { RunHistoryModal } from './RunHistoryModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
 import { PublishFlowModal, publishFlow } from './PublishFlowModal';
-import { AUTOMATIONS_ENDPOINT, TurnOnError, turnOnAutomation, turnOnErrorWords, turnedOnSentence, observerAutomationsUrl } from '../utils/automationTurnOn';
+import { AUTOMATIONS_ENDPOINT, OPEN_OBSERVER_LABEL, TurnOnError, turnOnAutomation, turnOnErrorWords, turnedOnSentence, updatedSentence, observerAutomationsUrl } from '../utils/automationTurnOn';
+import { browserMemory, findFlowAutomation, setFlowAutomationOn, updateFlowAutomation, type LinkedAutomation } from '../utils/automationLink';
 import { fetchGatewayConnection } from './GatewayConnectionModal';
 import { WorkflowLifecycleModal } from './WorkflowLifecycleModal';
 import { ModelResidencyPanel } from './ModelResidencyPanel';
@@ -1184,10 +1185,22 @@ export function Toolbar() {
     },
   });
 
-  // "Turn it on" (UX review #1): save the open flow when it is the one, make
-  // it available (publish), then create the automation from its defaults.
+  // "Turn it on" (UX review #1) and one automation per flow (re-review #3):
+  // save the open flow when it is the one, make it available (publish), then
+  // UPDATE the automation this flow already has (utils/automationLink.ts), or
+  // create it the first time — never a duplicate.
+  type FlowRef = { kind: 'open' } | { kind: 'library'; flowId: string; flowName: string };
+  const flowRefIds = useCallback((which: FlowRef) => (which.kind === 'open' ? { id: flowId || '', name: getFlow().name.trim() } : { id: which.flowId, name: which.flowName }), [flowId, getFlow]);
+  const findLinked = useCallback(
+    async (which: FlowRef, next?: AutomationDefaults | null): Promise<LinkedAutomation | null> => {
+      const { id, name } = flowRefIds(which);
+      if (!id) return null;
+      return findFlowAutomation(id, [next?.title || '', name]);
+    },
+    [flowRefIds]
+  );
   const turnOn = useCallback(
-    async (which: { kind: 'open' } | { kind: 'library'; flowId: string; flowName: string }, next: AutomationDefaults) => {
+    async (which: FlowRef, next: AutomationDefaults): Promise<{ title: string; updated: boolean }> => {
       let id: string;
       let name: string;
       if (which.kind === 'open') {
@@ -1205,21 +1218,76 @@ export function Toolbar() {
         id = which.flowId;
         name = which.flowName;
       }
+      const publish = (fid: string) => publishFlow(fid, { reload_gateway: true }, gatewayContracts);
+      const linked = await findFlowAutomation(id, [next.title || '', name]);
+      if (linked) {
+        let bundleRef: string;
+        try {
+          bundleRef = (await publish(id)).bundle_ref;
+        } catch (error) {
+          throw new TurnOnError('publish', turnOnErrorWords('publish', error));
+        }
+        try {
+          await updateFlowAutomation(linked, { defaults: next, flowId: id, flowName: name, bundleRef });
+        } catch (error) {
+          throw new TurnOnError('create', turnOnErrorWords('create', error));
+        }
+        queryClient.invalidateQueries({ queryKey: ['flows'] });
+        return { title: next.title || linked.title || name, updated: true };
+      }
       const on = await turnOnAutomation({
         defaults: next,
         flowId: id,
         flowName: name,
         requestId: `flow-turn-on-${id}-${Date.now()}`,
-        publish: (fid) => publishFlow(fid, { reload_gateway: true }, gatewayContracts),
+        publish,
         create: (body) => gatewayJson<{ automation_id: string }>(AUTOMATIONS_ENDPOINT, jsonRequest(body, { method: 'POST' })),
       });
+      browserMemory.set(id, on.automationId);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
-      return on;
+      return { title: on.title, updated: false };
     },
     [flowId, gatewayContracts, getFlow, queryClient, saveMutation]
   );
+  const setLinkedOn = useCallback(
+    async (which: FlowRef, on: boolean) => {
+      const linked = await findLinked(which);
+      if (!linked) throw new TurnOnError('create', 'This flow has no automation yet: turn it on first.');
+      try {
+        await setFlowAutomationOn(linked, on);
+      } catch (error) {
+        throw new TurnOnError('create', turnOnErrorWords('create', error));
+      }
+    },
+    [findLinked]
+  );
 
-  // The header badge's Turn it on: the open flow's saved automation, said in a toast with the link.
+  // One object per flow (the dialog re-reads the link when it changes).
+  const openFlowLinkApi = useMemo(
+    () => ({
+      find: () => findLinked({ kind: 'open' }, useFlowStore.getState().flowAutomationDefaults),
+      setOn: (on: boolean) => setLinkedOn({ kind: 'open' }, on),
+    }),
+    [findLinked, setLinkedOn]
+  );
+
+  // The header badge's menu: Turn it on / Update the automation / Turn it off, said in a toast with the link.
+  const [openFlowLinked, setOpenFlowLinked] = useState<LinkedAutomation | null>(null);
+  const refreshOpenFlowLinked = useCallback(async () => {
+    try {
+      setOpenFlowLinked(await findLinked({ kind: 'open' }, useFlowStore.getState().flowAutomationDefaults));
+    } catch {
+      setOpenFlowLinked(null); // the menu then offers Turn it on, which itself never duplicates
+    }
+  }, [findLinked]);
+  const observerLinkNode = useCallback(async () => {
+    const observer = observerAutomationsUrl((await fetchGatewayConnection().catch(() => ({ gateway_url: '' }))).gateway_url);
+    return observer ? (
+      <a href={observer} target="_blank" rel="noreferrer">
+        {OPEN_OBSERVER_LABEL}
+      </a>
+    ) : null;
+  }, []);
   const turnOnOpenFlow = useCallback(async () => {
     const defaults = useFlowStore.getState().flowAutomationDefaults;
     if (!defaults) {
@@ -1229,22 +1297,30 @@ export function Toolbar() {
     const pending = toast.loading('Turning it on…');
     try {
       const on = await turnOn({ kind: 'open' }, defaults);
-      const observer = observerAutomationsUrl((await fetchGatewayConnection().catch(() => ({ gateway_url: '' }))).gateway_url);
       toast.success(
         <span>
-          {turnedOnSentence(on.title)}{' '}
-          {observer ? (
-            <a href={observer} target="_blank" rel="noreferrer">
-              Open Observer
-            </a>
-          ) : null}
+          {on.updated ? updatedSentence(on.title) : turnedOnSentence(on.title)} {await observerLinkNode()}
         </span>,
         { id: pending, duration: 10000 }
       );
+      void refreshOpenFlowLinked();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error), { id: pending, duration: 10000 });
     }
-  }, [turnOn]);
+  }, [observerLinkNode, refreshOpenFlowLinked, turnOn]);
+  const setOpenFlowOn = useCallback(
+    async (on: boolean) => {
+      const pending = toast.loading(on ? 'Turning it back on…' : 'Turning it off…');
+      try {
+        await setLinkedOn({ kind: 'open' }, on);
+        toast.success(on ? 'It is on again.' : 'It is off (paused). Turn it back on here or in Observer.', { id: pending });
+        void refreshOpenFlowLinked();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : String(error), { id: pending, duration: 10000 });
+      }
+    },
+    [refreshOpenFlowLinked, setLinkedOn]
+  );
 
   const saveGate: SaveGateInput = {
     savePending: saveMutation.isPending,
@@ -2029,6 +2105,9 @@ export function Toolbar() {
           words={natureWords}
           onClick={() => setShowOpenFlowAutomation(true)}
           onTurnOn={() => void turnOnOpenFlow()}
+          linked={openFlowLinked}
+          onMenuOpen={() => void refreshOpenFlowLinked()}
+          onSetOn={(on) => void setOpenFlowOn(on)}
         />
 
         {/* The action groups. On desktop this wrapper is display: contents (the
@@ -2237,6 +2316,7 @@ export function Toolbar() {
             flow={getFlow()}
             gatewayContracts={gatewayContracts}
             onTurnOn={(next) => turnOn({ kind: 'open' }, next)}
+            link={openFlowLinkApi}
             onClose={() => setShowOpenFlowAutomation(false)}
             onSave={(next) => {
               // The open document: saved with the flow (Save), like any edit;
@@ -2342,6 +2422,10 @@ export function Toolbar() {
           onUpdateInterfaces={handleUpdateInterfaces}
           onUpdateAutomationDefaults={handleUpdateAutomationDefaults}
           onTurnOnAutomation={(id, name, next) => turnOn({ kind: 'library', flowId: id, flowName: name }, next)}
+          automationLink={(id, name) => ({
+            find: () => findLinked({ kind: 'library', flowId: id, flowName: name }),
+            setOn: (on: boolean) => setLinkedOn({ kind: 'library', flowId: id, flowName: name }, on),
+          })}
           gatewayContracts={gatewayContracts}
           onDuplicateFlow={handleDuplicateFlow}
           onDeleteFlow={handleDeleteFlow}

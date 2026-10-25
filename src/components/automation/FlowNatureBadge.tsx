@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import type { AutomationDefaults, AutomationTriggerDefaults } from '../../types/flow';
 import { flowNature, type AutomationWords } from '../../utils/automationChoice';
+import { linkedStatusWords, type LinkedAutomation } from '../../utils/automationLink';
 import { fetchMailboxes } from '../../utils/automationGateway';
 import { fetchTriggerConnections } from '../../utils/triggerConnections';
 
@@ -54,14 +55,21 @@ export function FlowNatureBadge({
   onClick,
   onTurnOn,
   words,
+  linked = null,
+  onMenuOpen,
+  onSetOn,
 }: {
   automation: AutomationDefaults | null | undefined;
   executable: boolean;
   /** Open the Automation dialog. */
   onClick?: () => void;
-  /** Turn the saved automation on (in the badge's menu when there is one). */
+  /** Turn the saved automation on — or update the one this flow has (in the badge's menu). */
   onTurnOn?: () => void;
   words?: AutomationWords;
+  /** The automation this flow already has (null: none yet): the menu then offers Update / Turn it off. */
+  linked?: LinkedAutomation | null;
+  onMenuOpen?: () => void;
+  onSetOn?: (on: boolean) => void;
 }) {
   const [menuAt, setMenuAt] = useState<{ top: number; left: number } | null>(null);
   const open = menuAt !== null;
@@ -105,6 +113,7 @@ export function FlowNatureBadge({
           // Fixed position: the header strip clips overflow (UX review #19).
           const r = e.currentTarget.getBoundingClientRect();
           setMenuAt({ top: r.bottom + 6, left: r.left });
+          onMenuOpen?.();
         }}
         title={title}
         aria-haspopup="menu"
@@ -124,6 +133,7 @@ export function FlowNatureBadge({
           >
             Automation…
           </button>
+          {linked ? <span className="flow-nature-menu-status">{linkedStatusWords(linked)} · see it in Observer</span> : null}
           <button
             type="button"
             role="menuitem"
@@ -132,8 +142,20 @@ export function FlowNatureBadge({
               onTurnOn();
             }}
           >
-            Turn it on
+            {linked ? 'Update the automation' : 'Turn it on'}
           </button>
+          {linked && onSetOn && (linked.status === 'active' || linked.status === 'paused') ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onSetOn(linked.status !== 'active');
+              }}
+            >
+              {linked.status === 'active' ? 'Turn it off' : 'Turn it back on'}
+            </button>
+          ) : null}
         </span>
       ) : null}
     </span>
