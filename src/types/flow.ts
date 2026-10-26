@@ -667,6 +667,9 @@ export interface RunSummary {
   paused?: boolean;
   is_draft?: boolean;
   run_lifecycle?: Record<string, unknown> | null;
+  // The automation that started it (an occurrence) and the run's recorded origin (backlog 1038).
+  automation_id?: string | null;
+  origin?: { kind?: string | null } | null;
   // Present only when the run is waiting for real user input (not pause/subworkflow)
   prompt?: string | null;
   choices?: string[] | null;

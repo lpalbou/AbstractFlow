@@ -485,7 +485,7 @@ export function automationDraft(input: {
     trigger = { ...trigger, config: { ...built.config, ...trigger.config } };
   }
   // What arrives goes on On Flow Start as the trigger's typed pins (and On
-  // Flow End gets response / notify / success): added here, never asked for.
+  // Flow End gets response / success / note, ADR-0041): added here, never asked for.
   let graph: AutomationGraph | undefined;
   if (trigger) {
     const starts = flow.nodes.filter((n) => n.type === 'on_flow_start' || n.data?.nodeType === 'on_flow_start');

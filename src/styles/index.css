@@ -9708,3 +9708,81 @@ button.flow-nature-badge:hover:not(:disabled),
 .flow-library-read-failed {
   justify-content: flex-start;
 }
+
+/* After the run (framework ADR-0041): what arrived, the note, the alert or why nothing rang, each delivery. */
+.run-after {
+  margin-top: 12px;
+  border-top: 1px solid var(--bg-tertiary);
+  padding-top: 12px;
+  min-width: 0;
+}
+.run-after-title {
+  margin: 0 0 8px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.run-after-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+.run-after-facts dt {
+  color: var(--text-secondary);
+}
+.run-after-facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.run-after-muted {
+  color: var(--text-muted);
+}
+.run-after-alerts,
+.run-after-deliveries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.run-after-deliveries {
+  margin-top: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--bg-tertiary);
+}
+.run-after-deliveries li[data-state='failed'] {
+  color: var(--error);
+}
+.run-after-alert-title {
+  font-weight: 600;
+}
+.run-after-refresh {
+  grid-column: 1 / -1;
+}
+@media (max-width: 480px) {
+  .run-after-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .run-after-facts dt {
+    margin-top: 4px;
+  }
+}
+
+/* A pin's meaning in words, under it (On Flow End's notify of older flows, note). */
+.pin-help {
+  padding: 0 10px 4px 22px;
+  max-width: 260px;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  white-space: normal;
+}
+
+/* Notify me says whom it reaches and how, on the node. */
+.node-reaches {
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}

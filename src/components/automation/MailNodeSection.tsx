@@ -8,6 +8,7 @@
  * and Delete's "for good" option. Publish: the channel with suggestions and
  * the rules the gateway enforces, and the "Also notify me" toggle.
  */
+import { NOTIFY_ME_CHANNEL_CHOICES, NOTIFY_ME_CHANNEL_HELP, NOTIFY_ME_REACHES } from '../../utils/afterTheRun';
 import { useEffect, useMemo, useState } from 'react';
 import { AfSwitch } from '@abstractframework/ui-kit';
 import type { Edge } from 'reactflow';
@@ -219,9 +220,34 @@ export function PublishNodeSection({ nodeId, data, onPinDefaults }: { nodeId: st
     <div className="property-section mail-node-section">
       <p className="property-hint">
         {isNotify
-          ? 'You are notified on the tray, the Assistant and the watch.'
-          : 'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant and the watch.'}
+          ? `${NOTIFY_ME_REACHES}.`
+          : 'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant, the watch and the phone.'}
       </p>
+      {isNotify ? (
+        // Who and where (ADR-0041): the recipient is you; the channel set is "all my channels"
+        // until the runtime passes a channel choice to the gateway (the others are shown, not offered).
+        <div className="run-form-field automation-field">
+          <label className="property-label" htmlFor={`notify-to-${nodeId}`}>
+            Who
+          </label>
+          <select id={`notify-to-${nodeId}`} className="run-form-input" value="me" disabled aria-describedby={`notify-help-${nodeId}`}>
+            <option value="me">Me</option>
+          </select>
+          <label className="property-label" htmlFor={`notify-channels-${nodeId}`}>
+            Where
+          </label>
+          <select id={`notify-channels-${nodeId}`} className="run-form-input" value="all" onChange={() => undefined} aria-describedby={`notify-help-${nodeId}`}>
+            {NOTIFY_ME_CHANNEL_CHOICES.map((c) => (
+              <option key={c.value} value={c.value} disabled={!c.available}>
+                {c.available ? c.label : `${c.label} (not yet)`}
+              </option>
+            ))}
+          </select>
+          <span className="property-hint" id={`notify-help-${nodeId}`}>
+            {NOTIFY_ME_CHANNEL_HELP}
+          </span>
+        </div>
+      ) : null}
       {!isNotify && !wired(edges, nodeId, 'channel') ? (
         <div className="run-form-field automation-field">
           <label className="property-label" htmlFor={`channel-${nodeId}`}>
@@ -247,7 +273,7 @@ export function PublishNodeSection({ nodeId, data, onPinDefaults }: { nodeId: st
         <AfSwitch
           variant="row"
           label="Also notify me"
-          description="On the tray, the Assistant and the watch."
+          description="On the tray, the Assistant, the watch and the phone."
           action="publish-alert"
           checked={alert}
           onChange={(on: boolean) => onPinDefaults({ ...defaults, alert: on })}

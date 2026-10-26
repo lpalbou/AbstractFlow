@@ -1655,7 +1655,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `publish_event`
 - Document node: `{"id":"<unique_id>","type":"publish_event","template":"Notify me"}`
-- Utility: Notify me on the tray, the Assistant and the watch.
+- Utility: Reach yourself: the tray, the watch or the phone, and the Assistant. The one node that notifies you (On Flow End only records the outcome).
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Notify me"`; input defaults with `pin_defaults`
@@ -1676,7 +1676,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Publish to channel"`; input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `channel` string: A name applications subscribe to (lowercase letters, digits, . _ -), e.g. results.; `type` string: What kind of message it is, your own name (default: <channel>.message).; `title` string: A short title (required).; `body` string: The text (optional).; `subject` string: What it is about (optional).; `data` object: Any extra JSON for the applications.; `alert` boolean: On: also notify me (tray, Assistant, watch).
+- Inputs: `exec-in` execution; `channel` string: A name applications subscribe to (lowercase letters, digits, . _ -), e.g. results.; `type` string: What kind of message it is, your own name (default: <channel>.message).; `title` string: A short title (required).; `body` string: The text (optional).; `subject` string: What it is about (optional).; `data` object: Any extra JSON for the applications.; `alert` boolean: On: also notify me (tray, Assistant, watch or phone).
 - Outputs: `exec-out` execution; `result` object: The published event: event_id, sequence, alerted.; `success` boolean
 - Default config: {
   "pinDefaults": {

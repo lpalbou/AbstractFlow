@@ -189,7 +189,7 @@ describe('New flow: "What starts it?"', () => {
     expect(newFlowValues('X', '', [], automationStart(emptyPicker('arrives'), support))).toEqual({ error: 'Choose what it listens to.' });
   });
 
-  it('Create with a trigger: ONLY On Flow Start (what arrives, typed) and On Flow End (response, notify, success), nothing between', () => {
+  it('Create with a trigger: ONLY On Flow Start (what arrives, typed) and On Flow End (response, success, note: no notify pin, ADR-0041), nothing between', () => {
     const automation = automationFromChoice({ kind: 'mail', account: 'default' }, SOURCES);
     useFlowStore.getState().createFlow({ name: 'Mail judge', description: '', interfaces: [], automation });
     const st = useFlowStore.getState();
@@ -201,10 +201,10 @@ describe('New flow: "What starts it?"', () => {
     const end = flow.nodes.find((n) => n.data.nodeType === 'on_flow_end')!;
     expect(start.data.outputs.map((p) => `${p.id}:${p.type}`)).toEqual(['exec-out:execution', 'messages:emails', 'mailbox:string', 'event:object']);
     expect(start.data.outputs.every((p) => p.type === 'execution' || Boolean(p.description))).toBe(true);
-    expect(end.data.inputs.map((p) => p.id)).toEqual(['exec-in', 'response', 'notify', 'success']);
+    expect(end.data.inputs.map((p) => p.id)).toEqual(['exec-in', 'response', 'success', 'note']);
     expect(flow.nodes.some((n) => n.data.nodeType === 'agent' || n.data.label === 'Trigger event')).toBe(false);
     expect(flow.automation_defaults).toEqual(automation);
-    expect(st.canvasNote).toBe('What arrives is on On Flow Start; put what the person should see on On Flow End’s response (and notify for an alert).');
+    expect(st.canvasNote).toBe('What arrives is on On Flow Start. On Flow End records the outcome: response, success and a note; it reaches nobody. Add Notify me to reach yourself.');
     // Chat: no trigger node, no defaults.
     useFlowStore.getState().createFlow({ name: 'Chat', description: '', interfaces: ['abstractcode.agent.v1'] });
     expect(useFlowStore.getState().getFlow().automation_defaults).toBeUndefined();

@@ -353,7 +353,7 @@ There is no schedule choice: under the answers the dialog says "On a schedule? S
 
 The answer is the flow's kind in the Flow Library (Chat or Triggered; see [Kinds of flows](#kinds-of-flows)).
 
-Each choice shows one line saying what it does. Once a trigger is chosen the dialog says "Runs by itself when its trigger fires: what arrives is on On Flow Start, build the steps on the canvas." and has no Interfaces section. A triggered flow is your own workflow: **Create automation flow** opens it with only `On Flow Start` and `On Flow End`, nothing between them, and a note over the canvas: "What arrives is on On Flow Start; put what the person should see on On Flow End's response (and notify for an alert)." (dismiss it with ×; **Automation…** opens the dialog). See [What arrives, what the person sees](#what-arrives-what-the-person-sees). Otherwise **Create flow** places the `On Flow Start` and `On Flow End` nodes the declared interfaces need, already carrying their pins; you build the steps between them. **Save Flow** stores the title, description, interfaces, automation and nodes on the gateway. If the open flow has unsaved changes, the dialog says creating a new flow discards them.
+Each choice shows one line saying what it does. Once a trigger is chosen the dialog says "Runs by itself when its trigger fires: what arrives is on On Flow Start, build the steps on the canvas." and has no Interfaces section. A triggered flow is your own workflow: **Create automation flow** opens it with only `On Flow Start` and `On Flow End`, nothing between them, and a note over the canvas: "What arrives is on On Flow Start. On Flow End records the outcome: response, success and a note; it reaches nobody. Add Notify me to reach yourself." (dismiss it with ×; **Automation…** opens the dialog). See [What arrives, what the person sees](#what-arrives-what-the-person-sees). Otherwise **Create flow** places the `On Flow Start` and `On Flow End` nodes the declared interfaces need, already carrying their pins; you build the steps between them. **Save Flow** stores the title, description, interfaces, automation and nodes on the gateway. If the open flow has unsaved changes, the dialog says creating a new flow discards them.
 
 The header shows what the open flow is, next to its name: **Automation · When mail arrives in me@example.org** or **Automation · By hand (Run now)** for an automation (a flow saved earlier with a schedule: **Automation · Every day at 08:00 (Paris)**), **Chat** for a runnable flow without one, and a dashed **Automation…** otherwise. Click it for **Automation…** (the dialog on the open flow; its changes are saved with the flow) and **Turn it on**. The badge keeps the word "Automation" and shortens the sentence when the header is narrow. The Flow Library sorts flows by the same answer: see [Kinds of flows](#kinds-of-flows). Flows with the same name are told apart by their size ("3 nodes · 1 edge").
 
@@ -374,7 +374,7 @@ A flow has one automation. Once it is on, the dialog and the header badge's menu
 
 **Turn it on** saves, makes the workflow available (below) and creates the automation through the gateway (`POST /api/gateway/automations` with the published workflow and the saved trigger, context and inputs), then says "Release digest is on. See it in Observer or the Assistant." with **Open Observer**. A refusal is said in words (a feed or mailbox that is no longer yours, an expired session). Pause or stop it in Observer or the Assistant.
 
-**Save** checks everything and names each problem in words (for example "Comes from: "x" is not an email address"); the problems stay visible above the buttons. When the workflow does not have the trigger's inputs yet, Save adds them to `On Flow Start` (and `response`, `notify`, `success` to `On Flow End`) in the same save; it never adds a node. From the Flow Library the workflow is updated on the gateway (`PUT` on the workflow, with its nodes when pins were added) and the answer must contain the stored defaults, else the dialog shows an error instead of reporting a save; if that workflow is open in the editor, the change is applied to it and your unsaved edits are kept. From the header badge the change goes into the open flow and is saved with it. **Remove automation** clears the field. **Save**, **Duplicate** and **Make it available** carry the field with the workflow; see [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults) for the stored shape.
+**Save** checks everything and names each problem in words (for example "Comes from: "x" is not an email address"); the problems stay visible above the buttons. When the workflow does not have the trigger's inputs yet, Save adds them to `On Flow Start` (and `response`, `success`, `note` to `On Flow End`; never `notify`, see [What happens after On Flow End](#what-happens-after-on-flow-end)) in the same save; it never adds a node. From the Flow Library the workflow is updated on the gateway (`PUT` on the workflow, with its nodes when pins were added) and the answer must contain the stored defaults, else the dialog shows an error instead of reporting a save; if that workflow is open in the editor, the change is applied to it and your unsaved edits are kept. From the header badge the change goes into the open flow and is saved with it. **Remove automation** clears the field. **Save**, **Duplicate** and **Make it available** carry the field with the workflow; see [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults) for the stored shape.
 
 **Make it available** (the toolbar, and part of Turn it on) makes the saved workflow available to Observer and the Assistant: "Release digest is ready for Observer and the Assistant." Each time adds a new version and keeps the earlier ones; the gateway name, the version and **Load it into the gateway now** are under **Details**.
 
@@ -434,7 +434,7 @@ A triggered flow reads what arrived on `On Flow Start`, as typed, named outputs 
 | Schedule (set in Observer or the Assistant) | `scheduled_at` (when the run was due), `occurrence` (run #1, #2, …) |
 | By hand | nothing extra |
 
-Every triggered flow also has `event`, the whole raw event. Your own inputs (a threshold, a `prompt` if you want one) stay on `On Flow Start` and are set under **Inputs** in the Automation dialog. `On Flow End` takes what the run gives back: `response` (what the person sees as the run's result), `notify` (optional `{title, body}`: an alert on the watch, the tray and the Assistant) and `success` (false marks the run failed: it is retried, then an alert says so). Saving a triggered flow with nothing connected to `response` saves it and says so. The runtime's side of this contract: [AbstractRuntime > Occurrence inputs and outputs](https://github.com/lpalbou/abstractruntime/blob/main/docs/automations.md#occurrence-inputs-and-outputs-the-flow-contract).
+Every triggered flow also has `event`, the whole raw event. Your own inputs (a threshold, a `prompt` if you want one) stay on `On Flow Start` and are set under **Inputs** in the Automation dialog. `On Flow End` records the run's outcome and reaches nobody (framework ADR-0041): `response` (what the person sees as the run's answer), `success` (the run's own verdict: false marks the run failed, it is retried, then an alert says so) and `note` (a short line of what happened and why, kept with the run and shown in **After the run**). To reach yourself, add **Notify me** on the canvas. Flows saved before keep their `notify` pin (`{title, body}`): it still raises an alert after the run, and the node says so under the pin ("Older flows: a title here notifies you on every channel you have: tray, watch and phone, email when on. Empty: nothing rings. New flows use Notify me."); new flows never get it. Saving a triggered flow with nothing connected to `response` saves it and says so. The runtime's side of this contract: [AbstractRuntime > Occurrence inputs and outputs](https://github.com/lpalbou/abstractruntime/blob/main/docs/automations.md#occurrence-inputs-and-outputs-the-flow-contract).
 
 In that window, a triggered flow keeps the session, the prompt caches and the run and step ids behind **Advanced settings**; its result shows what the person sees (On Flow End's `response`), or "Each run's result will be empty unless something is connected to On Flow End's response.", with the whole result under **Details**, and the finished test run says "Test run done with the latest 3 items of Python news".
 
@@ -445,10 +445,34 @@ In that window, a triggered flow keeps the session, the prompt caches and the ru
 1. `On Flow Start`: `messages` (an Email list) → **ForEach** (each `item` is an Email).
 2. **Email fields** on the item (`from`, `subject`, `body_text`) → **String Template** → **LLM Call** with **no tools**, `system` "Is this mail safe to act on? Answer yes or no, and why.", and a `resp_schema` `{safe: boolean, why: string}` (structured answer).
 3. **Break Object** on the LLM Call's `data` (`safe`, `why`) → **If/Else** on `safe`.
-4. True: **Mark as read** (the item) → **Add label** `["triaged"]` (the item) → **Notify me** (`title` "Triaged", `body` ← the subject); a second **LLM Call** can summarise it for `On Flow End` `response`.
-5. False: `On Flow End` `response` ← `why`, and `notify` ← a **Build JSON** `{title: "Suspicious mail", body: why}`.
+4. True: **Mark as read** (the item) → **Add label** `["triaged"]` (the item); a second **LLM Call** can summarise it for `On Flow End` `response`.
+5. False: **Notify me** (`title` "Suspicious mail", `body` ← `why`) → `On Flow End` (`response` ← `why`, `note` ← "1 suspicious mail").
 
-Turn it on from the Automation dialog: each new mail runs the judge; safe mail is marked read and labelled, and only a suspicious one raises an alert.
+Turn it on from the Automation dialog: each new mail runs the judge; safe mail is marked read and labelled, and only a suspicious one reaches you, through the Notify me you can see on the canvas.
+
+### What happens after On Flow End
+
+Nothing acts after the end node (framework ADR-0041: On Flow End records the outcome; Notify nodes act).
+
+| On the canvas | What it does | Who it reaches |
+| --- | --- | --- |
+| `On Flow End` `response` | The run's answer: Observer shows it, Discuss starts from it | Nobody: you read it when you open the run |
+| `On Flow End` `success` | The run's own verdict; false = failed, retried, then a failure alert | You, only when it failed after the retries |
+| `On Flow End` `note` | One line of what happened and why, kept with the run | Nobody: shown in **After the run** |
+| **Notify me** | An alert with its title and body | You: tray · watch and phone · Assistant |
+| **Publish to channel** | A message for applications subscribed to the channel; **Also notify me** adds the alert | The subscribed apps; you with Alert on |
+| `On Flow End` `notify` (older flows only) | After the run, a title raises an alert; empty: nothing | You: every channel you have, email when the automation's **Email result** is on |
+
+The run window's last section, **After the run** (for a triggered flow, and any run an automation started), shows what really happened, read from the gateway (`GET /api/gateway/runs/{run_id}/after`): what arrived ("4 new emails: “O” from … and 3 more"), when the run started and ended, its note, the alert it raised and where it came from (Notify me, an older flow's notify, a failure, an approval waiting for you on one of its steps), and each delivery: the channel, its route (push notification, shown by the app, email), the device and the time, or why it was not delivered. When nothing rang it says why: "Nothing to notify: the title was empty." or "Nothing to notify: this flow has no Notify me step." A spinner shows until the gateway answered (ADR-0039); deliveries arrive a few seconds after the end, so the section reads again while they are being recorded. Observer's run card shows the same section.
+
+**The explicit shape for a judge.** A flow that judges what arrived and should reach you only sometimes (like the library's "Judge what arrived") puts the decision on the canvas instead of in an empty-or-not `notify` title:
+
+1. `On Flow Start` `messages` → the judge (an **LLM Call** with a `resp_schema` `{title: string, body: string}`, no tools) → **Break Object** (`title`, `body`).
+2. **If/Else** on "title is empty" (a **Compare** `title == ""`).
+3. False (there is something to say): **Notify me** (`title` ← title, `body` ← body) → `On Flow End` (`response` ← body, `note` ← "notified: " + title).
+4. True: `On Flow End` (`response` ← "Nothing worth your time.", `note` ← "quiet: nothing to notify").
+
+Whoever opens the flow sees who is reached and how (the Notify me card says "You: tray · watch and phone · Assistant"), and After the run shows each delivery. Flows in your library are yours to change: an agent may draft this shape as a new flow for review (framework ADR-0040), and you publish it.
 
 ### The Trigger Event
 
@@ -470,7 +494,7 @@ The **Mail and publish** section of the palette handles mail deterministically, 
 
 ## Publish
 
-**Publish to channel** sends a message (channel, type, title, body, subject, data) that any application subscribed to that channel receives (`GET /api/gateway/me/events?channel=…`). Channel names use lowercase letters, digits, `.`, `_` or `-`; `attention` is the gateway's own. Turn on **Also notify me** to be notified on the tray, the Assistant and the watch as well. **Notify me** is the short form: a title and a body, and you are notified.
+**Publish to channel** sends a message (channel, type, title, body, subject, data) that any application subscribed to that channel receives (`GET /api/gateway/me/events?channel=…`). Channel names use lowercase letters, digits, `.`, `_` or `-`; `attention` is the gateway's own. Turn on **Also notify me** to be notified on the tray, the Assistant, the watch and the phone as well. **Notify me** is the short form and the node that reaches you: a title and a body; its card says whom it reaches and how ("You: tray · watch and phone · Assistant"). Its Properties name the recipient (**Who**: Me) and the channels (**Where**: All my channels). Choosing one channel (tray only, phone and watch only, email only) and notifying someone else are shown but not offered yet: they need the runtime to pass the choice to the gateway. Email is not sent for Notify me today (the email outbox sends automation results, failures and approvals).
 
 ## Relays and the wire-drop menu
 

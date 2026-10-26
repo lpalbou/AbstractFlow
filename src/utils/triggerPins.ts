@@ -11,9 +11,13 @@
  *   by hand  -> nothing extra
  *
  * The runtime fills them from the occurrence's `input_data[<name>]` (the same
- * mechanism as `event`). On Flow End of an automation flow takes `response`
- * (what the person sees), `notify` ({title, body}: an attention alert) and
- * `success`. Pure: nodes in, nodes out.
+ * mechanism as `event`). On Flow End of an automation flow RECORDS the
+ * outcome (framework ADR-0041, "No hidden effects after a flow"): `response`
+ * (what the person sees as the answer), `success` (the run's own verdict) and
+ * `note` (a short line of what happened and why, kept with the run). Nothing
+ * on it reaches a person: Notify me does, on the canvas. The `notify` pin of
+ * flows saved before is kept as their compatibility path and says so on the
+ * node; it is never added to a flow. Pure: nodes in, nodes out.
  */
 import type { Edge, Node } from 'reactflow';
 import type { AutomationTriggerDefaults, FlowNodeData, Pin, VisualFlow } from '../types/flow';
@@ -84,18 +88,28 @@ export function triggerStartPins(kind: TriggerPinKind): Pin[] {
 /** Every pin name some trigger fills (never asked as an automation input). */
 export const TRIGGER_FILLED_PIN_IDS: ReadonlySet<string> = new Set([TRIGGER_EVENT_PIN_ID, ...Object.values(PINS).flat().map((p) => p.id)]);
 
-/** On Flow End of an automation flow: what the person sees, the alert, success. */
+/** On Flow End of an automation flow: the run's outcome record (ADR-0041), never an effect. */
 export const AUTOMATION_END_PINS: Pin[] = [
-  { id: 'response', label: 'response', type: 'string', description: 'What the person sees as the run’s result.' },
-  {
-    id: 'notify',
-    label: 'notify',
-    type: 'object',
-    description: 'Optional {title, body} (or true): raises an alert on the watch, the tray and the Assistant.',
-    schema: { type: 'object', properties: { title: { type: 'string' }, body: { type: 'string' } } },
-  },
-  { id: 'success', label: 'success', type: 'boolean', description: 'False marks the run failed: it is retried, then an alert says so.' },
+  { id: 'response', label: 'response', type: 'string', description: 'What the person sees as the run’s answer.' },
+  { id: 'success', label: 'success', type: 'boolean', description: 'The run’s own verdict. False marks the run failed: it is retried, then an alert says so.' },
+  { id: 'note', label: 'note', type: 'string', description: 'A short line of what happened and why, kept with the run and shown after it.' },
 ];
+
+/**
+ * The `notify` pin of triggered flows saved before ADR-0041: {title, body};
+ * a title raises an alert after the run. Kept for those flows (the node says
+ * so in words), never added to a flow: new flows use Notify me.
+ */
+export const NOTIFY_COMPAT_PIN_ID = 'notify';
+
+/** The line On Flow End shows under its pins of a triggered flow (null: none). */
+export function endPinHelp(pinId: string): string | null {
+  if (pinId === NOTIFY_COMPAT_PIN_ID) {
+    return 'Older flows: a title here notifies you on every channel you have: tray, watch and phone, email when on. Empty: nothing rings. New flows use Notify me.';
+  }
+  if (pinId === 'note') return 'Kept with the run; shown in After the run. Reaches nobody.';
+  return null;
+}
 
 function addPins(list: Pin[], pins: Pin[]): Pin[] {
   const missing = pins.filter((p) => !list.some((x) => x.id === p.id));
@@ -104,8 +118,8 @@ function addPins(list: Pin[], pins: Pin[]): Pin[] {
 
 /**
  * On Flow Start gets the trigger's pins (and `event`), On Flow End the
- * automation's (`response`, `notify`, `success`); pins already there are
- * kept, nothing is wired. Returns the same array when nothing changed.
+ * outcome record (`response`, `success`, `note`); pins already there (an
+ * older flow's `notify`) are kept, nothing is wired. Returns the same array when nothing changed.
  */
 export function withTriggerPins(nodes: Node<FlowNodeData>[], kind: TriggerPinKind): Node<FlowNodeData>[] {
   let changed = false;
@@ -134,7 +148,7 @@ export function hasTriggerPins(flow: Pick<VisualFlow, 'nodes'>, kind: TriggerPin
 
 /** The note a new automation flow opens with (dismissible). */
 export const AUTOMATION_CANVAS_NOTE =
-  'What arrives is on On Flow Start; put what the person should see on On Flow End’s response (and notify for an alert).';
+  'What arrives is on On Flow Start. On Flow End records the outcome: response, success and a note; it reaches nobody. Add Notify me to reach yourself.';
 
 /** Said when a triggered flow's result would be empty (the save warning and the test result view). */
 export const EMPTY_RESULT_WARNING = 'Each run’s result will be empty unless something is connected to On Flow End’s response.';

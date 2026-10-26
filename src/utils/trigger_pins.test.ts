@@ -1,7 +1,7 @@
 // Operator ruling 2026-10-25: a triggered flow is the person's own workflow.
 // What arrives is on On Flow Start as typed, named pins per trigger (the
 // runtime's occurrence inputs, abstractruntime docs/automations.md); On Flow
-// End takes response / notify / success; nothing is pre-built between them.
+// End takes response / success / note (ADR-0041: no notify pin); nothing is pre-built between them.
 import { describe, expect, it } from 'vitest';
 import { AUTOMATION_END_PINS, automationSaveWarning, triggerPinKind, triggerStartPins, withTriggerPins } from './triggerPins';
 import { inputFields } from './automationInputs';
@@ -22,7 +22,7 @@ describe('trigger pins', () => {
     }
     const messages = triggerStartPins('email')[0].schema as { items: { properties: Record<string, unknown> } };
     for (const field of ['id', 'from', 'to', 'subject', 'date', 'body_text', 'attachments']) expect(Object.keys(messages.items.properties)).toContain(field);
-    expect(AUTOMATION_END_PINS.map((p) => `${p.id}:${p.type}`)).toEqual(['response:string', 'notify:object', 'success:boolean']);
+    expect(AUTOMATION_END_PINS.map((p) => `${p.id}:${p.type}`)).toEqual(['response:string', 'success:boolean', 'note:string']);
   });
 
   it('maps triggers to kinds', () => {
@@ -41,7 +41,7 @@ describe('trigger pins', () => {
     const once = withTriggerPins(nodes, 'feed');
     expect(once).not.toBe(nodes);
     expect(once[0].data.outputs.map((p) => p.id)).toEqual(['exec-out', 'threshold', 'items', 'feed', 'event']);
-    expect(once[1].data.inputs.map((p) => p.id)).toEqual(['exec-in', 'response', 'notify', 'success']);
+    expect(once[1].data.inputs.map((p) => p.id)).toEqual(['exec-in', 'response', 'success', 'note']);
     expect(withTriggerPins(once, 'feed')).toBe(once);
   });
 });

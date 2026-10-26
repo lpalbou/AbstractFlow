@@ -79,6 +79,8 @@ import { unambiguousSubRunCandidate } from '../utils/subrunAttach';
 import { displayDataPinTypeLabel } from '../utils/pinTypeOptions';
 import { savedFlowSummariesFromResponse, subflowExecutionLabel } from '../utils/subflowPins';
 import { findGatedStep, gatedStepKey } from '../utils/gatedStep';
+import { showsAfterTheRun } from '../utils/afterTheRun';
+import { AfterTheRunSection } from './automation/AfterTheRun';
 import {
   formatProgressSummary,
   progressDisplayPercent,
@@ -5072,6 +5074,19 @@ export function RunFlowModal({
   }, [computedFinalResult, result]);
 
   const hasRunData = isRunning || effectiveResult != null || events.length > 0;
+  // "After the run" (framework ADR-0041): what arrived, the note, the alert or why nothing rang,
+  // each delivery. For a triggered flow's run and any run an automation started, once it ended.
+  const afterTheRunNode =
+    rootRunId &&
+    !isRunning &&
+    effectiveResult != null &&
+    showsAfterTheRun({
+      triggered: Boolean(automationTrigger),
+      automationId: runSummary?.automation_id ?? null,
+      originKind: runSummary?.origin?.kind ?? null,
+    }) ? (
+      <AfterTheRunSection runId={rootRunId} />
+    ) : null;
   const isActiveRun = Boolean(isRunning || isPaused || isWaiting);
 
   // Clear the optimistic "Cancelling…" affordance once the run actually
@@ -7912,10 +7927,12 @@ export function RunFlowModal({
                       )}
                     </div>
                   ) : null}
+                  {afterTheRunNode}
                 </div>
               ) : (
                 <div className="run-details-body">
                   <div className="run-details-empty">Select a step to inspect outputs.</div>
+                  {afterTheRunNode}
                 </div>
               )}
             </div>

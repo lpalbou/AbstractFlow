@@ -3432,7 +3432,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     if (automation) {
       // A triggered flow is the person's own workflow (operator ruling
       // 2026-10-25): ONLY On Flow Start (what arrives, as typed pins) and On
-      // Flow End (response, notify, success), nothing between, no prompt.
+      // Flow End (the outcome record: response, success, note; ADR-0041 — no
+      // notify pin: Notify me reaches the person), nothing between, no prompt.
       if (!nodes.some((n) => n.data.nodeType === 'on_flow_start')) nodes = [scaffold('on_flow_start'), ...nodes];
       if (!nodes.some((n) => n.data.nodeType === 'on_flow_end')) nodes = [...nodes, scaffold('on_flow_end')];
       nodes = withTriggerPins(nodes, triggerPinKind(automation.trigger));

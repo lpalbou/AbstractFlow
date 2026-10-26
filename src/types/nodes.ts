@@ -2553,7 +2553,7 @@ const MAIL_NODES: NodeTemplate[] = [
       { id: 'body', label: 'body', type: 'string', description: 'The text (optional).' },
       { id: 'subject', label: 'subject', type: 'string', description: 'What it is about (optional).' },
       { id: 'data', label: 'data', type: 'object', description: 'Any extra JSON for the applications.' },
-      { id: 'alert', label: 'alert', type: 'boolean', description: 'On: also notify me (tray, Assistant, watch).' },
+      { id: 'alert', label: 'alert', type: 'boolean', description: 'On: also notify me (tray, Assistant, watch or phone).' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -2568,7 +2568,7 @@ const MAIL_NODES: NodeTemplate[] = [
     icon: '&#x1F514;', // Bell
     label: 'Notify me',
     preset: true,
-    description: 'Notify me on the tray, the Assistant and the watch.',
+    description: 'Reach yourself: the tray, the watch or the phone, and the Assistant. The one node that notifies you (On Flow End only records the outcome).',
     headerColor: MAIL_HEADER,
     inputs: [
       EXEC_IN,

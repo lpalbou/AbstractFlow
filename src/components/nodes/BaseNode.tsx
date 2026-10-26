@@ -6,6 +6,8 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
+import { endPinHelp } from '../../utils/triggerPins';
+import { NOTIFY_ME_REACHES, isNotifyMeNode } from '../../utils/afterTheRun';
 import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Handle, Position, NodeProps, useUpdateNodeInternals } from 'reactflow';
@@ -769,6 +771,7 @@ export const BaseNode = memo(function BaseNode({
   // Render-fold (0156 Stage 1): reads folded onto this node's pin rows.
   const foldedReads = useFoldedReadsForNode(id);
   const flowId = useFlowStore((s) => s.flowId);
+  const isTriggeredFlow = useFlowStore((s) => Boolean(s.flowAutomationDefaults));
   const flowName = useFlowStore((s) => s.flowName);
   const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
@@ -4286,6 +4289,13 @@ export const BaseNode = memo(function BaseNode({
           </>
         )}
 
+        {/* Notify me says whom it reaches and how, on the node (ADR-0041). */}
+        {isNotifyMeNode(data) ? (
+          <div className="node-reaches" data-field="notify-reaches">
+            {NOTIFY_ME_REACHES}
+          </div>
+        ) : null}
+
         {/* Data input pins */}
         <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => {
@@ -5736,6 +5746,14 @@ export const BaseNode = memo(function BaseNode({
                   onClose={() => setFxEditingPin(null)}
                   onPromote={promotePinExpression(pin.id)}
                 />
+              ) : null}
+
+              {/* On Flow End of a triggered flow records the outcome (ADR-0041): its
+                  notify pin (older flows) and note say in words what they do. */}
+              {data.nodeType === 'on_flow_end' && isTriggeredFlow && endPinHelp(pin.id) ? (
+                <div className="pin-help" data-pin-help={pin.id}>
+                  {endPinHelp(pin.id)}
+                </div>
               ) : null}
 
               {/* Condition preview: the deciding law stays readable ON the
