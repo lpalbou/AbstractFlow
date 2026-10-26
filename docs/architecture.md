@@ -66,7 +66,8 @@ flowchart TB
     Preflight["Run preflight (utils/preflight.ts)"]
     Triggers["Trigger sources, connections + automations<br/>(utils/triggerSources.ts, triggerConnections.ts, triggerBindings.ts,<br/>automationChoice.ts, automationInputs.ts)"]
     Assistant["Workflow Authoring Assistant drawer"]
-    Client["Gateway client (utils/gatewayClient.ts)"]
+    RunWin["Run window (RunFlowModal)<br/>Run as if triggered, After the run"]
+    Client["Gateway client (utils/gatewayClient.ts)<br/>reads retried in utils/readRetry.ts"]
   end
   subgraph Server["Flow server (bin/)"]
     Cli["cli.js + flags.js<br/>launch flags, Gateway URL (flag, env, saved, pointer)"]
@@ -85,6 +86,7 @@ flowchart TB
   Toolbar --> Client
   TopBar --> Client
   Assistant --> Client
+  RunWin --> Client
   Client --> Cli
   Cli --> Fwd
   Cli --> Gateway
@@ -110,7 +112,17 @@ flowchart LR
 ```
 
 Pins added on open are compared against the document as stored, so the
-workflow shows unsaved changes until you save it. See
+workflow shows unsaved changes until you save it.
+
+Three address parameters open the editor on something, each read once after
+sign-in: `?bundle=…[&version=…][&flow=…]` opens a Gateway workflow
+(`src/utils/bundleDeepLink.ts`; a reload opens it again); `?trigger=…` and
+`?flow=…` are removed from the address once read. `?trigger=…` opens
+**New flow** on one of your triggers once your mailboxes and connections have
+loaded (`src/utils/triggerDeepLink.ts`), and `?flow=…` alone opens a flow of
+your Flow library through the library's own load path
+(`src/utils/flowDeepLink.ts`). See [API and contracts > Editor Address
+Parameters](api.md#editor-address-parameters). See
 [Web editor > Hidden Connections](web-editor.md#hidden-connections) and
 [VisualFlow JSON > Interfaces](visualflow.md#interfaces).
 
@@ -182,13 +194,18 @@ flowchart LR
 - **Validation** (`src/utils/triggerBindings.ts`): the field's shape is
   checked (unknown keys refused, so no automation id or credential is stored in
   a workflow), then the trigger settings are checked against the source's
-  `config_schema` using a JSON Schema subset. A schema that uses a keyword
-  outside the subset is refused rather than partly checked.
+  `config_schema` using a JSON Schema subset. A setting whose schema uses a
+  keyword outside the subset is shown as a JSON field of its own and checked by
+  the Gateway; it never blocks the trigger.
 - **Editing** (`src/components/AutomationDefaultsModal.tsx`): the settings form
   is built from the source's schema; saving is a `PUT` whose answer must echo
   the stored field. For a source with `needs_connection`, the dialog lists the
   author's connections of that source (`src/utils/triggerConnections.ts`) and
   stores the choice as `trigger.connection_id`.
+- **Trigger pins** (`src/utils/triggerPins.ts`): a trigger chosen in New
+  Flow, or saved in the Automation dialog, adds the named outputs of what
+  arrives (`messages`, `items`, `calls`, …) and `event` to `On Flow Start`, and
+  `response`, `success` and `note` to `On Flow End`; it never adds a node.
 - **Trigger event** (`src/utils/triggerEvent.ts`): *Add trigger event* on
   `On Flow Start` adds the `event` output, typed with the CloudEvents envelope's
   schema, and a wired Break Object named "Trigger event". A workflow with that
@@ -205,6 +222,53 @@ that has already started ([Web editor > Waits inside a
 flow](web-editor.md#waits-inside-a-flow)). See
 [Web editor > Automations](web-editor.md#automations) and
 [VisualFlow JSON > Automation Defaults](visualflow.md#automation-defaults).
+
+## After The Run
+
+`On Flow End` records a run's outcome and reaches nobody; every effect toward a
+person is a node on the canvas (framework
+[ADR-0041](https://github.com/lpalbou/AbstractFramework/blob/main/docs/adr/0041-no-hidden-effects-after-a-flow.md)).
+**Notify me** is a `publish_event` node on the `me` channel with its alert on;
+its **Where** choice is saved in the node's `effectConfig.channels` and passed
+by the compiled workflow to the Gateway, whose deliverers each honour it. The
+run window reads back what happened:
+
+```mermaid
+flowchart LR
+  subgraph Flow["Flow editor"]
+    End["On Flow End<br/>response, success, note"]
+    Notify["Notify me<br/>effectConfig.channels"]
+    After["Run window: After the run<br/>(utils/afterTheRun.ts)"]
+  end
+  subgraph GW["AbstractGateway"]
+    Record[(Run record<br/>outcome and note)]
+    Alert["Alert<br/>publish_event, channel me"]
+    Deliver["Deliveries<br/>tray, push to watch or phone, email outbox"]
+    Route["GET /api/gateway/runs/{run_id}/after"]
+  end
+  End --> Record
+  Notify --> Alert --> Deliver
+  Record --> Route
+  Alert --> Route
+  Deliver --> Route
+  Route --> After
+```
+
+An older flow's `notify` pin on `On Flow End` still raises an alert after the
+run; new flows never get it. See [Web editor > What happens after On Flow
+End](web-editor.md#what-happens-after-on-flow-end).
+
+## Reads And Loading States
+
+Every Gateway read goes through `gatewayFetch` (`src/utils/gatewayClient.ts`)
+and `src/utils/readRetry.ts`, the one place Flow retries (framework
+[ADR-0039](https://github.com/lpalbou/AbstractFramework/blob/main/docs/adr/0039-loading-states-spinner-until-a-read-has-failed.md)):
+a GET is tried three times, 1 s then 3 s apart, on a timeout, a lost
+connection, a 5xx, 408 or 429; any other refusal is final at once; writes are
+sent once. React Query's own retry is off, so tries are never multiplied. The
+views show a spinner until the read answered, and the reason with **Retry**
+only after every try failed ([Web editor > Loading and
+errors](web-editor.md#loading-and-errors)).
 
 ## Repository Layout
 

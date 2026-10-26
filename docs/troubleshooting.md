@@ -158,11 +158,24 @@ it through the interface receives missing or mistyped values.
 | trigger source "..." is not served / is unavailable / version ... is not served | The stored defaults name a source or version the connected Gateway does not offer. | Pick a served source and save again. |
 | Gateway answered the automation defaults update without storing them | The Gateway accepted the update but does not store `automation_defaults`. | Update the Gateway to a release with automations. |
 | Your feeds and webhooks could not be read: … / Trigger connections are unavailable on this gateway (it predates them) | The Gateway does not serve `/api/gateway/triggers/connections` (HTTP 404). | Update the Gateway to a release with trigger connections. |
-| That connection is not one of yours on this gateway: choose another. / Connection: … | The source reads from a connection and none of yours is selected, or the saved one was deleted or belongs to another source. | Pick another one under **When something arrives**, or create one with **Set up a new one…**, then **Refresh**. |
+| That connection is not one of yours on this gateway: choose another. / Connection: … | The source reads from a connection and none of yours is selected, or the saved one was deleted or belongs to another source. | Pick another one under **When something arrives**, or create one with **Add a feed or webhook…**, then **Refresh**. |
 | unknown trigger field(s) ['connection_id'] (HTTP 422) | The Gateway does not accept `trigger.connection_id` in `automation_defaults` yet. | Update the Gateway to a release with trigger connections. |
 | unknown context field(s) ['growing'] (HTTP 422) | You changed **Remembers up to** and the Gateway does not accept `context.growing.max_tokens` yet. | Keep the default budget, or update the Gateway. |
 | I cannot find "On a schedule" in What starts it? | Flow does not set schedules: a schedule is a property of the automation. | Set it in Observer or the Assistant. A flow saved earlier with a schedule keeps it ("Now: Every day at 08:00 (Paris) · a schedule from an earlier save"). |
 | Mailboxes are not available on this gateway. / Your mailboxes could not be read: … | The Gateway has no mail routes, or reading `GET /api/gateway/me/email` failed. | Connect a mailbox in the console (**Add a mailbox…**) or check the Gateway. |
+
+### Triggered flows, links and notifications
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| A list shows a spinner and "Loading…" for several seconds | The Gateway is still answering; listing feed and webhook connections can take several seconds on a busy Gateway. | Wait: each read is tried three times before Flow says why ([Web editor > Loading and errors](web-editor.md#loading-and-errors)). |
+| A list says why it could not be read, with **Retry** | Every try failed (timeout, lost connection, a server error), or the Gateway refused the read. | Check that the Gateway is reachable and you are signed in, then press **Retry**. |
+| "The trigger <id> is not among your connections." | The link from the console names a connection or mailbox that is not yours on this Gateway, or was deleted. | Pick another one under **When something arrives**, or create it on the console's Triggers page and **Refresh**. |
+| "The flow <id> is not in your Flow library any more." | The `?flow=` link names a flow that was deleted, or one that belongs to another account. | Open it from the Flow Library, or publish the flow again from the account that owns it. |
+| After the run says "Nothing to notify: this flow has no Notify me step." | `On Flow End` records the outcome and reaches nobody. | Add **Notify me** where the flow should reach you ([What happens after On Flow End](web-editor.md#what-happens-after-on-flow-end)). |
+| After the run says "Nothing to notify: the title was empty." | An older flow's `notify` pin, or a Notify me, had no title. | Wire a title, or let the empty title mean "nothing worth saying" on purpose. |
+| A delivery reads "not delivered: …" | That channel could not deliver the alert; the Gateway's reason follows the colon. | Fix that channel (the device, the app or the mailbox the reason names), or pick other channels under Notify me's **Where**. |
+| "Could not read what happened after the run: …" | The Gateway does not serve `GET /api/gateway/runs/{run_id}/after` (HTTP 404), or the read failed. | Update the Gateway, or press **Retry**. |
 
 ### Edited example flows do not appear in the Flow Library
 

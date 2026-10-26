@@ -97,17 +97,29 @@ warns about missing, unconnected, or mistyped interface pins. See [VisualFlow JS
 A workflow can also be an automation. **New Flow** asks *What starts it?*: a
 person in a chat, something arriving (one of your mailboxes, feeds or
 webhooks, listed by name) or Run now only (a schedule is set on the automation
-in Observer or the Assistant, never in Flow); a trigger
-choice creates the flow with its trigger and the wired **Trigger event** node
-already in place. The **Automation** dialog (the header badge, or Flow Library
-> **Automation…**) sets what starts it, the context (independent runs, or a
-growing conversation that remembers up to the gateway's default token budget)
-and the inputs, as a form built from `On Flow Start`; **Turn it on** makes the flow
-available and creates the automation. A triggered flow is your own workflow:
-it opens with only `On Flow Start` (what arrives: `messages`, `items`,
-`calls`, … typed) and `On Flow End` (`response`, `notify`, `success`). See
-[Web editor > Automations](docs/web-editor.md#automations) and
-[The Trigger Event](docs/web-editor.md#the-trigger-event).
+in Observer or the Assistant, never in Flow). The Flow Library sorts flows by
+that answer: **Chat**, **Triggered** and **Other**. The **Automation** dialog
+(the header badge, or Flow Library > **Automation…**) sets what starts it, the
+context (independent runs, or a growing conversation that remembers up to the
+gateway's default token budget) and the inputs, as a form built from
+`On Flow Start`; **Turn it on** makes the flow available and creates the
+automation. A triggered flow is your own workflow: it opens with only
+`On Flow Start` (what arrives: `messages`, `items`, `calls`, … typed) and
+`On Flow End`, which records the outcome (`response`, `success`, `note`) and
+reaches nobody. **Notify me** is the node that reaches you, on the channels you
+choose; the run window's **After the run** shows what arrived, the alert and
+each delivery. **Run as if triggered** tests the flow on the latest mail, feed
+items or webhook calls. The **Mail and publish** palette section acts on your
+mailboxes (search, mark, label, move, send, reply) without a model, and the
+**Waits** section holds the nodes that pause a running flow. See
+[Web editor > Automations](docs/web-editor.md#automations),
+[What happens after On Flow End](docs/web-editor.md#what-happens-after-on-flow-end),
+[Mail](docs/web-editor.md#mail) and
+[Waits inside a flow](docs/web-editor.md#waits-inside-a-flow).
+
+The Gateway console links into the editor: `?trigger=<connection id>` opens
+**New flow** on that trigger, and `?flow=<flow id>` opens a flow of your Flow
+library. See [Web editor > Open Flow From A Trigger](docs/web-editor.md#open-flow-from-a-trigger).
 
 The About button in the top bar opens the shared AbstractFramework About card:
 the AbstractFlow version, the AbstractFramework and AbstractGateway versions the
@@ -162,7 +174,8 @@ npm run docs:llms
 
 - [Documentation index](docs/README.md)
 - [Getting started](docs/getting-started.md)
-- [Web editor](docs/web-editor.md) (including the [responsive layout](docs/web-editor.md#responsive-layout))
+- [Web editor](docs/web-editor.md) (including the [responsive layout](docs/web-editor.md#responsive-layout) and [automations](docs/web-editor.md#automations))
+- [Workflow node catalog](docs/workflow-node-catalog.md)
 - [Architecture](docs/architecture.md)
 - [API and contracts](docs/api.md)
 - [VisualFlow JSON](docs/visualflow.md)

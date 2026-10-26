@@ -76,15 +76,38 @@ the Automation dialog) has typed outputs for what arrived: `messages` and
 `mailbox` for mail, `items` and `feed` for a feed, `calls` for a webhook,
 `scheduled_at` and `occurrence` for a schedule (set in Observer or the
 Assistant), plus `event` (the whole raw
-event). Put what the person should see on `On Flow End`'s `response`, and
-`notify` for an alert. See [Web editor > What arrives, what the person
-sees](web-editor.md#what-arrives-what-the-person-sees).
+event). Put what the person should see on `On Flow End`'s `response`, and a
+short line of what happened on its `note`. See [Web editor > What arrives,
+what the person sees](web-editor.md#what-arrives-what-the-person-sees).
+
+## How Do I Get Notified Only When Something Matters?
+
+Put the decision on the canvas and add **Notify me** on the branch that should
+reach you: for example a judge (an **LLM Call** with a structured answer), an
+**If/Else** on its result, and **Notify me** on one branch only. `On Flow End`
+records the outcome (`response`, `success`, `note`) and reaches nobody. Notify
+me reaches you on all your channels (the tray, the watch or the phone, email
+when a mailbox is connected) unless you pick some under **Where**. Flows saved
+before Notify me existed keep their `notify` pin on `On Flow End`, which still
+raises an alert when it carries a title. See [Web editor > What happens after
+On Flow End](web-editor.md#what-happens-after-on-flow-end).
+
+## How Do I See What A Triggered Run Did After It Ended?
+
+Open the run: its last section, **After the run**, says what arrived, when the
+run started and ended, its note, the alert it raised and each delivery
+(channel, route, device, time, or why it was not delivered), or why nothing
+rang. Observer shows the same section under each run of an automation. See
+[Web editor > What happens after On Flow End](web-editor.md#what-happens-after-on-flow-end).
 
 ## Where Do I Create A Feed Or Webhook Connection?
 
 On the Gateway console's **Triggers** page (`/console#triggers`). Under
-**When something arrives** (New Flow or the Automation dialog), **Set up a new
-one…** opens that page; press **Refresh** when you come back. Mailboxes are not
+**When something arrives** (New Flow or the Automation dialog), **Add a feed or
+webhook…** opens that page; press **Refresh** when you come back. From a row
+of that page, **New flow for this trigger…** opens Flow with the trigger
+already picked ([Web editor > Open Flow From A
+Trigger](web-editor.md#open-flow-from-a-trigger)). Mailboxes are not
 connections: **Add a mailbox…** opens the console's account page, where you
 connect one; it then appears by its address ("When mail arrives in
 me@example.org").

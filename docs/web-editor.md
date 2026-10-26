@@ -8,6 +8,7 @@ It talks to AbstractGateway for:
 - workflow CRUD and publishing
 - provider/model/capability discovery
 - run start, commands, ledger replay, and ledger streaming
+- automations, trigger connections, mailboxes and what happened after a run
 - artifacts, media previews, and generated output downloads
 
 ## Run With A Gateway
@@ -60,18 +61,14 @@ If the workflow cannot be opened, Flow says why: "This workflow isn't on this ga
 
 ## Open Flow From A Trigger
 
-The Gateway console's **Triggers** page can open a new flow already set up for one of your trigger connections. The link is the editor's address (standalone, e.g. `http://127.0.0.1:3005/`, or through the Gateway, `/apps/flow/`) with one parameter:
+The Gateway console's **Triggers** page can open a new flow already set up for one of your trigger connections. The link is the editor's address (standalone, e.g. `http://127.0.0.1:3003/`, or through the Gateway, `/apps/flow/`) with one parameter:
 
 ```text
 /apps/flow/?trigger=<connection_id>        a feed or webhook connection
 /apps/flow/?trigger=mail:<mailbox_id>      a mailbox (the account id from GET /api/gateway/me/email)
 ```
 
-Once signed in, Flow removes the parameter from the address (a reload does not reopen it) and opens **New flow** on *When something arrives*. Your mailboxes and connections are read through the same address (`/apps/flow/api/gateway/...` under the Gateway); listing the connections can take several seconds on a busy gateway (2 to 16 s measured), and until both lists have answered the picker shows a spinner and "Loading your mailboxes and connections…" where the list will be. The link waits for them: when they arrive, that trigger is picked, once, and the title field is focused with a proposed name you can change: "<connection name> digest" for a feed or webhook, "<mailbox address> handling" for a mailbox. Anything you chose or typed while the lists loaded is kept. If the trigger is not one of your connections, the dialog stays on *When something arrives* with nothing picked and says "The trigger <id> is not among your connections." If a list could not be read after three tries, the picker says why, with **Retry**, and the link is applied when Retry brings the list. A link with an empty `trigger` says what it needs.
-
-### Loading and errors
-
-Flow follows the framework's loading rule ([ADR-0039](https://github.com/lpalbou/AbstractFramework/blob/main/docs/adr/0039-loading-states-spinner-until-a-read-has-failed.md)). A list that has not answered yet shows a spinner and an animated "Loading…" where it will be, never an empty state or a count: the *What starts it?* picker (New flow and the Automation dialog), the Flow Library (its counts, its pills and "Loading your saved flows" above the bundled examples), Run history and the run switcher, the artifact lists and players, the model residency panel and the select menus. A read that fails on a timeout, a lost connection or a server error (5xx, 408, 429) is tried again, three tries in all, 1 s then 3 s apart, with the spinner up throughout; a refusal (401, 403, 404, 422) is final at once. Only when every try has failed does the list say why, with **Retry**. Writes (save, publish, turn on, start a run) are sent once. In **Run as if triggered**, reading the sample is a read (tried like the others, 45 s per try); if it still fails, the panel says why and **Run** tries again.
+Once signed in, Flow removes the parameter from the address (a reload does not reopen it) and opens **New flow** on *When something arrives*. Your mailboxes and connections are read through the same address (`/apps/flow/api/gateway/...` under the Gateway); listing the connections can take several seconds on a busy gateway (each try waits up to 45 s), and until both lists have answered the picker shows a spinner and "Loading your mailboxes and connections…" where the list will be. The link waits for them: when they arrive, that trigger is picked, once, and the title field is focused with a proposed name you can change: "<connection name> digest" for a feed or webhook, "<mailbox address> handling" for a mailbox. Anything you chose or typed while the lists loaded is kept. If the trigger is not one of your connections, the dialog stays on *When something arrives* with nothing picked and says "The trigger <id> is not among your connections." If a list could not be read after three tries, the picker says why, with **Retry**, and the link is applied when Retry brings the list. A link with an empty `trigger` says what it needs.
 
 ## Open A Library Flow From A Link
 
@@ -84,6 +81,10 @@ The Gateway console's **Triggers** page names, in each row's **Handled by**, the
 The id is the library flow's id. A published workflow keeps it in its manifest (`metadata.source.root_flow_id`, written when Flow publishes), which is how the console finds the flow behind an automation; a workflow that ships with the Gateway, or one imported as a `.flow` file, has none, and the console shows its name without a link ("Not in the Flow library (ADR-0040)").
 
 Once signed in, Flow removes the parameter from the address (a reload does not reopen it) and opens the flow the way the Flow Library does: the loading screen with the flow's name and **Cancel**, then the flow in the editor (Save updates it). If your library has no flow with that id, Flow says "The flow <id> is not in your Flow library any more." and keeps the editor as it was; a link with an empty `flow` says what it needs. `?bundle=<id>&flow=<flow_id>` is the workflow link above, where `flow` names a flow inside the bundle: a link with `bundle` is never read as a library link.
+
+## Loading And Errors
+
+Flow follows the framework's loading rule ([ADR-0039](https://github.com/lpalbou/AbstractFramework/blob/main/docs/adr/0039-loading-states-spinner-until-a-read-has-failed.md)). A list that has not answered yet shows a spinner and an animated "Loading…" where it will be, never an empty state or a count: the *What starts it?* picker (New flow and the Automation dialog), the Flow Library (its counts, its pills and "Loading your saved flows" above the bundled examples), Run history and the run switcher, the artifact lists and players, the model residency panel, the select menus, the sign-in check and the run window's [After the run](#what-happens-after-on-flow-end). A read that fails on a timeout, a lost connection or a server error (5xx, 408, 429) is tried again, three tries in all, 1 s then 3 s apart, with the spinner up throughout; a refusal (401, 403, 404, 422) is final at once. Only when every try has failed does the list say why, with **Retry**. Writes (save, publish, turn on, start a run) are sent once. In **Run as if triggered**, reading the sample is a read (tried like the others, 45 s per try); if it still fails, the panel says why and **Run** tries again.
 
 ## About
 
@@ -402,14 +403,19 @@ A trigger starts a run; a wait pauses a run that is already running. The
   other form does not have are removed, and the panel says how many first.
 - **Emit Event** (`emit_event`) sends a named event (name, scope, payload) that
   wakes the runs waiting for it in a Wait for Event.
+- **Delay** (`wait_until`) pauses this run for a number of seconds (`duration`),
+  then continues. It carries the Waits badge and colour. Known issue
+  (unreleased): the palette still lists Delay under **Events and time**; the
+  palette search finds it by name.
 
-These were named On Schedule, On Event and Wait Event, and sat under Events
-with an Event badge. The node types did not change, so a saved flow or bundle
-compiles exactly as before: a saved node keeps its saved label in the file,
-and the card shows the current name while the label is still the old default
-("On Event" reads "Wait for Event"); a label you typed is shown as typed. A
-saved `wait_event` node loads as a Wait for Event in its step form; the
-palette and the authoring assistant offer only the one Wait for Event.
+Compatibility: Wait Until and the two forms of Wait for Event were named On
+Schedule, On Event and Wait Event. Their node types and saved fields are
+unchanged, so a saved flow or bundle compiles exactly as before: a saved node
+keeps its label in the file, and the card shows the current name while the
+label is still the old default ("On Event" reads "Wait for Event"); a label you
+typed is shown as typed. A saved `wait_event` node loads as a Wait for Event in
+its step form; the palette and the authoring assistant offer only the one Wait
+for Event, and the palette search still finds the old names.
 
 ### Trigger-Source Discovery
 
@@ -436,9 +442,9 @@ A triggered flow reads what arrived on `On Flow Start`, as typed, named outputs 
 
 Every triggered flow also has `event`, the whole raw event. Your own inputs (a threshold, a `prompt` if you want one) stay on `On Flow Start` and are set under **Inputs** in the Automation dialog. `On Flow End` records the run's outcome and reaches nobody (framework ADR-0041): `response` (what the person sees as the run's answer), `success` (the run's own verdict: false marks the run failed, it is retried, then an alert says so) and `note` (a short line of what happened and why, kept with the run and shown in **After the run**). To reach yourself, add **Notify me** on the canvas. Flows saved before keep their `notify` pin (`{title, body}`): it still raises an alert after the run, and the node says so under the pin ("Older flows: a title here notifies you on every channel you have: tray, watch and phone, email when on. Empty: nothing rings. New flows use Notify me."); new flows never get it. Saving a triggered flow with nothing connected to `response` saves it and says so. The runtime's side of this contract: [AbstractRuntime > Occurrence inputs and outputs](https://github.com/lpalbou/abstractruntime/blob/main/docs/automations.md#occurrence-inputs-and-outputs-the-flow-contract).
 
-In that window, a triggered flow keeps the session, the prompt caches and the run and step ids behind **Advanced settings**; its result shows what the person sees (On Flow End's `response`), or "Each run's result will be empty unless something is connected to On Flow End's response.", with the whole result under **Details**, and the finished test run says "Test run done with the latest 3 items of Python news".
-
 **Run as if triggered.** Pressing **Run** on a flow with an automation trigger opens the run window with **Run as if triggered** first: "Using: When mail arrives in me@example.org", one control (**Use the last [100] messages**; items for a feed, calls for a webhook; nothing for a schedule or by hand) and one sentence saying what **Run** will do ("Run reads the last 100 messages of me@example.org again and runs the flow on them."). The window has one **Run** button, at the bottom. Every Run asks the gateway for a fresh sample with the current count (`POST /api/gateway/triggers/sample {trigger, count}` → `{inputs, truncated, summary}`), fills those inputs and starts a normal run with them, saying "Running with the last 100 messages of me@example.org (test run)", or "Only 3 messages found: running with them (test run)" when fewer came back, with "(stopped after 20 s)" when the gateway stopped reading early. Nothing is turned on. Your own inputs stay under **Your inputs**; what the trigger fills (`messages`, `mailbox`, `event`, …) is under **Advanced: edit the inputs**, filled from the last sample. Only typing in them counts as editing: the panel then says "Using your edited inputs." with **Use the sample again**, and Run uses your values until then (each opening of the window starts fresh). A failure is said in words (a mailbox that cannot be reached, a feed that answered 404). Flows without a trigger keep the plain run window.
+
+In the run window, a triggered flow keeps the session, the prompt caches and the run and step ids behind **Advanced settings**; its result shows what the person sees (On Flow End's `response`), or "Each run's result will be empty unless something is connected to On Flow End's response.", with the whole result under **Details**, and the finished test run says "Test run done with the latest 3 items of Python news". Its last section is **After the run** (see [What happens after On Flow End](#what-happens-after-on-flow-end)).
 
 **Worked example: a safe-mail judge.** A mail trigger, and a deterministic flow that never lets a model act on untrusted mail with tools:
 
@@ -463,7 +469,7 @@ Nothing acts after the end node (framework ADR-0041: On Flow End records the out
 | **Publish to channel** | A message for applications subscribed to the channel; **Also notify me** adds the alert | The subscribed apps; you with Alert on |
 | `On Flow End` `notify` (older flows only) | After the run, a title raises an alert; empty: nothing | You: every channel you have, email when the automation's **Email result** is on |
 
-The run window's last section, **After the run** (for a triggered flow, and any run an automation started), shows what really happened, read from the gateway (`GET /api/gateway/runs/{run_id}/after`): what arrived ("4 new emails: “O” from … and 3 more"), when the run started and ended, its note, the alert it raised and where it came from (Notify me, an older flow's notify, a failure, an approval waiting for you on one of its steps), and each delivery: the channel, its route (push notification, shown by the app, email), the device and the time, or why it was not delivered. When nothing rang it says why: "Nothing to notify: the title was empty." or "Nothing to notify: this flow has no Notify me step." A spinner shows until the gateway answered (ADR-0039); deliveries arrive a few seconds after the end, so the section reads again while they are being recorded. Observer's run card shows the same section.
+The run window's last section, **After the run** (for a triggered flow, and any run an automation started), shows what really happened, read from the gateway (`GET /api/gateway/runs/{run_id}/after`): what arrived ("4 new emails: “O” from … and 3 more"), when the run started and ended, its note, the alert it raised and where it came from (Notify me, an older flow's notify, a failure, an approval waiting for you on one of its steps), and each delivery: the channel, its route (push notification, shown by the app, email), the device and the time, or why it was not delivered. When nothing rang it says why: "Nothing to notify: the title was empty." or "Nothing to notify: this flow has no Notify me step." A spinner shows until the gateway answered ([Loading and errors](#loading-and-errors)); when the read failed it says "Could not read what happened after the run: …" with **Retry** (a Gateway without the route answers 404, which is final at once). Deliveries arrive a few seconds after the end, so the section reads again while they are being recorded. Observer's run card shows the same section.
 
 **The explicit shape for a judge.** A flow that judges what arrived and should reach you only sometimes (like the library's "Judge what arrived") puts the decision on the canvas instead of in an empty-or-not `notify` title:
 
@@ -480,11 +486,11 @@ The **Trigger event** node is an optional helper for the raw envelope: most flow
 
 A workflow with the `event` output is *triggerable*. **New Flow** with a trigger and **Save** in the Automation dialog add it (and the named outputs) for you; the Trigger event node is never placed by default. See [VisualFlow JSON > The trigger event](visualflow.md#the-trigger-event) for the envelope's fields.
 
-`On Schedule`, `On Event` and `Delay` (`wait_until`) are different: they wait inside a run that has already started and never start a workflow. See [Workflow node catalog](workflow-node-catalog.md).
+**Wait Until**, **Wait for Event** and **Delay** are different: they pause a run that has already started and never start a workflow. See [Waits inside a flow](#waits-inside-a-flow) and the [Workflow node catalog](workflow-node-catalog.md).
 
 ## Mail
 
-The **Mail and publish** section of the palette handles mail deterministically, with no model: each node is one fixed action of the runtime (`mail.*`) on a mailbox of yours, and a refusal (a read-only mailbox, a message the server no longer has) comes back as `success` false with the reason in `result`.
+The **Mail and publish** section of the palette handles mail deterministically, with no model: each node is one fixed action of the runtime (`mail.*`) on a mailbox of yours, and a refusal (a read-only mailbox, a message the server no longer has) comes back as `success` false with the reason in `result`. The mail nodes run on AbstractRuntime 0.12.0 or later behind the Gateway.
 
 - **Email** is a data type: one email has `id` (where the message is: what the mail nodes act on), `message_id`, `mailbox`, `folder`, `thread_id`, `from`, `to`, `cc`, `subject`, `date`, `body_text`, `body_html`, `attachments` (`index`, `name`, `size`, `type`), `seen`, `flagged` and `labels`; hover an Email pin to see them. A mail trigger's `messages` is an Email list; **ForEach** over an Email list gives one Email per item, which the mail nodes take as it is. **Email fields** (or **Break Email** beside Break Object, or the wire-drop menu on an Email) turns one Email into a pin per field, each with its type.
 - **Search mail** (mailbox, folder, limit; in Properties: from, to, subject has, contains, since, until, unread only, flagged only, with labels) gives an Email list, newest first, without bodies; **Get mail** reads emails with their bodies.

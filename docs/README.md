@@ -41,14 +41,14 @@ The canvas reflects that split:
 Start here:
 
 - [Getting started](getting-started.md): start a Gateway, run the editor, sign in, and author a first workflow.
-- [Web editor](web-editor.md): the editor's features: sign-in, About, the responsive layout on phones and tablets, switches, discovery, Resources, the Flow Library and the kinds of flows (Chat, Triggered, Other; schedules are set in Observer or the Assistant), flow interfaces, automations (What starts it?, context budget, inputs form), trigger-source discovery, trigger connections and the trigger event, mail (Email fields, Break Email), the wire-drop menu (Relay, If/Else, Break Object, Break Email, ForEach), paths that repeat, a loop whose body ends the run (Fix the loop), hidden connections, the authoring assistant, media and file nodes.
+- [Web editor](web-editor.md): the editor's features: sign-in; links into the editor (a Gateway workflow, `?trigger=` for a new flow on a trigger, `?flow=` for a library flow); loading states and Retry; About; the responsive layout on phones and tablets; switches; discovery; Resources; the Flow Library and the kinds of flows (Chat, Triggered, Other; schedules are set in Observer or the Assistant); the toolbar (New, Open, Save, the C and O keys); flow interfaces; automations (What starts it?, context budget, inputs form, Turn it on, Run as if triggered); the Waits nodes (Wait Until, Wait for Event, Emit Event, Delay); what arrives on On Flow Start; what happens after On Flow End (`response`, `success`, `note`, Notify me and its channels, After the run); trigger-source discovery, trigger connections and the trigger event; mail (the Email type, the mail nodes, mailbox and folder pickers, Break Email); Publish to channel; the wire-drop menu (Relay, If/Else, Break Object, Break Email, ForEach); folded nodes; paths that repeat; a loop whose body ends the run (Fix the loop); hidden connections; the authoring assistant; media and file nodes.
 - [Troubleshooting](troubleshooting.md): symptoms, causes, and fixes for sign-in, proxy, editor, and local development problems.
 - [FAQ](faq.md): short answers about what Flow owns and what it delegates.
 
 Reference:
 
-- [Architecture](architecture.md): components, boundaries, and diagrams of the editor, the Flow server, and Gateway, including the automation-defaults path from document to automation.
-- [API and contracts](api.md): CLI options, environment variables, proxy contract, and the main frontend modules.
+- [Architecture](architecture.md): components, boundaries, and diagrams of the editor, the Flow server, and Gateway, including the automation-defaults path from document to automation, what happens after a run (framework ADR-0041), and how reads are retried (ADR-0039).
+- [API and contracts](api.md): CLI options, environment variables, the editor's address parameters, the proxy contract and the Gateway routes Flow calls, and the main frontend modules.
 - [CLI](cli.md): the `abstractflow-editor` command.
 - [VisualFlow JSON](visualflow.md): the workflow document format, interfaces and their boundary pins, the `automation_defaults` field (including `trigger.connection_id`), the trigger event a triggered run receives with one example per source, pin expressions, and sharing.
 

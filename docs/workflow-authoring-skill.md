@@ -426,6 +426,11 @@ Loop body semantics (control frames):
   warning.
 - `done` is an execution OUTPUT that fires after the final iteration:
   `<loop>.done -> <next step>.exec-in`. Never wire anything into `done`.
+- `on_flow_end` ends the run wherever it is reached, inside a loop body too: a
+  body that reaches `on_flow_end` stops after the first item. Wire
+  `<loop>.done -> end.exec-in`; the body's last node needs no exec wire out.
+  The editor flags the shape ("This loop stops after its first item") and
+  offers **Fix the loop**.
 - For several body steps per iteration, chain them or use
   `<loop>.loop -> sequence.exec-in` with `then:<n>` branches.
 
@@ -455,6 +460,27 @@ create an automation from it (its trigger defaults live in the flow's
 Scheduled digest pattern (run by an automation): `on_flow_start` -> prompt
 builder -> Agent/LLM -> write/report -> `on_flow_end`, with
 `system_datetime.iso` in prompt variables.
+
+### Triggered Flows, Mail And Notifications
+
+A triggered flow reads what arrived on `on_flow_start` as typed outputs (mail:
+`messages`, an Email list, and `mailbox`; feed: `items`, `feed`; webhook:
+`calls`; plus `event`, the raw envelope). Its `on_flow_end` records the
+outcome and reaches nobody: `response` (what the person sees), `success`
+(false marks the run failed) and `note` (one line of what happened and why).
+Never add a `notify` input to `on_flow_end` in a new flow; to reach the person,
+put a **Notify me** node (the Mail and publish section) on the branch that
+should reach them, after an explicit decision (an LLM Call with a structured
+answer, then If/Else). Notify me has `title` (required) and `body`.
+
+The `mail_*` nodes (`mail_search`, `mail_get`, `mail_mark`, `mail_label`,
+`mail_move`, `mail_delete`, `mail_send`, `mail_reply`, `mail_forward`,
+`mail_attachment`) act on the person's mailboxes deterministically, one
+runtime action each, with no model: prefer them to Agent tools for acting on
+mail, and never give a model tools while it reads untrusted mail. ForEach over
+an Email list gives one Email per item, which the mail nodes take as is; a
+Break Object fed by an Email exposes its fields. The node catalog has their
+exact pins.
 
 ### LLM And Agent Nodes
 

@@ -48,6 +48,18 @@ The server is built on `@abstractframework/app-server` and serves the same edito
 - Session cookies use `Path=<base path>/`. When a browser holds two cookies of the same name, the one with the longest path (sent first) wins. Signing out under `/apps/flow/` also clears the `Path=/` cookies.
 - Browser storage keys all start with `abstractflow_`: under the Gateway, every app shares one origin.
 
+## Editor Address Parameters
+
+The editor's address (standalone `http://127.0.0.1:3003/` or `/apps/flow/` under the Gateway) accepts these query parameters, read once after sign-in:
+
+| Parameter | Opens | After reading |
+| --- | --- | --- |
+| `?bundle=<bundle_id>[&version=<bundle_version>][&flow=<flow_id>]` | a Gateway workflow: your own flow when you published it, else an unsaved copy | kept: a reload opens it again |
+| `?trigger=<connection_id>` or `?trigger=mail:<mailbox_id>` | **New flow** on *When something arrives* with that trigger picked, once your mailboxes and connections have loaded | removed from the address |
+| `?flow=<flow_id>` (without `bundle`) | that flow of your Flow library | removed from the address |
+
+The Gateway console uses them from its Workflows page (**Open**) and its Triggers page (**New flow for this trigger…**, and the flow named under **Handled by**). See [Web editor > Open A Gateway Workflow From A Link](web-editor.md#open-a-gateway-workflow-from-a-link), [Open Flow From A Trigger](web-editor.md#open-flow-from-a-trigger) and [Open A Library Flow From A Link](web-editor.md#open-a-library-flow-from-a-link).
+
 ## Proxy Contract
 
 The Flow server answers these routes itself:
@@ -77,7 +89,11 @@ The important Gateway surfaces are:
 - `/api/gateway/visualflows/{flow_id}/publish`
 - `/api/gateway/trigger-sources` (automation trigger sources; the path is read from `contracts.common.automations.trigger_sources_endpoint` when the capabilities advertise it)
 - `/api/gateway/triggers/connections` (the signed-in person's trigger connections, listed in the Automation dialog for sources with `needs_connection`; a Gateway without the route answers 404 and the dialog says connections are unavailable)
+- `/api/gateway/automations` (`GET` to find a flow's automation, `POST` for **Turn it on**), `/api/gateway/automations/{id}` (`GET`, `PATCH` for **Update the automation**), `/api/gateway/automations/{id}/commands` (turn it off and back on) and `/api/gateway/automations/defaults` (the Growing context budget)
+- `/api/gateway/triggers/sample` (`POST {trigger, count}` → `{inputs, truncated, summary}`: **Run as if triggered**)
+- `/api/gateway/me/email` (your mailboxes), `/api/gateway/me/email/folders` and `/api/gateway/me/email/accounts/{mailbox_id}/folders` (the folder picker of **Move to folder**)
 - `/api/gateway/runs/start`
+- `/api/gateway/runs/{run_id}/after` (**After the run**: what arrived, the run's note, the alert and each delivery; framework ADR-0041)
 - `/api/gateway/runs/{run_id}/ledger`
 - `/api/gateway/runs/{run_id}/ledger/stream`
 - `/api/gateway/runs/{run_id}/artifacts`
@@ -123,6 +139,16 @@ High-value source modules:
 - `src/utils/triggerConnections.ts`: trigger connections (`fetchTriggerConnections`, `connectionsForSource`, `connectionProblem`) and the console link `consoleNewConnectionUrl` (`<gateway>/console#triggers?new=<source id>`).
 - `src/utils/triggerEvent.ts`: the trigger event: `TRIGGER_EVENT_SCHEMA` (the CloudEvents envelope, including a connection batch's items), `isTriggerableFlow`, `triggerEventRequirement` (`required` for connection sources, `recommended` for other event sources, `optional` for time and manual sources) and `withTriggerEvent` (the store action `addTriggerEvent`).
 - `src/components/AutomationDefaultsModal.tsx`: the Flow Library **Automation** dialog, including the **Connection** selector and the triggerable check.
+- `src/utils/readRetry.ts`: the one retry policy for Gateway reads (three tries, 1 s then 3 s apart, on a timeout, a lost connection, 5xx, 408 or 429), used by `gatewayFetch`.
+- `src/utils/triggerPins.ts`: the named `On Flow Start` outputs per trigger and `On Flow End`'s `response`, `success` and `note` (`withTriggerPins`), and the words under an older flow's `notify` pin.
+- `src/utils/triggerSample.ts`: **Run as if triggered** (`POST /api/gateway/triggers/sample`) and its sentences.
+- `src/utils/afterTheRun.ts` and `src/components/automation/AfterTheRun.tsx`: **After the run** (`GET /api/gateway/runs/{run_id}/after`), and Notify me's **Where** choices (`effectConfig.channels`).
+- `src/utils/mailNodes.ts` and `src/utils/emailType.ts`: the mail nodes' checks and the Email data type's fields.
+- `src/utils/flowKinds.ts`: a flow's kind in the Flow Library (Chat, Triggered, Other) and its start sentence.
+- `src/utils/waitNodes.ts`: the Waits nodes' current names on cards saved with the earlier default labels, and Wait for Event's two forms.
+- `src/utils/loopEndsRun.ts`: the "loop stops after its first item" check and **Fix the loop** (`loopEndFix`, the `fix_loop_end` authoring command).
+- `src/utils/bundleDeepLink.ts`, `src/utils/triggerDeepLink.ts`, `src/utils/flowDeepLink.ts`: the [editor address parameters](#editor-address-parameters).
+- `src/utils/fileShortcuts.ts`: the **C** (New flow) and **O** (Flow Library) keys, never while typing or with a dialog open.
 - `src/hooks/useAboutAction.ts`: the About dialog action (app version from `package.json` at build time; the framework and gateway versions from `GET /api/gateway/about` through the ui-kit `aboutVersionsFromGateway` helper; no package list).
 - `bin/server.js`: the Flow server (`createFlowServer`) on `@abstractframework/app-server`: base path, identity header, session proxy, static files.
 - `bin/flags.js`: the launch flags and the Gateway URL resolution (`parseFlowFlags`).
