@@ -404,9 +404,8 @@ A trigger starts a run; a wait pauses a run that is already running. The
 - **Emit Event** (`emit_event`) sends a named event (name, scope, payload) that
   wakes the runs waiting for it in a Wait for Event.
 - **Delay** (`wait_until`) pauses this run for a number of seconds (`duration`),
-  then continues. It carries the Waits badge and colour. Known issue
-  (unreleased): the palette still lists Delay under **Events and time**; the
-  palette search finds it by name.
+  then continues. It carries the Waits badge and colour and sits in the Waits
+  section of the palette.
 
 Compatibility: Wait Until and the two forms of Wait for Event were named On
 Schedule, On Event and Wait Event. Their node types and saved fields are
