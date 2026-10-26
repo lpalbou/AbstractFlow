@@ -128,6 +128,8 @@ export function alertSource(alert: RunAfterAlert): string {
 /** One delivery in words: "Watch (Laurent’s Watch) · push notification · sent". */
 export function deliverySentence(d: RunAfterDelivery): string {
   const where = d.device_name ? `${channelWord(d.channel)} (${d.device_name})` : channelWord(d.channel);
+  // The console lists the item: that listing is its delivery.
+  if (d.channel === 'console') return `${where} · listed · ${d.state === 'failed' ? 'not listed' : 'sent'}`;
   const state = d.state === 'failed' ? `not delivered${d.reason ? `: ${d.reason}` : ''}` : 'sent';
   return `${where} · ${routeWord(d.via)} · ${state}`;
 }

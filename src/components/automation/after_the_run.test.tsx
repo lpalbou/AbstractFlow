@@ -197,7 +197,7 @@ describe('After the run', () => {
     expect(shouldReadAgain(GMAIL, 1)).toBe(false);
     expect(shouldReadAgain({ ...GMAIL, attention: null, deliveries: [], quiet_reason: 'empty title' }, 1)).toBe(false);
     expect(shouldReadAgain({ ...GMAIL, deliveries: [] }, 99)).toBe(false);
-    expect(deliverySentence({ channel: 'console', via: 'stream', state: 'sent' })).toBe('Console · shown by the app · sent');
+    expect(deliverySentence({ channel: 'console', via: 'stream', state: 'sent' })).toBe('Console · listed · sent');
   });
 
   it('shown for a triggered flow and for any run an automation started', () => {
