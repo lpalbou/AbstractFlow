@@ -73,6 +73,18 @@ Once signed in, Flow removes the parameter from the address (a reload does not r
 
 Flow follows the framework's loading rule ([ADR-0039](https://github.com/lpalbou/AbstractFramework/blob/main/docs/adr/0039-loading-states-spinner-until-a-read-has-failed.md)). A list that has not answered yet shows a spinner and an animated "Loading…" where it will be, never an empty state or a count: the *What starts it?* picker (New flow and the Automation dialog), the Flow Library (its counts, its pills and "Loading your saved flows" above the bundled examples), Run history and the run switcher, the artifact lists and players, the model residency panel and the select menus. A read that fails on a timeout, a lost connection or a server error (5xx, 408, 429) is tried again, three tries in all, 1 s then 3 s apart, with the spinner up throughout; a refusal (401, 403, 404, 422) is final at once. Only when every try has failed does the list say why, with **Retry**. Writes (save, publish, turn on, start a run) are sent once. In **Run as if triggered**, reading the sample is a read (tried like the others, 45 s per try); if it still fails, the panel says why and **Run** tries again.
 
+## Open A Library Flow From A Link
+
+The Gateway console's **Triggers** page names, in each row's **Handled by**, the flow that handles that trigger; the name opens that flow here. The link is the editor's address (standalone or through the Gateway) with one parameter:
+
+```text
+/apps/flow/?flow=<flow_id>        a flow of your Flow library (its id)
+```
+
+The id is the library flow's id. A published workflow keeps it in its manifest (`metadata.source.root_flow_id`, written when Flow publishes), which is how the console finds the flow behind an automation; a workflow that ships with the Gateway, or one imported as a `.flow` file, has none, and the console shows its name without a link ("Not in the Flow library (ADR-0040)").
+
+Once signed in, Flow removes the parameter from the address (a reload does not reopen it) and opens the flow the way the Flow Library does: the loading screen with the flow's name and **Cancel**, then the flow in the editor (Save updates it). If your library has no flow with that id, Flow says "The flow <id> is not in your Flow library any more." and keeps the editor as it was; a link with an empty `flow` says what it needs. `?bundle=<id>&flow=<flow_id>` is the workflow link above, where `flow` names a flow inside the bundle: a link with `bundle` is never read as a library link.
+
 ## About
 
 The About button (the `i` icon in the top-right cluster, between Appearance and the connection pill) opens the AbstractFramework About card: the AbstractFlow version, the AbstractFramework and AbstractGateway versions, links to the website, source, docs, issues, feedback and contact, and one author/licence line. When the card opens, Flow asks the connected gateway for its versions (`GET /api/gateway/about`); it shows only the framework and gateway versions, never a package list. If that request fails, the AbstractGateway line reads `unavailable (...)` with the HTTP status or error.

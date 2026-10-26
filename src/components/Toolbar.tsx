@@ -75,6 +75,7 @@ import {
   type BundleManifestView,
 } from '../utils/bundleDeepLink';
 import { parseTriggerLink, withoutTriggerParam, type TriggerLink } from '../utils/triggerDeepLink';
+import { flowLinkNotFound, parseFlowLink, withoutFlowParam } from '../utils/flowDeepLink';
 import { fileShortcutFromEvent } from '../utils/fileShortcuts';
 import { useDeepLinkBanner } from '../hooks/deepLinkBanner';
 import { deepLinkLoadingName, isAbortError, useFlowLoading } from '../hooks/flowLoading';
@@ -778,8 +779,9 @@ export function Toolbar() {
   const finishFlowLoading = useFlowLoading((st) => st.finish);
 
   // Load a flow into the editor (no unsaved-changes gate — see handleLoadFlow).
+  // `opts.notFound`: the sentence when the library has no such flow (a `?flow=` link).
   const doLoadFlow = useCallback(
-    async (selectedFlowId: string) => {
+    async (selectedFlowId: string, opts?: { notFound?: string }) => {
       try {
         if (bundledFlowIdSet.has(selectedFlowId)) {
           const bundled = flowLibraryCatalog.flows.find((f) => f.id === selectedFlowId);
@@ -820,6 +822,10 @@ export function Toolbar() {
           finishFlowLoading(signal);
         }
       } catch (error) {
+        if (error instanceof GatewayHttpError && error.status === 404 && opts?.notFound) {
+          toast.error(opts.notFound, { duration: 10000 });
+          return;
+        }
         toast.error('Failed to load flow');
       }
     },
@@ -920,6 +926,25 @@ export function Toolbar() {
     setNewFlowTrigger(link);
     setShowNewFlowModal(true);
   }, [gatewayCapabilitiesQuery.isLoading]);
+
+  // `?flow=<visualflow id>` (the console's Triggers page: the name of a flow
+  // that handles a trigger, utils/flowDeepLink.ts): once per page load, after
+  // the gateway answered its capability probe. The parameter leaves the
+  // address at once (a reload does not reopen it); the flow opens through the
+  // library's load path, a flow not in the library says so.
+  const flowLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (flowLinkHandledRef.current || gatewayCapabilitiesQuery.isLoading || typeof window === 'undefined') return;
+    flowLinkHandledRef.current = true;
+    const link = parseFlowLink(window.location.search);
+    if (!link) return;
+    window.history.replaceState(window.history.state, '', withoutFlowParam(window.location.href));
+    if ('error' in link) {
+      toast.error(link.error, { duration: 10000 });
+      return;
+    }
+    void doLoadFlow(link.flowId, { notFound: flowLinkNotFound(link.flowId) });
+  }, [doLoadFlow, gatewayCapabilitiesQuery.isLoading]);
 
   // Handle loading a flow
   const handleLoadFlow = useCallback(
