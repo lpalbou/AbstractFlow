@@ -120,6 +120,17 @@ const EVENT_NODES: NodeTemplate[] = [
     ],
     category: 'events',
   },
+];
+
+// Waits: nodes that pause a run that is ALREADY running, until a time or a
+// named event (Emit Event wakes the runs waiting for one). None of them starts
+// a flow: a trigger does (an automation: Automation… in the editor header or
+// the Flow Library). Node types are unchanged from when these lived under
+// Events (`on_schedule`, `on_event`, `wait_event`, `emit_event`), so every
+// saved flow and bundle compiles exactly as before; only the names, the
+// palette section and the card badge changed (utils/waitNodes.ts maps the
+// earlier default names to the current ones on the card).
+const WAIT_NODES: NodeTemplate[] = [
   {
     type: 'wait_until',
     icon: '&#x23F3;', // Hourglass
@@ -135,17 +146,6 @@ const EVENT_NODES: NodeTemplate[] = [
     ],
     category: 'waits',
   },
-];
-
-// Waits: nodes that pause a run that is ALREADY running, until a time or a
-// named event (Emit Event wakes the runs waiting for one). None of them starts
-// a flow: a trigger does (an automation: Automation… in the editor header or
-// the Flow Library). Node types are unchanged from when these lived under
-// Events (`on_schedule`, `on_event`, `wait_event`, `emit_event`), so every
-// saved flow and bundle compiles exactly as before; only the names, the
-// palette section and the card badge changed (utils/waitNodes.ts maps the
-// earlier default names to the current ones on the card).
-const WAIT_NODES: NodeTemplate[] = [
   {
     type: 'on_schedule',
     icon: '&#x23F0;', // Alarm clock
@@ -2543,7 +2543,7 @@ const MAIL_NODES: NodeTemplate[] = [
     type: 'publish_event',
     icon: '&#x1F4E1;', // Satellite antenna
     label: 'Publish to channel',
-    description: 'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant and the watch.',
+    description: 'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant, the watch and the phone.',
     headerColor: MAIL_HEADER,
     inputs: [
       EXEC_IN,

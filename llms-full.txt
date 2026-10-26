@@ -4001,7 +4001,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `publish_event`
 - Document node: `{"id":"<unique_id>","type":"publish_event","template":"Publish to channel"}`
-- Utility: Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant and the watch.
+- Utility: Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant, the watch and the phone.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Publish to channel"`; input defaults with `pin_defaults`
