@@ -2568,7 +2568,7 @@ const MAIL_NODES: NodeTemplate[] = [
     icon: '&#x1F514;', // Bell
     label: 'Notify me',
     preset: true,
-    description: 'Reach yourself: the tray, the watch or the phone, and the Assistant. The one node that notifies you (On Flow End only records the outcome).',
+    description: 'Reach yourself: on all your channels (the tray, the watch or the phone, email) or the ones you choose in Properties. The one node that notifies you (On Flow End only records the outcome).',
     headerColor: MAIL_HEADER,
     inputs: [
       EXEC_IN,

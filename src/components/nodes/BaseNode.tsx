@@ -7,7 +7,7 @@
  */
 
 import { endPinHelp } from '../../utils/triggerPins';
-import { NOTIFY_ME_REACHES, isNotifyMeNode } from '../../utils/afterTheRun';
+import { isNotifyMeNode, notifyMeChannels, notifyMeReaches } from '../../utils/afterTheRun';
 import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Handle, Position, NodeProps, useUpdateNodeInternals } from 'reactflow';
@@ -4292,7 +4292,7 @@ export const BaseNode = memo(function BaseNode({
         {/* Notify me says whom it reaches and how, on the node (ADR-0041). */}
         {isNotifyMeNode(data) ? (
           <div className="node-reaches" data-field="notify-reaches">
-            {NOTIFY_ME_REACHES}
+            {notifyMeReaches(notifyMeChannels(data))}
           </div>
         ) : null}
 

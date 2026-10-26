@@ -31,6 +31,9 @@ export type RunAfterAlert = {
   run_id?: string | null;
   prompt_ref?: string | null;
   open?: boolean;
+  /** A published alert (Notify me): whom it was for ("me") and the channels it asked for ("all" = every channel). */
+  recipient?: string | null;
+  asked?: string[] | 'all' | null;
 };
 
 export type RunAfter = {
@@ -125,6 +128,13 @@ export function alertSource(alert: RunAfterAlert): string {
   return 'On Flow End’s notify (older flows)';
 }
 
+/** What a Notify me alert asked for, in words: "asked: watch, phone", "asked: all my channels" (null: not a Notify me alert). */
+export function askedSentence(alert: RunAfterAlert): string | null {
+  if (alert.asked === 'all') return 'asked: all my channels';
+  if (Array.isArray(alert.asked) && alert.asked.length) return `asked: ${alert.asked.join(', ')}`;
+  return null;
+}
+
 /** One delivery in words: "Watch (Laurent’s Watch) · push notification · sent". */
 export function deliverySentence(d: RunAfterDelivery): string {
   const where = d.device_name ? `${channelWord(d.channel)} (${d.device_name})` : channelWord(d.channel);
@@ -154,28 +164,78 @@ export function showsAfterTheRun(opts: { triggered: boolean; automationId?: stri
 
 /**
  * Notify me (a Publish to channel preset: channel "me", Alert on) is the
- * node that reaches the person. Where it reaches them today, in words on the
- * node: the tray, the watch or the phone (push), the Assistant. Email is not
- * sent for it (the email outbox delivers automation results only).
+ * node that reaches the person. Who: you (another account comes later).
+ * Where: the channels saved in the node's effectConfig (`channels`), passed
+ * by the compiled workflow to the gateway, where each deliverer honours them:
+ * the tray, push (the watch first, else the phone), email (when a mailbox is
+ * connected). No `channels` = every channel (older flows, "All my channels").
+ * The console lists every alert: it is the record itself.
  */
-export const NOTIFY_ME_REACHES = 'You: tray · watch and phone · Assistant';
+export type NotifyChannel = 'tray' | 'watch' | 'phone' | 'email';
+export const NOTIFY_CHANNELS: ReadonlyArray<NotifyChannel> = ['tray', 'watch', 'phone', 'email'];
 
 /** Is this node Notify me (Publish to channel with its channel fixed: no channel pin)? */
 export function isNotifyMeNode(data: { nodeType?: string; inputs?: ReadonlyArray<{ id: string }> }): boolean {
   return data.nodeType === 'publish_event' && !(data.inputs || []).some((p) => p.id === 'channel');
 }
 
+/** The channels a Notify me node saved (canonical order), or null: every channel. */
+export function notifyMeChannels(data: { effectConfig?: { channels?: unknown } | null }): NotifyChannel[] | null {
+  const raw = data.effectConfig?.channels;
+  if (!Array.isArray(raw)) return null;
+  const picked = NOTIFY_CHANNELS.filter((c) => raw.includes(c));
+  return picked.length ? picked : null;
+}
+
 /**
- * The channel choice of Notify me, in Properties. Only "All my channels" is
- * delivered today: choosing one channel needs the runtime to pass a
- * `channels` input to the gateway and each channel to honour it (ADR-0041,
- * Consequences), so the other choices are shown, not offered.
+ * The "Where" choices of Notify me, in Properties: chips, several allowed.
+ * "All my channels" is the absence of a choice; the others add their channels.
  */
-export const NOTIFY_ME_CHANNEL_CHOICES: ReadonlyArray<{ value: string; label: string; available: boolean }> = [
-  { value: 'all', label: 'All my channels', available: true },
-  { value: 'tray', label: 'Tray only', available: false },
-  { value: 'push', label: 'Phone and watch only', available: false },
-  { value: 'email', label: 'Email only', available: false },
+export const NOTIFY_ME_CHANNEL_CHOICES: ReadonlyArray<{ value: string; label: string; channels: ReadonlyArray<NotifyChannel> }> = [
+  { value: 'all', label: 'All my channels', channels: [] },
+  { value: 'tray', label: 'Tray', channels: ['tray'] },
+  { value: 'push', label: 'Watch and phone', channels: ['watch', 'phone'] },
+  { value: 'email', label: 'Email', channels: ['email'] },
 ];
+
+/** Is this chip on for the saved channels? */
+export function notifyChoiceOn(choice: { value: string; channels: ReadonlyArray<NotifyChannel> }, channels: NotifyChannel[] | null): boolean {
+  if (choice.value === 'all') return channels === null;
+  return channels !== null && choice.channels.every((c) => channels.includes(c));
+}
+
+/**
+ * The channels after a chip is pressed: "All my channels" clears the choice;
+ * another chip toggles its channels; none left = all again (null).
+ */
+export function toggleNotifyChoice(channels: NotifyChannel[] | null, value: string): NotifyChannel[] | null {
+  const choice = NOTIFY_ME_CHANNEL_CHOICES.find((c) => c.value === value);
+  if (!choice || choice.value === 'all') return null;
+  const current = new Set<NotifyChannel>(channels || []);
+  const on = notifyChoiceOn(choice, channels);
+  for (const c of choice.channels) {
+    if (on) current.delete(c);
+    else current.add(c);
+  }
+  const next = NOTIFY_CHANNELS.filter((c) => current.has(c));
+  return next.length ? next : null;
+}
+
+/** Whom Notify me reaches and how, in words on the node: "You: watch and phone", "You: all my channels". */
+export function notifyMeReaches(channels: NotifyChannel[] | null): string {
+  if (channels === null) return 'You: all my channels';
+  const has = (c: NotifyChannel) => channels.includes(c);
+  const words: string[] = [];
+  if (has('tray')) words.push('tray');
+  if (has('watch') && has('phone')) words.push('watch and phone');
+  else if (has('watch')) words.push('watch');
+  else if (has('phone')) words.push('phone');
+  if (has('email')) words.push('email');
+  return `You: ${words.join(' · ')}`;
+}
+
+/** The node line of a Notify me without a choice (older flows, "All my channels"). */
+export const NOTIFY_ME_REACHES = notifyMeReaches(null);
+
 export const NOTIFY_ME_CHANNEL_HELP =
-  'Today Notify me reaches every channel above except email. Choosing one channel, and notifying someone else, come later.';
+  'All my channels: the tray, the watch or the phone (the watch first), email when a mailbox is connected. Choose one or several to narrow it. The console lists every alert. Notifying someone else comes later.';

@@ -382,6 +382,8 @@ export interface FlowNodeData {
   };
   // Effect node configuration
   effectConfig?: {
+    channels?: string[];   // For publish_event (Notify me "Where"): tray | watch | phone | email; absent = every channel
+    recipient?: string;    // For publish_event (Notify me "Who"): "me" (absent = me)
     provider?: string;     // For llm_call
     model?: string;        // For llm_call
     operation?: string;    // For model_residency: list_loaded, load, unload

@@ -19,14 +19,21 @@ import { AUTOMATION_CANVAS_NOTE, AUTOMATION_END_PINS, endPinHelp, withTriggerPin
 import {
   NOTIFY_ME_CHANNEL_CHOICES,
   NOTIFY_ME_REACHES,
+  askedSentence,
   deliverySentence,
   isNotifyMeNode,
+  notifyChoiceOn,
+  notifyMeChannels,
+  notifyMeReaches,
+  toggleNotifyChoice,
   quietSentence,
   shouldReadAgain,
   showsAfterTheRun,
   type RunAfter,
 } from '../../utils/afterTheRun';
 import { AfterTheRunView } from './AfterTheRun';
+import { PublishNodeSection } from './MailNodeSection';
+import { toVisualFlow } from '../../utils/serialization';
 
 function renderNode(data: FlowNodeData): string {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } });
@@ -128,19 +135,52 @@ describe('Notify me says whom it reaches and how', () => {
     const html = renderNode(data);
     expect(html).toContain('data-field="notify-reaches"');
     expect(html).toContain(NOTIFY_ME_REACHES);
-    expect(NOTIFY_ME_REACHES).toBe('You: tray · watch and phone · Assistant');
+    expect(NOTIFY_ME_REACHES).toBe('You: all my channels');
+    expect(renderNode({ ...data, effectConfig: { channels: ['phone', 'watch'] } })).toContain('You: watch and phone');
+    expect(notifyMeReaches(['tray', 'email'])).toBe('You: tray · email');
+    expect(notifyMeReaches(['watch'])).toBe('You: watch');
     const publish = createNodeData(getNodeTemplate('publish_event')!);
     expect(isNotifyMeNode(publish)).toBe(false);
     expect(renderNode(publish)).not.toContain('data-field="notify-reaches"');
   });
 
-  it('the channel choice: all my channels now; one channel only once the runtime passes it', () => {
-    expect(NOTIFY_ME_CHANNEL_CHOICES.map((c) => `${c.label}:${c.available}`)).toEqual([
-      'All my channels:true',
-      'Tray only:false',
-      'Phone and watch only:false',
-      'Email only:false',
-    ]);
+  it('Where: chips, several allowed; All my channels clears the choice; none left = all again', () => {
+    expect(NOTIFY_ME_CHANNEL_CHOICES.map((c) => c.label)).toEqual(['All my channels', 'Tray', 'Watch and phone', 'Email']);
+    let channels = toggleNotifyChoice(null, 'push');
+    expect(channels).toEqual(['watch', 'phone']);
+    channels = toggleNotifyChoice(channels, 'email');
+    expect(channels).toEqual(['watch', 'phone', 'email']);
+    expect(NOTIFY_ME_CHANNEL_CHOICES.filter((c) => notifyChoiceOn(c, channels)).map((c) => c.value)).toEqual(['push', 'email']);
+    channels = toggleNotifyChoice(channels, 'push');
+    expect(channels).toEqual(['email']);
+    expect(toggleNotifyChoice(channels, 'email')).toBeNull();
+    expect(toggleNotifyChoice(['tray'], 'all')).toBeNull();
+    // An older node (no effectConfig, or junk in it) reads as every channel.
+    expect(notifyMeChannels({})).toBeNull();
+    expect(notifyMeChannels({ effectConfig: { channels: ['fax'] } })).toBeNull();
+  });
+
+  it('Properties: the chips are live and save effectConfig.channels', () => {
+    const data = { ...notifyMe(), effectConfig: { channels: ['tray'] } } as FlowNodeData;
+    const saved: unknown[] = [];
+    const html = renderToStaticMarkup(
+      createElement(PublishNodeSection, { nodeId: 'n1', data, onPinDefaults: () => {}, onEffectConfig: (c: unknown) => saved.push(c) })
+    );
+    expect(html).toContain('data-field="notify-where"');
+    expect(html).not.toContain('(not yet)');
+    expect(html).not.toMatch(/<button[^>]*disabled/);
+    expect((html.match(/aria-pressed="true"/g) || []).length).toBe(1);
+    expect(html).toContain('You: tray.');
+  });
+
+  it('the saved flow carries channels in the node’s effectConfig (the compiled JSON the gateway runs)', () => {
+    const data = { ...notifyMe(), effectConfig: { channels: ['watch', 'phone'] } } as FlowNodeData;
+    const flow = JSON.parse(JSON.stringify(toVisualFlow('f1', 'Judge', [{ id: 'n1', type: 'custom', position: { x: 0, y: 0 }, data }], [])));
+    expect(flow.nodes[0].type).toBe('publish_event');
+    expect(flow.nodes[0].data.effectConfig.channels).toEqual(['watch', 'phone']);
+    expect(flow.nodes[0].data.pinDefaults).toMatchObject({ channel: 'me', alert: true });
+    const older = JSON.parse(JSON.stringify(toVisualFlow('f1', 'Judge', [{ id: 'n1', type: 'custom', position: { x: 0, y: 0 }, data: notifyMe() }], [])));
+    expect(older.nodes[0].data.effectConfig?.channels).toBeUndefined();
   });
 });
 
@@ -167,6 +207,22 @@ describe('After the run', () => {
     expect(html).toContain('Watch (Laurent’s Watch) · push notification · sent');
     expect(html).toContain('Email · email · not delivered: The mail server refused the password.');
     expect(html).not.toContain('Nothing to notify');
+  });
+
+  it('a Notify me alert says what it asked for beside what was delivered', () => {
+    const after: RunAfter = {
+      run_id: 'r1',
+      trigger: null,
+      run: { status: 'completed', started: 'a', ended: 'b' },
+      attention: { record_key: 'publish:r1:n7', kind: 'notify', title: 'Judged', from: 'notify_me', recipient: 'me', asked: ['watch', 'phone'] },
+      deliveries: [{ record_key: 'publish:r1:n7', channel: 'watch', via: 'push', state: 'sent', time: 'x' }],
+    };
+    const html = renderToStaticMarkup(createElement(AfterTheRunView, { state: { status: 'ready', after } }));
+    expect(html).toContain('data-field="asked"');
+    expect(html).toContain('asked: watch, phone');
+    expect(html).toContain('Watch · push notification · sent');
+    expect(askedSentence({ record_key: 'k', asked: 'all' })).toBe('asked: all my channels');
+    expect(askedSentence({ record_key: 'k', from: 'flow_end' })).toBeNull();
   });
 
   it('nothing rang: the reason in words', () => {

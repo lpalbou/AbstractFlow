@@ -1655,7 +1655,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `publish_event`
 - Document node: `{"id":"<unique_id>","type":"publish_event","template":"Notify me"}`
-- Utility: Reach yourself: the tray, the watch or the phone, and the Assistant. The one node that notifies you (On Flow End only records the outcome).
+- Utility: Reach yourself: on all your channels (the tray, the watch or the phone, email) or the ones you choose in Properties. The one node that notifies you (On Flow End only records the outcome).
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Notify me"`; input defaults with `pin_defaults`

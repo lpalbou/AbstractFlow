@@ -5025,7 +5025,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         <MailNodeSection nodeId={node.id} data={data} onPinDefaults={(pinDefaults) => updateNodeData(node.id, { pinDefaults })} />
       ) : null}
       {(PUBLISH_NODE_TYPES as readonly string[]).includes(String(data.nodeType)) ? (
-        <PublishNodeSection nodeId={node.id} data={data} onPinDefaults={(pinDefaults) => updateNodeData(node.id, { pinDefaults })} />
+        <PublishNodeSection
+          nodeId={node.id}
+          data={data}
+          onPinDefaults={(pinDefaults) => updateNodeData(node.id, { pinDefaults })}
+          onEffectConfig={(effectConfig) => updateNodeData(node.id, { effectConfig })}
+        />
       ) : null}
 
       {/* On Flow Start dynamic parameters (output pins) */}

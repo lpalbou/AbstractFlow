@@ -459,7 +459,7 @@ Nothing acts after the end node (framework ADR-0041: On Flow End records the out
 | `On Flow End` `response` | The run's answer: Observer shows it, Discuss starts from it | Nobody: you read it when you open the run |
 | `On Flow End` `success` | The run's own verdict; false = failed, retried, then a failure alert | You, only when it failed after the retries |
 | `On Flow End` `note` | One line of what happened and why, kept with the run | Nobody: shown in **After the run** |
-| **Notify me** | An alert with its title and body | You: tray · watch and phone · Assistant |
+| **Notify me** | An alert with its title and body | You, on the channels its **Where** names: all of them (tray, watch or phone, email) unless you choose |
 | **Publish to channel** | A message for applications subscribed to the channel; **Also notify me** adds the alert | The subscribed apps; you with Alert on |
 | `On Flow End` `notify` (older flows only) | After the run, a title raises an alert; empty: nothing | You: every channel you have, email when the automation's **Email result** is on |
 
@@ -472,7 +472,7 @@ The run window's last section, **After the run** (for a triggered flow, and any 
 3. False (there is something to say): **Notify me** (`title` ← title, `body` ← body) → `On Flow End` (`response` ← body, `note` ← "notified: " + title).
 4. True: `On Flow End` (`response` ← "Nothing worth your time.", `note` ← "quiet: nothing to notify").
 
-Whoever opens the flow sees who is reached and how (the Notify me card says "You: tray · watch and phone · Assistant"), and After the run shows each delivery. Flows in your library are yours to change: an agent may draft this shape as a new flow for review (framework ADR-0040), and you publish it.
+Whoever opens the flow sees who is reached and how (the Notify me card says "You: all my channels", or what you chose, such as "You: watch and phone"), and After the run shows what it asked for and each delivery. Flows in your library are yours to change: an agent may draft this shape as a new flow for review (framework ADR-0040), and you publish it.
 
 ### The Trigger Event
 
@@ -494,7 +494,12 @@ The **Mail and publish** section of the palette handles mail deterministically, 
 
 ## Publish
 
-**Publish to channel** sends a message (channel, type, title, body, subject, data) that any application subscribed to that channel receives (`GET /api/gateway/me/events?channel=…`). Channel names use lowercase letters, digits, `.`, `_` or `-`; `attention` is the gateway's own. Turn on **Also notify me** to be notified on the tray, the Assistant, the watch and the phone as well. **Notify me** is the short form and the node that reaches you: a title and a body; its card says whom it reaches and how ("You: tray · watch and phone · Assistant"). Its Properties name the recipient (**Who**: Me) and the channels (**Where**: All my channels). Choosing one channel (tray only, phone and watch only, email only) and notifying someone else are shown but not offered yet: they need the runtime to pass the choice to the gateway. Email is not sent for Notify me today (the email outbox sends automation results, failures and approvals).
+**Publish to channel** sends a message (channel, type, title, body, subject, data) that any application subscribed to that channel receives (`GET /api/gateway/me/events?channel=…`). Channel names use lowercase letters, digits, `.`, `_` or `-`; `attention` is the gateway's own. Turn on **Also notify me** to be notified on the tray, the Assistant, the watch and the phone as well. **Notify me** is the short form and the node that reaches you: a title and a body; its card says whom it reaches and how ("You: all my channels", "You: watch and phone", "You: tray · email"). Its Properties name the recipient (**Who**: Me; notifying someone else comes later) and the channels (**Where**, chips, several allowed):
+
+- **All my channels** (the default, and every flow saved before the choice existed): the tray, the watch or the phone by push (the watch first when it is in use, else the phone), and email when a mailbox is connected.
+- **Tray**, **Watch and phone**, **Email**: only those. Pressing a chip adds or removes it; **All my channels** clears the choice, and removing the last chip returns to it.
+
+The choice is saved in the node (`effectConfig.channels`, e.g. `["watch", "phone"]`; absent = all), passed by the compiled workflow to the gateway, and honoured there by each channel: the tray shows (and counts) only an alert that lists it, push rings only the listed devices, the email outbox mails only when Email is listed. The console lists every alert (it is the record itself). After the run shows "asked: watch, phone" (or "asked: all my channels") beside the deliveries.
 
 ## Relays and the wire-drop menu
 

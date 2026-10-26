@@ -9786,3 +9786,11 @@ button.flow-nature-badge:hover:not(:disabled),
   font-size: 11px;
   color: var(--text-secondary);
 }
+
+/* Notify me's "Where": chips, several allowed (Properties). */
+.notify-where {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 4px;
+}

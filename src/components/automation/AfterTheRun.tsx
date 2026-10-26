@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AFTER_REREAD_MS,
   alertSource,
+  askedSentence,
   alertTitle,
   arrivedSentence,
   deliverySentence,
@@ -90,6 +91,9 @@ function AfterTheRunBody({ after, refreshing }: { after: RunAfter; refreshing: b
                 <li key={a.record_key}>
                   <span className="run-after-alert-title">{alertTitle(a)}</span>
                   <span className="run-after-muted"> · {alertSource(a)}{a.raised_at ? ` · ${when(a.raised_at)}` : ''}</span>
+                  {askedSentence(a) ? (
+                    <span className="run-after-muted" data-field="asked"> · {askedSentence(a)}</span>
+                  ) : null}
                   {rows.length ? (
                     <ul className="run-after-deliveries">
                       {rows.map((d, i) => (

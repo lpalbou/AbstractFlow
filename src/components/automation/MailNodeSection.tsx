@@ -8,9 +8,9 @@
  * and Delete's "for good" option. Publish: the channel with suggestions and
  * the rules the gateway enforces, and the "Also notify me" toggle.
  */
-import { NOTIFY_ME_CHANNEL_CHOICES, NOTIFY_ME_CHANNEL_HELP, NOTIFY_ME_REACHES } from '../../utils/afterTheRun';
+import { NOTIFY_ME_CHANNEL_CHOICES, NOTIFY_ME_CHANNEL_HELP, notifyChoiceOn, notifyMeChannels, notifyMeReaches, toggleNotifyChoice } from '../../utils/afterTheRun';
 import { useEffect, useMemo, useState } from 'react';
-import { AfSwitch } from '@abstractframework/ui-kit';
+import { AfChipButton, AfSwitch } from '@abstractframework/ui-kit';
 import type { Edge } from 'reactflow';
 import type { FlowNodeData, JsonValue } from '../../types/flow';
 import { useFlowStore } from '../../hooks/useFlow';
@@ -202,7 +202,18 @@ function SearchQueryForm({ query, onQuery }: { query: Record<string, JsonValue>;
   );
 }
 
-export function PublishNodeSection({ nodeId, data, onPinDefaults }: { nodeId: string; data: FlowNodeData; onPinDefaults: Patch }) {
+export function PublishNodeSection({
+  nodeId,
+  data,
+  onPinDefaults,
+  onEffectConfig,
+}: {
+  nodeId: string;
+  data: FlowNodeData;
+  onPinDefaults: Patch;
+  /** Notify me's Who / Where, saved in the node's effectConfig (`channels`; absent = every channel). */
+  onEffectConfig?: (effectConfig: NonNullable<FlowNodeData['effectConfig']>) => void;
+}) {
   const edges = useFlowStore((s) => s.edges);
   const nodes = useFlowStore((s) => s.nodes);
   const defaults = (data.pinDefaults || {}) as Record<string, JsonValue>;
@@ -216,16 +227,22 @@ export function PublishNodeSection({ nodeId, data, onPinDefaults }: { nodeId: st
   const suggestions = Array.from(new Set([...used, ...PUBLISH_CHANNEL_SUGGESTIONS]));
   const problem = !isNotify && !wired(edges, nodeId, 'channel') ? publishChannelProblem(channel) : null;
   const alert = isNotify || defaults.alert === true;
+  const channels = notifyMeChannels(data);
+  const pickWhere = (value: string) => {
+    const next = toggleNotifyChoice(channels, value);
+    const { channels: _old, ...rest } = (data.effectConfig || {}) as NonNullable<FlowNodeData['effectConfig']>;
+    onEffectConfig?.(next ? { ...rest, channels: next } : rest);
+  };
   return (
     <div className="property-section mail-node-section">
       <p className="property-hint">
         {isNotify
-          ? `${NOTIFY_ME_REACHES}.`
+          ? `${notifyMeReaches(channels)}.`
           : 'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant, the watch and the phone.'}
       </p>
       {isNotify ? (
-        // Who and where (ADR-0041): the recipient is you; the channel set is "all my channels"
-        // until the runtime passes a channel choice to the gateway (the others are shown, not offered).
+        // Who and where (ADR-0041): the recipient is you (another account comes later); where is
+        // a set of chips saved as effectConfig.channels, honoured by the tray, push and email.
         <div className="run-form-field automation-field">
           <label className="property-label" htmlFor={`notify-to-${nodeId}`}>
             Who
@@ -233,16 +250,23 @@ export function PublishNodeSection({ nodeId, data, onPinDefaults }: { nodeId: st
           <select id={`notify-to-${nodeId}`} className="run-form-input" value="me" disabled aria-describedby={`notify-help-${nodeId}`}>
             <option value="me">Me</option>
           </select>
-          <label className="property-label" htmlFor={`notify-channels-${nodeId}`}>
+          <span className="property-label" id={`notify-channels-${nodeId}`}>
             Where
-          </label>
-          <select id={`notify-channels-${nodeId}`} className="run-form-input" value="all" onChange={() => undefined} aria-describedby={`notify-help-${nodeId}`}>
+          </span>
+          <div className="notify-where" role="group" aria-labelledby={`notify-channels-${nodeId}`} data-field="notify-where">
             {NOTIFY_ME_CHANNEL_CHOICES.map((c) => (
-              <option key={c.value} value={c.value} disabled={!c.available}>
-                {c.available ? c.label : `${c.label} (not yet)`}
-              </option>
+              <AfChipButton
+                key={c.value}
+                size="sm"
+                tone={notifyChoiceOn(c, channels) ? 'accent' : 'neutral'}
+                pressed={notifyChoiceOn(c, channels)}
+                disabled={!onEffectConfig}
+                onClick={() => pickWhere(c.value)}
+              >
+                {c.label}
+              </AfChipButton>
             ))}
-          </select>
+          </div>
           <span className="property-hint" id={`notify-help-${nodeId}`}>
             {NOTIFY_ME_CHANNEL_HELP}
           </span>
