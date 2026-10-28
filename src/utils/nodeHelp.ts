@@ -89,14 +89,21 @@ const HELP: Record<string, Written> = {
       result: 'True when “a op b” holds.',
     },
     examples: [
-      'Has items: Array Length → a, op >, b 0 gives true when the list has at least one item.',
+      'Has items: Array Length → a, op >, b 0 gives true when the list has at least one item. (Is Empty does it in one node.)',
       'Equal: a = the status, op ==, b “done”.',
     ],
   },
   is_empty_string: {
-    purpose: 'True when the text is empty. Nothing connected counts as empty.',
-    pins: { text: 'The text to check.', result: 'True when the text is empty.' },
-    examples: ['If (Is Empty(summary)) → true → On Flow End (response “Nothing to summarize”).'],
+    purpose: 'True when a text is empty or a list has no items. Nothing connected counts as empty.',
+    details: [
+      'Empty: nothing, an empty text, a list or an object with no items. Not empty: a space, 0, false, a list with any item.',
+      'One node for “is there anything?”: no Array Length and Compare to get right.',
+    ],
+    pins: { text: 'The text or list to check.', result: 'True when it is empty.' },
+    examples: [
+      'Email triage: Get Variable “triage” → Is Empty → If: false → Notify me; true → On Flow End (response “No important emails”).',
+      'If (Is Empty(summary)) → true → On Flow End (response “Nothing to summarize”).',
+    ],
   },
   join: {
     purpose: 'Joins the items of a list into one text, with a delimiter between them.',

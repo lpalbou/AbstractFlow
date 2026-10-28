@@ -1,6 +1,6 @@
 # 0160 — Email-triage QA: Compare's hidden `==`, the inert notify pin, node help, the test-run mailbox, Join's new line
 
-- Status: COMPLETED 2026-10-28 (0.12.0), except the Is Empty part (see "Remaining").
+- Status: COMPLETED 2026-10-28 (0.12.0; the Is Empty part in 0.12.1 with AbstractRuntime 0.15.1).
 - Created: 2026-10-28 · Completed: 2026-10-28
 - Owner: flow (release-closing wave, worker W6). Source: operator QA of the redeployed set,
   items (c), (d), (e) (`untracked/release-closing/QA.md` at the workspace root).
@@ -72,12 +72,9 @@ one); `joinDelimiterText` mirrors the runtime's escape rule in tests only.
 
 ## Remaining
 
-- **Is Empty on lists** needs AbstractRuntime's `is_empty_string` to treat a list/object with no
-  elements as empty (it returned false for `[]`): runtime branch `fix/email-triage-qa` (PR held for
-  the lead, a runtime release cascades). The Flow side (the pin takes any value) is on branch
-  `fix/is-empty-lists`, held until that runtime is released: shipping it first would make
-  Is Empty([]) silently false.
+- ~~Is Empty on lists~~: done. AbstractRuntime 0.15.1 (PR #15, backlog 0857) treats a list/object with
+  no elements as empty; Flow 0.12.1 (PR #4) lets the node take any value (older nodes retyped on
+  load, `src/utils/isEmptyNode.test.ts`).
 - Gateway hardening (optional): `run_after.py` should report `empty title` only when `notify` is
   an object, not when it is `null`.
-- Join writes object items as Python text (`{'id': …}`): a Notify me body built from a list of
-  emails is unreadable; join their subjects instead, or a runtime change (JSON for objects).
+- Join writes object items as Python text: proposed item 0161.

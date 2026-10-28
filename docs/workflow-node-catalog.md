@@ -637,11 +637,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `is_empty_string`
 - Document node: `{"id":"<unique_id>","type":"is_empty_string"}`
-- Utility: True if text is empty.
+- Utility: True if a text is empty or a list has no items (nothing connected counts as empty).
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `text` string
+- Inputs: `text` any (value): A text or a list (an object too): empty text, no items, or nothing is empty.
 - Outputs: `result` boolean
 - Default config: none
 

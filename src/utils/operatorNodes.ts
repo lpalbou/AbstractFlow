@@ -27,7 +27,7 @@ const OPERATORS: Readonly<Record<string, { sign: string; title: string; shape?: 
   round: { sign: '≈', title: 'Round a number' },
   concat: { sign: '++', title: 'String concat' },
   length: { sign: 'len', title: 'String length' },
-  is_empty_string: { sign: '∅?', title: 'Is the string empty' },
+  is_empty_string: { sign: '∅?', title: 'Is it empty (text or list)' },
   contains: { sign: '∋', title: 'String contains' },
   uppercase: { sign: 'AA', title: 'Uppercase' },
   lowercase: { sign: 'aa', title: 'Lowercase' },
