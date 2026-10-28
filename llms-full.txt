@@ -6497,7 +6497,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.12.1] - 2026-10-28
 
-Needs AbstractRuntime 0.15.1 for the list semantics (backlog 0857 there): on an older runtime Is Empty on an empty list returns false.
+Needs AbstractRuntime 0.15.1 for the list semantics (backlog 0862 there): on an older runtime Is Empty on an empty list returns false.
 
 ### Changed
 

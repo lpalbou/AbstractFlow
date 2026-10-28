@@ -1,4 +1,4 @@
-// QA 2026-10-28 (e): Is Empty takes a list (AbstractRuntime backlog 0857).
+// QA 2026-10-28 (e): Is Empty takes a list (AbstractRuntime backlog 0862).
 import { describe, expect, it } from 'vitest';
 import { createNodeData, getNodeTemplate } from '../types/nodes';
 import { areTypesCompatible } from './validation';

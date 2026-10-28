@@ -32,7 +32,7 @@ describe('node help', () => {
     expect(help.details.join(' ')).toContain('!= not equal to');
     expect(help.inputs.find((p) => p.id === 'op')?.text).toBe('The operator. Not set: ==.');
     expect(help.examples[0]).toContain('op >, b 0');
-    // With the AbstractRuntime release that empties lists (backlog 0857), Is Empty is the one-node way.
+    // With the AbstractRuntime release that empties lists (backlog 0862), Is Empty is the one-node way.
     expect(help.examples[0]).toContain('Is Empty does it in one node');
   });
 

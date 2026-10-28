@@ -1,6 +1,6 @@
 /**
  * Is Empty takes a text or a list (QA 2026-10-28 (e); AbstractRuntime backlog
- * 0857: nothing, "" or a list/object with no elements is empty). Its input
+ * 0862: nothing, "" or a list/object with no elements is empty). Its input
  * keeps the runtime id `text`; flows saved before typed it `string`, which
  * refused a list wire: on load the pin becomes `any`, labelled `value`
  * (a label the author changed is kept).

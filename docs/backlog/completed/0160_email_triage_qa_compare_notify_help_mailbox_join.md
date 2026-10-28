@@ -72,7 +72,7 @@ one); `joinDelimiterText` mirrors the runtime's escape rule in tests only.
 
 ## Remaining
 
-- ~~Is Empty on lists~~: done. AbstractRuntime 0.15.1 (PR #15, backlog 0857) treats a list/object with
+- ~~Is Empty on lists~~: done. AbstractRuntime 0.15.1 (PR #15, backlog 0862) treats a list/object with
   no elements as empty; Flow 0.12.1 (PR #4) lets the node take any value (older nodes retyped on
   load, `src/utils/isEmptyNode.test.ts`).
 - Gateway hardening (optional): `run_after.py` should report `empty title` only when `notify` is
