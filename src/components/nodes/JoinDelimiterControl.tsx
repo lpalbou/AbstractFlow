@@ -35,7 +35,7 @@ export function JoinDelimiterControl({ value, onChange }: { value: unknown; onCh
           className="af-pin-input nodrag"
           type="text"
           value={text}
-          placeholder="e.g. \n or ;"
+          placeholder="not set: a comma"
           aria-label="Delimiter (\n = new line, \t = tab)"
           title="\n = new line, \t = tab"
           onMouseDown={(e) => e.stopPropagation()}

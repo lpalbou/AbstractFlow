@@ -63,12 +63,14 @@ export function TriggeredRunPanel({
       </div>
       <div className="run-form-section-body run-triggered-body">
         <p className="run-triggered-using">Using: {triggerSentence(savedTrigger || trigger, words)}</p>
-        {mailbox !== null ? (
+        {/* Edited inputs are used as they are (no sample is read): no mailbox to pick then. */}
+        {mailbox !== null && !edited ? (
           <div className="automation-inline-field run-triggered-mailbox">
-            <label htmlFor="run-triggered-mailbox">Mailbox for this test run</label>
+            <span id="run-triggered-mailbox-label">Mailbox for this test run</span>
             {mailboxChoices.length > 1 && onMailbox ? (
               <select
                 id="run-triggered-mailbox"
+                aria-labelledby="run-triggered-mailbox-label"
                 className="run-form-select"
                 value={mailbox}
                 disabled={busy}
@@ -81,13 +83,13 @@ export function TriggeredRunPanel({
                 ))}
               </select>
             ) : (
-              <span id="run-triggered-mailbox" className="run-triggered-mailbox-name">
+              <span className="run-triggered-mailbox-name">
                 {mailboxName(mailbox, words?.mailboxes || null)}
               </span>
             )}
           </div>
         ) : null}
-        {mailbox !== null && savedMailbox !== null && mailbox !== savedMailbox ? (
+        {mailbox !== null && !edited && savedMailbox !== null && mailbox !== savedMailbox ? (
           <p className="automation-muted" data-field="test-mailbox-note">
             For this test run only: the automation keeps reading {mailboxName(savedMailbox, words?.mailboxes || null)}.
           </p>

@@ -196,4 +196,13 @@ describe('Run as if triggered: which mailbox, and another one for the test run (
     await runAsIfTriggered({ trigger: picked, count: 5, edited: false, filledPinIds: ['messages'], words: WORDS, sample, prefill: () => {}, start: () => {} });
     expect(sample).toHaveBeenCalledWith({ trigger: { ...MAIL, config: { account: 'work' } }, count: 5 });
   });
+
+  it('with edited inputs (no sample is read) there is no mailbox to pick', () => {
+    const html = renderToStaticMarkup(
+      createElement(TriggeredRunPanel, { trigger: withTestMailbox(MAIL, 'work'), savedTrigger: MAIL, onMailbox: () => {}, words: WORDS, count: 100, onCount: () => {}, busy: false, error: '', edited: true, onUseSample: () => {} })
+    );
+    expect(html).toContain('Using your edited inputs.');
+    expect(html).not.toContain('Mailbox for this test run');
+    expect(html).not.toContain('data-field="test-mailbox-note"');
+  });
 });

@@ -66,13 +66,13 @@ const HELP: Record<string, Written> = {
     ],
     pins: {
       title: 'What the notification says, in a few words (required, at most 120 characters).',
-      body: 'More text under the title (optional): for example the list of emails, made with Join.',
+      body: 'More text under the title (optional): for example the subjects of the emails, one per line (Join with New line). Join writes objects as raw text, so join their subjects, not the emails.',
       data: 'Any extra JSON kept with the alert, for applications (optional).',
       result: 'The published alert: event_id, sequence, alerted.',
       success: 'True when the alert was published.',
     },
     examples: [
-      'Title “Emails requiring your attention”; body = Join(the important subjects, delimiter New line).',
+      'Title “Emails requiring your attention”; body = Join(the important emails’ subjects, delimiter New line).',
     ],
   },
   compare: {
@@ -89,7 +89,7 @@ const HELP: Record<string, Written> = {
       result: 'True when “a op b” holds.',
     },
     examples: [
-      'Has items: Array Length → a, op >, b 0 gives true when the list has at least one item. (Is Empty does it in one node.)',
+      'Has items: Array Length → a, op >, b 0 gives true when the list has at least one item.',
       'Equal: a = the status, op ==, b “done”.',
     ],
   },

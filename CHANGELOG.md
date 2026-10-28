@@ -13,7 +13,7 @@ Operator QA of the email-triage automation (backlog 0160). Works with the releas
 ### Fixed
 
 - **Compare shows the operator it runs.** A Compare with no operator chosen runs `==` (the runtime's default), but its folded card showed "=?", so "Array Length == 0" read as "has items" and an email-triage run with 2 important emails ended through "No important emails detected" (reproduced through AbstractRuntime with 5 emails, 2 important: the list variable held 2, the condition was `2 == 0`). The folded and open card now show `==`, and the operator list offers `!=` (the runtime always accepted it).
-- **After the run no longer says "the title was empty" when Notify me was never reached.** An older flow's On Flow End `notify` pin with nothing wired and no value made every run's outcome carry `notify: null`, which the gateway reports as an empty title. Such an inert pin is now removed when the flow opens (a used one is kept), and the sentences say what happened: "Nothing to notify: the run did not reach a Notify me step." (and, for an older notify without a title, "…, and On Flow End’s notify (older flows) had no title.").
+- **After the run no longer says "the title was empty" when Notify me was never reached.** An older flow's On Flow End `notify` pin with nothing wired and no value made every run's outcome carry `notify: null`, which the gateway reports as an empty title. Such an inert pin is now removed when the flow opens (a used one is kept; save the flow so its runs no longer carry it), and the sentences say what happened: "Nothing to notify: the run did not reach a Notify me step." (and, for an older notify without a title, "…, and On Flow End’s notify (older flows) had no title.").
 
 ### Added
 

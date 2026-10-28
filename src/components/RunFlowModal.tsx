@@ -2356,7 +2356,8 @@ export function RunFlowModal({
   // until the person picks another; the saved automation never changes.
   const [testMailbox, setTestMailbox] = useState<string | null>(null);
   const savedMailboxKey = `${currentWorkflowKey}|${savedAutomationTrigger ? triggerMailbox(savedAutomationTrigger) ?? '' : ''}`;
-  useEffect(() => setTestMailbox(null), [savedMailboxKey]);
+  // Each opening of the window starts on the automation's own mailbox.
+  useEffect(() => setTestMailbox(null), [savedMailboxKey, isOpen]);
   const automationTrigger = useMemo(
     () => (savedAutomationTrigger ? withTestMailbox(savedAutomationTrigger, testMailbox) : null),
     [savedAutomationTrigger, testMailbox]

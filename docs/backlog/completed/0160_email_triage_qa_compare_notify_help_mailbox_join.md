@@ -59,6 +59,17 @@ empty.
   hermetic gateway fixture: the folded Compare reads `==`, On Flow End's help dialog, Join's
   "Comma" control, the Run panel's mailbox line.
 
+## Adversarial review (2026-10-28, fresh opus reviewer)
+
+No blocker. Fixed: Compare's help no longer points at Is Empty for lists (false until the runtime
+release; a test guards it); the docs say the inert pin goes when the flow is opened AND saved (the
+gateway runs the stored file); the mailbox picker hides while edited inputs are used (no sample is
+read then) and resets on each opening of the Run window; Notify me's body help says to join the
+subjects (Join writes objects as raw text); the custom Join field's placeholder says an unset
+delimiter is a comma; the single-mailbox line no longer labels a span. Not changed (nits):
+whitespace-only Compare op shows `==` while the runtime would refuse it (the picker never writes
+one); `joinDelimiterText` mirrors the runtime's escape rule in tests only.
+
 ## Remaining
 
 - **Is Empty on lists** needs AbstractRuntime's `is_empty_string` to treat a list/object with no
