@@ -68,7 +68,7 @@ describe('Waits: names, section, badge', () => {
   it('puts them under Waits, not Events, and Waits after Events and time', () => {
     const waits = NODE_CATEGORIES.waits;
     expect(waits.label).toBe('Waits');
-    expect(waits.nodes.map((n) => n.type)).toEqual(['on_schedule', 'on_event', 'wait_event', 'emit_event']);
+    expect(waits.nodes.map((n) => n.type)).toEqual(['wait_until', 'on_schedule', 'on_event', 'wait_event', 'emit_event']);
     expect(NODE_CATEGORIES.events.nodes.some((n) => ['on_schedule', 'on_event', 'wait_event', 'emit_event'].includes(n.type))).toBe(false);
     const sections = buildPaletteSections();
     const keys = sections.map((s) => s.key);
@@ -76,7 +76,7 @@ describe('Waits: names, section, badge', () => {
     const section = sections.find((s) => s.key === 'waits')!;
     expect(section.label).toBe('Waits');
     // One Wait for Event in the palette: the step form is not offered on its own.
-    expect(section.nodes.map((n) => `${n.type}|${n.label}`)).toEqual(['on_schedule|Wait Until', 'on_event|Wait for Event', 'emit_event|Emit Event']);
+    expect(section.nodes.map((n) => `${n.type}|${n.label}`)).toEqual(['wait_until|Delay', 'on_schedule|Wait Until', 'on_event|Wait for Event', 'emit_event|Emit Event']);
     expect(sections.flatMap((s) => s.nodes).some((n) => n.type === 'wait_event')).toBe(false);
   });
 

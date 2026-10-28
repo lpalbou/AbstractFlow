@@ -76,7 +76,7 @@ describe('the Mail and publish catalog (abstractruntime 0.12.0 contract)', () =>
     expect(pin('mail_mark', 'ids').type).toBe('emails');
     expect(pin('mail_reply', 'id').type).toBe('email');
     expect(template('Publish to channel').description).toBe(
-      'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant and the watch.'
+      'Applications that subscribe to this channel receive it; with Alert on, you are notified on the tray, the Assistant, the watch and the phone.'
     );
   });
 
