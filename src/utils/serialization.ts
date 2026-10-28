@@ -8,6 +8,7 @@ import { getNodeTemplate, createNodeData, mergePinDocsFromTemplate } from '../ty
 import { inferEntryNode, isRouteOverrideEdge, withMultiEntryRouteData } from './multiEntryRoutes';
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from './visualFlowCompat';
 import { withoutInertNotifyPin } from './triggerPins';
+import { withIsEmptyAnyInput } from './isEmptyNode';
 
 /**
  * Convert React Flow nodes/edges to VisualFlow format for API.
@@ -101,6 +102,8 @@ export function fromVisualFlow(flow: VisualFlow): {
     // no expression rings nothing; dropped so the run's outcome no longer
     // carries `notify: null` (QA 2026-10-28). A used one is kept.
     data = withoutInertNotifyPin(vn.id, data, flowEdges);
+    // Is Empty takes a text or a list (an older node typed its input `string`).
+    data = withIsEmptyAnyInput(data);
 
     // While node: add `item:any` output pin for parity with ForEach / Loop.
     if (data.nodeType === 'while') {

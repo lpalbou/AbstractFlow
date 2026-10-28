@@ -2979,11 +2979,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `is_empty_string`
 - Document node: `{"id":"<unique_id>","type":"is_empty_string"}`
-- Utility: True if text is empty.
+- Utility: True if a text is empty or a list has no items (nothing connected counts as empty).
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `text` string
+- Inputs: `text` any (value): A text or a list (an object too): empty text, no items, or nothing is empty.
 - Outputs: `result` boolean
 - Default config: none
 
@@ -6494,6 +6494,14 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.12.1] - 2026-10-28
+
+Needs AbstractRuntime 0.15.1 for the list semantics (backlog 0862 there): on an older runtime Is Empty on an empty list returns false.
+
+### Changed
+
+- **Is Empty takes a text or a list.** Its input (runtime id `text`, now labelled `value`) accepts any value, so a list variable is checked with one node: nothing, an empty text, or a list or object with no items is empty (QA 2026-10-28 (e)). Flows saved before open with the input retyped (a label you changed is kept). Its help says what counts as empty, with the email-triage example (Get Variable → Is Empty → If). Unwired, the node keeps its text field.
 
 ## [0.12.0] - 2026-10-28
 

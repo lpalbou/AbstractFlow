@@ -3,7 +3,7 @@
 ## Snapshot
 - Updated: 2026-10-28
 - Planned: 0
-- Proposed: 50 (on disk, recursive; 0159 added 2026-10-11)
+- Proposed: 51 (on disk, recursive; 0161 added 2026-10-28)
 - Completed: 55
 - Deprecated: 0
 
@@ -13,7 +13,8 @@ email-triage run ended on "No important emails" because Compare with no operator
 its folded card showed "=?"; After the run said "the title was empty" because an unwired older
 `notify` pin put `notify: null` in the outcome. Fixed (Compare shows `==`, offers `!=`; inert
 notify pin dropped on load; truthful sentences), plus node help dialogs, the test-run mailbox
-picker and Join's New line. Remaining: Is Empty on lists waits for an AbstractRuntime release.
+picker and Join's New line. Is Empty on lists shipped in 0.12.1 (needs AbstractRuntime 0.15.1).
+Proposed 0161: Join writes objects as raw Python text (the email-triage Notify me body).
 
 ## 2026-10-11 One fold for getters (0159), PROPOSED
 Item 0159 (`proposed/0159_one_fold_for_getters.md`): the operator dislikes the automatic read pill

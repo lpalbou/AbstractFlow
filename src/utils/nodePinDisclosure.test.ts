@@ -226,7 +226,7 @@ describe('node pin disclosure policy', () => {
 
   it('exposes string predicate utility pins', () => {
     const empty = nodeData('is_empty_string');
-    expect(empty.inputs).toEqual([{ id: 'text', label: 'text', type: 'string' }]);
+    expect(empty.inputs).toEqual([{ id: 'text', label: 'value', type: 'any', description: 'A text or a list (an object too): empty text, no items, or nothing is empty.' }]);
     expect(empty.outputs).toEqual([{ id: 'result', label: 'result', type: 'boolean' }]);
     expect(ids(disclosure(empty).inputPins)).toEqual(['text']);
 

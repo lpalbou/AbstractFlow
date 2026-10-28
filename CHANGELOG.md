@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.12.1] - 2026-10-28
+
+Needs AbstractRuntime 0.15.1 for the list semantics (backlog 0862 there): on an older runtime Is Empty on an empty list returns false.
+
+### Changed
+
+- **Is Empty takes a text or a list.** Its input (runtime id `text`, now labelled `value`) accepts any value, so a list variable is checked with one node: nothing, an empty text, or a list or object with no items is empty (QA 2026-10-28 (e)). Flows saved before open with the input retyped (a label you changed is kept). Its help says what counts as empty, with the email-triage example (Get Variable → Is Empty → If). Unwired, the node keeps its text field.
+
 ## [0.12.0] - 2026-10-28
 
 Operator QA of the email-triage automation (backlog 0160). Works with the released AbstractRuntime and AbstractGateway; the Is Empty change for lists waits for an AbstractRuntime release and is not in this version.

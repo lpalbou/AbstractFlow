@@ -14,6 +14,7 @@ import {
   EdgeChange,
 } from 'reactflow';
 import { withTriggerEvent } from '../utils/triggerEvent';
+import { withIsEmptyAnyInput } from '../utils/isEmptyNode';
 import { AUTOMATION_CANVAS_NOTE, triggerPinKind, withTriggerPins, withoutInertNotifyPin, type TriggerPinKind } from '../utils/triggerPins';
 import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
@@ -1593,6 +1594,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       // expression rings nothing, yet the run's outcome carried `notify: null`, which
       // After the run read as "the title was empty" (QA 2026-10-28): dropped. A used one stays.
       data = withoutInertNotifyPin(vn.id, data, rawEdges);
+      // Is Empty takes a text or a list (an older node typed its input `string`).
+      data = withIsEmptyAnyInput(data);
 
       // Renamed defaults (a label the author changed is kept).
       if (data.nodeType === 'answer_user' && data.label === 'Answer User') {

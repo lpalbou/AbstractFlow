@@ -32,8 +32,8 @@ describe('node help', () => {
     expect(help.details.join(' ')).toContain('!= not equal to');
     expect(help.inputs.find((p) => p.id === 'op')?.text).toBe('The operator. Not set: ==.');
     expect(help.examples[0]).toContain('op >, b 0');
-    // Is Empty on a list waits for an AbstractRuntime release: the help must not send people there yet.
-    expect(JSON.stringify(help)).not.toContain('Is Empty');
+    // With the AbstractRuntime release that empties lists (backlog 0862), Is Empty is the one-node way.
+    expect(help.examples[0]).toContain('Is Empty does it in one node');
   });
 
   it('the dialog body lists purpose, inputs, outputs and examples', () => {
