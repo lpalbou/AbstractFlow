@@ -7,6 +7,7 @@ import type { FlowNodeData, VisualFlow, VisualNode, VisualEdge } from '../types/
 import { getNodeTemplate, createNodeData, mergePinDocsFromTemplate } from '../types/nodes';
 import { inferEntryNode, isRouteOverrideEdge, withMultiEntryRouteData } from './multiEntryRoutes';
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from './visualFlowCompat';
+import { withoutInertNotifyPin } from './triggerPins';
 
 /**
  * Convert React Flow nodes/edges to VisualFlow format for API.
@@ -95,6 +96,11 @@ export function fromVisualFlow(flow: VisualFlow): {
         (data as any).inputs = nextInputs;
       }
     }
+
+    // On Flow End: an older flow's `notify` pin with nothing wired, no value and
+    // no expression rings nothing; dropped so the run's outcome no longer
+    // carries `notify: null` (QA 2026-10-28). A used one is kept.
+    data = withoutInertNotifyPin(vn.id, data, flowEdges);
 
     // While node: add `item:any` output pin for parity with ForEach / Loop.
     if (data.nodeType === 'while') {

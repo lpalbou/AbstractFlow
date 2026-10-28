@@ -16,7 +16,7 @@ import { useFlowStore } from '../hooks/useFlow';
 import { TriggeredRunPanel } from './automation/TriggeredRunPanel';
 import { useTriggerWords } from './automation/FlowNatureBadge';
 import { EMPTY_RESULT_WARNING, TRIGGER_FILLED_PIN_IDS } from '../utils/triggerPins';
-import { DEFAULT_SAMPLE_COUNT, fetchTriggerSample, runAsIfTriggered, runResponse, sameInputValue } from '../utils/triggerSample';
+import { DEFAULT_SAMPLE_COUNT, fetchTriggerSample, runAsIfTriggered, runResponse, sameInputValue, triggerMailbox, withTestMailbox } from '../utils/triggerSample';
 import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
@@ -2350,8 +2350,17 @@ export function RunFlowModal({
   // A flow with an automation trigger runs "as if triggered" (operator ruling
   // 2026-10-25): what the trigger fills is sampled by the gateway and those
   // inputs sit under "Advanced: edit the inputs"; the person's own stay above.
-  const automationTrigger = useFlowStore((st) => st.flowAutomationDefaults?.trigger) || null;
-  const triggerWords = useTriggerWords(automationTrigger);
+  const savedAutomationTrigger = useFlowStore((st) => st.flowAutomationDefaults?.trigger) || null;
+  const triggerWords = useTriggerWords(savedAutomationTrigger);
+  // The mailbox this test run reads (QA 2026-10-28 (d)): the automation's own
+  // until the person picks another; the saved automation never changes.
+  const [testMailbox, setTestMailbox] = useState<string | null>(null);
+  const savedMailboxKey = `${currentWorkflowKey}|${savedAutomationTrigger ? triggerMailbox(savedAutomationTrigger) ?? '' : ''}`;
+  useEffect(() => setTestMailbox(null), [savedMailboxKey]);
+  const automationTrigger = useMemo(
+    () => (savedAutomationTrigger ? withTestMailbox(savedAutomationTrigger, testMailbox) : null),
+    [savedAutomationTrigger, testMailbox]
+  );
   const triggerFilledPins = useMemo(
     () => (automationTrigger ? visibleFormInputPins.filter((pin) => TRIGGER_FILLED_PIN_IDS.has(pin.id)) : []),
     [automationTrigger, visibleFormInputPins]
@@ -8035,6 +8044,8 @@ export function RunFlowModal({
                     {automationTrigger ? (
                       <TriggeredRunPanel
                         trigger={automationTrigger}
+                        savedTrigger={savedAutomationTrigger || undefined}
+                        onMailbox={setTestMailbox}
                         words={triggerWords}
                         count={sampleCount}
                         onCount={setSampleCount}

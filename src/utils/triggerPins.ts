@@ -16,8 +16,9 @@
  * (what the person sees as the answer), `success` (the run's own verdict) and
  * `note` (a short line of what happened and why, kept with the run). Nothing
  * on it reaches a person: Notify me does, on the canvas. The `notify` pin of
- * flows saved before is kept as their compatibility path and says so on the
- * node; it is never added to a flow. Pure: nodes in, nodes out.
+ * flows saved before is kept as their compatibility path when it is used
+ * (its help says so), dropped when inert; it is never added to a flow. Pure:
+ * nodes in, nodes out.
  */
 import type { Edge, Node } from 'reactflow';
 import type { AutomationTriggerDefaults, FlowNodeData, Pin, VisualFlow } from '../types/flow';
@@ -97,18 +98,51 @@ export const AUTOMATION_END_PINS: Pin[] = [
 
 /**
  * The `notify` pin of triggered flows saved before ADR-0041: {title, body};
- * a title raises an alert after the run. Kept for those flows (the node says
- * so in words), never added to a flow: new flows use Notify me.
+ * a title raises an alert after the run. Kept for those flows when it is
+ * used (wired, or a value or expression set), never added to a flow: new
+ * flows use Notify me. Its help is the node's help (utils/nodeHelp.ts), never
+ * prose on the canvas (QA 2026-10-28).
  */
 export const NOTIFY_COMPAT_PIN_ID = 'notify';
 
-/** The line On Flow End shows under its pins of a triggered flow (null: none). */
-export function endPinHelp(pinId: string): string | null {
-  if (pinId === NOTIFY_COMPAT_PIN_ID) {
-    return 'Older flows: a title here notifies you on every channel you have: tray, watch and phone, email when on. Empty: nothing rings. New flows use Notify me.';
+function isBlank(value: unknown): boolean {
+  if (value === undefined || value === null || value === '') return true;
+  if (typeof value === 'object' && !Array.isArray(value)) return Object.keys(value as object).length === 0;
+  return false;
+}
+
+/**
+ * Is On Flow End's `notify` pin inert: nothing wired to it, no value, no
+ * expression? Then it rings nothing, yet the run's outcome still carried
+ * `notify: null`, which the gateway read as "the title was empty" (QA
+ * 2026-10-28, email-triage). Such a pin is dropped when the flow loads.
+ */
+export function isInertNotifyPin(
+  nodeId: string,
+  data: Pick<FlowNodeData, 'nodeType' | 'inputs' | 'pinDefaults' | 'pinExpressions'>,
+  edges: ReadonlyArray<Pick<Edge, 'target' | 'targetHandle'>>
+): boolean {
+  if (data.nodeType !== 'on_flow_end') return false;
+  if (!(data.inputs || []).some((p) => p.id === NOTIFY_COMPAT_PIN_ID)) return false;
+  if (edges.some((e) => e.target === nodeId && e.targetHandle === NOTIFY_COMPAT_PIN_ID)) return false;
+  if (!isBlank((data.pinDefaults as Record<string, unknown> | undefined)?.[NOTIFY_COMPAT_PIN_ID])) return false;
+  const expr = (data.pinExpressions as Record<string, unknown> | undefined)?.[NOTIFY_COMPAT_PIN_ID];
+  return typeof expr !== 'string' || !expr.trim();
+}
+
+/** On Flow End without its inert `notify` pin (the same object when there is nothing to drop). */
+export function withoutInertNotifyPin<T extends Pick<FlowNodeData, 'nodeType' | 'inputs' | 'pinDefaults' | 'pinExpressions'>>(
+  nodeId: string,
+  data: T,
+  edges: ReadonlyArray<Pick<Edge, 'target' | 'targetHandle'>>
+): T {
+  if (!isInertNotifyPin(nodeId, data, edges)) return data;
+  const next = { ...data, inputs: data.inputs.filter((p) => p.id !== NOTIFY_COMPAT_PIN_ID) };
+  if (next.pinDefaults && NOTIFY_COMPAT_PIN_ID in next.pinDefaults) {
+    const { [NOTIFY_COMPAT_PIN_ID]: _dropped, ...rest } = next.pinDefaults as Record<string, unknown>;
+    next.pinDefaults = rest as T['pinDefaults'];
   }
-  if (pinId === 'note') return 'Kept with the run; shown in After the run. Reaches nobody.';
-  return null;
+  return next;
 }
 
 function addPins(list: Pin[], pins: Pin[]): Pin[] {

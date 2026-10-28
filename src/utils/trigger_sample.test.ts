@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { TriggeredRunPanel } from '../components/automation/TriggeredRunPanel';
 import { GatewayHttpError } from './gatewayClient';
-import { TRIGGER_SAMPLE_ENDPOINT, fetchTriggerSample, runAsIfTriggered, sampleErrorWords, testRunSentence } from './triggerSample';
+import { TRIGGER_SAMPLE_ENDPOINT, fetchTriggerSample, runAsIfTriggered, sampleErrorWords, testMailboxChoices, testRunSentence, withTestMailbox } from './triggerSample';
 import { parseMailboxes } from './automationGateway';
 import { ME_EMAIL_RESPONSE } from './triggerSources.fixtures';
 import type { AutomationTriggerDefaults } from '../types/flow';
@@ -153,5 +153,47 @@ describe('every Run re-samples (operator, 17:37: a stale first sample was reused
     expect(edited).toContain('Using your edited inputs.');
     expect(edited).toContain('Use the sample again');
     expect(edited).not.toContain('Use the last');
+  });
+});
+
+describe('Run as if triggered: which mailbox, and another one for the test run (QA 2026-10-28 (d))', () => {
+  const render = (trigger: AutomationTriggerDefaults, saved: AutomationTriggerDefaults, onMailbox?: (a: string) => void) =>
+    renderToStaticMarkup(
+      createElement(TriggeredRunPanel, { trigger, savedTrigger: saved, onMailbox, words: WORDS, count: 100, onCount: () => {}, busy: false, error: '', edited: false, onUseSample: () => {} })
+    );
+
+  it('lists the readable mailboxes by address, the main one first; a send-only one is not offered', () => {
+    expect(testMailboxChoices(MAIL, WORDS.mailboxes)).toEqual([
+      { value: 'default', label: 'test@abstractframework.ai (main)' },
+      { value: 'work', label: 'work@example.org' },
+    ]);
+    expect(testMailboxChoices(FEED, WORDS.mailboxes)).toEqual([]);
+  });
+
+  it('the panel says which mailbox is read and lets the person pick another', () => {
+    const html = render(MAIL, MAIL, () => {});
+    expect(html).toContain('Mailbox for this test run');
+    expect(html).toMatch(/<select id="run-triggered-mailbox"[^>]*>/);
+    expect(html).toContain('<option value="default" selected="">test@abstractframework.ai (main)</option>');
+    expect(html).toContain('<option value="work">work@example.org</option>');
+    expect(html).not.toContain('send-only@example.org');
+    expect(html).not.toContain('data-field="test-mailbox-note"');
+    // No mailbox control on a feed.
+    expect(render(FEED, FEED, () => {})).not.toContain('Mailbox for this test run');
+  });
+
+  it('a picked mailbox rides the sample request for this run only; the automation keeps its own', async () => {
+    const picked = withTestMailbox(MAIL, 'work');
+    expect(picked.config.account).toBe('work');
+    expect(MAIL.config.account).toBe('default');
+    expect(withTestMailbox(MAIL, null)).toBe(MAIL);
+    expect(withTestMailbox(FEED, 'work')).toBe(FEED);
+    const html = render(picked, MAIL, () => {});
+    expect(html).toContain('<option value="work" selected="">work@example.org</option>');
+    expect(html).toContain('For this test run only: the automation keeps reading test@abstractframework.ai.');
+    expect(html).toContain('Run reads the last 100 messages of work@example.org again');
+    const sample = vi.fn(async () => ({ inputs: { messages: [] }, truncated: false, summary: '' }));
+    await runAsIfTriggered({ trigger: picked, count: 5, edited: false, filledPinIds: ['messages'], words: WORDS, sample, prefill: () => {}, start: () => {} });
+    expect(sample).toHaveBeenCalledWith({ trigger: { ...MAIL, config: { account: 'work' } }, count: 5 });
   });
 });

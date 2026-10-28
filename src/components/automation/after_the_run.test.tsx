@@ -1,7 +1,8 @@
 // Framework ADR-0041 "No hidden effects after a flow" in Flow:
 // - On Flow End records the outcome (response, success, note); new triggered
-//   flows never get the notify pin; an older flow's notify pin says in words
-//   what it does; the canvas note points at Notify me;
+//   flows never get the notify pin; an older flow's notify pin is explained in
+//   the node help dialog (no canvas prose), dropped when inert; the canvas note
+//   points at Notify me;
 // - Notify me says on the node whom it reaches and how;
 // - the run view's "After the run" section says what arrived, the note, the
 //   alert or why nothing rang, and each delivery (spinner first, ADR-0039).
@@ -15,7 +16,9 @@ import { createNodeData, getAllNodeTemplates, getNodeTemplate } from '../../type
 import type { FlowNodeData } from '../../types/flow';
 import { BaseNode } from '../nodes/BaseNode';
 import { useFlowStore } from '../../hooks/useFlow';
-import { AUTOMATION_CANVAS_NOTE, AUTOMATION_END_PINS, endPinHelp, withTriggerPins } from '../../utils/triggerPins';
+import { AUTOMATION_CANVAS_NOTE, AUTOMATION_END_PINS, isInertNotifyPin, withTriggerPins } from '../../utils/triggerPins';
+import { NodeHelpBody } from '../NodeHelpModal';
+import { nodeHelp } from '../../utils/nodeHelp';
 import {
   NOTIFY_ME_CHANNEL_CHOICES,
   NOTIFY_ME_REACHES,
@@ -33,7 +36,7 @@ import {
 } from '../../utils/afterTheRun';
 import { AfterTheRunView } from './AfterTheRun';
 import { PublishNodeSection } from './MailNodeSection';
-import { toVisualFlow } from '../../utils/serialization';
+import { fromVisualFlow, toVisualFlow } from '../../utils/serialization';
 
 function renderNode(data: FlowNodeData): string {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } });
@@ -110,21 +113,56 @@ describe('On Flow End records the outcome (ADR-0041)', () => {
     expect(AUTOMATION_END_PINS.map((p) => p.id)).toEqual(['response', 'success', 'note']);
   });
 
-  it('the notify pin of a triggered flow says in words what it does, on the node', () => {
-    expect(endPinHelp('notify')).toBe(
-      'Older flows: a title here notifies you on every channel you have: tray, watch and phone, email when on. Empty: nothing rings. New flows use Notify me.'
-    );
+  it('the notify pin of a triggered flow carries no prose on the canvas: its help is the node help dialog', () => {
     const template = getNodeTemplate('on_flow_end')!;
     const data = createNodeData(template);
     data.inputs = [...data.inputs, { id: 'response', label: 'response', type: 'string' }, { id: 'notify', label: 'notify', type: 'object' }, { id: 'note', label: 'note', type: 'string' }];
-    // Not a triggered flow: no help line (the pin means nothing there).
-    expect(renderNode(data)).not.toContain('data-pin-help');
     useFlowStore.setState({ flowAutomationDefaults: { schema_version: 1, trigger: { source_id: 'email.received', source_version: 1, config: {} } } as never });
     const html = renderNode(data);
-    expect(html).toContain('data-pin-help="notify"');
-    expect(html).toContain('Older flows: a title here notifies you on every channel you have');
-    expect(html).toContain('data-pin-help="note"');
-    expect(html).not.toContain('data-pin-help="response"');
+    // QA 2026-10-28: the in-node self-comment is gone.
+    expect(html).not.toContain('data-pin-help');
+    expect(html).not.toContain('Older flows: a title here');
+    // The help dialog explains the pin, with the node's purpose, inputs and an example.
+    const help = renderToStaticMarkup(createElement(NodeHelpBody, { data }));
+    expect(help).toContain('data-help-pin="notify"');
+    expect(help).toContain('Older flows only');
+    expect(help).toContain('use Notify me before On Flow End');
+    expect(help).toContain('data-help-section="examples"');
+    expect(nodeHelp(data).purpose).toContain('It reaches nobody');
+  });
+
+  it('an inert notify pin (nothing wired, no value, no expression) is dropped on load; a used one is kept', () => {
+    const end = (id: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      type: 'on_flow_end',
+      position: { x: 0, y: 0 },
+      data: {
+        nodeType: 'on_flow_end',
+        label: 'On Flow End',
+        inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'response', label: 'response', type: 'string' }, { id: 'notify', label: 'notify', type: 'object' }, { id: 'success', label: 'success', type: 'boolean' }],
+        outputs: [],
+        ...extra,
+      },
+    });
+    const flow = {
+      id: 'f',
+      name: 'f',
+      nodes: [
+        end('inert', { pinDefaults: { response: 'No important emails detected' } }),
+        end('wired'),
+        end('valued', { pinDefaults: { notify: { title: 'Done' } } }),
+        end('expr', { pinExpressions: { notify: '{"title": vars.t}' } }),
+        { id: 'src', type: 'literal_json', position: { x: 0, y: 0 }, data: { nodeType: 'literal_json', label: 'x', inputs: [], outputs: [{ id: 'value', label: 'value', type: 'object' }] } },
+      ],
+      edges: [{ id: 'e1', source: 'src', sourceHandle: 'value', target: 'wired', targetHandle: 'notify' }],
+    } as never;
+    const { nodes } = fromVisualFlow(flow);
+    const pins = (id: string) => nodes.find((n) => n.id === id)!.data.inputs.map((p) => p.id);
+    expect(pins('inert')).toEqual(['exec-in', 'response', 'success']);
+    expect(pins('wired')).toContain('notify');
+    expect(pins('valued')).toContain('notify');
+    expect(pins('expr')).toContain('notify');
+    expect(isInertNotifyPin('valued', { nodeType: 'on_flow_end', inputs: [{ id: 'notify', label: 'notify', type: 'object' }], pinDefaults: { notify: {} } } as never, [])).toBe(true);
   });
 });
 
@@ -228,8 +266,10 @@ describe('After the run', () => {
   it('nothing rang: the reason in words', () => {
     const quiet: RunAfter = { ...GMAIL, attention: null, alerts: [], deliveries: [], quiet_reason: 'empty title' };
     const html = renderToStaticMarkup(createElement(AfterTheRunView, { state: { status: 'ready', after: quiet } }));
-    expect(html).toContain('Nothing to notify: the title was empty.');
-    expect(quietSentence('no notify')).toBe('Nothing to notify: this flow has no Notify me step.');
+    // QA 2026-10-28: a run that ended without reaching Notify me while an unwired notify pin
+    // sat on On Flow End was told "the title was empty": the sentence now says what happened.
+    expect(html).toContain('Nothing to notify: the run did not reach a Notify me step, and On Flow End’s notify (older flows) had no title.');
+    expect(quietSentence('no notify')).toBe('Nothing to notify: the run did not reach a Notify me step.');
   });
 
   it('an approval on a sub-run: said as what it is, open or answered, with its deliveries', () => {

@@ -6,7 +6,6 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
-import { endPinHelp } from '../../utils/triggerPins';
 import { isNotifyMeNode, notifyMeChannels, notifyMeReaches } from '../../utils/afterTheRun';
 import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -34,7 +33,8 @@ import {
 } from '../../utils/agentToolsPin';
 import { hasSecretLikeValue } from '../../utils/flowAuthoringCommands';
 import { useFlowStore } from '../../hooks/useFlow';
-import { isCollapsibleOperator } from '../../utils/operatorNodes';
+import { JoinDelimiterControl } from './JoinDelimiterControl';
+import { COMPARE_DEFAULT_OP, COMPARE_OPS, isCollapsibleOperator } from '../../utils/operatorNodes';
 import { HiddenConnectionsBadge } from './HiddenConnectionsBadge';
 import { NodeStatusGlyph } from './NodeStatusGlyph';
 import { categoryColorVar, colorSectionForCategory, nodeSemanticCategory } from '../../utils/nodeCategoryColors';
@@ -771,7 +771,6 @@ export const BaseNode = memo(function BaseNode({
   // Render-fold (0156 Stage 1): reads folded onto this node's pin rows.
   const foldedReads = useFoldedReadsForNode(id);
   const flowId = useFlowStore((s) => s.flowId);
-  const isTriggeredFlow = useFlowStore((s) => Boolean(s.flowAutomationDefaults));
   const flowName = useFlowStore((s) => s.flowName);
   const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
@@ -4397,6 +4396,7 @@ export const BaseNode = memo(function BaseNode({
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const isTemplateTextPin = isTemplateNode && pin.id === 'template';
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
+                const isJoinDelimiterPin = data.nodeType === 'join' && pin.id === 'delimiter';
                 const isStringifyJsonModePin = isStringifyJsonNode && pin.id === 'mode';
                 const isThinkingPin = (isAgentNode || isLlmNode) && pin.id === 'thinking';
                 const isAnswerUserLevelPin = isAnswerUserNode && pin.id === 'level';
@@ -4481,6 +4481,7 @@ export const BaseNode = memo(function BaseNode({
 	                  ((isAgentNode || isLlmNode || subflowHasToolsPin) && pin.id === 'tools') ||
 	                  (isVarNode && pin.id === 'name') ||
 	                  isCompareOpPin ||
+	                  isJoinDelimiterPin ||
 	                  isStringifyJsonModePin ||
                   isEmitEventName ||
                   isEmitEventScopePin ||
@@ -4647,23 +4648,27 @@ export const BaseNode = memo(function BaseNode({
 
 	                if (isCompareOpPin && !connected) {
 	                  const raw = pinDefaults.op;
-	                  const currentOp = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : '==';
+	                  const currentOp = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : COMPARE_DEFAULT_OP;
 	                  controls.push(
                     <AfSelect
                       key="compare-op"
                       variant="pin"
                       value={currentOp}
                       placeholder="=="
-                      options={[
-                        { value: '==', label: '==' },
-                        { value: '>=', label: '>=' },
-                        { value: '>', label: '>' },
-                        { value: '<=', label: '<=' },
-                        { value: '<', label: '<' },
-                      ]}
+                      options={COMPARE_OPS.map((o) => ({ value: o.value, label: o.label }))}
                       searchable={false}
                       minPopoverWidth={120}
                       onChange={(v) => setPinDefault('op', (v || '==') as any)}
+                    />
+                  );
+                }
+
+                if (isJoinDelimiterPin && !connected) {
+                  controls.push(
+                    <JoinDelimiterControl
+                      key="join-delimiter"
+                      value={pinDefaults.delimiter}
+                      onChange={(v) => setPinDefault('delimiter', v as any)}
                     />
                   );
                 }
@@ -5746,14 +5751,6 @@ export const BaseNode = memo(function BaseNode({
                   onClose={() => setFxEditingPin(null)}
                   onPromote={promotePinExpression(pin.id)}
                 />
-              ) : null}
-
-              {/* On Flow End of a triggered flow records the outcome (ADR-0041): its
-                  notify pin (older flows) and note say in words what they do. */}
-              {data.nodeType === 'on_flow_end' && isTriggeredFlow && endPinHelp(pin.id) ? (
-                <div className="pin-help" data-pin-help={pin.id}>
-                  {endPinHelp(pin.id)}
-                </div>
               ) : null}
 
               {/* Condition preview: the deciding law stays readable ON the

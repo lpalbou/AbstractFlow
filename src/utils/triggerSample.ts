@@ -14,7 +14,7 @@
 import type { AutomationTriggerDefaults } from '../types/flow';
 import { GatewayHttpError, gatewayJson, jsonRequest } from './gatewayClient';
 import { triggerPinKind, type TriggerPinKind } from './triggerPins';
-import { mailboxName, connectionKind, type AutomationWords } from './automationChoice';
+import { mailboxName, connectionKind, readableMailboxes, type AutomationWords, type Mailbox } from './automationChoice';
 
 export const TRIGGER_SAMPLE_ENDPOINT = 'api/gateway/triggers/sample';
 export const DEFAULT_SAMPLE_COUNT = 100;
@@ -99,6 +99,41 @@ export function sampleSourceName(trigger: AutomationTriggerDefaults, words: Auto
   if (kind === 'email') return mailboxName(typeof trigger.config.account === 'string' ? trigger.config.account : 'default', words.mailboxes || null);
   const cid = trigger.connection_id || '';
   return words.connections?.find((c) => c.connection_id === cid)?.label || (connectionKind(trigger.source_id) === 'feed' ? 'the feed' : 'the webhook');
+}
+
+/** The mailbox a mail trigger reads (its account id; "default" when unset), or null for another trigger. */
+export function triggerMailbox(trigger: AutomationTriggerDefaults): string | null {
+  if (triggerPinKind(trigger) !== 'email') return null;
+  const account = trigger.config?.account;
+  return typeof account === 'string' && account && account !== 'self' ? account : 'default';
+}
+
+/**
+ * The trigger a test run reads (QA 2026-10-28 (d)): the automation's own, with
+ * the mailbox the person picked for this run. The pick rides the sample request
+ * (`POST /triggers/sample` reads `trigger.config.account`); the saved
+ * automation is never changed.
+ */
+export function withTestMailbox(trigger: AutomationTriggerDefaults, account: string | null | undefined): AutomationTriggerDefaults {
+  const current = triggerMailbox(trigger);
+  if (current === null || !account || account === current) return trigger;
+  return { ...trigger, config: { ...trigger.config, account } };
+}
+
+/**
+ * The mailboxes a test run can read (`GET /me/email` accounts: connected,
+ * with an incoming server; the main one first), by address. The automation's
+ * own mailbox stays listed even when the gateway no longer lists it.
+ */
+export function testMailboxChoices(trigger: AutomationTriggerDefaults, mailboxes: readonly Mailbox[] | null | undefined): Array<{ value: string; label: string }> {
+  const own = triggerMailbox(trigger);
+  if (own === null) return [];
+  const list = readableMailboxes(mailboxes || []).map((m) => ({
+    value: m.account_id,
+    label: `${m.address || mailboxName(m.account_id, null)}${m.primary ? ' (main)' : ''}`,
+  }));
+  if (!list.some((c) => c.value === own)) list.unshift({ value: own, label: mailboxName(own, mailboxes || null) });
+  return list;
 }
 
 const LIST_PIN: Partial<Record<TriggerPinKind, string>> = { email: 'messages', feed: 'items', webhook: 'calls' };
