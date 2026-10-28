@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { VisualFlow } from '../types/flow';
 import { fromVisualFlow, toVisualFlow } from './serialization';
+import { useFlowStore } from '../hooks/useFlow';
 import { operatorSymbol } from './operatorNodes';
 import { quietSentence } from './afterTheRun';
 import { nodeHelp } from './nodeHelp';
@@ -35,12 +36,19 @@ describe('email-triage (QA 2026-10-28)', () => {
       expect(flow.nodes.find((n) => n.id === id)!.data.inputs.some((p) => p.id === 'notify')).toBe(true);
       expect(byId(id).data.inputs.map((p) => p.id)).not.toContain('notify');
     }
-    const saved = toVisualFlow('email-triage', 'email-triage', nodes, edges);
+    // The editor's load path (the library, a deep link), then the saved flow.
+    useFlowStore.getState().clearFlow();
+    useFlowStore.getState().loadFlow(JSON.parse(JSON.stringify(flow)));
+    const saved = useFlowStore.getState().getFlow();
     for (const id of ['node-2', 'node-25']) {
-      expect(saved.nodes.find((n) => n.id === id)!.data.inputs.map((p) => p.id)).toEqual(['exec-in', 'response', 'success']);
+      const pins = saved.nodes.find((n) => n.id === id)!.data.inputs.map((p) => p.id);
+      expect(pins).not.toContain('notify');
+      expect(pins).toEqual(expect.arrayContaining(['exec-in', 'response', 'success']));
     }
+    expect(toVisualFlow('f', 'f', nodes, edges).nodes.find((n) => n.id === 'node-25')!.data.inputs.map((p) => p.id)).toEqual(['exec-in', 'response', 'success']);
     // Notify me's title is the saved one, untouched.
-    expect(byId('node-19').data.pinDefaults?.title).toBe('Emails requiring your attension');
+    expect(saved.nodes.find((n) => n.id === 'node-19')!.data.pinDefaults?.title).toBe('Emails requiring your attension');
+    useFlowStore.getState().clearFlow();
   });
 
   it('After the run says Notify me was not reached, never only "the title was empty"', () => {

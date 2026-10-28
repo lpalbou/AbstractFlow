@@ -1476,7 +1476,7 @@ const MATH_NODES: NodeTemplate[] = [
 const STRING_NODES: NodeTemplate[] = [
   { type: 'concat', icon: '&#x2795;', label: 'Concat', description: 'Concatenate two strings.', headerColor: '#E74C3C', inputs: [{ id: 'a', label: 'a', type: 'string' }, { id: 'b', label: 'b', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'split', icon: '&#x2702;', label: 'Split', description: 'Split text by a delimiter into an array (with trimming/drop-empty defaults).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'string' },
-  { type: 'join', icon: '&#x1F517;', label: 'Join', description: 'Join array items into a string using a delimiter.', headerColor: '#E74C3C', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'join', icon: '&#x1F517;', label: 'Join', description: 'Join array items into a string using a delimiter.', headerColor: '#E74C3C', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'delimiter', label: 'delimiter', type: 'string', description: 'What goes between two items (not set: a comma); \\n is a new line, \\t a tab.' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'format', icon: '&#x1F4DD;', label: 'Format', description: 'Python-style string format: template.format(**values).', headerColor: '#E74C3C', inputs: [{ id: 'template', label: 'template', type: 'string' }, { id: 'values', label: 'values', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   // Text with variables: the properties panel edits the text with variable chips (run variables, or
   // an input of the node for a value that comes from a wire); stored as `{{name}}` placeholders.
@@ -1570,11 +1570,11 @@ const CONTROL_NODES: NodeTemplate[] = [
     type: 'compare',
     icon: '=?',
     label: 'Compare',
-    description: 'Compare a and b using operator op (==, !=, <, <=, >, >=).',
+    description: 'Compare a and b using operator op (==, !=, <, <=, >, >=); no operator set compares with ==.',
     headerColor: '#F39C12',
     inputs: [
       { id: 'a', label: 'a', type: 'any' },
-      { id: 'op', label: 'op', type: 'string' },
+      { id: 'op', label: 'op', type: 'string', description: 'The operator: ==, !=, >, >=, <, <= (not set: ==).' },
       { id: 'b', label: 'b', type: 'any' },
     ],
     outputs: [{ id: 'result', label: 'result', type: 'boolean' }],

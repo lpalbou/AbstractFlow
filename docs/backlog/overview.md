@@ -1,11 +1,19 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-10-11
+- Updated: 2026-10-28
 - Planned: 0
 - Proposed: 50 (on disk, recursive; 0159 added 2026-10-11)
-- Completed: 54
+- Completed: 55
 - Deprecated: 0
+
+## 2026-10-28 Email-triage QA (0160), COMPLETED in 0.12.0
+Item 0160 (`completed/0160_email_triage_qa_compare_notify_help_mailbox_join.md`): the operator's
+email-triage run ended on "No important emails" because Compare with no operator runs `==` and
+its folded card showed "=?"; After the run said "the title was empty" because an unwired older
+`notify` pin put `notify: null` in the outcome. Fixed (Compare shows `==`, offers `!=`; inert
+notify pin dropped on load; truthful sentences), plus node help dialogs, the test-run mailbox
+picker and Join's New line. Remaining: Is Empty on lists waits for an AbstractRuntime release.
 
 ## 2026-10-11 One fold for getters (0159), PROPOSED
 Item 0159 (`proposed/0159_one_fold_for_getters.md`): the operator dislikes the automatic read pill

@@ -543,6 +543,20 @@ type colours.
   minus, four corners, padlock) and a tooltip. The preview map in the bottom
   right has its own show/hide button.
 
+### Node help
+
+Select a node and press **Help** beside its type in **Properties**: a dialog says what the node is
+for, how it behaves, each input and output (name, type, meaning) and, for the nodes people trip
+on, examples (On Flow End, Notify me, Compare, Is Empty, Join, Add to List Variable, Get
+Variable, Array Length, If). Every node has one: the others show their own description and pin
+descriptions. The canvas carries no explanatory prose under pins.
+
+- **Compare** shows the operator it runs on its card and folded: with none chosen it is `==`
+  (equal to), so "Array Length `==` 0" reads as what it is (true only for an empty list). The
+  operators are `==`, `!=`, `>`, `>=`, `<`, `<=`.
+- **Join** takes its delimiter from a list (Comma, Comma and space, New line, Blank line, Space,
+  Tab) or **Custom…**, a text where `\n` is a new line and `\t` a tab.
+
 ### If/Else branch order
 
 The up/down arrows button at the top right of an If/Else node swaps the order in which its True and
@@ -804,9 +818,9 @@ A triggered flow reads what arrived on `On Flow Start`, as typed, named outputs 
 | Schedule (set in Observer or the Assistant) | `scheduled_at` (when the run was due), `occurrence` (run #1, #2, …) |
 | By hand | nothing extra |
 
-Every triggered flow also has `event`, the whole raw event. Your own inputs (a threshold, a `prompt` if you want one) stay on `On Flow Start` and are set under **Inputs** in the Automation dialog. `On Flow End` records the run's outcome and reaches nobody (framework ADR-0041): `response` (what the person sees as the run's answer), `success` (the run's own verdict: false marks the run failed, it is retried, then an alert says so) and `note` (a short line of what happened and why, kept with the run and shown in **After the run**). To reach yourself, add **Notify me** on the canvas. Flows saved before keep their `notify` pin (`{title, body}`): it still raises an alert after the run, and the node says so under the pin ("Older flows: a title here notifies you on every channel you have: tray, watch and phone, email when on. Empty: nothing rings. New flows use Notify me."); new flows never get it. Saving a triggered flow with nothing connected to `response` saves it and says so. The runtime's side of this contract: [AbstractRuntime > Occurrence inputs and outputs](https://github.com/lpalbou/abstractruntime/blob/main/docs/automations.md#occurrence-inputs-and-outputs-the-flow-contract).
+Every triggered flow also has `event`, the whole raw event. Your own inputs (a threshold, a `prompt` if you want one) stay on `On Flow Start` and are set under **Inputs** in the Automation dialog. `On Flow End` records the run's outcome and reaches nobody (framework ADR-0041): `response` (what the person sees as the run's answer), `success` (the run's own verdict: false marks the run failed, it is retried, then an alert says so) and `note` (a short line of what happened and why, kept with the run and shown in **After the run**). To reach yourself, add **Notify me** on the canvas. Flows saved before keep their `notify` pin (`{title, body}`) when it is used (wired, or a value or expression set): it still raises an alert after the run, and On Flow End's [help](#node-help) says so. An unused one (nothing wired, no value) is removed when the flow opens, so the run's outcome no longer carries an empty `notify`; new flows never get it. Saving a triggered flow with nothing connected to `response` saves it and says so. The runtime's side of this contract: [AbstractRuntime > Occurrence inputs and outputs](https://github.com/lpalbou/abstractruntime/blob/main/docs/automations.md#occurrence-inputs-and-outputs-the-flow-contract).
 
-**Run as if triggered.** Pressing **Run** on a flow with an automation trigger opens the run window with **Run as if triggered** first: "Using: When mail arrives in me@example.org", one control (**Use the last [100] messages**; items for a feed, calls for a webhook; nothing for a schedule or by hand) and one sentence saying what **Run** will do ("Run reads the last 100 messages of me@example.org again and runs the flow on them."). The window has one **Run** button, at the bottom. Every Run asks the gateway for a fresh sample with the current count (`POST /api/gateway/triggers/sample {trigger, count}` → `{inputs, truncated, summary}`), fills those inputs and starts a normal run with them, saying "Running with the last 100 messages of me@example.org (test run)", or "Only 3 messages found: running with them (test run)" when fewer came back, with "(stopped after 20 s)" when the gateway stopped reading early. Nothing is turned on. Your own inputs stay under **Your inputs**; what the trigger fills (`messages`, `mailbox`, `event`, …) is under **Advanced: edit the inputs**, filled from the last sample. Only typing in them counts as editing: the panel then says "Using your edited inputs." with **Use the sample again**, and Run uses your values until then (each opening of the window starts fresh). A failure is said in words (a mailbox that cannot be reached, a feed that answered 404). Flows without a trigger keep the plain run window.
+**Run as if triggered.** Pressing **Run** on a flow with an automation trigger opens the run window with **Run as if triggered** first: "Using: When mail arrives in me@example.org", one control (**Use the last [100] messages**; items for a feed, calls for a webhook; nothing for a schedule or by hand) and one sentence saying what **Run** will do ("Run reads the last 100 messages of me@example.org again and runs the flow on them."). A mail trigger also says which mailbox the test run reads (**Mailbox for this test run**) and, when you have several, lets you pick another of your mailboxes (those connected with an incoming server, from `GET /api/gateway/me/email`; the main one first, by address): the pick rides the sample request (`trigger.config.account`) for that run only, and the panel says "For this test run only: the automation keeps reading …". The window has one **Run** button, at the bottom. Every Run asks the gateway for a fresh sample with the current count (`POST /api/gateway/triggers/sample {trigger, count}` → `{inputs, truncated, summary}`), fills those inputs and starts a normal run with them, saying "Running with the last 100 messages of me@example.org (test run)", or "Only 3 messages found: running with them (test run)" when fewer came back, with "(stopped after 20 s)" when the gateway stopped reading early. Nothing is turned on. Your own inputs stay under **Your inputs**; what the trigger fills (`messages`, `mailbox`, `event`, …) is under **Advanced: edit the inputs**, filled from the last sample. Only typing in them counts as editing: the panel then says "Using your edited inputs." with **Use the sample again**, and Run uses your values until then (each opening of the window starts fresh). A failure is said in words (a mailbox that cannot be reached, a feed that answered 404). Flows without a trigger keep the plain run window.
 
 In the run window, a triggered flow keeps the session, the prompt caches and the run and step ids behind **Advanced settings**; its result shows what the person sees (On Flow End's `response`), or "Each run's result will be empty unless something is connected to On Flow End's response.", with the whole result under **Details**, and the finished test run says "Test run done with the latest 3 items of Python news". Its last section is **After the run** (see [What happens after On Flow End](#what-happens-after-on-flow-end)).
 
@@ -833,7 +847,7 @@ Nothing acts after the end node (framework ADR-0041: On Flow End records the out
 | **Publish to channel** | A message for applications subscribed to the channel; **Also notify me** adds the alert | The subscribed apps; you with Alert on |
 | `On Flow End` `notify` (older flows only) | After the run, a title raises an alert; empty: nothing | You: every channel you have, email when the automation's **Email result** is on |
 
-The run window's last section, **After the run** (for a triggered flow, and any run an automation started), shows what really happened, read from the gateway (`GET /api/gateway/runs/{run_id}/after`): what arrived ("4 new emails: “O” from … and 3 more"), when the run started and ended, its note, the alert it raised and where it came from (Notify me, an older flow's notify, a failure, an approval waiting for you on one of its steps), and each delivery: the channel, its route (push notification, shown by the app, email), the device and the time, or why it was not delivered. When nothing rang it says why: "Nothing to notify: the title was empty." or "Nothing to notify: this flow has no Notify me step." A spinner shows until the gateway answered ([Loading and errors](#loading-and-errors)); when the read failed it says "Could not read what happened after the run: …" with **Retry** (a Gateway without the route answers 404, which is final at once). Deliveries arrive a few seconds after the end, so the section reads again while they are being recorded. Observer's run card shows the same section.
+The run window's last section, **After the run** (for a triggered flow, and any run an automation started), shows what really happened, read from the gateway (`GET /api/gateway/runs/{run_id}/after`): what arrived ("4 new emails: “O” from … and 3 more"), when the run started and ended, its note, the alert it raised and where it came from (Notify me, an older flow's notify, a failure, an approval waiting for you on one of its steps), and each delivery: the channel, its route (push notification, shown by the app, email), the device and the time, or why it was not delivered. When nothing rang it says why: "Nothing to notify: the run did not reach a Notify me step." (the flow has none, or the run ended on a path without it), or, when the run's outcome carried On Flow End's older `notify` without a title, "Nothing to notify: the run did not reach a Notify me step, and On Flow End’s notify (older flows) had no title." A spinner shows until the gateway answered ([Loading and errors](#loading-and-errors)); when the read failed it says "Could not read what happened after the run: …" with **Retry** (a Gateway without the route answers 404, which is final at once). Deliveries arrive a few seconds after the end, so the section reads again while they are being recorded. Observer's run card shows the same section.
 
 **The explicit shape for a judge.** A flow that judges what arrived and should reach you only sometimes (like the library's "Judge what arrived") puts the decision on the canvas instead of in an empty-or-not `notify` title:
 
@@ -2453,11 +2467,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `compare`
 - Document node: `{"id":"<unique_id>","type":"compare"}`
-- Utility: Compare a and b using operator op (==, !=, <, <=, >, >=).
+- Utility: Compare a and b using operator op (==, !=, <, <=, >, >=); no operator set compares with ==.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `a` any; `op` string; `b` any
+- Inputs: `a` any; `op` string: The operator: ==, !=, >, >=, <, <= (not set: ==).; `b` any
 - Outputs: `result` boolean
 - Default config: none
 
@@ -2981,7 +2995,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `items` array; `delimiter` string
+- Inputs: `items` array; `delimiter` string: What goes between two items (not set: a comma); \n is a new line, \t a tab.
 - Outputs: `result` string
 - Default config: none
 
@@ -6422,7 +6436,8 @@ it through the interface receives missing or mistyped values.
 | A list says why it could not be read, with **Retry** | Every try failed (timeout, lost connection, a server error), or the Gateway refused the read. | Check that the Gateway is reachable and you are signed in, then press **Retry**. |
 | "The trigger <id> is not among your connections." | The link from the console names a connection or mailbox that is not yours on this Gateway, or was deleted. | Pick another one under **When something arrives**, or create it on the console's Triggers page and **Refresh**. |
 | "The flow <id> is not in your Flow library any more." | The `?flow=` link names a flow that was deleted, or one that belongs to another account. | Open it from the Flow Library, or publish the flow again from the account that owns it. |
-| After the run says "Nothing to notify: this flow has no Notify me step." | `On Flow End` records the outcome and reaches nobody. | Add **Notify me** where the flow should reach you ([What happens after On Flow End](web-editor.md#what-happens-after-on-flow-end)). |
+| After the run says "Nothing to notify: the run did not reach a Notify me step." | `On Flow End` records the outcome and reaches nobody; the run ended on a path without **Notify me** (or the flow has none). | Add **Notify me** where the flow should reach you ([What happens after On Flow End](web-editor.md#what-happens-after-on-flow-end)); check the condition that chose the path. |
+| A triggered flow ends through its "nothing to report" path although items qualified. | A **Compare** with no operator chosen runs `==`: "Array Length `==` 0" is true only for an empty list. | Set Compare's operator (`>` 0, or `!=` 0); its card shows the operator it runs ([Node help](web-editor.md#node-help)). |
 | After the run says "Nothing to notify: the title was empty." | An older flow's `notify` pin, or a Notify me, had no title. | Wire a title, or let the empty title mean "nothing worth saying" on purpose. |
 | A delivery reads "not delivered: …" | That channel could not deliver the alert; the Gateway's reason follows the colon. | Fix that channel (the device, the app or the mailbox the reason names), or pick other channels under Notify me's **Where**. |
 | "Could not read what happened after the run: …" | The Gateway does not serve `GET /api/gateway/runs/{run_id}/after` (HTTP 404), or the read failed. | Update the Gateway, or press **Retry**. |
@@ -6479,6 +6494,21 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.12.0] - 2026-10-28
+
+Operator QA of the email-triage automation (backlog 0160). Works with the released AbstractRuntime and AbstractGateway; the Is Empty change for lists waits for an AbstractRuntime release and is not in this version.
+
+### Fixed
+
+- **Compare shows the operator it runs.** A Compare with no operator chosen runs `==` (the runtime's default), but its folded card showed "=?", so "Array Length == 0" read as "has items" and an email-triage run with 2 important emails ended through "No important emails detected" (reproduced through AbstractRuntime with 5 emails, 2 important: the list variable held 2, the condition was `2 == 0`). The folded and open card now show `==`, and the operator list offers `!=` (the runtime always accepted it).
+- **After the run no longer says "the title was empty" when Notify me was never reached.** An older flow's On Flow End `notify` pin with nothing wired and no value made every run's outcome carry `notify: null`, which the gateway reports as an empty title. Such an inert pin is now removed when the flow opens (a used one is kept), and the sentences say what happened: "Nothing to notify: the run did not reach a Notify me step." (and, for an older notify without a title, "…, and On Flow End’s notify (older flows) had no title.").
+
+### Added
+
+- **Node help.** **Help** in Properties opens a dialog (the kit's `AfModal`) with what the node is for, how it behaves, each input and output (name, type, meaning) and examples; written help for On Flow End, Notify me, Compare, Is Empty, Join, Add to List Variable, Get Variable, Array Length and If, the node's own words for every other node. It replaces the explanatory lines that sat under On Flow End's `notify` and `note` pins on the canvas.
+- **Run as if triggered: which mailbox.** A mail trigger's test run says which mailbox it reads (**Mailbox for this test run**) and, with several, lets you pick another of your readable mailboxes (`GET /api/gateway/me/email`, by address, the main one first). The pick rides the sample request (`trigger.config.account` of `POST /api/gateway/triggers/sample`) for that run only; the automation keeps its own, and the panel says so.
+- **Join: New line.** The delimiter is a list (Comma, Comma and space, New line, Blank line, Space, Tab) or **Custom…**, a text where `\n` is a new line and `\t` a tab, stored as those escapes (AbstractRuntime's Join reads them).
 
 ## [0.11.0] - 2026-10-28
 

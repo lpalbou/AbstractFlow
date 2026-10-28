@@ -125,11 +125,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `compare`
 - Document node: `{"id":"<unique_id>","type":"compare"}`
-- Utility: Compare a and b using operator op (==, !=, <, <=, >, >=).
+- Utility: Compare a and b using operator op (==, !=, <, <=, >, >=); no operator set compares with ==.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `a` any; `op` string; `b` any
+- Inputs: `a` any; `op` string: The operator: ==, !=, >, >=, <, <= (not set: ==).; `b` any
 - Outputs: `result` boolean
 - Default config: none
 
@@ -653,7 +653,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `items` array; `delimiter` string
+- Inputs: `items` array; `delimiter` string: What goes between two items (not set: a comma); \n is a new line, \t a tab.
 - Outputs: `result` string
 - Default config: none
 

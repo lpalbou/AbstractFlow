@@ -14,7 +14,7 @@ import {
   EdgeChange,
 } from 'reactflow';
 import { withTriggerEvent } from '../utils/triggerEvent';
-import { AUTOMATION_CANVAS_NOTE, triggerPinKind, withTriggerPins, type TriggerPinKind } from '../utils/triggerPins';
+import { AUTOMATION_CANVAS_NOTE, triggerPinKind, withTriggerPins, withoutInertNotifyPin, type TriggerPinKind } from '../utils/triggerPins';
 import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
@@ -1589,6 +1589,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       );
       // String Template placeholders read run variables directly; an older empty `vars` input goes.
       data = withoutRedundantTemplateVars(data, connectedInputHandlesByNodeId.get(vn.id) || new Set<string>());
+      // On Flow End: an older flow's `notify` pin with nothing wired, no value and no
+      // expression rings nothing, yet the run's outcome carried `notify: null`, which
+      // After the run read as "the title was empty" (QA 2026-10-28): dropped. A used one stays.
+      data = withoutInertNotifyPin(vn.id, data, rawEdges);
 
       // Renamed defaults (a label the author changed is kept).
       if (data.nodeType === 'answer_user' && data.label === 'Answer User') {
