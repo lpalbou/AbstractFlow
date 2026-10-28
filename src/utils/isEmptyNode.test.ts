@@ -45,3 +45,20 @@ describe('Is Empty takes a text or a list', () => {
     expect(help.examples[0]).toContain('Get Variable “triage” → Is Empty');
   });
 });
+
+describe('Is Empty on the canvas', () => {
+  it('keeps its text field when nothing is wired (the pin is any-typed now)', async () => {
+    const { createElement } = await import('react');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+    const { ReactFlowProvider } = await import('reactflow');
+    const { BaseNode } = await import('../components/nodes/BaseNode');
+    const data = { ...createNodeData(getNodeTemplate('is_empty_string')!), pinDefaults: { text: 'saved text' } };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } });
+    const props = { id: 'n1', data, selected: false, type: 'custom', zIndex: 0, isConnectable: true, xPos: 0, yPos: 0, dragging: false } as never;
+    const html = renderToStaticMarkup(
+      createElement(QueryClientProvider, { client }, createElement(ReactFlowProvider, null, createElement(BaseNode, props)))
+    );
+    expect(html).toContain('value="saved text"');
+  });
+});

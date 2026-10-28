@@ -4384,10 +4384,13 @@ export const BaseNode = memo(function BaseNode({
                   const connected = isPinConnected(pin.id, true);
                   const controls: ReactNode[] = [];
 
+                // Is Empty's input takes a text or a list (`any`); unwired, it keeps its text field.
+                const isEmptyTextPin = data.nodeType === 'is_empty_string' && pin.id === 'text';
                 const isPrimitive =
                   pin.type === 'string' ||
                   pin.type === 'number' ||
-                  pin.type === 'boolean';
+                  pin.type === 'boolean' ||
+                  isEmptyTextPin;
                 const isEmitEventName = isEmitEventNode && pin.id === 'name';
                 const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
                 const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
@@ -5550,7 +5553,7 @@ export const BaseNode = memo(function BaseNode({
 
                 if (!connected && isPrimitive && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];
-                  if (pin.type === 'string') {
+                  if (pin.type === 'string' || isEmptyTextPin) {
                     controls.push(
                       <input
                         key="pin-default"

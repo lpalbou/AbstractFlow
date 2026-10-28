@@ -6501,7 +6501,7 @@ Needs AbstractRuntime 0.15.1 for the list semantics (backlog 0857 there): on an 
 
 ### Changed
 
-- **Is Empty takes a text or a list.** Its input (runtime id `text`, now labelled `value`) accepts any value, so a list variable is checked with one node: nothing, an empty text, or a list or object with no items is empty (QA 2026-10-28 (e)). Flows saved before open with the input retyped (a label you changed is kept). Its help says what counts as empty, with the email-triage example (Get Variable → Is Empty → If).
+- **Is Empty takes a text or a list.** Its input (runtime id `text`, now labelled `value`) accepts any value, so a list variable is checked with one node: nothing, an empty text, or a list or object with no items is empty (QA 2026-10-28 (e)). Flows saved before open with the input retyped (a label you changed is kept). Its help says what counts as empty, with the email-triage example (Get Variable → Is Empty → If). Unwired, the node keeps its text field.
 
 ## [0.12.0] - 2026-10-28
 
