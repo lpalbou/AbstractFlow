@@ -3,12 +3,15 @@
  * with an automation trigger reads the saved trigger and runs the flow on a
  * sample of what it would deliver (utils/triggerSample.ts). One control per
  * kind: the last N messages / items / calls, "as if it fired now" for a
- * schedule, nothing for by hand.
+ * schedule, nothing for by hand. A mail trigger says which mailbox the run
+ * reads and lets the person pick another of their mailboxes for this test
+ * run (QA 2026-10-28 (d)); the automation keeps its own.
  */
 import type { AutomationTriggerDefaults } from '../../types/flow';
 import { triggerSentence, type AutomationWords } from '../../utils/automationChoice';
 import { triggerPinKind } from '../../utils/triggerPins';
-import { sampleNoun, sampleSourceName } from '../../utils/triggerSample';
+import { sampleNoun, sampleSourceName, testMailboxChoices, triggerMailbox } from '../../utils/triggerSample';
+import { mailboxName } from '../../utils/automationChoice';
 import { LoadingLine, ReadFailed } from '../ReadState';
 
 export function TriggeredRunPanel({
@@ -20,8 +23,15 @@ export function TriggeredRunPanel({
   error,
   edited,
   onUseSample,
+  savedTrigger,
+  onMailbox,
 }: {
+  /** The trigger this test run reads (the saved one, with the mailbox picked for the run). */
   trigger: AutomationTriggerDefaults;
+  /** The automation's saved trigger (default: `trigger`): its mailbox is the one it keeps. */
+  savedTrigger?: AutomationTriggerDefaults;
+  /** Pick the mailbox this test run reads (an account id from GET /me/email). */
+  onMailbox?: (account: string) => void;
   words?: AutomationWords;
   count: number;
   onCount: (n: number) => void;
@@ -33,6 +43,9 @@ export function TriggeredRunPanel({
 }) {
   const kind = triggerPinKind(trigger);
   const noun = sampleNoun(kind);
+  const mailbox = triggerMailbox(trigger);
+  const savedMailbox = triggerMailbox(savedTrigger || trigger);
+  const mailboxChoices = testMailboxChoices(savedTrigger || trigger, words?.mailboxes);
   // The panel says what Run (the dialog's one Run button) will do.
   const plan = edited
     ? null
@@ -49,7 +62,38 @@ export function TriggeredRunPanel({
         </div>
       </div>
       <div className="run-form-section-body run-triggered-body">
-        <p className="run-triggered-using">Using: {triggerSentence(trigger, words)}</p>
+        <p className="run-triggered-using">Using: {triggerSentence(savedTrigger || trigger, words)}</p>
+        {/* Edited inputs are used as they are (no sample is read): no mailbox to pick then. */}
+        {mailbox !== null && !edited ? (
+          <div className="automation-inline-field run-triggered-mailbox">
+            <span id="run-triggered-mailbox-label">Mailbox for this test run</span>
+            {mailboxChoices.length > 1 && onMailbox ? (
+              <select
+                id="run-triggered-mailbox"
+                aria-labelledby="run-triggered-mailbox-label"
+                className="run-form-select"
+                value={mailbox}
+                disabled={busy}
+                onChange={(e) => onMailbox(e.target.value)}
+              >
+                {mailboxChoices.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="run-triggered-mailbox-name">
+                {mailboxName(mailbox, words?.mailboxes || null)}
+              </span>
+            )}
+          </div>
+        ) : null}
+        {mailbox !== null && !edited && savedMailbox !== null && mailbox !== savedMailbox ? (
+          <p className="automation-muted" data-field="test-mailbox-note">
+            For this test run only: the automation keeps reading {mailboxName(savedMailbox, words?.mailboxes || null)}.
+          </p>
+        ) : null}
         {noun && !edited ? (
           <label className="automation-inline-field run-triggered-count">
             <span>Use the last</span>

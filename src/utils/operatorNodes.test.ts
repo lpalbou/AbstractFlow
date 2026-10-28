@@ -16,7 +16,9 @@ describe('collapsible operator nodes', () => {
     expect(isCollapsibleOperator('llm_call')).toBe(false);
     expect(isCollapsedOperator({ nodeType: 'llm_call', collapsed: true } as unknown as FlowNodeData)).toBe(false);
     expect(operatorSymbol({ nodeType: 'compare', pinDefaults: { op: '>=' } } as unknown as FlowNodeData)).toBe('>=');
-    expect(operatorSymbol({ nodeType: 'compare', pinDefaults: {} } as unknown as FlowNodeData)).toBe('=?');
+    // No operator set: the runtime compares with ==, and the folded node says so (QA 2026-10-28).
+    expect(operatorSymbol({ nodeType: 'compare', pinDefaults: {} } as unknown as FlowNodeData)).toBe('==');
+    expect(operatorSymbol({ nodeType: 'compare' } as unknown as FlowNodeData)).toBe('==');
   });
 
   it('the folded state is saved with the flow and comes back on load', () => {

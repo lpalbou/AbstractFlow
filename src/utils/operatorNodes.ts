@@ -49,6 +49,19 @@ const OPERATORS: Readonly<Record<string, { sign: string; title: string; shape?: 
   string_template: { sign: '', title: 'Text with variables', shape: 'circle' },
 };
 
+/** The operator Compare runs when its `op` pin is not set (AbstractRuntime `control_compare`). */
+export const COMPARE_DEFAULT_OP = '==';
+
+/** Compare's operators, in words for the picker (the runtime accepts exactly these). */
+export const COMPARE_OPS: ReadonlyArray<{ value: string; label: string; words: string }> = [
+  { value: '==', label: '==', words: 'equal to' },
+  { value: '!=', label: '!=', words: 'not equal to' },
+  { value: '>', label: '>', words: 'greater than' },
+  { value: '>=', label: '>=', words: 'greater than or equal to' },
+  { value: '<', label: '<', words: 'less than' },
+  { value: '<=', label: '<=', words: 'less than or equal to' },
+];
+
 /** The folded shape: a circle for an operator, a rounded rectangle for a variable getter. */
 export function foldedShape(nodeType: string): FoldedShape {
   return OPERATORS[nodeType]?.shape ?? 'circle';
@@ -69,6 +82,10 @@ export function operatorSymbol(data: Pick<FlowNodeData, 'nodeType' | 'pinDefault
   if (own && !opWired && !(data.pinExpressions as Record<string, unknown> | undefined)?.[own]) {
     const value = (data.pinDefaults as Record<string, unknown> | undefined)?.[own];
     if (typeof value === 'string' && value.trim()) return value.trim();
+    // Compare with no operator set runs `==` (the runtime's default): the
+    // folded node says so. Showing "=?" there hid an `==` that inverted an
+    // operator's "has items" check (QA 2026-10-28, email-triage).
+    if (own === 'op') return COMPARE_DEFAULT_OP;
   }
   return OPERATORS[data.nodeType]?.sign ?? '';
 }

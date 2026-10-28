@@ -4,6 +4,7 @@
 
 import { MailNodeSection, PublishNodeSection } from './automation/MailNodeSection';
 import { LoadingLine } from './ReadState';
+import { NodeHelpModal } from './NodeHelpModal';
 import { MAIL_NODE_TYPES, PUBLISH_NODE_TYPES } from '../utils/mailNodes';
 import React, { useCallback, useEffect, useState, useRef, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -499,6 +500,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   } = useFlowStore();
   const [triggerEventNote, setTriggerEventNote] = useState<{ nodeId: string; ok: boolean; text: string } | null>(null);
   const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  // The help follows the selection: another node closes it.
+  useEffect(() => setHelpOpen(false), [node?.id]);
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
   const generatedImageContract =
@@ -2007,7 +2011,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             <Icon name={nodeIconName(data.nodeType, data.label)} size={16} />
           </span>
           <span className="node-type">{data.nodeType}</span>
+          <button
+            type="button"
+            className="node-help-button"
+            onClick={() => setHelpOpen(true)}
+            aria-haspopup="dialog"
+            title="What this node does, its inputs and outputs, examples"
+          >
+            Help
+          </button>
         </div>
+        <NodeHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} data={data} />
         {isCollapsibleOperator(data.nodeType) ? (
           // The keyboard path to fold / unfold an operator (the canvas has the
           // fold button, a double click and a tap).

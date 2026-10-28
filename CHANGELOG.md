@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.12.0] - 2026-10-28
+
+Operator QA of the email-triage automation (backlog 0160). Works with the released AbstractRuntime and AbstractGateway; the Is Empty change for lists waits for an AbstractRuntime release and is not in this version.
+
+### Fixed
+
+- **Compare shows the operator it runs.** A Compare with no operator chosen runs `==` (the runtime's default), but its folded card showed "=?", so "Array Length == 0" read as "has items" and an email-triage run with 2 important emails ended through "No important emails detected" (reproduced through AbstractRuntime with 5 emails, 2 important: the list variable held 2, the condition was `2 == 0`). The folded and open card now show `==`, and the operator list offers `!=` (the runtime always accepted it).
+- **After the run no longer says "the title was empty" when Notify me was never reached.** An older flow's On Flow End `notify` pin with nothing wired and no value made every run's outcome carry `notify: null`, which the gateway reports as an empty title. Such an inert pin is now removed when the flow opens (a used one is kept; save the flow so its runs no longer carry it), and the sentences say what happened: "Nothing to notify: the run did not reach a Notify me step." (and, for an older notify without a title, "…, and On Flow End’s notify (older flows) had no title.").
+
+### Added
+
+- **Node help.** **Help** in Properties opens a dialog (the kit's `AfModal`) with what the node is for, how it behaves, each input and output (name, type, meaning) and examples; written help for On Flow End, Notify me, Compare, Is Empty, Join, Add to List Variable, Get Variable, Array Length and If, the node's own words for every other node. It replaces the explanatory lines that sat under On Flow End's `notify` and `note` pins on the canvas.
+- **Run as if triggered: which mailbox.** A mail trigger's test run says which mailbox it reads (**Mailbox for this test run**) and, with several, lets you pick another of your readable mailboxes (`GET /api/gateway/me/email`, by address, the main one first). The pick rides the sample request (`trigger.config.account` of `POST /api/gateway/triggers/sample`) for that run only; the automation keeps its own, and the panel says so.
+- **Join: New line.** The delimiter is a list (Comma, Comma and space, New line, Blank line, Space, Tab) or **Custom…**, a text where `\n` is a new line and `\t` a tab, stored as those escapes (AbstractRuntime's Join reads them).
+
 ## [0.11.0] - 2026-10-28
 
 Trigger connections need an AbstractGateway that serves `/api/gateway/triggers/connections` and accepts `trigger.connection_id` in `automation_defaults`; against an older Gateway the Automation dialog says connections are unavailable. The trigger event works with any Runtime that delivers `input_data.event`.

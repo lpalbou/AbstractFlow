@@ -9770,16 +9770,6 @@ button.flow-nature-badge:hover:not(:disabled),
   }
 }
 
-/* A pin's meaning in words, under it (On Flow End's notify of older flows, note). */
-.pin-help {
-  padding: 0 10px 4px 22px;
-  max-width: 260px;
-  font-size: 10px;
-  line-height: 1.35;
-  color: var(--text-muted);
-  white-space: normal;
-}
-
 /* Notify me says whom it reaches and how, on the node. */
 .node-reaches {
   padding: 4px 10px 2px;

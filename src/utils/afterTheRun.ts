@@ -90,10 +90,14 @@ export function routeWord(via: string): string {
 /** Why nothing rang, in words (the gateway's `quiet_reason`). */
 export function quietSentence(reason: string | undefined): string {
   switch (reason) {
+    // "empty title": the run's outcome carried On Flow End's `notify` (older
+    // flows) without a title, and no Notify me ran. A gateway says it too when
+    // that pin was merely there, unwired (QA 2026-10-28): the sentence names
+    // both, so it is true either way.
     case 'empty title':
-      return 'Nothing to notify: the title was empty.';
+      return 'Nothing to notify: the run did not reach a Notify me step, and On Flow End’s notify (older flows) had no title.';
     case 'no notify':
-      return 'Nothing to notify: this flow has no Notify me step.';
+      return 'Nothing to notify: the run did not reach a Notify me step.';
     case 'still running':
       return 'Still running: nothing has been sent yet.';
     case 'not recorded yet':

@@ -1,0 +1,1250 @@
+{
+ "id": "67c4ef6e",
+ "name": "email-triage",
+ "description": "",
+ "interfaces": [],
+ "nodes": [
+  {
+   "id": "node-1",
+   "type": "on_flow_start",
+   "position": {
+    "x": -256,
+    "y": 0
+   },
+   "data": {
+    "nodeType": "on_flow_start",
+    "label": "On Flow Start",
+    "icon": "&#x1F3C1;",
+    "headerColor": "#C0392B",
+    "inputs": [],
+    "outputs": [
+     {
+      "id": "exec-out",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "messages",
+      "label": "messages",
+      "type": "array",
+      "description": "The new mail of this run: from, to, subject, date, body_text, attachments (name, size, file).",
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "properties": {
+         "id": {
+          "type": "string",
+          "description": "The message id."
+         },
+         "from": {
+          "type": "string",
+          "description": "Who sent it."
+         },
+         "to": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          },
+          "description": "Who it was sent to."
+         },
+         "subject": {
+          "type": "string"
+         },
+         "date": {
+          "type": "string",
+          "format": "date-time"
+         },
+         "body_text": {
+          "type": "string",
+          "description": "The message as plain text."
+         },
+         "attachments": {
+          "type": "array",
+          "description": "Its attachments: name, size and the stored file (artifact).",
+          "items": {
+           "type": "object",
+           "properties": {
+            "name": {
+             "type": "string"
+            },
+            "size": {
+             "type": "integer"
+            },
+            "artifact": {
+             "type": "object"
+            },
+            "index": {
+             "type": "integer"
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     },
+     {
+      "id": "mailbox",
+      "label": "mailbox",
+      "type": "string",
+      "description": "The address of the mailbox it arrived in (its id when it has no address)."
+     },
+     {
+      "id": "event",
+      "label": "event",
+      "type": "object",
+      "description": "Everything about what started the run, as one object (the raw event).",
+      "schema": {
+       "type": "object",
+       "title": "Trigger event",
+       "description": "The event that started this run (CloudEvents 1.0). Empty when the run was started by hand.",
+       "properties": {
+        "id": {
+         "type": "string",
+         "description": "Unique id of the event."
+        },
+        "type": {
+         "type": "string",
+         "description": "What happened, e.g. abstractframework.feed.item."
+        },
+        "source": {
+         "type": "string",
+         "description": "Where it came from (the trigger source / connection)."
+        },
+        "subject": {
+         "type": "string",
+         "description": "What it is about (an email subject, a feed item title, a webhook subject)."
+        },
+        "time": {
+         "type": "string",
+         "format": "date-time",
+         "description": "When it happened."
+        },
+        "datacontenttype": {
+         "type": "string"
+        },
+        "data": {
+         "type": "object",
+         "description": "The event's content. Connection sources (feeds, webhooks): a batch {count, events}; email: {count, messages}; schedules: the tick and its series.",
+         "properties": {
+          "count": {
+           "type": "integer",
+           "description": "How many items this run received (connection sources, email)."
+          },
+          "events": {
+           "type": "array",
+           "description": "The received items, oldest first (connection sources).",
+           "items": {
+            "type": "object",
+            "description": "One received item (CloudEvents): a feed item, a webhook call...",
+            "properties": {
+             "id": {
+              "type": "string"
+             },
+             "type": {
+              "type": "string"
+             },
+             "subject": {
+              "type": "string",
+              "description": "The item title / id, the webhook subject."
+             },
+             "time": {
+              "type": "string",
+              "format": "date-time"
+             },
+             "data": {
+              "type": "object",
+              "description": "Feed item: title, link, published, summary. Webhook call: body (JSON) or body_text.",
+              "properties": {
+               "title": {
+                "type": "string"
+               },
+               "link": {
+                "type": "string"
+               },
+               "published": {
+                "type": "string"
+               },
+               "summary": {
+                "type": "string"
+               },
+               "body": {
+                "description": "A webhook call's JSON body."
+               },
+               "body_text": {
+                "type": "string"
+               }
+              }
+             }
+            }
+           }
+          },
+          "messages": {
+           "type": "array",
+           "description": "email.received: the messages (from, subject, date...); bodies ride input_data.emails."
+          },
+          "series": {
+           "type": "object",
+           "description": "Schedules only: which run of the schedule this is (run #1, #2, …).",
+           "properties": {
+            "rule": {
+             "type": "string",
+             "description": "The schedule rule (e.g. every 1d at 08:00 Europe/Paris)."
+            },
+            "occurrence": {
+             "type": "integer",
+             "description": "The run number: 1 for run #1, 2 for run #2, …"
+            },
+            "scheduled_at": {
+             "type": "string",
+             "format": "date-time",
+             "description": "When this run was due."
+            },
+            "next_at": {
+             "type": [
+              "string",
+              "null"
+             ],
+             "format": "date-time",
+             "description": "When the next run is due, or null when the schedule ends."
+            },
+            "coalesced": {
+             "type": "integer",
+             "description": "Missed ticks folded into this run (0 when none)."
+            }
+           }
+          }
+         }
+        },
+        "bindingid": {
+         "type": "string"
+        },
+        "connectionid": {
+         "type": "string",
+         "description": "The trigger connection that received it."
+        },
+        "correlationid": {
+         "type": "string"
+        },
+        "dedupekey": {
+         "type": "string"
+        },
+        "sequence": {
+         "type": "integer",
+         "description": "Position in the connection's event stream."
+        },
+        "abstracttrust": {
+         "type": "string",
+         "description": "How far the content can be trusted (e.g. external)."
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "node-2",
+   "type": "on_flow_end",
+   "position": {
+    "x": 1392,
+    "y": 112
+   },
+   "data": {
+    "nodeType": "on_flow_end",
+    "label": "On Flow End",
+    "icon": "&#x23F9;",
+    "headerColor": "#C0392B",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "response",
+      "label": "response",
+      "type": "string",
+      "description": "What the person sees as the run’s result."
+     },
+     {
+      "id": "notify",
+      "label": "notify",
+      "type": "object",
+      "description": "Optional {title, body} (or true): raises an alert on the watch, the tray and the Assistant.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "title": {
+         "type": "string"
+        },
+        "body": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     {
+      "id": "success",
+      "label": "success",
+      "type": "boolean",
+      "description": "False marks the run failed: it is retried, then an alert says so."
+     }
+    ],
+    "outputs": [],
+    "pinDefaults": {
+     "response": "Sent a notification of important emails"
+    }
+   }
+  },
+  {
+   "id": "node-3",
+   "type": "loop",
+   "position": {
+    "x": 224,
+    "y": 0
+   },
+   "data": {
+    "nodeType": "loop",
+    "label": "ForEach",
+    "icon": "&#x1F501;",
+    "headerColor": "#F39C12",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "items",
+      "label": "items",
+      "type": "array"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "loop",
+      "label": "loop",
+      "type": "execution"
+     },
+     {
+      "id": "done",
+      "label": "done",
+      "type": "execution"
+     },
+     {
+      "id": "item",
+      "label": "item",
+      "type": "any"
+     },
+     {
+      "id": "index",
+      "label": "index",
+      "type": "number"
+     }
+    ]
+   }
+  },
+  {
+   "id": "node-10",
+   "type": "llm_call",
+   "position": {
+    "x": 576,
+    "y": -256
+   },
+   "data": {
+    "nodeType": "llm_call",
+    "label": "LLM Call",
+    "icon": "&#x1F4AD;",
+    "headerColor": "#3498DB",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "use_context",
+      "label": "use_context",
+      "type": "boolean",
+      "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+     },
+     {
+      "id": "context",
+      "label": "context",
+      "type": "object",
+      "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+     },
+     {
+      "id": "memory",
+      "label": "memory",
+      "type": "memory",
+      "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
+     },
+     {
+      "id": "provider",
+      "label": "provider",
+      "type": "provider_text",
+      "description": "Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+     },
+     {
+      "id": "model",
+      "label": "model",
+      "type": "model",
+      "description": "Text/LLM model id/name. If unset, uses the node’s configured model."
+     },
+     {
+      "id": "system",
+      "label": "system",
+      "type": "string",
+      "description": "Optional system prompt for this single call."
+     },
+     {
+      "id": "prompt",
+      "label": "prompt",
+      "type": "string",
+      "description": "User prompt/content for this single call."
+     },
+     {
+      "id": "tools",
+      "label": "tools",
+      "type": "tools",
+      "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+     },
+     {
+      "id": "prompt_cache_binding",
+      "label": "prompt_cache_binding",
+      "type": "any",
+      "description": "Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run."
+     },
+     {
+      "id": "max_in_tokens",
+      "label": "max_in_tokens",
+      "type": "number",
+      "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+     },
+     {
+      "id": "max_output_tokens",
+      "label": "max_output_tokens",
+      "type": "number",
+      "description": "Optional output token cap for this call (max_output_tokens). When set, bounds the assistant response length."
+     },
+     {
+      "id": "temperature",
+      "label": "temperature",
+      "type": "number",
+      "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+     },
+     {
+      "id": "seed",
+      "label": "seed",
+      "type": "number",
+      "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+     },
+     {
+      "id": "thinking",
+      "label": "thinking",
+      "type": "string",
+      "description": "Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default."
+     },
+     {
+      "id": "speculation",
+      "label": "MTP",
+      "type": "any",
+      "description": "Native MTP request: false disables; {mode: \"native_mtp\", num_draft_tokens: 2, require_acceleration: true} requests depth. Unset inherits."
+     },
+     {
+      "id": "resp_schema",
+      "label": "resp_schema",
+      "type": "json_schema",
+      "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+     }
+    ],
+    "outputs": [
+     {
+      "id": "exec-out",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "response",
+      "label": "response",
+      "type": "string",
+      "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+     },
+     {
+      "id": "data",
+      "label": "data",
+      "type": "object",
+      "description": "Structured assistant output object matching resp_schema. Visible by default when a response schema is configured."
+     },
+     {
+      "id": "success",
+      "label": "success",
+      "type": "boolean",
+      "description": "True if the LLM call completed successfully."
+     },
+     {
+      "id": "meta",
+      "label": "meta",
+      "type": "object",
+      "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+     },
+     {
+      "id": "tool_calls",
+      "label": "tool_calls",
+      "type": "array",
+      "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+     }
+    ],
+    "pinDefaults": {
+     "system": "You define if an email is important to a user. ",
+     "resp_schema": {
+      "type": "object",
+      "properties": {
+       "important": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "important"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "id": "node-11",
+   "type": "concat",
+   "position": {
+    "x": 464,
+    "y": -192
+   },
+   "data": {
+    "nodeType": "concat",
+    "label": "Concat",
+    "icon": "&#x2795;",
+    "headerColor": "#E74C3C",
+    "inputs": [
+     {
+      "id": "a",
+      "label": "a",
+      "type": "string"
+     },
+     {
+      "id": "b",
+      "label": "b",
+      "type": "string"
+     },
+     {
+      "id": "c",
+      "label": "c",
+      "type": "string"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "result",
+      "label": "result",
+      "type": "string"
+     }
+    ],
+    "concatConfig": {
+     "separator": " "
+    },
+    "pinDefaults": {
+     "a": "You define if an email is important to a user. ",
+     "b": "Current user priorities: "
+    },
+    "collapsed": true
+   }
+  },
+  {
+   "id": "node-12",
+   "type": "literal_string",
+   "position": {
+    "x": 224,
+    "y": -256
+   },
+   "data": {
+    "nodeType": "literal_string",
+    "label": "Priorities",
+    "icon": "\"",
+    "headerColor": "#FF00FF",
+    "inputs": [],
+    "outputs": [
+     {
+      "id": "value",
+      "label": "value",
+      "type": "string"
+     }
+    ],
+    "literalValue": ""
+   }
+  },
+  {
+   "id": "node-13",
+   "type": "break_object",
+   "position": {
+    "x": 832,
+    "y": -128
+   },
+   "data": {
+    "nodeType": "break_object",
+    "label": "Break Object",
+    "icon": "&#x1F9E9;",
+    "headerColor": "#3498DB",
+    "inputs": [
+     {
+      "id": "object",
+      "label": "object",
+      "type": "object",
+      "description": "Input object to decompose into selected output fields."
+     }
+    ],
+    "outputs": [
+     {
+      "id": "important",
+      "label": "important",
+      "type": "boolean",
+      "schema": {
+       "type": "boolean"
+      }
+     }
+    ],
+    "breakConfig": {
+     "selectedPaths": [
+      "important"
+     ]
+    },
+    "collapsed": true
+   }
+  },
+  {
+   "id": "node-14",
+   "type": "if",
+   "position": {
+    "x": 928,
+    "y": -256
+   },
+   "data": {
+    "nodeType": "if",
+    "label": "Is Important?",
+    "icon": "&#x2753;",
+    "headerColor": "#F39C12",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "condition",
+      "label": "condition",
+      "type": "boolean"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "true",
+      "label": "true",
+      "type": "execution"
+     },
+     {
+      "id": "false",
+      "label": "false",
+      "type": "execution"
+     }
+    ]
+   }
+  },
+  {
+   "id": "node-16",
+   "type": "set_vars",
+   "position": {
+    "x": -32,
+    "y": 0
+   },
+   "data": {
+    "nodeType": "set_vars",
+    "label": "Set Variables",
+    "icon": "&#x1F4E4;&#xFE0F;",
+    "headerColor": "#16A085",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "triage",
+      "label": "triage",
+      "type": "array",
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "x-abstract-type": "object",
+        "additionalProperties": true
+       },
+       "x-abstract-flow-io-items-type": "object"
+      }
+     }
+    ],
+    "outputs": [
+     {
+      "id": "exec-out",
+      "label": "",
+      "type": "execution"
+     }
+    ],
+    "pinDefaults": {
+     "triage": []
+    }
+   }
+  },
+  {
+   "id": "node-18",
+   "type": "add_to_list",
+   "position": {
+    "x": 1168,
+    "y": -256
+   },
+   "data": {
+    "nodeType": "add_to_list",
+    "label": "Add to triage",
+    "icon": "&#x2795;",
+    "headerColor": "#16A085",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "name",
+      "label": "name",
+      "type": "string",
+      "description": "The list variable to add to."
+     },
+     {
+      "id": "item",
+      "label": "item",
+      "type": "any",
+      "description": "Added as one element."
+     },
+     {
+      "id": "items",
+      "label": "items",
+      "type": "array",
+      "description": "Each element of this list is added."
+     }
+    ],
+    "outputs": [
+     {
+      "id": "exec-out",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "list",
+      "label": "list",
+      "type": "array",
+      "description": "The list after the addition."
+     }
+    ],
+    "pinDefaults": {
+     "name": "triage"
+    }
+   }
+  },
+  {
+   "id": "node-19",
+   "type": "publish_event",
+   "position": {
+    "x": 1056,
+    "y": 112
+   },
+   "data": {
+    "nodeType": "publish_event",
+    "label": "Notify me",
+    "icon": "&#x1F514;",
+    "headerColor": "#D97706",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "title",
+      "label": "title",
+      "type": "string",
+      "description": "What the notification says (required)."
+     },
+     {
+      "id": "body",
+      "label": "body",
+      "type": "string",
+      "description": "More text (optional)."
+     },
+     {
+      "id": "data",
+      "label": "data",
+      "type": "object",
+      "description": "Any extra JSON."
+     }
+    ],
+    "outputs": [
+     {
+      "id": "exec-out",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "result",
+      "label": "result",
+      "type": "object"
+     },
+     {
+      "id": "success",
+      "label": "success",
+      "type": "boolean"
+     }
+    ],
+    "pinDefaults": {
+     "channel": "me",
+     "alert": true,
+     "title": "Emails requiring your attension"
+    }
+   }
+  },
+  {
+   "id": "node-20",
+   "type": "get_var",
+   "position": {
+    "x": 304,
+    "y": 240
+   },
+   "data": {
+    "nodeType": "get_var",
+    "label": "Get triage",
+    "icon": "&#x1F4E5;",
+    "headerColor": "#16A085",
+    "inputs": [
+     {
+      "id": "name",
+      "label": "name",
+      "type": "string"
+     },
+     {
+      "id": "default",
+      "label": "default",
+      "type": "any",
+      "description": "Value used when the path is missing."
+     }
+    ],
+    "outputs": [
+     {
+      "id": "value",
+      "label": "value",
+      "type": "array"
+     }
+    ],
+    "pinDefaults": {
+     "name": "triage"
+    }
+   }
+  },
+  {
+   "id": "node-22",
+   "type": "array_length",
+   "position": {
+    "x": 528,
+    "y": 240
+   },
+   "data": {
+    "nodeType": "array_length",
+    "label": "Array Length",
+    "icon": "#",
+    "headerColor": "#3498DB",
+    "inputs": [
+     {
+      "id": "array",
+      "label": "array",
+      "type": "array"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "result",
+      "label": "result",
+      "type": "number"
+     }
+    ],
+    "collapsed": true
+   }
+  },
+  {
+   "id": "node-23",
+   "type": "compare",
+   "position": {
+    "x": 640,
+    "y": 208
+   },
+   "data": {
+    "nodeType": "compare",
+    "label": "Compare",
+    "icon": "=?",
+    "headerColor": "#F39C12",
+    "inputs": [
+     {
+      "id": "a",
+      "label": "a",
+      "type": "any"
+     },
+     {
+      "id": "op",
+      "label": "op",
+      "type": "string"
+     },
+     {
+      "id": "b",
+      "label": "b",
+      "type": "any"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "result",
+      "label": "result",
+      "type": "boolean"
+     }
+    ],
+    "pinExpressions": {
+     "b": "0"
+    },
+    "collapsed": true
+   }
+  },
+  {
+   "id": "node-24",
+   "type": "if",
+   "position": {
+    "x": 752,
+    "y": 112
+   },
+   "data": {
+    "nodeType": "if",
+    "label": "Has Important Emails?",
+    "icon": "&#x2753;",
+    "headerColor": "#F39C12",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "condition",
+      "label": "condition",
+      "type": "boolean"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "true",
+      "label": "true",
+      "type": "execution"
+     },
+     {
+      "id": "false",
+      "label": "false",
+      "type": "execution"
+     }
+    ]
+   }
+  },
+  {
+   "id": "node-25",
+   "type": "on_flow_end",
+   "position": {
+    "x": 1056,
+    "y": 416
+   },
+   "data": {
+    "nodeType": "on_flow_end",
+    "label": "On Flow End",
+    "icon": "&#x23F9;",
+    "headerColor": "#C0392B",
+    "inputs": [
+     {
+      "id": "exec-in",
+      "label": "",
+      "type": "execution"
+     },
+     {
+      "id": "response",
+      "label": "response",
+      "type": "string",
+      "description": "What the person sees as the run’s result."
+     },
+     {
+      "id": "notify",
+      "label": "notify",
+      "type": "object",
+      "description": "Optional {title, body} (or true): raises an alert on the watch, the tray and the Assistant.",
+      "schema": {
+       "type": "object",
+       "properties": {
+        "title": {
+         "type": "string"
+        },
+        "body": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     {
+      "id": "success",
+      "label": "success",
+      "type": "boolean",
+      "description": "False marks the run failed: it is retried, then an alert says so."
+     }
+    ],
+    "outputs": [],
+    "pinDefaults": {
+     "response": "No important emails detected"
+    }
+   }
+  },
+  {
+   "id": "node-26",
+   "type": "join",
+   "position": {
+    "x": 688,
+    "y": 320
+   },
+   "data": {
+    "nodeType": "join",
+    "label": "Join",
+    "icon": "&#x1F517;",
+    "headerColor": "#E74C3C",
+    "inputs": [
+     {
+      "id": "items",
+      "label": "items",
+      "type": "array"
+     },
+     {
+      "id": "delimiter",
+      "label": "delimiter",
+      "type": "string"
+     }
+    ],
+    "outputs": [
+     {
+      "id": "result",
+      "label": "result",
+      "type": "string"
+     }
+    ]
+   }
+  }
+ ],
+ "edges": [
+  {
+   "id": "edge-1792942947247",
+   "source": "node-1",
+   "sourceHandle": "messages",
+   "target": "node-3",
+   "targetHandle": "items",
+   "animated": false
+  },
+  {
+   "id": "edge-1793193907977",
+   "source": "node-3",
+   "sourceHandle": "loop",
+   "target": "node-10",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793193930736",
+   "source": "node-11",
+   "sourceHandle": "result",
+   "target": "node-10",
+   "targetHandle": "system",
+   "animated": false
+  },
+  {
+   "id": "edge-1793193954036",
+   "source": "node-12",
+   "sourceHandle": "value",
+   "target": "node-11",
+   "targetHandle": "c",
+   "animated": false
+  },
+  {
+   "id": "edge-1793193975207",
+   "source": "node-3",
+   "sourceHandle": "item",
+   "target": "node-10",
+   "targetHandle": "prompt",
+   "animated": false
+  },
+  {
+   "id": "edge-1793193990752",
+   "source": "node-10",
+   "sourceHandle": "data",
+   "target": "node-13",
+   "targetHandle": "object"
+  },
+  {
+   "id": "edge-1793194003427",
+   "source": "node-10",
+   "sourceHandle": "exec-out",
+   "target": "node-14",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793194010915",
+   "source": "node-13",
+   "sourceHandle": "important",
+   "target": "node-14",
+   "targetHandle": "condition",
+   "animated": false
+  },
+  {
+   "id": "edge-1793194051523",
+   "source": "node-1",
+   "sourceHandle": "exec-out",
+   "target": "node-16",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793194052990",
+   "source": "node-16",
+   "sourceHandle": "exec-out",
+   "target": "node-3",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793194101130",
+   "source": "node-14",
+   "sourceHandle": "true",
+   "target": "node-18",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793194110914",
+   "source": "node-3",
+   "sourceHandle": "item",
+   "target": "node-18",
+   "targetHandle": "item",
+   "animated": false
+  },
+  {
+   "id": "edge-1793194192806",
+   "source": "node-20",
+   "sourceHandle": "value",
+   "target": "node-22",
+   "targetHandle": "array",
+   "animated": false
+  },
+  {
+   "id": "edge-1793194204231",
+   "source": "node-22",
+   "sourceHandle": "result",
+   "target": "node-23",
+   "targetHandle": "a",
+   "animated": false
+  },
+  {
+   "id": "edge-1793194229643",
+   "source": "node-23",
+   "sourceHandle": "result",
+   "target": "node-24",
+   "targetHandle": "condition",
+   "animated": false
+  },
+  {
+   "id": "edge-1793194240485",
+   "source": "node-3",
+   "sourceHandle": "done",
+   "target": "node-24",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793194247543",
+   "source": "node-24",
+   "sourceHandle": "true",
+   "target": "node-19",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793194293702",
+   "source": "node-19",
+   "sourceHandle": "exec-out",
+   "target": "node-2",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793194301533",
+   "source": "node-24",
+   "sourceHandle": "false",
+   "target": "node-25",
+   "targetHandle": "exec-in",
+   "animated": true
+  },
+  {
+   "id": "edge-1793194399628",
+   "source": "node-20",
+   "sourceHandle": "value",
+   "target": "node-26",
+   "targetHandle": "items",
+   "animated": false
+  },
+  {
+   "id": "edge-1793194425828",
+   "source": "node-26",
+   "sourceHandle": "result",
+   "target": "node-19",
+   "targetHandle": "body",
+   "animated": false
+  },
+  {
+   "id": "edge-1793194448328",
+   "source": "node-19",
+   "sourceHandle": "success",
+   "target": "node-2",
+   "targetHandle": "success",
+   "animated": false
+  }
+ ],
+ "entryNode": "node-1",
+ "automation_defaults": {
+  "schema_version": 1,
+  "trigger": {
+   "source_id": "email.received",
+   "source_version": 1,
+   "config": {
+    "account": "work"
+   }
+  },
+  "context": {
+   "mode": "independent"
+  },
+  "input_data": {}
+ },
+ "functions": []
+}
