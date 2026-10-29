@@ -9,6 +9,7 @@ import {
   clearGatewayConnection,
   fetchGatewayConnection,
   hasBrowserGatewaySession,
+  topBarConnectionState,
   type GatewayConnectionStatus,
 } from './components/GatewayConnectionModal';
 import { AuthoringAssistantDrawer } from './components/AuthoringAssistantDrawer';
@@ -441,11 +442,17 @@ function App() {
               </>
             ) : undefined
           }
+          // The kit's ONE account widget (top-bar set, operator 2026-10-29): signed in, the person,
+          // the name and the connection light in one button; its menu says who and which
+          // gateway, with Copy user id and Disconnect (= handle_disconnect). The principal comes from
+          // the app server's connection status (`gateway.principal`).
+          identity="menu"
           connection={{
             phase: connection_phase,
             signingOut: signing_out,
             onConnect: () => set_show_connection(true),
             onDisconnect: handle_disconnect,
+            status: topBarConnectionState(connection_status),
           }}
         />
       </header>

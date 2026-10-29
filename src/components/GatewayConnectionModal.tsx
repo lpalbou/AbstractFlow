@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { GATEWAY_CONNECTION_PATH, GatewaySessionSignInCard } from '@abstractframework/ui-kit';
+import { GATEWAY_CONNECTION_PATH, GatewaySessionSignInCard, type GatewayConnectionState } from '@abstractframework/ui-kit';
 import { GatewayHttpError } from '../utils/gatewayClient';
 import { retryRead } from '../utils/readRetry';
 
@@ -47,6 +47,17 @@ export function hasBrowserGatewaySession(status: GatewayConnectionStatus | null)
   if (auth?.mode === 'legacy-token' || auth?.user_auth_enabled === false) return false;
   if (principal.source === 'legacy-token') return false;
   return true;
+}
+
+/**
+ * The session as the kit's top bar reads it (`AfTopBarActions` `connection.status`: the account
+ * widget takes the principal from `gateway.principal`). Only the typed fields the kit knows: the
+ * gateway's `detail` may be a typed object here, the kit's is a string, so it is dropped.
+ */
+export function topBarConnectionState(status: GatewayConnectionStatus | null): GatewayConnectionState | null {
+  if (!status) return null;
+  const { detail: _detail, ...gateway } = status.gateway || {};
+  return { ok: status.ok, has_session: status.has_session, gateway_url: status.gateway_url, ...(status.gateway ? { gateway } : {}) };
 }
 
 /** This browser's session, from the app server; a read, tried like every gateway read (utils/readRetry.ts). */
