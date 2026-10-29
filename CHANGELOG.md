@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Changed
+- The top bar's account is the kit's ONE account widget (operator ruling 2026-10-29: the docs button, Appearance,
+  About and the account are the same kit components in every app). Signed in, one button shows the person icon,
+  your name and the connection light; its menu holds Signed in as, Gateway, Copy user id and Disconnect. It replaces
+  the Disconnect pill. `AfTopBarActions` gets `identity="menu"` and the app server's connection status
+  (`topBarConnectionState`). Needs `@abstractframework/ui-kit` ^0.9.6 (was ^0.9.2). Test: `src/top_bar_set.test.tsx`.
+
 ## [0.12.1] - 2026-10-28
 
 Needs AbstractRuntime 0.15.1 for the list semantics (backlog 0862 there): on an older runtime Is Empty on an empty list returns false.
