@@ -309,8 +309,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `prompt` string; `choices` array
-- Outputs: `exec-out` execution; `response` string
+- Inputs: `exec-in` execution; `prompt` string; `choices` array; `question` object: Optional conversation policy: essential waits for an answer; clarification declares a 120–300 second deadline and fallback.
+- Outputs: `exec-out` execution; `response` string; `timed_out` boolean: True when the declared clarification deadline expired without an answer.; `fallback` string: Declared fallback after expiry; never a fabricated user answer.; `question` object: Question identity and resolution metadata.
 - Default config: none
 
 ### core / Code

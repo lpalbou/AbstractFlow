@@ -6107,6 +6107,29 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {data.nodeType === 'ask_user' && (
         <div className="property-section">
           <label className="property-label">User Prompt Settings</label>
+          <label className="property-label" htmlFor="question-policy">Question policy</label>
+          <select id="question-policy" className="property-input" value={data.effectConfig?.question?.importance || ''}
+            onChange={(event) => {
+              const importance = event.target.value;
+              const question = importance === 'essential' ? { importance: 'essential' as const }
+                : importance === 'clarification' ? { importance: 'clarification' as const, timeout_s: 180, fallback: '' } : undefined;
+              updateNodeData(node.id, { effectConfig: { ...data.effectConfig, question } });
+            }}>
+            <option value="">Standard question (wait for an answer)</option>
+            <option value="essential">Essential (wait for an answer)</option>
+            <option value="clarification">Clarification (declare a deadline and fallback)</option>
+          </select>
+          {data.effectConfig?.question?.importance === 'clarification' && <>
+            <label className="property-label" htmlFor="question-deadline">Wait at most (seconds)</label>
+            <input id="question-deadline" className="property-input" type="number" min={120} max={300}
+              value={data.effectConfig.question.timeout_s ?? 180}
+              onChange={(event) => updateNodeData(node.id, { effectConfig: { ...data.effectConfig, question: { ...data.effectConfig!.question!, timeout_s: Number(event.target.value) } } })} />
+            <label className="property-label" htmlFor="question-fallback">If no answer arrives</label>
+            <textarea id="question-fallback" className="property-input" value={data.effectConfig.question.fallback || ''}
+              placeholder="Describe exactly how work should continue."
+              onChange={(event) => updateNodeData(node.id, { effectConfig: { ...data.effectConfig, question: { ...data.effectConfig!.question!, fallback: event.target.value } } })} />
+            <p className="property-hint">A nonempty fallback and 120–300 second deadline are required. Silence never grants permission.</p>
+          </>}
           <AfSwitch
             variant="row"
             className="property-switch"

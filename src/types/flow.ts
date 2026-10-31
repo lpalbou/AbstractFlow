@@ -460,6 +460,7 @@ export interface FlowNodeData {
     wait_key?: string;     // For listen_voice
     max_duration_s?: number; // For listen_voice
     allowFreeText?: boolean; // For ask_user
+    question?: { importance: 'essential' | 'clarification'; timeout_s?: number; fallback?: string }; // Optional ask_user conversation policy
     durationType?: 'seconds' | 'minutes' | 'hours' | 'timestamp'; // For wait_until
     allowed_tools?: string[]; // For tool_calls (tool name allowlist; empty => allow none)
     // For emit_event
