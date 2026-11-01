@@ -38,7 +38,7 @@ import { COMPARE_DEFAULT_OP, COMPARE_OPS, isCollapsibleOperator } from '../../ut
 import { HiddenConnectionsBadge } from './HiddenConnectionsBadge';
 import { NodeStatusGlyph } from './NodeStatusGlyph';
 import { categoryColorVar, colorSectionForCategory, nodeSemanticCategory } from '../../utils/nodeCategoryColors';
-import { useModels, useProviders } from '../../hooks/useProviders';
+import { useDecisionCatalog, useModels, useProviders, type DecisionCatalog } from '../../hooks/useProviders';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../../utils/capabilityRoutes';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../../hooks/useGatewayCapabilities';
 import { useVisionAdapterCatalog } from '../../hooks/useVisionAdapterCatalog';
@@ -76,6 +76,7 @@ import {
 import { getNodePinDisclosure, isMediaPresentationNode } from '../../utils/nodePinDisclosure';
 import { DEFAULT_THINKING_OPTIONS, thinkingOptionsFromModelCapabilities } from '../../utils/thinkingControls';
 import { hasJsonSchemaPinDefault, isJsonSchemaInputPin } from '../../utils/jsonSchemaPins';
+import { pinEnumOptions } from '../../utils/jsonSchemaEditor';
 import {
   applyImagePinDefaultPatch,
   extractImageModelParameterMetadata,
@@ -255,6 +256,25 @@ function withCurrentOption(options: SelectOption[], current: string): SelectOpti
   return [...options, { value: clean, label: clean }];
 }
 
+/**
+ * The Decision `model` choices: the chosen provider's decision models as bare ids, or,
+ * with no provider, every `provider/model` handle on the output.decision route.
+ */
+function decisionModelOptions(catalog: DecisionCatalog | undefined, provider: string): SelectOption[] {
+  const clean = provider.trim();
+  if (!catalog) return [];
+  if (clean) return (catalog.modelsByProvider[clean] || []).map((model) => ({ value: model, label: model }));
+  return catalog.providers.flatMap((p) =>
+    (catalog.modelsByProvider[p.name] || []).map((model) => ({ value: `${p.name}/${model}`, label: `${p.name}/${model}` }))
+  );
+}
+
+/** Why a typed Decision model is refused: with no provider it must be a `provider/model` handle. */
+export function decisionModelHandleIssue(value: string, provider: string): string | null {
+  if (provider.trim() || value.includes('/')) return null;
+  return 'Pick a provider, or type a provider/model handle (typesafe/jev-latest).';
+}
+
 function withGatewayDefaultOption(options: SelectOption[]): SelectOption[] {
   return [
     GATEWAY_DEFAULT_SELECT_OPTION,
@@ -302,6 +322,7 @@ function catalogScopeLabel(scope: PinCatalogScope): string {
   if (scope === 'stt') return 'STT';
   if (scope === 'image') return 'image';
   if (scope === 'music') return 'music';
+  if (scope === 'decision') return 'decision';
   return 'text';
 }
 
@@ -1609,6 +1630,20 @@ export const BaseNode = memo(function BaseNode({
     isProviderModelsNode ? data.providerModelsConfig?.capabilityRoute || TEXT_OUTPUT_CAPABILITY_ROUTE : TEXT_OUTPUT_CAPABILITY_ROUTE
   );
   const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode || isVarDeclNode || isToolParametersNode || subflowHasToolsPin) && !toolsConnected);
+  // Decision node: its `provider` / `model` pickers read the output.decision catalog
+  // (providers with a decision model, their decision models — hooks/useProviders.ts).
+  const wantsDecisionCatalog = useMemo(
+    () =>
+      inputData.some(
+        (pin) =>
+          !connectedInputPinIds.has(pin.id) &&
+          (providerCatalogScopeForPin(pin, data.nodeType) === 'decision' ||
+            modelCatalogScopeForPin(pin, inputData, data.nodeType) === 'decision')
+      ),
+    [connectedInputPinIds, data.nodeType, inputData]
+  );
+  const decisionCatalogQuery = useDecisionCatalog(wantsDecisionCatalog);
+  const decisionCatalog = decisionCatalogQuery.data;
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
@@ -2008,16 +2043,18 @@ export const BaseNode = memo(function BaseNode({
       const options =
         scope === 'text'
           ? providers.map((p) => ({ value: p.name, label: p.display_name || p.name }))
-          : scope === 'image'
-            ? imageProviderOptions
-            : scope === 'tts'
-              ? ttsProviderOptions
-              : scope === 'stt'
-                ? sttProviderOptions
-                : visibleMusicProviderOptions;
+          : scope === 'decision'
+            ? (decisionCatalog?.providers || []).map((p) => ({ value: p.name, label: p.display_name || p.name }))
+            : scope === 'image'
+              ? imageProviderOptions
+              : scope === 'tts'
+                ? ttsProviderOptions
+                : scope === 'stt'
+                  ? sttProviderOptions
+                  : visibleMusicProviderOptions;
       return withGatewayDefaultOption(withCurrentOption(options, current));
     },
-    [imageProviderOptions, providers, sttProviderOptions, ttsProviderOptions, visibleMusicProviderOptions]
+    [decisionCatalog, imageProviderOptions, providers, sttProviderOptions, ttsProviderOptions, visibleMusicProviderOptions]
   );
 
   const modelOptionsForCatalogScope = useCallback(
@@ -2026,7 +2063,9 @@ export const BaseNode = memo(function BaseNode({
       const options =
         scope === 'text'
           ? modelOptions
-          : scope === 'image'
+          : scope === 'decision'
+            ? decisionModelOptions(decisionCatalog, provider)
+            : scope === 'image'
             ? imageModelOptions
                 .filter(
                   (option) =>
@@ -2047,7 +2086,7 @@ export const BaseNode = memo(function BaseNode({
                     .map((option) => ({ value: option.model, label: option.label }));
       return withCurrentOption(options, current);
     },
-    [currentVisionProviderModelsTask, imageModelOptions, modelOptions, musicModelOptions, sttModelOptions, ttsModelOptions]
+    [currentVisionProviderModelsTask, decisionCatalog, imageModelOptions, modelOptions, musicModelOptions, sttModelOptions, ttsModelOptions]
   );
 
   const mediaCatalogLoading = useCallback(
@@ -2074,19 +2113,19 @@ export const BaseNode = memo(function BaseNode({
   const providerCatalogLoading = useCallback(
     (scope: PinCatalogScope) => {
       if (scope === 'text') return providersQuery.isLoading;
-      if (scope === 'decision') return false; // picked in the Properties panel, never inline
+      if (scope === 'decision') return decisionCatalogQuery.isLoading;
       return mediaCapabilitiesQuery.isLoading || mediaCatalogLoading(scope, 'providers');
     },
-    [mediaCapabilitiesQuery.isLoading, mediaCatalogLoading, providersQuery.isLoading]
+    [decisionCatalogQuery.isLoading, mediaCapabilitiesQuery.isLoading, mediaCatalogLoading, providersQuery.isLoading]
   );
 
   const modelCatalogLoading = useCallback(
     (scope: PinCatalogScope) => {
       if (scope === 'text') return modelsQuery.isLoading;
-      if (scope === 'decision') return false; // picked in the Properties panel, never inline
+      if (scope === 'decision') return decisionCatalogQuery.isLoading;
       return mediaCapabilitiesQuery.isLoading || mediaCatalogLoading(scope, 'models');
     },
-    [mediaCapabilitiesQuery.isLoading, mediaCatalogLoading, modelsQuery.isLoading]
+    [decisionCatalogQuery.isLoading, mediaCapabilitiesQuery.isLoading, mediaCatalogLoading, modelsQuery.isLoading]
   );
 
   const requestProviderCatalogForScope = useCallback(
@@ -3507,7 +3546,7 @@ export const BaseNode = memo(function BaseNode({
       const pin = inputData.find((candidate) => candidate.id === pinId);
       const scope = pin ? providerCatalogScopeForPin(pin, data.nodeType) : null;
       const clean =
-        scope && scope !== 'text'
+        scope && scope !== 'text' && scope !== 'decision'
           ? normalizeMediaProvider(value || '')
           : typeof value === 'string'
             ? value.trim()
@@ -5506,6 +5545,7 @@ export const BaseNode = memo(function BaseNode({
                       searchable
                       searchPlaceholder={`Search ${scopeLabel} providers…`}
                       clearable
+                      allowCustom={catalogProviderScope === 'decision'}
                       minPopoverWidth={300}
                       onOpen={() => requestProviderCatalogForScope(catalogProviderScope)}
                       onChange={(v) => setCatalogProviderDefault(pin.id, v || undefined)}
@@ -5514,9 +5554,7 @@ export const BaseNode = memo(function BaseNode({
                 }
 
                 const catalogModelScope = modelCatalogScopeForPin(pin, inputData, data.nodeType);
-                // A Decision's `model` is one provider/model handle with no provider pin: a plain text on the
-                // card; the catalog picker lives in the Properties panel.
-                if (!connected && catalogModelScope && catalogModelScope !== 'decision' && !hasSpecialControl) {
+                if (!connected && catalogModelScope && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];
                   const current = typeof raw === 'string' ? raw.trim() : '';
                   const providerPinId = providerPinIdForModelPin(pin, inputData, data.nodeType);
@@ -5528,6 +5566,9 @@ export const BaseNode = memo(function BaseNode({
                       : '';
                   const scopeLabel = catalogScopeLabel(catalogModelScope);
                   const loading = modelCatalogLoading(catalogModelScope);
+                  // A Decision's `model` works without a provider: the list is then every provider/model
+                  // handle on the output.decision route, and a handle can be typed.
+                  const isDecisionModel = catalogModelScope === 'decision';
                   controls.push(
                     <AfSelect
                       key="catalog-model"
@@ -5536,18 +5577,22 @@ export const BaseNode = memo(function BaseNode({
                       placeholder={
                         providerConnectedForModel
                           ? 'Provider from pin…'
-                          : !providerValue
+                          : !providerValue && !isDecisionModel
                             ? 'Pick provider…'
                             : loading
                               ? 'Loading…'
-                              : 'Select…'
+                              : isDecisionModel && !providerValue
+                                ? 'Gateway default…'
+                                : 'Select…'
                       }
                       options={modelOptionsForCatalogScope(catalogModelScope, providerValue, current)}
-                      disabled={providerConnectedForModel || !providerValue || loading}
+                      disabled={providerConnectedForModel || (!providerValue && !isDecisionModel) || loading}
                       loading={loading}
                       searchable
                       searchPlaceholder={`Search ${scopeLabel} models…`}
                       clearable
+                      allowCustom={isDecisionModel}
+                      validateCustomValue={isDecisionModel ? (value) => decisionModelHandleIssue(value, providerValue) : undefined}
                       minPopoverWidth={400}
                       onOpen={() => requestModelCatalogForScope(catalogModelScope, providerValue)}
                       onChange={(v) => setPinDefault(pin.id, v || undefined)}
@@ -5557,7 +5602,24 @@ export const BaseNode = memo(function BaseNode({
 
                 if (!connected && isPrimitive && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];
-                  if (pin.type === 'string' || isEmptyTextPin) {
+                  const enumOptions = pin.type === 'string' ? pinEnumOptions(pin) : [];
+                  if (enumOptions.length > 0) {
+                    // An enum-typed text pin (a Decision's question_type) picks from its schema's values.
+                    const current = typeof raw === 'string' ? raw.trim() : '';
+                    controls.push(
+                      <AfSelect
+                        key="pin-default"
+                        variant="pin"
+                        value={enumOptions.some((option) => option.value === current) ? current : ''}
+                        placeholder={enumOptions[0].label}
+                        options={enumOptions}
+                        searchable={false}
+                        clearable={false}
+                        minPopoverWidth={180}
+                        onChange={(v) => setPinDefault(pin.id, v || undefined)}
+                      />
+                    );
+                  } else if (pin.type === 'string' || isEmptyTextPin) {
                     controls.push(
                       <input
                         key="pin-default"

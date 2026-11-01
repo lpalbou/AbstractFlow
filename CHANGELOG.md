@@ -14,10 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `typesafe`). The Properties panel's question type (`choice` | `noul` | `score`), options and levels rewrite the
   typed output pins (`choice`/`confidence`/`probabilities`, `noul`/`verdict`, `score`/`level`/`confidence`/
   `probabilities`) plus `answer`, `model`, `success`; the pins carry JSON Schemas (option/level enums, probability
-  keys) so Break Object splits `answer` and Switch syncs its cases from `choice` or `level`. The `model` pin is one
-  `provider/model` handle picked from every provider's `output.decision` catalog; run checks require `state`,
-  `question`, options for a choice and two levels for a score; the node runs only where the Gateway advertises the
-  `decision` contract (`src/utils/decisionPins.ts`). Needs AbstractRuntime 0.16.0.
+  keys) so Break Object splits `answer` and Switch syncs its cases from `choice` or `level`. `question_type` is an
+  enum pin: a select on the card as in the panel (an enum-typed text pin now renders its schema's values inline,
+  `pinEnumOptions`), and a pin-default edit of a Decision node re-derives its outputs in the store. `provider`
+  (type `provider`) and `model` (type `model`) are the usual catalog pickers scoped to the decision catalog
+  (`useDecisionCatalog`: providers with an `output.decision` model, that provider's models; a `provider/model`
+  handle can still be typed, and the node sends both pins to the runtime). A wire dragged out of an array input
+  (`options`, `levels`) onto the canvas offers the flow's existing array outputs to wire in, then Make Array and
+  a relay. Run checks require `state`, `question`, options for a choice and two levels for a score; the node runs
+  only where the Gateway advertises the `decision` contract (`src/utils/decisionPins.ts`). Needs AbstractRuntime
+  0.16.0.
 
 ### Changed
 - The top bar's account is the kit's ONE account widget (operator ruling 2026-10-29: the docs button, Appearance,

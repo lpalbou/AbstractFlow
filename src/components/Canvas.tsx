@@ -33,7 +33,7 @@ import { wireLoopGlimpse } from '../utils/execGlimpse';
 import { GlimpseCard } from './GlimpseCard';
 import { RouteChoiceMenu } from './RouteChoiceMenu';
 import { ConnectionDropMenu } from './ConnectionDropMenu';
-import { dropChoiceCopy, dropChoiceNode, dropChoicesFor, type DropChoice } from '../utils/relays';
+import { dropChoiceCopy, dropChoiceNode, dropChoicesFor, existingSourceChoices, type DropChoice } from '../utils/relays';
 import { NodeTemplate, getAllNodeTemplates, getNodeTemplate } from '../types/nodes';
 import { PALETTE_ADD_NODE_EVENT, addPaletteNodeAtCentre } from '../utils/paletteAdd';
 import type { FlowNodeData, PinConnectionFeedback, PinType } from '../types/flow';
@@ -937,6 +937,8 @@ function CanvasBody() {
   // A wire released on empty canvas (not on a pin, not on a node) opens the
   // drop menu there: an If/Else for a boolean, Break Email for an Email, ForEach
   // for a list, a relay, and for an object a Break Object (utils/relays.ts dropChoicesFor).
+  // Out of an INPUT, the menu first lists the outputs already in the flow that
+  // could feed it (existingSourceChoices), then what to create (Make Array for a list).
   const handleConnectEnd = useCallback((event: globalThis.MouseEvent | TouchEvent) => {
     setActiveConnection(null);
     const from = dragStartRef.current;
@@ -953,8 +955,15 @@ function CanvasBody() {
   const wireDropMenu = useMemo(() => {
     if (!wireDrop) return null;
     const { from, at } = wireDrop;
+    const existing = from.handleType === 'target' ? existingSourceChoices(nodes, edges, from) : [];
     const create = (choice: string) => {
       setWireDrop(null);
+      const wire = existing.find((candidate) => candidate.id === choice);
+      if (wire) {
+        // The same path as a wire drawn by hand: validation, the entry-route question, the error toast.
+        handleConnect({ source: wire.source, sourceHandle: wire.sourceHandle, target: from.nodeId, targetHandle: from.handleId });
+        return;
+      }
       const made = dropChoiceNode(choice as DropChoice, from.handleType);
       const template = made.label
         ? getAllNodeTemplates().find((t) => t.type === made.type && t.label === made.label)
@@ -975,13 +984,16 @@ function CanvasBody() {
     return (
       <ConnectionDropMenu
         title={`Create from ${from.handleType === 'source' ? 'this output' : 'this input'}`}
-        choices={dropChoicesFor(from.pinType, from.handleType).map((id) => ({ id, ...dropChoiceCopy(id, from.pinType) }))}
+        choices={[
+          ...existing.map(({ id, label, hint }) => ({ id, label, hint })),
+          ...dropChoicesFor(from.pinType, from.handleType).map((id) => ({ id, ...dropChoiceCopy(id, from.pinType) })),
+        ]}
         at={at}
         onChoose={create}
         onCancel={() => setWireDrop(null)}
       />
     );
-  }, [wireDrop, addNodeAndConnect]);
+  }, [wireDrop, addNodeAndConnect, edges, handleConnect, nodes]);
 
   const handleIsValidConnection = useCallback(
     (connection: Connection): boolean =>

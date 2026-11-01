@@ -1258,17 +1258,25 @@ text and answers it in a single pass with a decision model (Kev / Lev / Laya loc
 `typesafe`). It needs a Gateway that advertises the `decision` capability (AbstractRuntime 0.16.0).
 
 - Inputs: `state` (the text), `question`, `question_type`, `options` (choice), `levels` (score),
-  `model` (one `provider/model` handle such as `mlx/jaredpalmer/kev-4b`, empty = the Gateway
-  `output.decision` default), `truncate`, and the advanced `questions` object (several named
+  `provider` and `model`, `truncate`, and the advanced `questions` object (several named
   questions; it replaces the single question).
-- The Properties panel's **Question type** select rewrites the typed output pins, like Switch
+- **Question type** is an enum pin (`choice` | `noul` | `score`): a select on the card and in
+  the Properties panel. Changing it either way rewrites the typed output pins, like Switch
   cases: `choice` gives `choice`, `confidence`, `probabilities`; `noul` (yes/no) gives `noul`
   (P(true)) and `verdict` (noul ≥ 0.5); `score` gives `score`, `level`, `confidence`,
   `probabilities`. Every type also has `answer` (the whole typed answer), `model`, `success`, and
   the advanced `answers` and `meta`.
+- **Provider** and **Model** are the same catalog pickers as the other nodes' `provider` /
+  `model` pins, scoped to the decision catalog: the provider list is every provider with at
+  least one model on the `output.decision` route, the model list that provider's decision
+  models (a bare id, sent with `provider`); with no provider the model list is every
+  `provider/model` handle, and a handle can be typed (`typesafe/jev-latest`). Empty: the
+  Gateway `output.decision` default.
 - The option names and level labels are edited as lists in the panel; they become the `enum` of
   `choice` / `level` and the keys of `probabilities`, so **Break Object** splits `answer` by
-  name and a **Switch** wired from `choice` or `level` offers **Sync cases from enum**.
+  name and a **Switch** wired from `choice` or `level` offers **Sync cases from enum**. A wire
+  dragged out of `options` or `levels` onto empty canvas lists the array outputs already in the
+  flow to wire in, then **Make Array** (builds the list from its pins) and a relay.
 - Run checks require `state`, `question`, at least one option for a choice and at least two
   ordered levels (lowest first) for a score, unless the advanced `questions` object is used.
 
@@ -2715,7 +2723,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: decision
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `state` string: The document / text the question is about.; `question` string: The instructions ("Which team should handle this?").; `question_type` string: choice | noul (yes/no probability) | score. Default: choice. Changing it rewrites the typed output pins.; `options` array: Choice only: the option names ["returns", "shipping"] or a {name: description} object. At least one.; `levels` array: Score only: the ordered level labels, lowest first ["Calm", "Frustrated", "Very angry"]. At least two.; `model` string: Optional provider/model handle (mlx/jaredpalmer/kev-4b, huggingface/ggml-org/Kev-4B-GGUF:Q4_K_M, typesafe/jev-latest). Empty: the Gateway output.decision default.; `truncate` boolean: Read only the first 65,536 tokens of an over-long state instead of failing.; `questions` object: Advanced: several named questions {name: {type, instructions, criteria}}. When wired or non-empty it REPLACES the single question; every answer lands in `answers`.
+- Inputs: `exec-in` execution; `state` string: The document / text the question is about.; `question` string: The instructions ("Which team should handle this?").; `question_type` string: choice | noul (yes/no probability) | score. Default: choice. Changing it rewrites the typed output pins.; `options` array: Choice only: the option names ["returns", "shipping"] or a {name: description} object. At least one.; `levels` array: Score only: the ordered level labels, lowest first ["Calm", "Frustrated", "Very angry"]. At least two.; `provider` provider: Optional decision provider (one with a model on the output.decision route: mlx, huggingface, typesafe…). Empty: the provider of a provider/model handle in `model`, else the Gateway default.; `model` model: Optional decision model: a bare id with `provider` set (jaredpalmer/kev-4b), or a provider/model handle on its own (mlx/jaredpalmer/kev-4b, huggingface/ggml-org/Kev-4B-GGUF:Q4_K_M, typesafe/jev-latest). Empty: the Gateway output.decision default.; `truncate` boolean: Read only the first 65,536 tokens of an over-long state instead of failing.; `questions` object: Advanced: several named questions {name: {type, instructions, criteria}}. When wired or non-empty it REPLACES the single question; every answer lands in `answers`.
 - Outputs: `exec-out` execution; `choice` string: The chosen option name.; `confidence` number: Confidence in the choice (0..1).; `probabilities` object: Probability per option, keyed by option name.; `answer` object: The whole typed answer as one object (type, the typed fields, probabilities). Break Object splits it.; `model` string: The provider/model that answered.; `success` boolean: True when an answer exists.; `answers` object: Advanced form: every answer keyed by question name (the single form keys its one answer "answer").; `meta` object: Execution metadata (schema, modality, provider/model, token usage).
 - Default config: {
   "pinDefaults": {
@@ -6553,10 +6561,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `typesafe`). The Properties panel's question type (`choice` | `noul` | `score`), options and levels rewrite the
   typed output pins (`choice`/`confidence`/`probabilities`, `noul`/`verdict`, `score`/`level`/`confidence`/
   `probabilities`) plus `answer`, `model`, `success`; the pins carry JSON Schemas (option/level enums, probability
-  keys) so Break Object splits `answer` and Switch syncs its cases from `choice` or `level`. The `model` pin is one
-  `provider/model` handle picked from every provider's `output.decision` catalog; run checks require `state`,
-  `question`, options for a choice and two levels for a score; the node runs only where the Gateway advertises the
-  `decision` contract (`src/utils/decisionPins.ts`). Needs AbstractRuntime 0.16.0.
+  keys) so Break Object splits `answer` and Switch syncs its cases from `choice` or `level`. `question_type` is an
+  enum pin: a select on the card as in the panel (an enum-typed text pin now renders its schema's values inline,
+  `pinEnumOptions`), and a pin-default edit of a Decision node re-derives its outputs in the store. `provider`
+  (type `provider`) and `model` (type `model`) are the usual catalog pickers scoped to the decision catalog
+  (`useDecisionCatalog`: providers with an `output.decision` model, that provider's models; a `provider/model`
+  handle can still be typed, and the node sends both pins to the runtime). A wire dragged out of an array input
+  (`options`, `levels`) onto the canvas offers the flow's existing array outputs to wire in, then Make Array and
+  a relay. Run checks require `state`, `question`, options for a choice and two levels for a score; the node runs
+  only where the Gateway advertises the `decision` contract (`src/utils/decisionPins.ts`). Needs AbstractRuntime
+  0.16.0.
 
 ### Changed
 - Every chat box uses the shared rounded multiline composer from `@abstractframework/panel-chat` 0.7.0:

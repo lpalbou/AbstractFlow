@@ -11,6 +11,7 @@ import { BREAK_EMAIL_HINT, BREAK_EMAIL_LABEL, EMAIL_SCHEMA } from './emailType';
  */
 import type { Edge, Node } from 'reactflow';
 import type { FlowNodeData, NodeType, Pin, PinType } from '../types/flow';
+import { areTypesCompatible } from './validation';
 
 export const RELAY_TYPE = 'reroute';
 
@@ -56,7 +57,7 @@ export function withRelayTypes(nodes: Node<FlowNodeData>[], edges: Edge[]): Node
   return changed ? next : nodes;
 }
 
-export type DropChoice = 'if' | 'relay' | 'break_object' | 'break_email' | 'foreach';
+export type DropChoice = 'if' | 'relay' | 'break_object' | 'break_email' | 'foreach' | 'make_array';
 
 /**
  * The typed lists ForEach takes as its `items` (an array of something): a plain
@@ -82,11 +83,14 @@ export const LIST_PIN_TYPES: ReadonlySet<PinType> = new Set<PinType>([
  * it (the only loop a list feeds directly: For counts numbers, While tests a
  * condition, Loop Limit caps a repeating path); a relay for any data pin; from
  * an object (or any) output, a Break Object too. Execution pins get nothing
- * (relays carry data only).
+ * (relays carry data only). From an ARRAY INPUT (a Decision's `options` /
+ * `levels`, Array Length…), a Make Array that builds the list first, then a
+ * relay; the outputs already in the flow that could feed the input are listed
+ * by `existingSourceChoices`.
  */
 export function dropChoicesFor(pinType: PinType | undefined, side: 'source' | 'target'): DropChoice[] {
   if (!pinType || pinType === 'execution') return [];
-  if (side !== 'source') return ['relay'];
+  if (side !== 'source') return pinType === 'array' ? ['make_array', 'relay'] : ['relay'];
   if (pinType === 'boolean') return ['if', 'relay'];
   if (pinType === 'email') return ['break_email', 'relay'];
   if (LIST_PIN_TYPES.has(pinType)) return ['foreach', 'relay'];
@@ -108,7 +112,59 @@ export function dropChoiceCopy(choice: DropChoice, pinType?: PinType): { label: 
       const each = pinType === 'emails' ? 'email' : 'item';
       return { label: 'ForEach', hint: `Run the next steps once for each ${each}: wire them to loop, and what comes after the last ${each} to done` };
     }
+    case 'make_array':
+      return { label: 'Make Array', hint: 'Build the list here: one input pin per item, in order (add pins in Properties)' };
   }
+}
+
+/** An output already in the flow that the drop menu offers to wire into the input a drag started from. */
+export interface ExistingSourceChoice {
+  /** The menu choice id (`wire:<n>`); Canvas maps it back to `source` / `sourceHandle`. */
+  id: string;
+  label: string;
+  hint: string;
+  source: string;
+  sourceHandle: string;
+}
+
+/**
+ * The outputs elsewhere in the flow whose type can feed the input a wire was
+ * dragged out of (operator 2026-11-01: an `options` array input dropped on the
+ * canvas offered only a relay while a Make Array sat right there). Same type
+ * rules as a hand-drawn wire (`areTypesCompatible`); a relay counts with the
+ * type it carries, an unfed relay (`any`) does not; the node itself and an
+ * output already wired to that input are left out.
+ */
+export function existingSourceChoices(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  from: { nodeId: string; handleId: string; pinType?: PinType }
+): ExistingSourceChoice[] {
+  if (!from.pinType || from.pinType === 'execution') return [];
+  const targetType = from.pinType;
+  const alreadyWired = new Set(
+    edges.filter((e) => e.target === from.nodeId && e.targetHandle === from.handleId).map((e) => `${e.source}::${e.sourceHandle}`)
+  );
+  const out: ExistingSourceChoice[] = [];
+  for (const node of withRelayTypes(nodes, edges)) {
+    if (node.id === from.nodeId || !node.data) continue;
+    const relay = isRelay(node);
+    if (relay && !edges.some((e) => e.target === node.id)) continue;
+    for (const pin of node.data.outputs) {
+      if (pin.type === 'execution' || pin.type === 'any') continue;
+      if (!areTypesCompatible(pin.type, targetType)) continue;
+      if (alreadyWired.has(`${node.id}::${pin.id}`)) continue;
+      const nodeLabel = node.data.label || node.data.nodeType;
+      out.push({
+        id: `wire:${out.length}`,
+        label: relay ? `${nodeLabel} (relay)` : `${nodeLabel} › ${pin.label || pin.id}`,
+        hint: `Wire this ${pin.type} output into ${from.handleId}`,
+        source: node.id,
+        sourceHandle: pin.id,
+      });
+    }
+  }
+  return out;
 }
 
 /** The node a drop choice creates (by type, and label for a preset) and its pin the dragged wire connects to. */
@@ -124,6 +180,8 @@ export function dropChoiceNode(choice: DropChoice, side: 'source' | 'target'): {
       return { type: 'break_object', label: BREAK_EMAIL_LABEL, pin: 'object' };
     case 'foreach':
       return { type: 'loop', pin: 'items' };
+    case 'make_array':
+      return { type: 'make_array', pin: 'result' };
   }
 }
 

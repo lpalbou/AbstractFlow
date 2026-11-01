@@ -20,6 +20,24 @@ export const DECISION_QUESTION_TYPE_LABELS: Record<DecisionQuestionType, string>
   score: 'Score (ordered levels)',
 };
 
+/** The short labels of the on-card `question_type` select. */
+export const DECISION_QUESTION_TYPE_SHORT_LABELS: Record<DecisionQuestionType, string> = {
+  choice: 'Choice',
+  noul: 'Yes-no (noul)',
+  score: 'Score',
+};
+
+/**
+ * The `question_type` input pin's schema: an enum (so the card renders a select,
+ * utils/jsonSchemaEditor.ts pinEnumOptions) whose members are titled through
+ * `oneOf` `{const, title}`.
+ */
+export const DECISION_QUESTION_TYPE_SCHEMA: Record<string, unknown> = {
+  type: 'string',
+  enum: [...DECISION_QUESTION_TYPES],
+  oneOf: DECISION_QUESTION_TYPES.map((type) => ({ const: type, title: DECISION_QUESTION_TYPE_SHORT_LABELS[type] })),
+};
+
 /** `choice` unless the value names another known type. */
 export function normalizeDecisionQuestionType(value: unknown): DecisionQuestionType {
   const raw = typeof value === 'string' ? value.trim().toLowerCase() : '';

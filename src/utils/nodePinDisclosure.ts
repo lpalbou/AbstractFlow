@@ -363,7 +363,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactInputs: true,
     compactOutputs: true,
     // `options` / `levels` are primary for their own question type only (decidePinVisibility).
-    primaryInputs: ['state', 'question', 'question_type', 'model'],
+    primaryInputs: ['state', 'question', 'question_type', 'provider', 'model'],
     advancedInputs: ['options', 'levels', 'truncate', 'questions'],
     primaryOutputs: ['choice', 'confidence', 'probabilities', 'noul', 'verdict', 'score', 'level', 'answer', 'model', 'success'],
     advancedOutputs: ['answers'],

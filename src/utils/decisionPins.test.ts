@@ -12,6 +12,9 @@ import {
   mergeDecisionOptionRows,
 } from './decisionPins';
 import { getNodePinDisclosure } from './nodePinDisclosure';
+import { pinEnumOptions } from './jsonSchemaEditor';
+import { modelCatalogScopeForPin, providerCatalogScopeForPin, providerPinIdForModelPin } from './pinCatalog';
+import { useFlowStore } from '../hooks/useFlow';
 import { inferSchemaForNodeOutput } from './outputSchemaInference';
 import { fromVisualFlow } from './serialization';
 
@@ -90,7 +93,7 @@ describe('decision pins', () => {
     expect(template.label).toBe('Decision');
     expect(template.category).toBe('core');
     expect(template.gatewayCapability).toBe('decision');
-    expect(ids(template.inputs)).toEqual(['exec-in', 'state', 'question', 'question_type', 'options', 'levels', 'model', 'truncate', 'questions']);
+    expect(ids(template.inputs)).toEqual(['exec-in', 'state', 'question', 'question_type', 'options', 'levels', 'provider', 'model', 'truncate', 'questions']);
     expect(ids(template.outputs)).toEqual(ids(decisionOutputPins('choice')));
     const data = createNodeData(template);
     expect(data.pinDefaults).toEqual({ question_type: 'choice' });
@@ -138,18 +141,82 @@ describe('decision pins', () => {
         expanded: false,
       });
     const choice = disclose(decideNode({ question_type: 'choice' }));
-    expect(ids(choice.inputPins)).toEqual(['exec-in', 'state', 'question', 'question_type', 'options', 'model']);
+    expect(ids(choice.inputPins)).toEqual(['exec-in', 'state', 'question', 'question_type', 'options', 'provider', 'model']);
     expect(ids(choice.outputPins)).toEqual(['exec-out', 'choice', 'confidence', 'probabilities', 'answer', 'model', 'success']);
     expect(ids(choice.hiddenInputPins)).toEqual(['levels', 'truncate', 'questions']);
     expect(ids(choice.hiddenOutputPins)).toEqual(['answers', 'meta']);
 
     const score = disclose(decideNode({ question_type: 'score', levels: ['low', 'high'] }));
-    expect(ids(score.inputPins)).toEqual(['exec-in', 'state', 'question', 'question_type', 'levels', 'model']);
+    expect(ids(score.inputPins)).toEqual(['exec-in', 'state', 'question', 'question_type', 'levels', 'provider', 'model']);
     expect(ids(score.outputPins)).toEqual(['exec-out', 'score', 'level', 'confidence', 'probabilities', 'answer', 'model', 'success']);
 
     const noul = disclose(decideNode({ question_type: 'noul' }));
-    expect(ids(noul.inputPins)).toEqual(['exec-in', 'state', 'question', 'question_type', 'model']);
+    expect(ids(noul.inputPins)).toEqual(['exec-in', 'state', 'question', 'question_type', 'provider', 'model']);
     expect(ids(noul.outputPins)).toEqual(['exec-out', 'noul', 'verdict', 'answer', 'model', 'success']);
+  });
+});
+
+describe('decision pins on the card (operator 2026-11-01)', () => {
+  it('question_type is an enum pin: the card select reads its values and titles off the schema', () => {
+    const pin = getNodeTemplate('decide')!.inputs.find((p) => p.id === 'question_type')!;
+    expect(pin.type).toBe('string');
+    expect(pin.schema?.enum).toEqual(['choice', 'noul', 'score']);
+    expect(pinEnumOptions(pin)).toEqual([
+      { value: 'choice', label: 'Choice' },
+      { value: 'noul', label: 'Yes-no (noul)' },
+      { value: 'score', label: 'Score' },
+    ]);
+    // A plain text pin (no enum) keeps its text field.
+    expect(pinEnumOptions(getNodeTemplate('decide')!.inputs.find((p) => p.id === 'question'))).toEqual([]);
+    expect(pinEnumOptions({ schema: { type: 'string', enum: ['a', 'b'] } })).toEqual([{ value: 'a', label: 'a' }, { value: 'b', label: 'b' }]);
+  });
+
+  it('a pin-default edit from the card rewrites the typed outputs exactly as the Properties panel does', () => {
+    const store = useFlowStore.getState();
+    store.clearFlow();
+    store.setNodes([{ id: 'd', type: 'custom', position: { x: 0, y: 0 }, data: decideNode({ question_type: 'choice', options: ['a', 'b'] }) }]);
+    // The card's setPinDefault: pinDefaults only, no outputs.
+    useFlowStore.getState().updateNodeData('d', { pinDefaults: { question_type: 'score', levels: ['low', 'high'] } });
+    const scored = useFlowStore.getState().nodes[0].data;
+    expect(ids(scored.outputs)).toEqual(ids(decisionOutputPins('score', [], ['low', 'high'])));
+    expect(scored.outputs.find((p) => p.id === 'level')?.schema).toEqual({ type: 'string', enum: ['low', 'high'] });
+    // An edge on a pin that disappears goes with it (the store's usual removed-handle rule).
+    useFlowStore.getState().setNodes([...useFlowStore.getState().nodes, { id: 'len', type: 'custom', position: { x: 0, y: 0 }, data: structuredClone(createNodeData(getNodeTemplate('literal_string')!)) }]);
+    useFlowStore.getState().setEdges([{ id: 'e', source: 'd', sourceHandle: 'level', target: 'len', targetHandle: 'value' }]);
+    useFlowStore.getState().updateNodeData('d', { pinDefaults: { question_type: 'noul' } });
+    expect(ids(useFlowStore.getState().nodes[0].data.outputs)).toEqual(ids(decisionOutputPins('noul')));
+    expect(useFlowStore.getState().edges).toEqual([]);
+    // Other nodes: untouched by the rule.
+    const llm = structuredClone(createNodeData(getNodeTemplate('llm_call')!));
+    useFlowStore.getState().setNodes([{ id: 'l', type: 'custom', position: { x: 0, y: 0 }, data: llm }]);
+    useFlowStore.getState().updateNodeData('l', { pinDefaults: { temperature: 0.2 } });
+    expect(useFlowStore.getState().nodes[0].data.outputs).toEqual(llm.outputs);
+  });
+
+  it('provider and model are catalog picker pins scoped to the decision catalog, model paired with provider', () => {
+    const inputs = getNodeTemplate('decide')!.inputs;
+    const provider = inputs.find((p) => p.id === 'provider')!;
+    const model = inputs.find((p) => p.id === 'model')!;
+    expect(ids(inputs).indexOf('provider')).toBe(ids(inputs).indexOf('model') - 1);
+    expect(provider.type).toBe('provider');
+    expect(model.type).toBe('model');
+    expect(providerCatalogScopeForPin(provider, 'decide')).toBe('decision');
+    expect(modelCatalogScopeForPin(model, inputs, 'decide')).toBe('decision');
+    expect(providerPinIdForModelPin(model, inputs, 'decide')).toBe('provider');
+    // The same pins on an LLM Call stay on the text catalog.
+    const llm = getNodeTemplate('llm_call')!.inputs;
+    expect(providerCatalogScopeForPin(llm.find((p) => p.id === 'provider')!, 'llm_call')).toBe('text');
+  });
+
+  it('a saved decide node from before the provider pin loads with it, and with the question_type enum', () => {
+    const saved = decideNode({ question_type: 'choice', options: ['a'] });
+    const legacy = { ...saved, inputs: saved.inputs.filter((p) => p.id !== 'provider').map((p) => (p.id === 'question_type' ? { id: p.id, label: p.label, type: p.type } : p)) };
+    const flow = fromVisualFlow({ id: 'f', name: 'f', nodes: [{ id: 'd', type: 'decide', position: { x: 0, y: 0 }, data: legacy }], edges: [] });
+    const loaded = flow.nodes[0].data;
+    expect(ids(loaded.inputs)).toEqual(['exec-in', 'state', 'question', 'question_type', 'options', 'levels', 'provider', 'model', 'truncate', 'questions']);
+    expect(loaded.inputs.find((p) => p.id === 'question_type')?.schema?.enum).toEqual(['choice', 'noul', 'score']);
+    expect(loaded.inputs.find((p) => p.id === 'model')?.type).toBe('model');
+    expect(ids(loaded.outputs)).toEqual(ids(decisionOutputPins('choice', ['a'])));
   });
 });
 

@@ -6,7 +6,7 @@ import { areTypesCompatible } from './validation';
 import { createNodeData, getAllNodeTemplates, getNodeTemplate, type NodeTemplate } from '../types/nodes';
 import { EMAIL_FIELDS, hasEmailFields, withEmailFields } from './emailType';
 import { buildPaletteSections } from './paletteModel';
-import { LIST_PIN_TYPES, dropChoiceCopy, dropChoiceNode, dropChoicesFor, wiredSourceType, type DropChoice } from './relays';
+import { LIST_PIN_TYPES, dropChoiceCopy, dropChoiceNode, dropChoicesFor, existingSourceChoices, wiredSourceType, type DropChoice } from './relays';
 
 /** A source node whose `out` output has the given type (a Code node's pins, retyped). */
 function source(id: string, type: PinType): Node<FlowNodeData> {
@@ -106,7 +106,9 @@ describe('Loops from a dropped list wire', () => {
     for (const type of LIST_PIN_TYPES) {
       expect(dropChoicesFor(type, 'source')).toEqual(['foreach', 'relay']);
     }
-    expect(dropChoicesFor('array', 'target')).toEqual(['relay']);
+    // An array INPUT offers a Make Array to build the list first (tested below).
+    expect(dropChoicesFor('array', 'target')).toEqual(['make_array', 'relay']);
+    expect(dropChoicesFor('emails', 'target')).toEqual(['relay']);
     expect(dropChoiceCopy('foreach', 'array')).toEqual({
       label: 'ForEach',
       hint: 'Run the next steps once for each item: wire them to loop, and what comes after the last item to done',
@@ -130,5 +132,44 @@ describe('Loops from a dropped list wire', () => {
       expect(s.nodes.find((n) => n.id === id)?.data.nodeType).toBe('loop');
       expect(s.edges.map((e) => [e.source, e.sourceHandle, e.target, e.targetHandle])).toEqual([['src', 'out', id, 'items']]);
     }
+  });
+});
+
+describe('An array input dropped on the canvas (operator 2026-11-01: a Decision’s options offered only a relay)', () => {
+  const make = (id: string, type: string): Node<FlowNodeData> => ({ id, type: 'custom', position: { x: 0, y: 0 }, data: createNodeData(getNodeTemplate(type as any)!) });
+  const edge = (source: string, sourceHandle: string, target: string, targetHandle: string): Edge => ({ id: `${source}-${target}`, source, sourceHandle, target, targetHandle });
+
+  it('lists the array outputs already in the flow (relays with the type they carry), never the node itself, a wired output, text, or an unfed relay', () => {
+    const decide = make('d', 'decide');
+    const nodes = [decide, make('arr', 'make_array'), make('lit', 'literal_array'), make('text', 'literal_string'), make('fed', 'reroute'), make('unfed', 'reroute'), make('len', 'array_length')];
+    const edges = [edge('lit', 'value', 'fed', 'in'), edge('arr', 'result', 'd', 'levels')];
+    const from = { nodeId: 'd', handleId: 'options', pinType: 'array' as const };
+    const choices = existingSourceChoices(nodes, edges, from);
+    expect(choices.map((c) => [c.source, c.sourceHandle])).toEqual([
+      ['arr', 'result'],
+      ['lit', 'value'],
+      ['fed', 'out'],
+    ]);
+    expect(choices.map((c) => c.id)).toEqual(['wire:0', 'wire:1', 'wire:2']);
+    expect(choices[0]).toMatchObject({ label: 'Make Array › result', hint: 'Wire this array output into options' });
+    expect(choices[2].label).toBe('Relay (relay)');
+    // The output already on this input is not offered again; an execution or text pin never is.
+    expect(existingSourceChoices(nodes, edges, { nodeId: 'd', handleId: 'levels', pinType: 'array' }).map((c) => c.source)).toEqual(['lit', 'fed']);
+    expect(existingSourceChoices(nodes, edges, { nodeId: 'd', handleId: 'exec-in', pinType: 'execution' })).toEqual([]);
+    // Any array input lists them the same way (Array Length's `array`; a Decision has no array output).
+    expect(existingSourceChoices(nodes, edges, { nodeId: 'len', handleId: 'array', pinType: 'array' }).map((c) => c.source)).toEqual(['arr', 'lit', 'fed']);
+  });
+
+  it('Make Array is created wired into the input it was dragged from (result -> options), in one undo step', () => {
+    useFlowStore.getState().setNodes([make('d', 'decide')]);
+    const made = dropChoiceNode('make_array', 'target');
+    expect(made).toEqual({ type: 'make_array', pin: 'result' });
+    expect(dropChoiceCopy('make_array').label).toBe('Make Array');
+    const id = useFlowStore.getState().addNodeAndConnect(getNodeTemplate(made.type)!, { x: -300, y: 0 }, { from: { nodeId: 'd', handleId: 'options', side: 'target' }, newPin: made.pin });
+    const s = useFlowStore.getState();
+    expect(s.nodes.find((n) => n.id === id)?.data.nodeType).toBe('make_array');
+    expect(s.edges.map((e) => [e.source, e.sourceHandle, e.target, e.targetHandle])).toEqual([[id, 'result', 'd', 'options']]);
+    s.undo();
+    expect(useFlowStore.getState().nodes.map((n) => n.id)).toEqual(['d']);
   });
 });

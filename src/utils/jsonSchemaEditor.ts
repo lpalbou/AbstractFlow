@@ -82,6 +82,29 @@ export function normalizeEnumValues(raw: unknown): string[] {
   return coerceEnumValues(raw);
 }
 
+/**
+ * The choices an enum-typed string pin offers inline on the node card: its
+ * schema's `enum` values, labelled by the `title` of a matching `oneOf`
+ * `{const, title}` entry when the schema has one (JSON Schema's own way to
+ * name enum members), else by the value. Empty for a pin without an enum.
+ */
+export function pinEnumOptions(pin: { schema?: Record<string, unknown> } | undefined): Array<{ value: string; label: string }> {
+  const schema = pin?.schema;
+  if (!schema || typeof schema !== 'object') return [];
+  const values = normalizeEnumValues((schema as Record<string, unknown>).enum);
+  if (values.length === 0) return [];
+  const titles = new Map<string, string>();
+  const oneOf = (schema as Record<string, unknown>).oneOf;
+  if (Array.isArray(oneOf)) {
+    for (const entry of oneOf) {
+      if (!entry || typeof entry !== 'object') continue;
+      const { const: value, title } = entry as { const?: unknown; title?: unknown };
+      if (typeof value === 'string' && typeof title === 'string' && title.trim()) titles.set(value, title.trim());
+    }
+  }
+  return values.map((value) => ({ value, label: titles.get(value) || value }));
+}
+
 function hasArraySchemaClause(root: Record<string, any>): boolean {
   return ['allOf', 'anyOf', 'oneOf'].some((key) => Array.isArray(root[key]) && root[key].length > 0);
 }

@@ -82,7 +82,29 @@
           {
             "id": "question_type",
             "label": "question_type",
-            "type": "string"
+            "type": "string",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "choice",
+                "noul",
+                "score"
+              ],
+              "oneOf": [
+                {
+                  "const": "choice",
+                  "title": "Choice"
+                },
+                {
+                  "const": "noul",
+                  "title": "Yes-no (noul)"
+                },
+                {
+                  "const": "score",
+                  "title": "Score"
+                }
+              ]
+            }
           },
           {
             "id": "options",
@@ -93,6 +115,11 @@
             "id": "levels",
             "label": "levels",
             "type": "array"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
           },
           {
             "id": "model",
@@ -260,7 +287,29 @@
           {
             "id": "question_type",
             "label": "question_type",
-            "type": "string"
+            "type": "string",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "choice",
+                "noul",
+                "score"
+              ],
+              "oneOf": [
+                {
+                  "const": "choice",
+                  "title": "Choice"
+                },
+                {
+                  "const": "noul",
+                  "title": "Yes-no (noul)"
+                },
+                {
+                  "const": "score",
+                  "title": "Score"
+                }
+              ]
+            }
           },
           {
             "id": "options",
@@ -271,6 +320,11 @@
             "id": "levels",
             "label": "levels",
             "type": "array"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
           },
           {
             "id": "model",
@@ -384,7 +438,29 @@
           {
             "id": "question_type",
             "label": "question_type",
-            "type": "string"
+            "type": "string",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "choice",
+                "noul",
+                "score"
+              ],
+              "oneOf": [
+                {
+                  "const": "choice",
+                  "title": "Choice"
+                },
+                {
+                  "const": "noul",
+                  "title": "Yes-no (noul)"
+                },
+                {
+                  "const": "score",
+                  "title": "Score"
+                }
+              ]
+            }
           },
           {
             "id": "options",
@@ -395,6 +471,11 @@
             "id": "levels",
             "label": "levels",
             "type": "array"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
           },
           {
             "id": "model",
@@ -809,6 +890,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-11-01T22:05:20.445719+00:00",
-  "updated_at": "2026-11-01T22:05:20.445719+00:00"
+  "created_at": "2026-11-01T22:46:51.188881+00:00",
+  "updated_at": "2026-11-01T22:46:51.188881+00:00"
 }

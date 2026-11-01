@@ -20,7 +20,7 @@ import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, J
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { computeFoldedGetters } from '../utils/foldedGetters';
-import { withDecisionOutputs } from '../utils/decisionPins';
+import { decisionOutputPinsForData, withDecisionOutputs } from '../utils/decisionPins';
 import { withTrailStep } from '../utils/runSpotlight';
 import { withLoopItemTypes, withRelayTypes } from '../utils/relays';
 import { withAgentSchemaOnInput } from '../utils/structuredOutput';
@@ -1193,13 +1193,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   // Update node data
-  updateNodeData: (nodeId, data) => {
+  updateNodeData: (nodeId, patch) => {
     // Config edits coalesce per node: rapid keystrokes in one field collapse
     // to a single baseline (the state before the first keystroke), so one
     // logical edit is one undo step — not one per character.
     get()._captureHistory(`update:${nodeId}`);
     const state = get();
     const existingNode = state.nodes.find((n) => n.id === nodeId);
+    // Decision node: a pin-default edit (question_type on the card, options / levels anywhere)
+    // rewrites the typed outputs, wherever the edit came from (utils/decisionPins.ts).
+    const data: Partial<FlowNodeData> =
+      existingNode?.data.nodeType === 'decide' && patch.pinDefaults && !patch.outputs
+        ? { ...patch, outputs: decisionOutputPinsForData({ pinDefaults: patch.pinDefaults }) }
+        : patch;
     const nextData = existingNode ? { ...existingNode.data, ...data } : undefined;
 
     const removedInputHandles = new Set<string>();

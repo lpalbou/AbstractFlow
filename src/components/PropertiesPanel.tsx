@@ -39,6 +39,8 @@ import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import { useVisionAdapterCatalog } from '../hooks/useVisionAdapterCatalog';
 import { useSemanticsRegistry } from '../hooks/useSemantics';
+import { useDecisionCatalog } from '../hooks/useProviders';
+import { decisionModelHandleIssue } from './nodes/BaseNode';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
 import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
@@ -77,7 +79,7 @@ import {
   providerPinIdForModelPin,
   type PinCatalogScope,
 } from '../utils/pinCatalog';
-import { DECISION_OUTPUT_CAPABILITY_ROUTE, TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
+import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 import { thinkingOptionsFromModelCapabilities } from '../utils/thinkingControls';
 import { RESEARCH_EFFORT_OPTIONS, isResearchEffortPin, normalizeResearchEffort } from '../utils/researchEffort';
 import { insertModelResidencyStep, modelResidencyTaskUnsupportedReason } from '../utils/modelResidencyGraph';
@@ -594,8 +596,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [sttModelOptions, setSttModelOptions] = useState<string[]>([]);
   const [musicProviderOptions, setMusicProviderOptions] = useState<string[]>([]);
   const [musicModelOptions, setMusicModelOptions] = useState<string[]>([]);
-  // Decision models: `provider/model` handles on the output.decision route, every provider.
-  const [decisionModelOptions, setDecisionModelOptions] = useState<string[]>([]);
   const [imageProviderOptions, setImageProviderOptions] = useState<string[]>([]);
   const [imageModelOptions, setImageModelOptions] = useState<
     Array<{ provider: string; model: string; label: string; catalogTask?: string } & MediaModelParameterMetadata>
@@ -603,7 +603,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
   const [mediaCatalogRequest, setMediaCatalogRequest] = useState<{
     seq: number;
-    scope: 'image' | 'tts' | 'stt' | 'music' | 'decision';
+    scope: 'image' | 'tts' | 'stt' | 'music';
     provider?: string;
     model?: string;
     task?: string;
@@ -612,7 +612,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   const requestMediaCatalog = useCallback(
     (
-      scope: 'image' | 'tts' | 'stt' | 'music' | 'decision',
+      scope: 'image' | 'tts' | 'stt' | 'music',
       options: { provider?: string; model?: string; task?: string; providersOnly?: boolean } = {}
     ) => {
       setMediaCatalogRequest((prev) => ({
@@ -758,6 +758,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     String(node?.data.pinDefaults?.model ?? node?.data.agentConfig?.model ?? node?.data.effectConfig?.model ?? ''),
     node?.data.nodeType === 'agent' || node?.data.nodeType === 'llm_call',
   );
+  // Decision node: the provider / model selects read the output.decision catalog (hooks/useProviders.ts).
+  const decisionCatalogQuery = useDecisionCatalog(node?.data.nodeType === 'decide');
 
   useEffect(() => {
     setShowCodeEditor(false);
@@ -925,39 +927,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       );
 
     setLoadingMediaModels(true);
-
-    if (request.scope === 'decision') {
-      // Every discovered provider's models on the output.decision route, as `provider/model` handles
-      // (the Decision node's `model` pin is one handle; AbstractCore splits it).
-      if (!providerDiscoveryEndpoint || !providerModelsEndpoint) {
-        setDecisionModelOptions([]);
-        setLoadingMediaModels(false);
-        return;
-      }
-      gatewayJson<{ items?: ProviderInfo[] }>(gatewayPath(providerDiscoveryEndpoint), { timeoutMs: 10_000 })
-        .then((catalog) => {
-          const names = (Array.isArray(catalog?.items) ? catalog.items : [])
-            .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
-            .filter(Boolean);
-          return Promise.all(
-            names.map((name) =>
-              gatewayJson<{ models?: unknown[]; items?: unknown[] }>(
-                gatewayPath(providerModelsEndpoint, { provider_name: name }, { capability_route: DECISION_OUTPUT_CAPABILITY_ROUTE }),
-                { timeoutMs: 15_000 }
-              )
-                .then((data) => {
-                  const models = Array.isArray(data?.models) ? data.models : Array.isArray(data?.items) ? data.items : [];
-                  return models.map((model) => modelId(model)).filter(Boolean).map((model) => `${name}/${model}`);
-                })
-                .catch(() => [] as string[])
-            )
-          );
-        })
-        .then((lists) => setDecisionModelOptions(uniq(lists.flat())))
-        .catch(() => setDecisionModelOptions([]))
-        .finally(() => setLoadingMediaModels(false));
-      return;
-    }
 
     if (request.scope === 'image') {
       if (!visionProviderModelsEndpoint) {
@@ -1725,7 +1694,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (scope === 'tts') return selectOptionsFromValues(ttsModelOptions);
     if (scope === 'stt') return selectOptionsFromValues(sttModelOptions);
     if (scope === 'music') return selectOptionsFromValues(musicModelOptions);
-    if (scope === 'decision') return selectOptionsFromValues(decisionModelOptions);
     return [];
   };
 
@@ -1747,7 +1715,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (scope === 'tts') return 'Search TTS models…';
     if (scope === 'stt') return 'Search STT models…';
     if (scope === 'music') return 'Search music models…';
-    if (scope === 'decision') return 'Search decision models…';
     return 'Search models…';
   };
 
@@ -1763,7 +1730,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (scope === 'tts') requestMediaCatalog('tts', { provider });
     if (scope === 'stt') requestMediaCatalog('stt', { provider });
     if (scope === 'music') requestMediaCatalog('music', { provider });
-    if (scope === 'decision') requestMediaCatalog('decision');
   };
 
   const providerDefaultForModelPin = (pin: Pin, pins: Pin[]) => {
@@ -3312,12 +3278,23 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             };
             const setRows = (next: string[]) =>
               commit({ [listPinId]: listPinId === 'options' ? mergeDecisionOptionRows(listRaw, next) : next.length > 0 ? next : undefined });
+            const providerValue = typeof defaults.provider === 'string' ? defaults.provider.trim() : '';
             const modelValue = typeof defaults.model === 'string' ? defaults.model : '';
-            const catalog = modelOptionsForScope('decision', '');
-            const modelOptions =
-              modelValue && !catalog.some((option) => option.value === modelValue)
-                ? [{ value: modelValue, label: modelValue }, ...catalog]
-                : catalog;
+            const withCurrent = (options: AfSelectOption[], current: string) =>
+              current && !options.some((option) => option.value === current) ? [{ value: current, label: current }, ...options] : options;
+            const decisionCatalog = decisionCatalogQuery.data;
+            const providerOptions = withGatewayDefaultOption(
+              withCurrent((decisionCatalog?.providers || []).map((p) => ({ value: p.name, label: p.display_name || p.name })), providerValue)
+            );
+            // The chosen provider's decision models as bare ids; with no provider, every provider/model handle.
+            const modelOptions = withCurrent(
+              providerValue
+                ? selectOptionsFromValues(decisionCatalog?.modelsByProvider[providerValue] || [])
+                : selectOptionsFromValues(
+                    (decisionCatalog?.providers || []).flatMap((p) => (decisionCatalog?.modelsByProvider[p.name] || []).map((m) => `${p.name}/${m}`))
+                  ),
+              modelValue
+            );
             const outputsHint =
               questionType === 'noul'
                 ? 'Outputs: noul (P(true)), verdict (noul ≥ 0.5), answer.'
@@ -3385,6 +3362,29 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 )}
 
                 <div className="property-group">
+                  <label className="property-sublabel">Provider</label>
+                  {isInputPinConnected('provider') ? (
+                    <span className="property-hint">Provided by connected pin.</span>
+                  ) : (
+                    <AfSelect
+                      value={providerValue}
+                      options={providerOptions}
+                      placeholder={decisionCatalogQuery.isLoading ? 'Loading…' : 'Auto (Gateway default)'}
+                      loading={decisionCatalogQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search decision providers…"
+                      clearable
+                      allowCustom
+                      onChange={(v) => commit({ provider: v.trim() || undefined, model: undefined })}
+                    />
+                  )}
+                  <span className="property-hint">
+                    A provider with a model on the <code>output.decision</code> route (mlx, huggingface, typesafe). Empty: the
+                    provider of a provider/model handle below, else the Gateway default.
+                  </span>
+                </div>
+
+                <div className="property-group">
                   <label className="property-sublabel">Model</label>
                   {isInputPinConnected('model') ? (
                     <span className="property-hint">Provided by connected pin.</span>
@@ -3392,20 +3392,20 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     <AfSelect
                       value={modelValue}
                       options={modelOptions}
-                      placeholder="Gateway decision default"
-                      loading={catalogLoadingForScope('decision', catalog)}
+                      placeholder={decisionCatalogQuery.isLoading ? 'Loading…' : 'Gateway decision default'}
+                      loading={decisionCatalogQuery.isLoading}
                       searchable
-                      searchPlaceholder={modelSearchPlaceholderForScope('decision')}
+                      searchPlaceholder="Search decision models…"
                       clearable
                       allowCustom
-                      validateCustomValue={(value) => (value.includes('/') ? null : 'Type a provider/model handle, for example typesafe/jev-latest.')}
-                      onOpen={() => requestModelOptionsForScope('decision', '')}
+                      validateCustomValue={(value) => decisionModelHandleIssue(value, providerValue)}
                       onChange={(v) => setPinDefault('model', v || undefined)}
                     />
                   )}
                   <span className="property-hint">
-                    A provider/model handle on the <code>output.decision</code> route (mlx/jaredpalmer/kev-4b, typesafe/jev-latest).
-                    Empty: the Gateway default.
+                    {providerValue
+                      ? `A ${providerValue} decision model (jaredpalmer/kev-4b). Empty: the Gateway default for that provider.`
+                      : 'A provider/model handle on the output.decision route (mlx/jaredpalmer/kev-4b, typesafe/jev-latest). Empty: the Gateway default.'}
                   </span>
                 </div>
               </>

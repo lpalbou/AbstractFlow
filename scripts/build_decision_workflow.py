@@ -8,6 +8,8 @@ Usage: python3 scripts/build_decision_workflow.py            # writes examples/f
 The flow reads `ticket`, `model` and `truncate` from On Flow Start, so one bundle serves
 every decision model: leave `model` empty for the host's `output.decision` default, or pass
 `mlx/jaredpalmer/kev-4b`, `huggingface/ggml-org/Kev-4B-GGUF:Q4_K_M`, `typesafe/jev-latest`.
+Each Decision node also has a `provider` pin (left empty here: with a bare model id it names
+the decision provider, and the node sends both `provider` and `model` to the runtime).
 """
 from __future__ import annotations
 
@@ -37,9 +39,13 @@ DECIDE_INPUTS = [
     pin("exec-in", "", "execution"),
     pin("state", "state", "string"),
     pin("question", "question", "string"),
-    pin("question_type", "question_type", "string"),
+    dict(pin("question_type", "question_type", "string"),
+         schema={"type": "string", "enum": ["choice", "noul", "score"],
+                 "oneOf": [{"const": "choice", "title": "Choice"}, {"const": "noul", "title": "Yes-no (noul)"},
+                           {"const": "score", "title": "Score"}]}),
     pin("options", "options", "array"),
     pin("levels", "levels", "array"),
+    pin("provider", "provider", "provider"),   # a decision provider; empty here: the handle in `model` names it
     pin("model", "model", "model"),
     pin("truncate", "truncate", "boolean"),
     pin("questions", "questions", "object"),   # advanced form: several System One questions at once

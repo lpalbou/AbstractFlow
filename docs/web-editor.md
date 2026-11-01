@@ -893,17 +893,25 @@ text and answers it in a single pass with a decision model (Kev / Lev / Laya loc
 `typesafe`). It needs a Gateway that advertises the `decision` capability (AbstractRuntime 0.16.0).
 
 - Inputs: `state` (the text), `question`, `question_type`, `options` (choice), `levels` (score),
-  `model` (one `provider/model` handle such as `mlx/jaredpalmer/kev-4b`, empty = the Gateway
-  `output.decision` default), `truncate`, and the advanced `questions` object (several named
+  `provider` and `model`, `truncate`, and the advanced `questions` object (several named
   questions; it replaces the single question).
-- The Properties panel's **Question type** select rewrites the typed output pins, like Switch
+- **Question type** is an enum pin (`choice` | `noul` | `score`): a select on the card and in
+  the Properties panel. Changing it either way rewrites the typed output pins, like Switch
   cases: `choice` gives `choice`, `confidence`, `probabilities`; `noul` (yes/no) gives `noul`
   (P(true)) and `verdict` (noul ≥ 0.5); `score` gives `score`, `level`, `confidence`,
   `probabilities`. Every type also has `answer` (the whole typed answer), `model`, `success`, and
   the advanced `answers` and `meta`.
+- **Provider** and **Model** are the same catalog pickers as the other nodes' `provider` /
+  `model` pins, scoped to the decision catalog: the provider list is every provider with at
+  least one model on the `output.decision` route, the model list that provider's decision
+  models (a bare id, sent with `provider`); with no provider the model list is every
+  `provider/model` handle, and a handle can be typed (`typesafe/jev-latest`). Empty: the
+  Gateway `output.decision` default.
 - The option names and level labels are edited as lists in the panel; they become the `enum` of
   `choice` / `level` and the keys of `probabilities`, so **Break Object** splits `answer` by
-  name and a **Switch** wired from `choice` or `level` offers **Sync cases from enum**.
+  name and a **Switch** wired from `choice` or `level` offers **Sync cases from enum**. A wire
+  dragged out of `options` or `levels` onto empty canvas lists the array outputs already in the
+  flow to wire in, then **Make Array** (builds the list from its pins) and a relay.
 - Run checks require `state`, `question`, at least one option for a choice and at least two
   ordered levels (lowest first) for a score, unless the advanced `questions` object is used.
 

@@ -6,7 +6,7 @@ import type { NodeType, FlowNodeData, JsonValue, Pin } from './flow';
 import { generatePythonTransformCode, upsertPythonAvailableVariablesComments } from '../utils/codegen';
 import { NODE_GATEWAY_CAPABILITIES, type GatewayAuthoringCapability } from '../utils/nodeCapabilities';
 import { BREAK_EMAIL_LABEL, breakEmailInputPin, emailFieldPins, emailPin, emailsPin } from '../utils/emailType';
-import { decisionOutputPins } from '../utils/decisionPins';
+import { DECISION_QUESTION_TYPE_SCHEMA, decisionOutputPins } from '../utils/decisionPins';
 
 // Node template used in the palette
 export interface NodeTemplate {
@@ -476,6 +476,7 @@ const CORE_NODES: NodeTemplate[] = [
         label: 'question_type',
         type: 'string',
         description: 'choice | noul (yes/no probability) | score. Default: choice. Changing it rewrites the typed output pins.',
+        schema: DECISION_QUESTION_TYPE_SCHEMA,
       },
       {
         id: 'options',
@@ -490,11 +491,18 @@ const CORE_NODES: NodeTemplate[] = [
         description: 'Score only: the ordered level labels, lowest first ["Calm", "Frustrated", "Very angry"]. At least two.',
       },
       {
+        id: 'provider',
+        label: 'provider',
+        type: 'provider',
+        description:
+          'Optional decision provider (one with a model on the output.decision route: mlx, huggingface, typesafe…). Empty: the provider of a provider/model handle in `model`, else the Gateway default.',
+      },
+      {
         id: 'model',
         label: 'model',
-        type: 'string',
+        type: 'model',
         description:
-          'Optional provider/model handle (mlx/jaredpalmer/kev-4b, huggingface/ggml-org/Kev-4B-GGUF:Q4_K_M, typesafe/jev-latest). Empty: the Gateway output.decision default.',
+          'Optional decision model: a bare id with `provider` set (jaredpalmer/kev-4b), or a provider/model handle on its own (mlx/jaredpalmer/kev-4b, huggingface/ggml-org/Kev-4B-GGUF:Q4_K_M, typesafe/jev-latest). Empty: the Gateway output.decision default.',
       },
       {
         id: 'truncate',
@@ -3191,6 +3199,9 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
 }
 
 const CANONICAL_TEMPLATE_PIN_NODE_TYPES = new Set<string>([
+  // Decision: a saved node gets the template's `provider` pin and the `question_type` enum
+  // schema (its typed outputs are re-derived afterwards, utils/decisionPins.ts).
+  'decide',
   'generate_image',
   'edit_image',
   'image_to_image',
@@ -3221,6 +3232,7 @@ function upsertTemplatePins(templatePins: Pin[], pins: Pin[]): Pin[] {
       label: templatePin.label,
       type: templatePin.type,
       description: hasOwnDescription ? pin.description : templatePin.description,
+      ...(templatePin.schema && !pin.schema ? { schema: templatePin.schema } : {}),
     };
   };
 

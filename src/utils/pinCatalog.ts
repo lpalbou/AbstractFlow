@@ -3,7 +3,7 @@ import type { NodeType, Pin } from '../types/flow';
 export type PinCatalogScope = 'text' | 'image' | 'tts' | 'stt' | 'music' | 'decision';
 
 const TEXT_NODE_TYPES = new Set<NodeType>(['agent', 'llm_call', 'provider_catalog', 'provider_models']);
-/** The Decision node's `model` pin is one `provider/model` handle from the `output.decision` route catalog. */
+/** The Decision node's `provider` / `model` pins pick from the `output.decision` route catalog (hooks/useProviders.ts useDecisionCatalog). */
 const DECISION_NODE_TYPES = new Set<NodeType>(['decide']);
 const IMAGE_NODE_TYPES = new Set<NodeType>(['generate_image', 'edit_image', 'image_to_image', 'upscale_image', 'generate_video', 'text_to_video', 'image_to_video']);
 const TTS_NODE_TYPES = new Set<NodeType>(['generate_voice']);
