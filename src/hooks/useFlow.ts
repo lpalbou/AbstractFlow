@@ -20,6 +20,7 @@ import type { AutomationDefaults, FlowFunction, FlowNodeData, VisualFlow, Pin, J
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { computeFoldedGetters } from '../utils/foldedGetters';
+import { withDecisionOutputs } from '../utils/decisionPins';
 import { withTrailStep } from '../utils/runSpotlight';
 import { withLoopItemTypes, withRelayTypes } from '../utils/relays';
 import { withAgentSchemaOnInput } from '../utils/structuredOutput';
@@ -3066,6 +3067,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           outputs: [...nextCasePins, nextDefaultPin, ...extraExecPins],
         };
       }
+
+      // Decision node: the typed outputs follow question_type / options / levels, never a stale save.
+      data = withDecisionOutputs(data);
 
       // Backward-compat + canonical ordering for While nodes:
       // ensure `item:any` exists (parity with ForEach / Loop).

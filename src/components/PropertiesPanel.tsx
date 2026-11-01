@@ -77,7 +77,7 @@ import {
   providerPinIdForModelPin,
   type PinCatalogScope,
 } from '../utils/pinCatalog';
-import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
+import { DECISION_OUTPUT_CAPABILITY_ROUTE, TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 import { thinkingOptionsFromModelCapabilities } from '../utils/thinkingControls';
 import { RESEARCH_EFFORT_OPTIONS, isResearchEffortPin, normalizeResearchEffort } from '../utils/researchEffort';
 import { insertModelResidencyStep, modelResidencyTaskUnsupportedReason } from '../utils/modelResidencyGraph';
@@ -103,6 +103,13 @@ import {
   subflowPinPatchForSelectedFlow,
 } from '../utils/subflowPins';
 import { inferSchemaForNodeOutput } from '../utils/outputSchemaInference';
+import {
+  DECISION_QUESTION_TYPES,
+  DECISION_QUESTION_TYPE_LABELS,
+  decisionOutputPinsForData,
+  mergeDecisionOptionRows,
+  normalizeDecisionQuestionType,
+} from '../utils/decisionPins';
 import { startHasTriggerEvent } from '../utils/triggerEvent';
 import { wiredSourceType } from '../utils/relays';
 import { BREAK_EMAIL_HINT, hasEmailFields, withEmailFields } from '../utils/emailType';
@@ -587,6 +594,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [sttModelOptions, setSttModelOptions] = useState<string[]>([]);
   const [musicProviderOptions, setMusicProviderOptions] = useState<string[]>([]);
   const [musicModelOptions, setMusicModelOptions] = useState<string[]>([]);
+  // Decision models: `provider/model` handles on the output.decision route, every provider.
+  const [decisionModelOptions, setDecisionModelOptions] = useState<string[]>([]);
   const [imageProviderOptions, setImageProviderOptions] = useState<string[]>([]);
   const [imageModelOptions, setImageModelOptions] = useState<
     Array<{ provider: string; model: string; label: string; catalogTask?: string } & MediaModelParameterMetadata>
@@ -594,7 +603,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
   const [mediaCatalogRequest, setMediaCatalogRequest] = useState<{
     seq: number;
-    scope: 'image' | 'tts' | 'stt' | 'music';
+    scope: 'image' | 'tts' | 'stt' | 'music' | 'decision';
     provider?: string;
     model?: string;
     task?: string;
@@ -603,7 +612,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   const requestMediaCatalog = useCallback(
     (
-      scope: 'image' | 'tts' | 'stt' | 'music',
+      scope: 'image' | 'tts' | 'stt' | 'music' | 'decision',
       options: { provider?: string; model?: string; task?: string; providersOnly?: boolean } = {}
     ) => {
       setMediaCatalogRequest((prev) => ({
@@ -916,6 +925,39 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       );
 
     setLoadingMediaModels(true);
+
+    if (request.scope === 'decision') {
+      // Every discovered provider's models on the output.decision route, as `provider/model` handles
+      // (the Decision node's `model` pin is one handle; AbstractCore splits it).
+      if (!providerDiscoveryEndpoint || !providerModelsEndpoint) {
+        setDecisionModelOptions([]);
+        setLoadingMediaModels(false);
+        return;
+      }
+      gatewayJson<{ items?: ProviderInfo[] }>(gatewayPath(providerDiscoveryEndpoint), { timeoutMs: 10_000 })
+        .then((catalog) => {
+          const names = (Array.isArray(catalog?.items) ? catalog.items : [])
+            .map((item) => (item && typeof item.name === 'string' ? item.name.trim() : ''))
+            .filter(Boolean);
+          return Promise.all(
+            names.map((name) =>
+              gatewayJson<{ models?: unknown[]; items?: unknown[] }>(
+                gatewayPath(providerModelsEndpoint, { provider_name: name }, { capability_route: DECISION_OUTPUT_CAPABILITY_ROUTE }),
+                { timeoutMs: 15_000 }
+              )
+                .then((data) => {
+                  const models = Array.isArray(data?.models) ? data.models : Array.isArray(data?.items) ? data.items : [];
+                  return models.map((model) => modelId(model)).filter(Boolean).map((model) => `${name}/${model}`);
+                })
+                .catch(() => [] as string[])
+            )
+          );
+        })
+        .then((lists) => setDecisionModelOptions(uniq(lists.flat())))
+        .catch(() => setDecisionModelOptions([]))
+        .finally(() => setLoadingMediaModels(false));
+      return;
+    }
 
     if (request.scope === 'image') {
       if (!visionProviderModelsEndpoint) {
@@ -1683,6 +1725,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (scope === 'tts') return selectOptionsFromValues(ttsModelOptions);
     if (scope === 'stt') return selectOptionsFromValues(sttModelOptions);
     if (scope === 'music') return selectOptionsFromValues(musicModelOptions);
+    if (scope === 'decision') return selectOptionsFromValues(decisionModelOptions);
     return [];
   };
 
@@ -1704,6 +1747,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (scope === 'tts') return 'Search TTS models…';
     if (scope === 'stt') return 'Search STT models…';
     if (scope === 'music') return 'Search music models…';
+    if (scope === 'decision') return 'Search decision models…';
     return 'Search models…';
   };
 
@@ -1719,6 +1763,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (scope === 'tts') requestMediaCatalog('tts', { provider });
     if (scope === 'stt') requestMediaCatalog('stt', { provider });
     if (scope === 'music') requestMediaCatalog('music', { provider });
+    if (scope === 'decision') requestMediaCatalog('decision');
   };
 
   const providerDefaultForModelPin = (pin: Pin, pins: Pin[]) => {
@@ -2200,6 +2245,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           This keeps the right panel consistent with inline pin editors on nodes. */}
       {(() => {
         const skipIds = new Set(['provider', 'model', 'tools', 'thinking', 'speculation']); // shown in dedicated sections (agent/llm_call) for better UX
+        if (data.nodeType === 'decide') skipIds.add('question_type'); // the Decision section owns it (it rewrites the outputs)
         const inputPins = data.inputs.filter((p) => p.type !== 'execution' && !skipIds.has(p.id));
         const mediaNode = MEDIA_NODE_TYPES.has(data.nodeType);
 
@@ -3240,6 +3286,134 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
+      {/* Decision node properties: the question type rewrites the typed output pins (like Switch cases). */}
+      {data.nodeType === 'decide' && (
+        <div className="property-section">
+          <label className="property-label">Decision</label>
+          {(() => {
+            const defaults = (data.pinDefaults || {}) as Record<string, unknown>;
+            const questionType = normalizeDecisionQuestionType(defaults.question_type);
+            const listPinId = questionType === 'score' ? 'levels' : 'options';
+            const listRaw = defaults[listPinId];
+            // Rows as typed (a blank row stays while it is edited); the pins use the clean names.
+            const rows: string[] = Array.isArray(listRaw)
+              ? listRaw.map((item) => (typeof item === 'string' ? item : ''))
+              : listRaw && typeof listRaw === 'object'
+                ? Object.keys(listRaw as Record<string, unknown>)
+                : [];
+            const commit = (patch: Record<string, unknown>) => {
+              const nextDefaults = { ...defaults };
+              for (const [key, value] of Object.entries(patch)) {
+                if (value === undefined) delete nextDefaults[key];
+                else nextDefaults[key] = value;
+              }
+              const pinDefaults = nextDefaults as FlowNodeData['pinDefaults'];
+              updateNodeData(node.id, { pinDefaults, outputs: decisionOutputPinsForData({ pinDefaults }) });
+            };
+            const setRows = (next: string[]) =>
+              commit({ [listPinId]: listPinId === 'options' ? mergeDecisionOptionRows(listRaw, next) : next.length > 0 ? next : undefined });
+            const modelValue = typeof defaults.model === 'string' ? defaults.model : '';
+            const catalog = modelOptionsForScope('decision', '');
+            const modelOptions =
+              modelValue && !catalog.some((option) => option.value === modelValue)
+                ? [{ value: modelValue, label: modelValue }, ...catalog]
+                : catalog;
+            const outputsHint =
+              questionType === 'noul'
+                ? 'Outputs: noul (P(true)), verdict (noul ≥ 0.5), answer.'
+                : questionType === 'score'
+                  ? 'Outputs: score, level, confidence, probabilities, answer.'
+                  : 'Outputs: choice, confidence, probabilities, answer.';
+            return (
+              <>
+                <div className="property-group">
+                  <label className="property-sublabel">Question type</label>
+                  {isInputPinConnected('question_type') ? (
+                    <span className="property-hint">Provided by connected pin.</span>
+                  ) : (
+                    <select
+                      className="property-select"
+                      value={questionType}
+                      onChange={(e) => commit({ question_type: normalizeDecisionQuestionType(e.target.value) })}
+                    >
+                      {DECISION_QUESTION_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {DECISION_QUESTION_TYPE_LABELS[type]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <span className="property-hint">{outputsHint}</span>
+                </div>
+
+                {questionType !== 'noul' && (
+                  <div className="property-group">
+                    <label className="property-sublabel">{questionType === 'score' ? 'Levels (lowest first)' : 'Options'}</label>
+                    {isInputPinConnected(listPinId) ? (
+                      <span className="property-hint">Provided by connected pin.</span>
+                    ) : (
+                      <div className="array-editor">
+                        {rows.map((value, index) => (
+                          <div key={index} className="array-item">
+                            <input
+                              className="array-item-input"
+                              value={value}
+                              onChange={(e) => setRows(rows.map((row, i) => (i === index ? e.target.value : row)))}
+                              placeholder={questionType === 'score' ? 'level label' : 'option name'}
+                            />
+                            <button
+                              type="button"
+                              className="array-item-remove"
+                              title={questionType === 'score' ? 'Remove level' : 'Remove option'}
+                              onClick={() => setRows(rows.filter((_, i) => i !== index))}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        <button type="button" className="array-add-button" onClick={() => setRows([...rows, ''])}>
+                          {questionType === 'score' ? '+ Add level' : '+ Add option'}
+                        </button>
+                      </div>
+                    )}
+                    <span className="property-hint">
+                      {questionType === 'score'
+                        ? 'At least two ordered levels; level is the label nearest the score.'
+                        : 'At least one option; choice is one of these names (a Switch can sync its cases from them).'}
+                    </span>
+                  </div>
+                )}
+
+                <div className="property-group">
+                  <label className="property-sublabel">Model</label>
+                  {isInputPinConnected('model') ? (
+                    <span className="property-hint">Provided by connected pin.</span>
+                  ) : (
+                    <AfSelect
+                      value={modelValue}
+                      options={modelOptions}
+                      placeholder="Gateway decision default"
+                      loading={catalogLoadingForScope('decision', catalog)}
+                      searchable
+                      searchPlaceholder={modelSearchPlaceholderForScope('decision')}
+                      clearable
+                      allowCustom
+                      validateCustomValue={(value) => (value.includes('/') ? null : 'Type a provider/model handle, for example typesafe/jev-latest.')}
+                      onOpen={() => requestModelOptionsForScope('decision', '')}
+                      onChange={(v) => setPinDefault('model', v || undefined)}
+                    />
+                  )}
+                  <span className="property-hint">
+                    A provider/model handle on the <code>output.decision</code> route (mlx/jaredpalmer/kev-4b, typesafe/jev-latest).
+                    Empty: the Gateway default.
+                  </span>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Switch node properties */}
       {data.nodeType === 'switch' && (
         <div className="property-section">
@@ -3275,6 +3449,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   if (handle === 'data' || handle === 'response') return structuredResponseSchemaFromGraph(source, nodes, edges);
                   return undefined;
                 }
+                // Decision: every typed output carries its own schema (answer, choice enum, level enum).
+                if (source.data.nodeType === 'decide') {
+                  return source.data.outputs.find((p) => p.id === handle)?.schema;
+                }
                 return undefined;
               };
 
@@ -3289,7 +3467,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 const valueEdge = edges.find((e) => e.target === node.id && e.targetHandle === 'value');
                 if (!valueEdge) return [];
                 const valueSource = nodes.find((n) => n.id === valueEdge.source);
-                if (!valueSource || valueSource.data.nodeType !== 'break_object') return [];
+                if (!valueSource) return [];
+                // A Decision's choice / level pin wired straight in: its enum is the option / level names.
+                if (valueSource.data.nodeType === 'decide') {
+                  const pin = valueSource.data.outputs.find((p) => p.id === valueEdge.sourceHandle);
+                  return normalizeEnumValues(pin?.schema?.enum);
+                }
+                if (valueSource.data.nodeType !== 'break_object') return [];
 
                 const fieldPath = typeof valueEdge.sourceHandle === 'string' ? valueEdge.sourceHandle : '';
                 if (!fieldPath) return [];

@@ -43,6 +43,7 @@ export const NODE_ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   agent: 'agent',
   subflow: 'board',
   llm_call: 'sparkle',
+  decide: 'check', // one typed verdict
   model_residency: 'server',
   tool_calls: 'terminal',
   call_tool: 'terminal',

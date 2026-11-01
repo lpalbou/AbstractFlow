@@ -491,6 +491,19 @@ Outputs: `response` text, structured `data` (when schema active),
 `tool_calls`, `meta`, `success`. Tools exposed to `llm_call` produce tool-call
 requests; a separate `tool_calls` node executes them.
 
+`decide` — ONE typed question about ONE text, answered in a single pass by a
+decision model (needs the Gateway `decision` capability). Inputs: `state` (the
+text), `question`, `question_type` (`choice` | `noul` | `score`), `options`
+(choice: option names, at least one), `levels` (score: ordered labels, lowest
+first, at least two), `model` (a `provider/model` handle; empty = the Gateway
+default). Outputs follow the type: choice → `choice`, `confidence`,
+`probabilities`; noul → `noul` (P(true)), `verdict`; score → `score`, `level`,
+`confidence`, `probabilities`; always `answer` (the whole typed answer, an
+object) and `success`. Prefer it over an `llm_call` with a `resp_schema` when
+the step is a classification, a yes/no gate or a rating: wire `choice` or
+`level` straight into a Switch (its cases are the option / level names), or
+`verdict` into an If.
+
 `agent` — autonomous multi-step work with tools and iterative reasoning (deep
 research, planning, multi-source synthesis):
 

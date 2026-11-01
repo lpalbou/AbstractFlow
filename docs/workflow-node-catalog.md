@@ -331,6 +331,22 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
   "functionName": "transform"
 }
 
+### core / Decision
+
+- Node type: `decide`
+- Document node: `{"id":"<unique_id>","type":"decide"}`
+- Utility: One question about one text, answered in a single pass by a decision model: a choice among options, a yes/no probability (noul), or a score on ordered levels. The typed output pins follow the question type.
+- Gateway capability: decision
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `state` string: The document / text the question is about.; `question` string: The instructions ("Which team should handle this?").; `question_type` string: choice | noul (yes/no probability) | score. Default: choice. Changing it rewrites the typed output pins.; `options` array: Choice only: the option names ["returns", "shipping"] or a {name: description} object. At least one.; `levels` array: Score only: the ordered level labels, lowest first ["Calm", "Frustrated", "Very angry"]. At least two.; `model` string: Optional provider/model handle (mlx/jaredpalmer/kev-4b, huggingface/ggml-org/Kev-4B-GGUF:Q4_K_M, typesafe/jev-latest). Empty: the Gateway output.decision default.; `truncate` boolean: Read only the first 65,536 tokens of an over-long state instead of failing.; `questions` object: Advanced: several named questions {name: {type, instructions, criteria}}. When wired or non-empty it REPLACES the single question; every answer lands in `answers`.
+- Outputs: `exec-out` execution; `choice` string: The chosen option name.; `confidence` number: Confidence in the choice (0..1).; `probabilities` object: Probability per option, keyed by option name.; `answer` object: The whole typed answer as one object (type, the typed fields, probabilities). Break Object splits it.; `model` string: The provider/model that answered.; `success` boolean: True when an answer exists.; `answers` object: Advanced form: every answer keyed by question name (the single form keys its one answer "answer").; `meta` object: Execution metadata (schema, modality, provider/model, token usage).
+- Default config: {
+  "pinDefaults": {
+    "question_type": "choice"
+  }
+}
+
 ### core / LLM Call
 
 - Node type: `llm_call`

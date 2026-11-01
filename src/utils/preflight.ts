@@ -9,6 +9,7 @@ import { gatewayAuthoringCapabilityStatus } from './gatewayClient';
 import { interfaceBoundaryPins, interfacePinTypeMatches, missingInterfacePins } from './flowFamilies';
 import { getArtifactConnectionError, getConfiguredArtifactInputError } from './mediaArtifacts';
 import { gatewayCapabilityForNodeType } from './nodeCapabilities';
+import { decisionLevels, decisionOptionNames, normalizeDecisionQuestionType } from './decisionPins';
 import { loopEndsRunIssues, loopEndsRunMessage } from './loopEndsRun';
 
 export type RunPreflightIssue = {
@@ -703,6 +704,25 @@ export function computeRunPreflightIssues(
 
     if (t === 'transcribe_audio') {
       if (!artifactInputPresent(edges, n, 'audio_artifact')) push(n, 'Missing required input: audio_artifact');
+    }
+
+    if (t === 'decide') {
+      if (!stringInputPresent(edges, n, 'state')) push(n, 'Missing required input: state');
+      // The advanced `questions` object replaces the single question (and its options / levels).
+      const questionsPresent =
+        inputConnected(edges, n.id, 'questions') || pinExpressionPresent(n, 'questions') || isNonEmptyObject(configValue(n, 'questions'));
+      if (!questionsPresent) {
+        if (!stringInputPresent(edges, n, 'question')) push(n, 'Missing required input: question');
+        const questionType = normalizeDecisionQuestionType(configValue(n, 'question_type'));
+        const listPresent = (handle: string, min: number, names: (value: unknown) => string[]) =>
+          inputConnected(edges, n.id, handle) || pinExpressionPresent(n, handle) || names(configValue(n, handle)).length >= min;
+        if (questionType === 'choice' && !listPresent('options', 1, decisionOptionNames)) {
+          push(n, 'Missing required input: options (a choice needs at least one option)');
+        }
+        if (questionType === 'score' && !listPresent('levels', 2, decisionLevels)) {
+          push(n, 'Missing required input: levels (a score needs at least two ordered levels)');
+        }
+      }
     }
   }
 

@@ -153,6 +153,30 @@ const HELP: Record<string, Written> = {
     details: ['The condition is read when the If runs: a value computed before it (a list filled by a loop) is the current one.'],
     pins: { condition: 'True or false (a Compare, an Is Empty, a boolean field).' },
   },
+  decide: {
+    purpose: 'Asks one question about one text and answers it in a single pass with a decision model: a choice among options, a yes/no probability, or a score on ordered levels.',
+    details: [
+      'The question type decides the typed outputs: choice → choice, confidence, probabilities; yes/no → noul (P(true)) and verdict (noul ≥ 0.5); score → score, level, confidence, probabilities. Changing the type rewrites the output pins.',
+      'answer carries the whole typed answer as one object; Break Object splits it, and a Switch can sync its cases from the option names.',
+      'A choice needs at least one option, a score at least two levels (lowest first). The advanced questions object replaces the single question with several named ones (answers holds them all).',
+      'Needs a Gateway that advertises the decision capability (AbstractRuntime 0.16.0 / AbstractCore 2.32.0).',
+    ],
+    pins: {
+      state: 'The document or text the question is about.',
+      question: 'The instructions: "Which team should handle this?"',
+      question_type: 'choice, noul (yes/no) or score. Not set: choice.',
+      options: 'The option names for a choice: ["returns", "shipping"] or {name: description}. Ignored for other types.',
+      levels: 'The ordered level labels for a score, lowest first: ["Calm", "Frustrated", "Very angry"].',
+      truncate: 'Read only the first 65,536 tokens of an over-long state instead of failing.',
+      questions: 'Advanced: several named questions {name: {type, instructions, criteria}}; replaces the single question.',
+      answer: 'The whole typed answer as one object.',
+      answers: 'Every answer keyed by question name.',
+    },
+    examples: [
+      'Support triage: state = the email body, question "Which team should handle this?", options ["returns", "shipping", "billing"] → choice → Switch (Sync cases from enum).',
+      'Mood: question_type score, levels ["Calm", "Frustrated", "Very angry"] → level → If (Compare level == "Very angry").',
+    ],
+  },
 };
 
 const TYPE_WORDS: Partial<Record<PinType, string>> = {

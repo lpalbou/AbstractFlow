@@ -9,6 +9,7 @@ import { inferEntryNode, isRouteOverrideEdge, withMultiEntryRouteData } from './
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from './visualFlowCompat';
 import { withoutInertNotifyPin } from './triggerPins';
 import { withIsEmptyAnyInput } from './isEmptyNode';
+import { withDecisionOutputs } from './decisionPins';
 
 /**
  * Convert React Flow nodes/edges to VisualFlow format for API.
@@ -194,6 +195,9 @@ export function fromVisualFlow(flow: VisualFlow): {
         (data as any).inputs = nextInputs;
       }
     }
+
+    // Decision node: the typed outputs follow question_type / options / levels, never a stale save.
+    data = withDecisionOutputs(data);
 
     return {
       id: vn.id,

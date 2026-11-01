@@ -48,8 +48,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install the runtime
-        # 0.7.0 carries the session history window entity_life_smoke proves.
-        run: python -m pip install "abstractruntime>=0.7.0"
+        # 0.16.0 carries the `decide` node decision_workflow_smoke proves (0.7.0: the session
+        # history window entity_life_smoke proves).
+        run: python -m pip install "abstractruntime>=0.16.0"
       - name: Run the smokes
         env:
           HOME: ${{ runner.temp }}/smoke-home
@@ -57,7 +58,7 @@ jobs:
           mkdir -p "$HOME"
           for smoke in entity_life_smoke entity_life_loop_smoke multiagent_coding_smoke \
                        coding_agent_v2_gates_smoke goal_agent_smoke react_coder_smoke \
-                       ralph_coder_smoke coscientist_smoke; do
+                       ralph_coder_smoke coscientist_smoke decision_workflow_smoke; do
             echo "::group::$smoke"
             python "scripts/$smoke.py"
             echo "::endgroup::"

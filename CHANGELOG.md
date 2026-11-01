@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Decision** node (`decide`), a first-level node in the palette's Essentials next to Agent and LLM Call: one
+  question about one text, answered in a single pass by a decision model (Kev / Lev / Laya locally, Jev through
+  `typesafe`). The Properties panel's question type (`choice` | `noul` | `score`), options and levels rewrite the
+  typed output pins (`choice`/`confidence`/`probabilities`, `noul`/`verdict`, `score`/`level`/`confidence`/
+  `probabilities`) plus `answer`, `model`, `success`; the pins carry JSON Schemas (option/level enums, probability
+  keys) so Break Object splits `answer` and Switch syncs its cases from `choice` or `level`. The `model` pin is one
+  `provider/model` handle picked from every provider's `output.decision` catalog; run checks require `state`,
+  `question`, options for a choice and two levels for a score; the node runs only where the Gateway advertises the
+  `decision` contract (`src/utils/decisionPins.ts`). Needs AbstractRuntime 0.16.0.
+
 ### Changed
 - The top bar's account is the kit's ONE account widget (operator ruling 2026-10-29: the docs button, Appearance,
   About and the account are the same kit components in every app). Signed in, one button shows the person icon,

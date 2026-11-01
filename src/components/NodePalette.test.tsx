@@ -61,7 +61,7 @@ describe('palette sections', () => {
     const sections = buildPaletteSections();
     expect(sections[0].key).toBe(ESSENTIALS_KEY);
     expect(sections[0].nodes.map((n) => n.type)).toEqual([
-      'on_flow_start', 'on_flow_end', 'agent', 'llm_call', 'code', 'if', 'for', 'string_template',
+      'on_flow_start', 'on_flow_end', 'agent', 'llm_call', 'decide', 'code', 'if', 'for', 'string_template',
     ]);
     const listed = sections.slice(1).flatMap((s) => s.nodes);
     expect(listed.length).toBe(paletteNodes.length);
@@ -256,19 +256,19 @@ describe('NodePalette render', () => {
       expect(html).toContain(`data-category="${s.key}"`);
     }
     const nodes = html.match(/data-palette-item="node"/g) || [];
-    expect(nodes.length).toBe(8); // only Essentials is open by default
+    expect(nodes.length).toBe(9); // only Essentials is open by default
   });
 
   it('section headers are buttons with aria-expanded and a count', () => {
     expect(html).toMatch(/data-category="essentials"[^>]*>|aria-expanded="true"[^>]*data-category="essentials"/);
     expect(html).toMatch(/<button[^>]*aria-expanded="true"[^>]*data-category="essentials"/);
     expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*data-category="core"/);
-    expect(html).toContain('aria-label="8 nodes"');
+    expect(html).toContain('aria-label="9 nodes"');
   });
 
   it('every node row has a kit svg icon, its full name, and a kit tooltip; no emoji anywhere', () => {
     const rows = html.split('data-palette-item="node"').slice(1);
-    expect(rows.length).toBe(8);
+    expect(rows.length).toBe(9);
     for (const row of rows) {
       const body = row.slice(0, row.indexOf('</div>'));
       expect(body).toMatch(/<svg[^>]*class="palette-node-icon"/);

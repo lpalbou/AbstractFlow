@@ -1651,7 +1651,7 @@ export const BaseNode = memo(function BaseNode({
     for (const pin of inputData) {
       if (connectedInputPinIds.has(pin.id)) continue;
       const scope = providerCatalogScopeForPin(pin, data.nodeType);
-      if (scope && scope !== 'text') scopes.add(scope);
+      if (scope && scope !== 'text' && scope !== 'decision') scopes.add(scope);
     }
     return Array.from(scopes).sort();
   }, [connectedInputPinIds, data.nodeType, inputData]);
@@ -2074,6 +2074,7 @@ export const BaseNode = memo(function BaseNode({
   const providerCatalogLoading = useCallback(
     (scope: PinCatalogScope) => {
       if (scope === 'text') return providersQuery.isLoading;
+      if (scope === 'decision') return false; // picked in the Properties panel, never inline
       return mediaCapabilitiesQuery.isLoading || mediaCatalogLoading(scope, 'providers');
     },
     [mediaCapabilitiesQuery.isLoading, mediaCatalogLoading, providersQuery.isLoading]
@@ -2082,6 +2083,7 @@ export const BaseNode = memo(function BaseNode({
   const modelCatalogLoading = useCallback(
     (scope: PinCatalogScope) => {
       if (scope === 'text') return modelsQuery.isLoading;
+      if (scope === 'decision') return false; // picked in the Properties panel, never inline
       return mediaCapabilitiesQuery.isLoading || mediaCatalogLoading(scope, 'models');
     },
     [mediaCapabilitiesQuery.isLoading, mediaCatalogLoading, modelsQuery.isLoading]
@@ -5512,7 +5514,9 @@ export const BaseNode = memo(function BaseNode({
                 }
 
                 const catalogModelScope = modelCatalogScopeForPin(pin, inputData, data.nodeType);
-                if (!connected && catalogModelScope && !hasSpecialControl) {
+                // A Decision's `model` is one provider/model handle with no provider pin: a plain text on the
+                // card; the catalog picker lives in the Properties panel.
+                if (!connected && catalogModelScope && catalogModelScope !== 'decision' && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];
                   const current = typeof raw === 'string' ? raw.trim() : '';
                   const providerPinId = providerPinIdForModelPin(pin, inputData, data.nodeType);

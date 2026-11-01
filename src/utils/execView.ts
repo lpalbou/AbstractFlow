@@ -40,7 +40,7 @@ export const EXEC_FAMILY_LABELS: Record<ExecNodeFamily, string> = {
 
 const CONTROL_TYPES = new Set(['if', 'switch', 'sequence', 'parallel', 'loop', 'loop_limit', 'while', 'for']);
 const INTERACTION_TYPES = new Set(['ask_user', 'answer_user', 'listen_voice']);
-const GENERATIVE_TYPES = new Set(['llm_call', 'agent']);
+const GENERATIVE_TYPES = new Set(['llm_call', 'agent', 'decide']);
 const MEDIA_TYPES = new Set([
   'generate_image',
   'edit_image',

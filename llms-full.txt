@@ -1251,6 +1251,27 @@ Switch node. `response` remains available as text for display and compatibility.
 The Switch panel can sync explicit cases from the discovered enum values, so the
 published workflow contains stable `switchConfig.cases`.
 
+## Decision Node
+
+**Decision** (`decide`, in Essentials next to Agent and LLM Call) asks one question about one
+text and answers it in a single pass with a decision model (Kev / Lev / Laya locally, Jev through
+`typesafe`). It needs a Gateway that advertises the `decision` capability (AbstractRuntime 0.16.0).
+
+- Inputs: `state` (the text), `question`, `question_type`, `options` (choice), `levels` (score),
+  `model` (one `provider/model` handle such as `mlx/jaredpalmer/kev-4b`, empty = the Gateway
+  `output.decision` default), `truncate`, and the advanced `questions` object (several named
+  questions; it replaces the single question).
+- The Properties panel's **Question type** select rewrites the typed output pins, like Switch
+  cases: `choice` gives `choice`, `confidence`, `probabilities`; `noul` (yes/no) gives `noul`
+  (P(true)) and `verdict` (noul ≥ 0.5); `score` gives `score`, `level`, `confidence`,
+  `probabilities`. Every type also has `answer` (the whole typed answer), `model`, `success`, and
+  the advanced `answers` and `meta`.
+- The option names and level labels are edited as lists in the panel; they become the `enum` of
+  `choice` / `level` and the keys of `probabilities`, so **Break Object** splits `answer` by
+  name and a **Switch** wired from `choice` or `level` offers **Sync cases from enum**.
+- Run checks require `state`, `question`, at least one option for a choice and at least two
+  ordered levels (lowest first) for a score, unless the advanced `questions` object is used.
+
 ## Media Nodes
 
 Flow exposes media nodes only when Gateway advertises the corresponding capability:
@@ -1855,6 +1876,19 @@ summarization, routing, synthesis. Inputs: `system`, `prompt`, `context`,
 Outputs: `response` text, structured `data` (when schema active),
 `tool_calls`, `meta`, `success`. Tools exposed to `llm_call` produce tool-call
 requests; a separate `tool_calls` node executes them.
+
+`decide` — ONE typed question about ONE text, answered in a single pass by a
+decision model (needs the Gateway `decision` capability). Inputs: `state` (the
+text), `question`, `question_type` (`choice` | `noul` | `score`), `options`
+(choice: option names, at least one), `levels` (score: ordered labels, lowest
+first, at least two), `model` (a `provider/model` handle; empty = the Gateway
+default). Outputs follow the type: choice → `choice`, `confidence`,
+`probabilities`; noul → `noul` (P(true)), `verdict`; score → `score`, `level`,
+`confidence`, `probabilities`; always `answer` (the whole typed answer, an
+object) and `success`. Prefer it over an `llm_call` with a `resp_schema` when
+the step is a classification, a yes/no gate or a rating: wire `choice` or
+`level` straight into a Switch (its cases are the option / level names), or
+`verdict` into an If.
 
 `agent` — autonomous multi-step work with tools and iterative reasoning (deep
 research, planning, multi-source synthesis):
@@ -2671,6 +2705,22 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
   },
   "codeBody": "# Available variables:\n# _input (dict)\n# input (any)\n\nreturn _input",
   "functionName": "transform"
+}
+
+### core / Decision
+
+- Node type: `decide`
+- Document node: `{"id":"<unique_id>","type":"decide"}`
+- Utility: One question about one text, answered in a single pass by a decision model: a choice among options, a yes/no probability (noul), or a score on ordered levels. The typed output pins follow the question type.
+- Gateway capability: decision
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `state` string: The document / text the question is about.; `question` string: The instructions ("Which team should handle this?").; `question_type` string: choice | noul (yes/no probability) | score. Default: choice. Changing it rewrites the typed output pins.; `options` array: Choice only: the option names ["returns", "shipping"] or a {name: description} object. At least one.; `levels` array: Score only: the ordered level labels, lowest first ["Calm", "Frustrated", "Very angry"]. At least two.; `model` string: Optional provider/model handle (mlx/jaredpalmer/kev-4b, huggingface/ggml-org/Kev-4B-GGUF:Q4_K_M, typesafe/jev-latest). Empty: the Gateway output.decision default.; `truncate` boolean: Read only the first 65,536 tokens of an over-long state instead of failing.; `questions` object: Advanced: several named questions {name: {type, instructions, criteria}}. When wired or non-empty it REPLACES the single question; every answer lands in `answers`.
+- Outputs: `exec-out` execution; `choice` string: The chosen option name.; `confidence` number: Confidence in the choice (0..1).; `probabilities` object: Probability per option, keyed by option name.; `answer` object: The whole typed answer as one object (type, the typed fields, probabilities). Break Object splits it.; `model` string: The provider/model that answered.; `success` boolean: True when an answer exists.; `answers` object: Advanced form: every answer keyed by question name (the single form keys its one answer "answer").; `meta` object: Execution metadata (schema, modality, provider/model, token usage).
+- Default config: {
+  "pinDefaults": {
+    "question_type": "choice"
+  }
 }
 
 ### core / LLM Call
@@ -6497,7 +6547,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Decision** node (`decide`), a first-level node in the palette's Essentials next to Agent and LLM Call: one
+  question about one text, answered in a single pass by a decision model (Kev / Lev / Laya locally, Jev through
+  `typesafe`). The Properties panel's question type (`choice` | `noul` | `score`), options and levels rewrite the
+  typed output pins (`choice`/`confidence`/`probabilities`, `noul`/`verdict`, `score`/`level`/`confidence`/
+  `probabilities`) plus `answer`, `model`, `success`; the pins carry JSON Schemas (option/level enums, probability
+  keys) so Break Object splits `answer` and Switch syncs its cases from `choice` or `level`. The `model` pin is one
+  `provider/model` handle picked from every provider's `output.decision` catalog; run checks require `state`,
+  `question`, options for a choice and two levels for a score; the node runs only where the Gateway advertises the
+  `decision` contract (`src/utils/decisionPins.ts`). Needs AbstractRuntime 0.16.0.
+
 ### Changed
+- Every chat box uses the shared rounded multiline composer from `@abstractframework/panel-chat` 0.7.0:
+  the authoring assistant and Follow Up (Ctrl/Cmd+Enter sends, since each starts a run), the code
+  assistant and the run window's waiting input and Continue (Enter sends, Shift+Enter adds a line);
+  attachments through the + button or drag and drop. The dependency moves from panel-chat 0.5 to
+  0.7, which also brings the 0.6 docs assistant wording and read-aloud behaviour; requires
+  `@abstractframework/ui-kit` ^0.9.8.
 - The top bar's account is the kit's ONE account widget (operator ruling 2026-10-29: the docs button, Appearance,
   About and the account are the same kit components in every app). Signed in, one button shows the person icon,
   your name and the connection light; its menu holds Signed in as, Gateway, Copy user id and Disconnect. It replaces

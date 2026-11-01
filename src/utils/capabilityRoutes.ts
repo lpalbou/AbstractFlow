@@ -1,4 +1,6 @@
 export const TEXT_OUTPUT_CAPABILITY_ROUTE = 'output.text';
+/** The decision modality route (the Decision node's `model` catalog, the Gateway `/decisions` endpoint). */
+export const DECISION_OUTPUT_CAPABILITY_ROUTE = 'output.decision';
 
 export interface CapabilityRouteOption {
   value: string;

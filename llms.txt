@@ -23,6 +23,7 @@ Key behavior:
 - The About dialog is the shared ui-kit compact card: the AbstractFlow version, the AbstractFramework and AbstractGateway versions from `GET /api/gateway/about`, links and the licence line (no package list). Audio artifacts play in the ui-kit waveform player (`AfAudioPlayer`); see docs/architecture.md "Audio Previews".
 - Unconnected LLM Call and Agent `resp_schema` pins can be edited inline; schema-active nodes expose structured output on `data` while `response` stays textual.
 - Agent and LLM Call nodes expose an MTP depth setting and a `speculation` pin. Precedence: connected pin, node setting, host default (no run-level override).
+- **Decision** (`decide`, Essentials): one typed question about one text answered in one pass by a decision model; the question type (`choice` | `noul` | `score`), options and levels rewrite the typed output pins and their schemas (Break Object splits `answer`, Switch syncs cases from `choice`/`level`); `model` is one `provider/model` handle from the `output.decision` catalog; needs the Gateway `decision` capability (AbstractRuntime 0.16.0) (src/utils/decisionPins.ts).
 
 ## Core Docs
 

@@ -2,6 +2,7 @@ import type { FlowNodeData, NodeType, Pin } from '../types/flow';
 import { createNodeData, getNodeTemplate } from '../types/nodes';
 import { hasStructuredResponseSchema, isStructuredResponseDataPin } from './structuredOutputs';
 import { modelNameLooksThinkingCapable } from './thinkingControls';
+import { normalizeDecisionQuestionType } from './decisionPins';
 
 export type PinDisclosureDirection = 'input' | 'output';
 
@@ -110,6 +111,10 @@ const DEFAULT_PIN_VALUES_BY_NODE_TYPE: Record<string, PinValueMap> = {
   },
   llm_call: {
     use_context: false,
+  },
+  decide: {
+    question_type: 'choice',
+    truncate: false,
   },
   subflow: {
     inherit_context: false,
@@ -353,6 +358,16 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     advancedOutputs: ['data'],
     advancedInputs: LLM_AGENT_ADVANCED_INPUTS.filter((pin) => pin !== 'max_iterations'),
     diagnosticOutputs: ['success', 'meta', 'tool_calls', 'result', 'raw', 'gen_time', 'ttft_ms'],
+  },
+  decide: {
+    compactInputs: true,
+    compactOutputs: true,
+    // `options` / `levels` are primary for their own question type only (decidePinVisibility).
+    primaryInputs: ['state', 'question', 'question_type', 'model'],
+    advancedInputs: ['options', 'levels', 'truncate', 'questions'],
+    primaryOutputs: ['choice', 'confidence', 'probabilities', 'noul', 'verdict', 'score', 'level', 'answer', 'model', 'success'],
+    advancedOutputs: ['answers'],
+    diagnosticOutputs: ['meta'],
   },
   subflow: {
     compactInputs: true,
@@ -1084,6 +1099,25 @@ function decidePinVisibility<TPin extends PinLike>(args: {
 
   if (args.connectedIds.has(args.pin.id)) {
     return { pinId: args.pin.id, direction: args.direction, visible: true, className: 'unmanaged', reason: 'connected' };
+  }
+
+  // Decision: the option list belongs to a choice question, the level list to a score; the other
+  // one is a stray value for the current type and stays behind the disclosure even when set.
+  if (args.direction === 'input' && args.nodeType === 'decide' && (args.pin.id === 'options' || args.pin.id === 'levels')) {
+    const questionType = normalizeDecisionQuestionType(
+      currentConfiguredValues({ data: args.data, pinId: 'question_type', pinDefaults: args.pinDefaults, config: args.config })[0]
+    );
+    const forThisType = args.pin.id === (questionType === 'score' ? 'levels' : 'options') && questionType !== 'noul';
+    if (forThisType) {
+      return { pinId: args.pin.id, direction: args.direction, visible: true, className: 'primary', reason: 'primary' };
+    }
+    return {
+      pinId: args.pin.id,
+      direction: args.direction,
+      visible: args.expanded,
+      className: 'advanced',
+      reason: args.expanded ? 'expanded' : 'unsupported',
+    };
   }
 
   if (args.direction === 'output' && isStructuredResponseDataPin(args.pin, String(args.nodeType))) {

@@ -10,10 +10,13 @@ export type GatewayAuthoringCapability =
   | 'generated_music'
   | 'model_residency'
   | 'tools'
-  | 'kg_memory';
+  | 'kg_memory'
+  | 'decision';
 
 export const NODE_GATEWAY_CAPABILITIES: Partial<Record<NodeType, GatewayAuthoringCapability>> = {
   model_residency: 'model_residency',
+  // The decision modality: discovery `plugin_caps.decision` / contract `decision.workflow`.
+  decide: 'decision',
   generate_image: 'generated_image',
   edit_image: 'edited_image',
   image_to_image: 'edited_image',

@@ -208,6 +208,12 @@ export interface GatewayCommonContract {
     };
     config_hint?: string;
   };
+  /** The decision modality (`_decision_contract_descriptor`): the `decide` node and the per-run endpoint. */
+  decision?: {
+    workflow?: { available?: boolean; node?: string; effect?: string; output_modality?: string; config_hint?: string };
+    direct_endpoint?: GatewayEndpointDescriptor & { route_available?: boolean; capability_route?: string; config_hint?: string };
+    [key: string]: unknown;
+  };
   memory?: GatewayEndpointDescriptor & {
     route_available?: boolean;
     structured_query?: boolean;
@@ -421,6 +427,7 @@ export interface GatewayOptionalFeatureStatus {
   modelResidency: boolean;
   hostState: boolean;
   sessionCaches: boolean;
+  decision: boolean;
 }
 
 export interface GatewayFlowEditorReadiness {
@@ -468,6 +475,7 @@ const AUTHORING_CAPABILITY_LABELS: Record<GatewayAuthoringCapability, string> = 
   model_residency: 'Model Residency',
   tools: 'Tool execution',
   kg_memory: 'Knowledge graph memory',
+  decision: 'Decision',
 };
 
 const AUTHORING_CAPABILITY_OPTIONAL_KEYS: Record<GatewayAuthoringCapability, keyof GatewayOptionalFeatureStatus> = {
@@ -481,6 +489,7 @@ const AUTHORING_CAPABILITY_OPTIONAL_KEYS: Record<GatewayAuthoringCapability, key
   model_residency: 'modelResidency',
   tools: 'tools',
   kg_memory: 'kgMemory',
+  decision: 'decision',
 };
 
 export function gatewayAuthoringCapabilityStatus(
@@ -1070,6 +1079,8 @@ export function getGatewayFlowEditorReadiness(
       modelResidency: Boolean(modelResidencyRouteAvailable && gatewayModelResidencySurfaceAllows(surfaceReadiness)),
       hostState: hostStateAvailable,
       sessionCaches: sessionCachesAvailable,
+      // The `decide` node runs only where the Gateway advertises the decision contract's workflow door.
+      decision: common?.decision?.workflow?.available === true,
     },
   };
 }

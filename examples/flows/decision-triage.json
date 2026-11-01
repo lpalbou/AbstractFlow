@@ -1,0 +1,814 @@
+{
+  "id": "decision-triage",
+  "name": "Decision triage",
+  "description": "Three decisions about one support ticket: which team (choice), escalate or not (noul), how frustrated the customer is (score). Break Object splits the typed choice answer. `model` picks the decision model (empty = the host's output.decision default).",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -700,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Ticket",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "ticket",
+            "label": "ticket",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "truncate",
+            "label": "truncate",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "ticket": "Shoes arrived two weeks late and in the wrong size. Also I see two charges on my card. I have written twice already and nobody answers.",
+          "model": "",
+          "truncate": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "department",
+      "type": "decide",
+      "position": {
+        "x": -300,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "decide",
+        "label": "Department",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "question",
+            "label": "question",
+            "type": "string"
+          },
+          {
+            "id": "question_type",
+            "label": "question_type",
+            "type": "string"
+          },
+          {
+            "id": "options",
+            "label": "options",
+            "type": "array"
+          },
+          {
+            "id": "levels",
+            "label": "levels",
+            "type": "array"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "truncate",
+            "label": "truncate",
+            "type": "boolean"
+          },
+          {
+            "id": "questions",
+            "label": "questions",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "object",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "choice"
+                },
+                "choice": {
+                  "type": "string",
+                  "enum": [
+                    "returns",
+                    "shipping",
+                    "billing"
+                  ]
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "probabilities": {
+                  "type": "object",
+                  "properties": {
+                    "returns": {
+                      "type": "number"
+                    },
+                    "shipping": {
+                      "type": "number"
+                    },
+                    "billing": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "choice",
+            "label": "choice",
+            "type": "string",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "returns",
+                "shipping",
+                "billing"
+              ]
+            }
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
+          },
+          {
+            "id": "probabilities",
+            "label": "probabilities",
+            "type": "object",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "returns": {
+                  "type": "number"
+                },
+                "shipping": {
+                  "type": "number"
+                },
+                "billing": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "answers",
+            "label": "answers",
+            "type": "object"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "question": "Which team should handle this?",
+          "question_type": "choice",
+          "truncate": false,
+          "options": {
+            "returns": "Exchanges, refunds, wrong or damaged items",
+            "shipping": "Delivery status, delays, lost packages",
+            "billing": "Charges, invoices, payment problems"
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "escalate",
+      "type": "decide",
+      "position": {
+        "x": -300,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "decide",
+        "label": "Escalate",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "question",
+            "label": "question",
+            "type": "string"
+          },
+          {
+            "id": "question_type",
+            "label": "question_type",
+            "type": "string"
+          },
+          {
+            "id": "options",
+            "label": "options",
+            "type": "array"
+          },
+          {
+            "id": "levels",
+            "label": "levels",
+            "type": "array"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "truncate",
+            "label": "truncate",
+            "type": "boolean"
+          },
+          {
+            "id": "questions",
+            "label": "questions",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "object",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "noul"
+                },
+                "noul": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "id": "noul",
+            "label": "noul",
+            "type": "number"
+          },
+          {
+            "id": "verdict",
+            "label": "verdict",
+            "type": "boolean"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "answers",
+            "label": "answers",
+            "type": "object"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "question": "Does this need urgent human attention?",
+          "question_type": "noul",
+          "truncate": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "frustration",
+      "type": "decide",
+      "position": {
+        "x": -300,
+        "y": 320
+      },
+      "data": {
+        "nodeType": "decide",
+        "label": "Frustration",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "question",
+            "label": "question",
+            "type": "string"
+          },
+          {
+            "id": "question_type",
+            "label": "question_type",
+            "type": "string"
+          },
+          {
+            "id": "options",
+            "label": "options",
+            "type": "array"
+          },
+          {
+            "id": "levels",
+            "label": "levels",
+            "type": "array"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "truncate",
+            "label": "truncate",
+            "type": "boolean"
+          },
+          {
+            "id": "questions",
+            "label": "questions",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "object",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "score"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "legend": {
+                  "type": "object"
+                },
+                "probabilities": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "id": "score",
+            "label": "score",
+            "type": "number"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Calm",
+                "Frustrated",
+                "Very angry"
+              ]
+            }
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
+          },
+          {
+            "id": "probabilities",
+            "label": "probabilities",
+            "type": "object",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "0": {
+                  "type": "number"
+                },
+                "1": {
+                  "type": "number"
+                },
+                "2": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "answers",
+            "label": "answers",
+            "type": "object"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "question": "How frustrated is the customer?",
+          "question_type": "score",
+          "truncate": false,
+          "levels": [
+            "Calm",
+            "Frustrated",
+            "Very angry"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "split",
+      "type": "break_object",
+      "position": {
+        "x": 120,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "choice",
+            "label": "choice",
+            "type": "string",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "returns",
+                "shipping",
+                "billing"
+              ]
+            }
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "choice",
+            "confidence"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Triage",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "department",
+            "label": "department",
+            "type": "string"
+          },
+          {
+            "id": "department_confidence",
+            "label": "department_confidence",
+            "type": "number"
+          },
+          {
+            "id": "escalate",
+            "label": "escalate",
+            "type": "boolean"
+          },
+          {
+            "id": "escalate_probability",
+            "label": "escalate_probability",
+            "type": "number"
+          },
+          {
+            "id": "frustration",
+            "label": "frustration",
+            "type": "string"
+          },
+          {
+            "id": "frustration_score",
+            "label": "frustration_score",
+            "type": "number"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-department-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "department",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-department-exec-out-escalate-exec-in",
+      "source": "department",
+      "sourceHandle": "exec-out",
+      "target": "escalate",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-escalate-exec-out-frustration-exec-in",
+      "source": "escalate",
+      "sourceHandle": "exec-out",
+      "target": "frustration",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-frustration-exec-out-end-exec-in",
+      "source": "frustration",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-ticket-department-state",
+      "source": "start",
+      "sourceHandle": "ticket",
+      "target": "department",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-department-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "department",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-truncate-department-truncate",
+      "source": "start",
+      "sourceHandle": "truncate",
+      "target": "department",
+      "targetHandle": "truncate",
+      "animated": false
+    },
+    {
+      "id": "e-start-ticket-escalate-state",
+      "source": "start",
+      "sourceHandle": "ticket",
+      "target": "escalate",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-escalate-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "escalate",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-truncate-escalate-truncate",
+      "source": "start",
+      "sourceHandle": "truncate",
+      "target": "escalate",
+      "targetHandle": "truncate",
+      "animated": false
+    },
+    {
+      "id": "e-start-ticket-frustration-state",
+      "source": "start",
+      "sourceHandle": "ticket",
+      "target": "frustration",
+      "targetHandle": "state",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-frustration-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "frustration",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-truncate-frustration-truncate",
+      "source": "start",
+      "sourceHandle": "truncate",
+      "target": "frustration",
+      "targetHandle": "truncate",
+      "animated": false
+    },
+    {
+      "id": "e-department-answer-split-object",
+      "source": "department",
+      "sourceHandle": "answer",
+      "target": "split",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-split-choice-end-department",
+      "source": "split",
+      "sourceHandle": "choice",
+      "target": "end",
+      "targetHandle": "department",
+      "animated": false
+    },
+    {
+      "id": "e-split-confidence-end-department_confidence",
+      "source": "split",
+      "sourceHandle": "confidence",
+      "target": "end",
+      "targetHandle": "department_confidence",
+      "animated": false
+    },
+    {
+      "id": "e-escalate-verdict-end-escalate",
+      "source": "escalate",
+      "sourceHandle": "verdict",
+      "target": "end",
+      "targetHandle": "escalate",
+      "animated": false
+    },
+    {
+      "id": "e-escalate-noul-end-escalate_probability",
+      "source": "escalate",
+      "sourceHandle": "noul",
+      "target": "end",
+      "targetHandle": "escalate_probability",
+      "animated": false
+    },
+    {
+      "id": "e-frustration-level-end-frustration",
+      "source": "frustration",
+      "sourceHandle": "level",
+      "target": "end",
+      "targetHandle": "frustration",
+      "animated": false
+    },
+    {
+      "id": "e-frustration-score-end-frustration_score",
+      "source": "frustration",
+      "sourceHandle": "score",
+      "target": "end",
+      "targetHandle": "frustration_score",
+      "animated": false
+    },
+    {
+      "id": "e-department-model-end-model",
+      "source": "department",
+      "sourceHandle": "model",
+      "target": "end",
+      "targetHandle": "model",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-11-01T22:05:20.445719+00:00",
+  "updated_at": "2026-11-01T22:05:20.445719+00:00"
+}

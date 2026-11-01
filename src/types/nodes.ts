@@ -6,6 +6,7 @@ import type { NodeType, FlowNodeData, JsonValue, Pin } from './flow';
 import { generatePythonTransformCode, upsertPythonAvailableVariablesComments } from '../utils/codegen';
 import { NODE_GATEWAY_CAPABILITIES, type GatewayAuthoringCapability } from '../utils/nodeCapabilities';
 import { BREAK_EMAIL_LABEL, breakEmailInputPin, emailFieldPins, emailPin, emailsPin } from '../utils/emailType';
+import { decisionOutputPins } from '../utils/decisionPins';
 
 // Node template used in the palette
 export interface NodeTemplate {
@@ -456,6 +457,60 @@ const CORE_NODES: NodeTemplate[] = [
           'Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler.',
       },
     ],
+    category: 'core',
+  },
+  {
+    type: 'decide',
+    icon: '&#x2696;', // Balance scale
+    label: 'Decision',
+    description:
+      'One question about one text, answered in a single pass by a decision model: a choice among options, a yes/no probability (noul), or a score on ordered levels. The typed output pins follow the question type.',
+    headerColor: '#3498DB', // Blue - AI
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.decide,
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'state', label: 'state', type: 'string', description: 'The document / text the question is about.' },
+      { id: 'question', label: 'question', type: 'string', description: 'The instructions ("Which team should handle this?").' },
+      {
+        id: 'question_type',
+        label: 'question_type',
+        type: 'string',
+        description: 'choice | noul (yes/no probability) | score. Default: choice. Changing it rewrites the typed output pins.',
+      },
+      {
+        id: 'options',
+        label: 'options',
+        type: 'array',
+        description: 'Choice only: the option names ["returns", "shipping"] or a {name: description} object. At least one.',
+      },
+      {
+        id: 'levels',
+        label: 'levels',
+        type: 'array',
+        description: 'Score only: the ordered level labels, lowest first ["Calm", "Frustrated", "Very angry"]. At least two.',
+      },
+      {
+        id: 'model',
+        label: 'model',
+        type: 'string',
+        description:
+          'Optional provider/model handle (mlx/jaredpalmer/kev-4b, huggingface/ggml-org/Kev-4B-GGUF:Q4_K_M, typesafe/jev-latest). Empty: the Gateway output.decision default.',
+      },
+      {
+        id: 'truncate',
+        label: 'truncate',
+        type: 'boolean',
+        description: 'Read only the first 65,536 tokens of an over-long state instead of failing.',
+      },
+      {
+        id: 'questions',
+        label: 'questions',
+        type: 'object',
+        description:
+          'Advanced: several named questions {name: {type, instructions, criteria}}. When wired or non-empty it REPLACES the single question; every answer lands in `answers`.',
+      },
+    ],
+    outputs: decisionOutputPins('choice'),
     category: 'core',
   },
   {
@@ -3006,6 +3061,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     // decides — an explicit pin is authoritative design; 20 is only the seed
     // when the author has not chosen).
     ...(template.type === 'agent' && { pinDefaults: { max_iterations: 20 } }),
+    ...(template.type === 'decide' && { pinDefaults: { question_type: 'choice' } }),
     ...(template.type === 'loop_limit' && { pinDefaults: { max: 3 } }),
     ...(template.type === 'publish_event' && !(template.label in MAIL_PRESET_DEFAULTS) ? { pinDefaults: { channel: 'results', alert: false } } : {}),
     ...(MAIL_PRESET_DEFAULTS[template.label] ? { pinDefaults: { ...MAIL_PRESET_DEFAULTS[template.label] } } : {}),

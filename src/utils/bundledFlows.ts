@@ -23,6 +23,9 @@ const bundledFlowModules = import.meta.glob<VisualFlow>(
     '../../examples/flows/adversarial-review.json',
     '../../examples/flows/structured-extract.json',
     '../../examples/flows/map-reduce.json',
+    // Decision triage: the three Decision question types on one support ticket,
+    // Break Object on the typed choice answer (the decision capability's example flow).
+    '../../examples/flows/decision-triage.json',
     '../../examples/flows/co-scientist.json',
     // co-scientist's professional-figure subflow (2026-07-20): without it in
     // the catalog the family renders a dangling "diagram-render (missing)"

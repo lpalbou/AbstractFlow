@@ -201,6 +201,7 @@ export type NodeType =
   | 'ask_user'
   | 'answer_user'
   | 'llm_call'
+  | 'decide'
   | 'model_residency'
   | 'generate_image'
   | 'edit_image'

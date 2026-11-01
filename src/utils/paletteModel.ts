@@ -38,6 +38,7 @@ export const ESSENTIAL_NODE_TYPES: Parameters<typeof getNodeTemplate>[0][] = [
   'on_flow_end',
   'agent',
   'llm_call',
+  'decide',
   'code',
   'if',
   'for',
