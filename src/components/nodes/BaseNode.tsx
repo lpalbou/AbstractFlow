@@ -4425,13 +4425,15 @@ export const BaseNode = memo(function BaseNode({
                   const connected = isPinConnected(pin.id, true);
                   const controls: ReactNode[] = [];
 
-                // Is Empty's input takes a text or a list (`any`); unwired, it keeps its text field.
-                const isEmptyTextPin = data.nodeType === 'is_empty_string' && pin.id === 'text';
+                // An unwired `any` pin (Make Array's elements, Is Empty's input) keeps a text
+                // field: what you type is the value. The fx control beside it is the explicit
+                // way to write an expression, so a plain word is never read as a Python name.
+                const isAnyTextPin = pin.type === 'any';
                 const isPrimitive =
                   pin.type === 'string' ||
                   pin.type === 'number' ||
                   pin.type === 'boolean' ||
-                  isEmptyTextPin;
+                  isAnyTextPin;
                 const isEmitEventName = isEmitEventNode && pin.id === 'name';
                 const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
                 const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
@@ -5619,7 +5621,7 @@ export const BaseNode = memo(function BaseNode({
                         onChange={(v) => setPinDefault(pin.id, v || undefined)}
                       />
                     );
-                  } else if (pin.type === 'string' || isEmptyTextPin) {
+                  } else if (pin.type === 'string' || isAnyTextPin) {
                     controls.push(
                       <input
                         key="pin-default"
