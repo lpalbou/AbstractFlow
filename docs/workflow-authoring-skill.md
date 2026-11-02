@@ -116,7 +116,12 @@ Node fields:
   transcript", not "Variable"). Only On Flow Start / On Flow End may keep
   defaults.
 - `pin_defaults`: values for unconnected input pins. Merged per key — omitted
-  keys keep their current values; emit a key to change it.
+  keys keep their current values; emit a key to change it. Give each value
+  the JSON type of its pin: `5` on a `number` pin, and on a `[type T]` pin of
+  the catalog the type of what is wired to its peers (Compare `b` is `5`
+  when `a` is wired to a number, `"5"` when it is wired to text). The editor
+  converts exact text (`"5"` to `5`) and refuses a run on a value that is not
+  of its pin's type.
 - `pin_expressions`: sandboxed Python expressions computing input pins at
   resolution time: `{"condition": "vars.fix_cycles < 3"}`. An expression
   reads `vars.*` (run variables, read-only) and `value` (the pin's wire value

@@ -5,6 +5,8 @@ It is the stable AI-readable companion to `docs/workflow-authoring-skill.md`.
 
 Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edges": ["node.pin -> node.pin", ...]}`. Each document node uses `type` matching the value shown here; if several visible palette entries share a `type`, set `template` to the exact variant label shown in the document node snippet.
 
+A pin marked `[type T]` shares one type with the other `[type T]` pins of its node (Compare's `a` and `b`): the type comes from what is wired to them. A pin default on such a pin is stored with that type, so give a JSON number (`5`) where the peer carries a number and a JSON string (`"5"`) only where it carries text; with nothing wired, a typed value is text.
+
 ## Visible Authoring Templates
 
 ### artifacts / Artifact
@@ -129,7 +131,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `a` any; `op` string: The operator: ==, !=, >, >=, <, <= (not set: ==).; `b` any
+- Inputs: `a` any [type T]; `op` string: The operator: ==, !=, >, >=, <, <= (not set: ==).; `b` any [type T]
 - Outputs: `result` boolean
 - Default config: none
 
@@ -545,8 +547,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `a` any; `b` any
-- Outputs: `result` any
+- Inputs: `a` any [type T]; `b` any [type T]
+- Outputs: `result` any [type T]
 - Default config: none
 
 ### data / Concat
@@ -609,8 +611,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `array` array: Input array (list/tuple).; `index` number: 0-based index (negative allowed; -1 is last).; `default` any: Fallback value when index is invalid (default null).
-- Outputs: `result` any: Element value (or default when not found).; `found` boolean: True when index is valid for the given array.
+- Inputs: `array` array: Input array (list/tuple).; `index` number: 0-based index (negative allowed; -1 is last).; `default` any [type T]: Fallback value when index is invalid (default null).
+- Outputs: `result` any [type T]: Element value (or default when not found).; `found` boolean: True when index is valid for the given array.
 - Default config: none
 
 ### data / Get Random Element
@@ -621,8 +623,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `array` array: Input array (list/tuple).; `default` any: Fallback value when the array is empty (default null).
-- Outputs: `result` any: Random element (or default when not found).; `found` boolean: True when an element was selected.
+- Inputs: `array` array: Input array (list/tuple).; `default` any [type T]: Fallback value when the array is empty (default null).
+- Outputs: `result` any [type T]: Random element (or default when not found).; `found` boolean: True when an element was selected.
 - Default config: none
 
 ### data / Get Property
@@ -633,8 +635,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `object` object; `key` string; `default` any
-- Outputs: `value` any
+- Inputs: `object` object; `key` string; `default` any [type T]
+- Outputs: `value` any [type T]
 - Default config: none
 
 ### data / Has Tools
@@ -2206,8 +2208,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `name` string; `default` any: Value used when the path is missing.
-- Outputs: `value` any
+- Inputs: `name` string; `default` any [type T]: Value used when the path is missing.
+- Outputs: `value` any [type T]
 - Default config: none
 
 ### variables / Get Variables

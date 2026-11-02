@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- A value typed on an unwired input takes the input's type (root ADR 0049). A number input stores a number and a
+  true/false input a boolean; an input that shares its type with others of its node (Compare's `a` and `b`,
+  Coalesce, the `default` of Get Property, Get Element, Get Random Element and Get Variable, declared as a template
+  `typeVar`) takes the type wired to them, so `5` typed in Compare `b` next to a wired number is the number 5 and
+  `a == b` holds. With nothing wired, a typed value is text. A small tag beside the box says the type; a value that
+  is not of its input's type (including a whole number beyond 2^53, which cannot be stored exactly) is flagged
+  under its row and refused by the run checks; a rewire converts a value when the conversion is exact. A flow saved by 0.13.0 with such a value stored as text is converted when you open
+  it, with a notice, and keeps the stored text until you save it.
+
 ## [0.13.0] - 2026-11-02
 
 Needs AbstractRuntime 0.16.0 (the Decision node and the Ask User question policy) and `@abstractframework/ui-kit` ^0.9.12 with `@abstractframework/panel-chat` ^0.7.0.

@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { copyWithFeedback } from '../lib/copy_feedback';
 import { loadEdgeNotice, UNTITLED_FLOW_NAME, useFlowStore } from '../hooks/useFlow';
+import { retypedLiteralsNotice } from '../utils/pinLiterals';
 import { NEW_FLOW_EVENT, OPEN_FLOW_EVENT } from '../utils/flowStart';
 import { NewFlowDialog, type NewFlowValues } from './NewFlowDialog';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -541,6 +542,9 @@ export function Toolbar() {
   const showLoadNotices = useCallback(() => {
     const state = useFlowStore.getState();
     if (state.interfacePinsAddedOnLoad > 0) toast(INTERFACE_PINS_ADDED_NOTICE);
+    // Stored values converted to their inputs' types are said, never converted silently.
+    const retypedNotice = retypedLiteralsNotice(state.literalsRetypedOnLoad, state.nodes);
+    if (retypedNotice) toast(retypedNotice, { duration: 10000 });
     // Edges the canvas could not draw are never lost silently.
     const edgeNotice = loadEdgeNotice(state.loadEdgeReport);
     if (edgeNotice) {

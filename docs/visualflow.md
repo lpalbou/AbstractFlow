@@ -143,6 +143,11 @@ The Waits nodes, **Wait Until** (`on_schedule`) and **Wait for Event** (`on_even
 ## Authoring Rules
 
 - Nodes contain editor data and runtime-facing pin defaults.
+- A pin default is a JSON value stored with its type (`5`, `"5"`, `true`, `[]`), and the
+  runtime uses it exactly as stored. The editor stores what is typed on a card as the input's
+  type, or for an input with a type variable (`typeVar` on the node template, such as Compare's
+  `a` and `b`) as the type wired to its peers; see
+  [Web editor > Values typed on a card](web-editor.md#values-typed-on-a-card).
 - Execution edges connect `exec-out` to `exec-in`.
 - Data edges connect typed pins.
 - Provider/model pins should use Gateway-discovered provider ids and models.

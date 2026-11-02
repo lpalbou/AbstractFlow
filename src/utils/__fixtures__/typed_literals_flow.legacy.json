@@ -1,0 +1,219 @@
+{
+  "id": "typed-literals-legacy",
+  "name": "Typed literals (Flow 0.13.0 save)",
+  "description": "The same flow as Flow 0.13.0 saved it: the typed b values stored as text (\"5\", \"9\").",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -520,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "limit": 10
+        }
+      }
+    },
+    {
+      "id": "five",
+      "type": "literal_number",
+      "position": {
+        "x": -520,
+        "y": 180
+      },
+      "data": {
+        "nodeType": "literal_number",
+        "label": "Five",
+        "icon": "#",
+        "headerColor": "#00FF00",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
+        ],
+        "literalValue": 5
+      }
+    },
+    {
+      "id": "same",
+      "type": "compare",
+      "position": {
+        "x": -200,
+        "y": 180
+      },
+      "data": {
+        "nodeType": "compare",
+        "label": "Is five",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": "==",
+          "b": "5"
+        }
+      }
+    },
+    {
+      "id": "above",
+      "type": "compare",
+      "position": {
+        "x": -200,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "compare",
+        "label": "Above nine",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": ">",
+          "b": "9"
+        }
+      }
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 120,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "same",
+            "label": "same",
+            "type": "boolean"
+          },
+          {
+            "id": "above",
+            "label": "above",
+            "type": "boolean"
+          }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-end-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-five-value-same-a",
+      "source": "five",
+      "sourceHandle": "value",
+      "target": "same",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "e-start-limit-above-a",
+      "source": "start",
+      "sourceHandle": "limit",
+      "target": "above",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "e-same-result-end-same",
+      "source": "same",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "same",
+      "animated": false
+    },
+    {
+      "id": "e-above-result-end-above",
+      "source": "above",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "above",
+      "animated": false
+    }
+  ],
+  "entryNode": "start"
+}

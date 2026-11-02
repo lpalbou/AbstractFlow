@@ -16,7 +16,8 @@ function json(value) {
 function pinText(pin) {
   const label = pin.label && pin.label !== pin.id ? ` (${pin.label})` : '';
   const description = pin.description ? `: ${pin.description}` : '';
-  return `\`${pin.id}\` ${pin.type}${label}${description}`;
+  const typeVar = pin.typeVar ? ` [type ${pin.typeVar}]` : '';
+  return `\`${pin.id}\` ${pin.type}${typeVar}${label}${description}`;
 }
 
 function defaultConfig(data) {
@@ -98,6 +99,8 @@ export async function generateWorkflowNodeCatalog() {
     'It is the stable AI-readable companion to `docs/workflow-authoring-skill.md`.',
     '',
     'Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edges": ["node.pin -> node.pin", ...]}`. Each document node uses `type` matching the value shown here; if several visible palette entries share a `type`, set `template` to the exact variant label shown in the document node snippet.',
+    '',
+    'A pin marked `[type T]` shares one type with the other `[type T]` pins of its node (Compare\'s `a` and `b`): the type comes from what is wired to them. A pin default on such a pin is stored with that type, so give a JSON number (`5`) where the peer carries a number and a JSON string (`"5"`) only where it carries text; with nothing wired, a typed value is text.',
     '',
     '## Visible Authoring Templates',
     '',

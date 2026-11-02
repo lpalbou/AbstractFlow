@@ -20,6 +20,8 @@ import type { FlowNodeData, JsonValue, Pin, PinType, VisualFlow } from '../../ty
 import { getBundledFlow } from '../../utils/bundledFlows';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
+import { LiteralKindTag, TypedLiteralInput } from '../pins/TypedLiteralInput';
+import { LITERAL_KIND_NOUN, literalKindOfValue, pinLiteralProblem, pinLiteralType } from '../../utils/pinLiterals';
 import { PinExpressionChip, PinExpressionEditor, maskStringLiterals } from '../pins/PinExpressionControl';
 import { useFoldedReadsForNode } from '../../hooks/foldedGettersContext';
 import { IconSwapVertical } from '../ToolbarIcons';
@@ -4479,6 +4481,7 @@ export const BaseNode = memo(function BaseNode({
                 {(() => {
                   const connected = isPinConnected(pin.id, true);
                   const controls: ReactNode[] = [];
+                  const literalProblem = connected ? null : pinLiteralProblem(id, pin.id, allNodes, edges);
 
                 // An unwired `any` pin (Make Array's elements, Is Empty's input) keeps a text
                 // field: what you type is the value. The fx control beside it is the explicit
@@ -5680,7 +5683,30 @@ export const BaseNode = memo(function BaseNode({
                         onChange={(v) => setPinDefault(pin.id, v || undefined)}
                       />
                     );
-                  } else if (pin.type === 'string' || isAnyTextPin) {
+                  } else if (isAnyTextPin) {
+                    // The value takes the type the graph gives this input (root ADR 0049):
+                    // a type variable resolved from the wires (Compare's b takes a's type),
+                    // else text. The tag says which, so nobody compares 5 with "5" unaware.
+                    const literalType = pinLiteralType(id, pin.id, allNodes, edges);
+                    const resolved = literalType && literalType.from !== 'default' ? literalType.kind : null;
+                    const tagKind = resolved ?? (raw === undefined ? null : literalKindOfValue(raw)) ?? 'string';
+                    const tagTitle = resolved
+                      ? `Takes the type of what is wired to this node: what you type here is ${LITERAL_KIND_NOUN[resolved]}.`
+                      : literalType
+                        ? 'Nothing wired to this node gives it a type yet: what you type here is text.'
+                        : 'Takes any value: what you type here is text.';
+                    controls.push(
+                      <TypedLiteralInput
+                        key="pin-default"
+                        value={raw}
+                        kind={resolved ?? 'string'}
+                        problem={literalProblem}
+                        ariaLabel={`${pin.label || pin.id} value`}
+                        onCommit={(v) => setPinDefault(pin.id, v)}
+                      />,
+                      <LiteralKindTag key="pin-type-tag" kind={tagKind} title={tagTitle} invalid={Boolean(literalProblem)} />
+                    );
+                  } else if (pin.type === 'string') {
                     controls.push(
                       <input
                         key="pin-default"
@@ -5876,6 +5902,16 @@ export const BaseNode = memo(function BaseNode({
                   );
                 })()}
               </div>
+
+              {/* A typed value that is not of its input's type (root ADR 0049): said on the card, under its row. */}
+              {(() => {
+                const problem = isPinConnected(pin.id, true) ? null : pinLiteralProblem(id, pin.id, allNodes, edges);
+                return problem ? (
+                  <div className="pin-literal-problem" data-pin-id={pin.id}>
+                    {pin.label || pin.id}: {problem}
+                  </div>
+                ) : null;
+              })()}
 
               {/* Inline expression editor: expands below the row it edits. */}
               {fxEditingPin === pin.id ? (

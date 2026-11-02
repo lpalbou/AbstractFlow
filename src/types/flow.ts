@@ -128,6 +128,15 @@ export interface Pin {
    * This is authoring metadata only; runtime values still flow by pin id.
    */
   schema?: Record<string, unknown>;
+  /**
+   * A type variable on an `any` pin of a node template: the pins of one node
+   * that name the same variable carry one type (Compare's `a` and `b`,
+   * Coalesce's inputs and result). The editor resolves it from the wires, and
+   * a value typed on an unwired pin of the variable takes that type
+   * (utils/pinLiterals.ts, root ADR 0049). Read from the template, never
+   * from a saved pin.
+   */
+  typeVar?: string;
 }
 
 export type PinConnectionFeedback = {

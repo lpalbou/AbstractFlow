@@ -58,7 +58,7 @@ jobs:
           mkdir -p "$HOME"
           for smoke in entity_life_smoke entity_life_loop_smoke multiagent_coding_smoke \
                        coding_agent_v2_gates_smoke goal_agent_smoke react_coder_smoke \
-                       ralph_coder_smoke coscientist_smoke decision_workflow_smoke; do
+                       ralph_coder_smoke coscientist_smoke decision_workflow_smoke typed_literals_smoke; do
             echo "::group::$smoke"
             python "scripts/$smoke.py"
             echo "::endgroup::"

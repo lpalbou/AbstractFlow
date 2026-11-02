@@ -11,6 +11,7 @@ import { getArtifactConnectionError, getConfiguredArtifactInputError } from './m
 import { gatewayCapabilityForNodeType } from './nodeCapabilities';
 import { decisionLevels, decisionOptionNames, normalizeDecisionQuestionType } from './decisionPins';
 import { loopEndsRunIssues, loopEndsRunMessage } from './loopEndsRun';
+import { pinLiteralProblem } from './pinLiterals';
 
 export type RunPreflightIssue = {
   id: string;
@@ -462,6 +463,16 @@ export function computeRunPreflightIssues(
     const resumeAt = nodesById.get(otherWire.target);
     if (resumeAt && edges.some((x) => x.target === resumeAt.id && isRouteOverrideEdge(x))) {
       push(resumeAt, `its per-path values do not apply when it is reached from the ${max}-times limit on ${source.data.label || source.id}'s wire (that way in takes the normal values)`, 'warning');
+    }
+  }
+
+  // A value typed on an unwired input that is not of the input's type (a number input, or Compare's
+  // b next to a wired number, holding "abc"): the run would compare or compute with the wrong
+  // type, so it is refused with the card's words (utils/pinLiterals.ts, root ADR 0049).
+  for (const n of nodes) {
+    for (const pin of n.data.inputs || []) {
+      const problem = pinLiteralProblem(n.id, pin.id, nodes, edges);
+      if (problem) push(n, `${pin.label || pin.id}: ${problem}`);
     }
   }
 
