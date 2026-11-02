@@ -458,13 +458,6 @@ body {
 
 /* Phone landscape: one thin header row, no footer. */
 @media (max-height: 500px) {
-  /* rows=4 made the composer ~170 px, taller than what a landscape phone
-     keeps above its keyboard: two lines, still resizable. */
-  .assistant-input-area textarea {
-    min-height: 56px;
-    height: 56px;
-  }
-
   .app-footer {
     display: none;
   }

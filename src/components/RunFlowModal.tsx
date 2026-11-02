@@ -10,6 +10,7 @@ import { LoadingLine } from './ReadState';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { randomId } from '@abstractframework/ui-kit';
+import { ChatComposer } from '@abstractframework/panel-chat';
 import { copyWithFeedback } from '../lib/copy_feedback';
 import { MEDIA_NEEDS_HTTPS, mediaAvailable } from '../lib/secure-context';
 import { useFlowStore } from '../hooks/useFlow';
@@ -2148,6 +2149,7 @@ export function RunFlowModal({
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState('');
   const [followUpAttachments, setFollowUpAttachments] = useState<File[]>([]);
+  const followUpFileInputRef = useRef<HTMLInputElement | null>(null);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
   const [followUpDragActive, setFollowUpDragActive] = useState(false);
@@ -7309,23 +7311,16 @@ export function RunFlowModal({
                         ) : null}
                         {(waitingPayload?.allowFreeText ?? true) && (
                           <div className="run-waiting-input">
-                            <textarea
-                              className="run-waiting-textarea"
+                            <ChatComposer
                               value={resumeDraft}
-                              onChange={(e) => setResumeDraft(e.target.value)}
+                              onChange={setResumeDraft}
+                              onSubmit={() => void submitVisitorMessage()}
                               placeholder="Type your message…"
-                              rows={3}
+                              ariaLabel="Message"
+                              busy={resumeSubmitting}
+                              busyLabel="Sending…"
+                              disabled={cancelRequested}
                             />
-                            <div className="run-waiting-actions">
-                              <button
-                                type="button"
-                                className="modal-button primary"
-                                onClick={submitVisitorMessage}
-                                disabled={!resumeDraft.trim() || resumeSubmitting || cancelRequested}
-                              >
-                                {resumeSubmitting ? 'Sending…' : 'Send'}
-                              </button>
-                            </div>
                           </div>
                         )}
                       </div>
@@ -7423,24 +7418,17 @@ export function RunFlowModal({
 
                         {(waitingPayload?.allowFreeText ?? true) && (
                           <div className="run-waiting-input">
-                            <textarea
-                              className="run-waiting-textarea"
+                            <ChatComposer
                               value={resumeDraft}
-                              onChange={(e) => setResumeDraft(e.target.value)}
-                              placeholder="Type your response…"
-                              rows={3}
+                              onChange={setResumeDraft}
+                              onSubmit={() => void submitResume()}
+                              placeholder={cancelRequested ? 'Cancel is pending for this run' : 'Type your response…'}
+                              ariaLabel="Response"
+                              busy={resumeSubmitting}
+                              sendLabel="Continue"
+                              busyLabel="Continuing…"
+                              disabled={cancelRequested}
                             />
-                            <div className="run-waiting-actions">
-                              <button
-                                type="button"
-                                className="modal-button primary"
-                                onClick={submitResume}
-                                disabled={!resumeDraft.trim() || resumeSubmitting || cancelRequested}
-                                title={cancelRequested ? 'Cancel is pending for this run' : undefined}
-                              >
-                                {resumeSubmitting ? 'Continuing...' : 'Continue'}
-                              </button>
-                            </div>
                           </div>
                         )}
                       </div>
@@ -7512,15 +7500,19 @@ export function RunFlowModal({
                         generatedImagePreview ||
                         generatedAudioPreview ||
                         generatedVideoPreview ||
-                        (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams) ||
+                        (selectedStep?.nodeType === 'on_flow_start' && (onFlowStartParams || onFlowStartContext)) ||
                         (selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null)) ? (
                         <div className="run-output-preview">
-                          {selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams ? (
+                          {selectedStep?.nodeType === 'on_flow_start' && (onFlowStartParams || onFlowStartContext) ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Run parameters</div>
-                              <div className="run-param-grid">
-                                {onFlowStartParams.map(renderOnFlowStartParam)}
-                              </div>
+                              {onFlowStartParams ? (
+                                <div className="run-param-grid">
+                                  {onFlowStartParams.map(renderOnFlowStartParam)}
+                                </div>
+                              ) : (
+                                <div className="run-param-empty">This flow has no inputs of its own.</div>
+                              )}
                               {onFlowStartContext ? (
                                 <details className="run-param-context">
                                   <summary className="run-output-title">
@@ -9057,14 +9049,23 @@ export function RunFlowModal({
                   <label className="run-followup-label" htmlFor="run-followup-textarea">
                     Message
                   </label>
-                  <textarea
-                    id="run-followup-textarea"
-                    className="run-followup-textarea"
-                    rows={4}
+                  <ChatComposer
+                    textareaId="run-followup-textarea"
                     value={followUpDraft}
-                    onChange={(e) => setFollowUpDraft(e.target.value)}
+                    onChange={setFollowUpDraft}
+                    onSubmit={() => void handleFollowUpSubmit()}
                     placeholder="Add your follow up request…"
+                    submitKey="mod-enter"
                     disabled={followUpSubmitting}
+                    busy={followUpSubmitting}
+                    sendLabel="Follow Up"
+                    busyLabel="Sending…"
+                    onAttach={() => followUpFileInputRef.current?.click()}
+                    attachDisabled={followUpSubmitting}
+                    actions={<input type="file" ref={followUpFileInputRef} multiple hidden onChange={(e) => {
+                      if (e.target.files) addFollowUpFiles(e.target.files);
+                      e.currentTarget.value = '';
+                    }} disabled={followUpSubmitting} />}
                   />
                   <div
                     className={`run-followup-drop ${followUpDragActive ? 'is-active' : ''}`}
@@ -9074,19 +9075,7 @@ export function RunFlowModal({
                     onDrop={handleFollowUpDrop}
                   >
                     <div className="run-followup-drop-title">Drag & drop attachments here</div>
-                    <div className="run-followup-drop-subtitle">or</div>
-                    <label className="run-followup-attach">
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(e) => {
-                          if (e.target.files) addFollowUpFiles(e.target.files);
-                          e.currentTarget.value = '';
-                        }}
-                        disabled={followUpSubmitting}
-                      />
-                      Choose files
-                    </label>
+                    <div className="run-followup-drop-subtitle">or use + to choose files</div>
                   </div>
                   {followUpAttachments.length > 0 ? (
                     <div className="run-followup-files">
@@ -9123,14 +9112,6 @@ export function RunFlowModal({
                     }}
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="modal-button primary"
-                    onClick={handleFollowUpSubmit}
-                    disabled={followUpSubmitting}
-                  >
-                    {followUpSubmitting ? 'Sending...' : 'Follow Up'}
                   </button>
                 </div>
               </div>

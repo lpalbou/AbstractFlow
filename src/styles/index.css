@@ -1232,50 +1232,15 @@ body,
   background: color-mix(in srgb, var(--bg-primary) 55%, transparent);
 }
 
-.assistant-input-area textarea {
-  width: 100%;
-  min-height: 96px;
-  max-height: 180px;
-  resize: vertical;
-  line-height: 1.4;
-}
-
-.assistant-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .assistant-actions-icons {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.assistant-actions-send {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .assistant-cycles-select {
   font-size: var(--font-size-sm);
   padding: 6px 8px;
-}
-
-.assistant-actions button.primary,
-.assistant-actions button.danger {
-  min-width: 88px;
-}
-
-.assistant-actions button.danger {
-  background: color-mix(in srgb, var(--error, #e74c3c) 80%, var(--bg-primary));
-  color: var(--on-strong, #fff);
-}
-
-.assistant-actions button.danger:hover:not(:disabled) {
-  background: var(--error, #e74c3c);
 }
 
 /* The right drawer's narrow-screen overlay (was a 720px rule) lives in the
@@ -3153,15 +3118,6 @@ button.primary:hover:not(:disabled) {
   color: var(--text-secondary);
 }
 
-.run-followup-textarea {
-  background: var(--bg-primary);
-  border: 1px solid var(--bg-tertiary);
-  border-radius: 8px;
-  color: var(--text-primary);
-  padding: 10px;
-  resize: vertical;
-}
-
 .run-followup-drop {
   border: 1px dashed color-mix(in srgb, var(--text-primary) 18%, transparent);
   border-radius: 10px;
@@ -3186,20 +3142,6 @@ button.primary:hover:not(:disabled) {
 .run-followup-drop-subtitle {
   font-size: var(--font-size-xs);
   color: var(--text-muted);
-}
-
-.run-followup-attach input[type='file'] {
-  display: none;
-}
-
-.run-followup-attach {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--bg-tertiary);
-  cursor: pointer;
 }
 
 .run-followup-files {
@@ -7790,29 +7732,7 @@ body.af-schema-editor-open .af-tooltip-bubble {
 }
 
 .code-assistant-composer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-  align-items: end;
-}
-
-.code-assistant-input {
-  width: 100%;
-  min-height: 0;
-  resize: none;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--bg-tertiary);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-}
-
-.code-assistant-input:focus {
-  outline: none;
-  border-color: var(--accent, #3b82f6);
+  min-width: 0;
 }
 
 .code-side-title {
@@ -8045,13 +7965,21 @@ body.af-schema-editor-open .af-tooltip-bubble {
     height: calc(100vh - 24px);
   }
 
+  /* One column that scrolls: each panel keeps its own height instead of
+     sharing the modal's (the 420 px editor overlapped the panels below and
+     the assistant thread collapsed to nothing behind its composer). */
   .code-editor-workspace {
     grid-template-columns: 1fr;
+    grid-auto-rows: max-content;
     overflow: auto;
   }
 
   .code-editor-container {
     min-height: 420px;
+  }
+
+  .code-assistant-column {
+    height: min(520px, 80vh);
   }
 }
 

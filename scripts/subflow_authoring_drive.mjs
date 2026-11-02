@@ -72,7 +72,7 @@ try {
   }, REQUEST);
   await new Promise((r) => setTimeout(r, 400));
   await page.evaluate(() => {
-    const send = Array.from(document.querySelectorAll('.assistant-actions-send button')).find((b) => b.textContent?.trim() === 'Send');
+    const send = document.querySelector('.assistant-input-area .pc-composer__send--compact');
     send?.click();
   });
   note('request sent — waiting for the turn (up to 10 min)');
@@ -84,7 +84,7 @@ try {
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 5000));
     const state = await page.evaluate(() => {
-      const stop = Array.from(document.querySelectorAll('.assistant-actions-send button')).find((b) => /Stop/i.test(b.textContent || ''));
+      const stop = document.querySelector('.assistant-input-area .pc-composer__trailing .pc-workflow-chat__stop');
       const pill = document.querySelector('.assistant-state-pill')?.textContent || '';
       const lastMsg = Array.from(document.querySelectorAll('.assistant-message, .assistant-messages [class*=message]')).pop()?.textContent?.slice(0, 120) || '';
       return { busy: Boolean(stop), pill, lastMsg };

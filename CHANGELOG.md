@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-02
+
+Needs AbstractRuntime 0.16.0 (the Decision node and the Ask User question policy) and `@abstractframework/ui-kit` ^0.9.12 with `@abstractframework/panel-chat` ^0.7.0.
+
 ### Fixed
 - Typing into an unwired `any` input on a node card (Make Array's elements, Is Empty's text) stores the text as the pin's value; writing an expression is the explicit fx control. A plain word used to be stored as a pin expression and failed at run time as an undefined Python name.
 - Setting a value on a card pin replaces an ƒx expression on that pin, and `array` pins whose items are strings (a Decision's `options` / `levels`) are typed on the card as one comma-separated line.
@@ -28,13 +32,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a relay. Run checks require `state`, `question`, options for a choice and two levels for a score; the node runs
   only where the Gateway advertises the `decision` contract (`src/utils/decisionPins.ts`). Needs AbstractRuntime
   0.16.0.
+- **Ask User: question policy.** Properties offer **Question policy**: *Standard question* (as before), *Essential*
+  (waits for an answer) or *Clarification*, which declares how long to wait (120 to 300 seconds, 180 by default) and
+  what happens if no answer arrives; the fallback is required, and silence never counts as consent. The node gains a
+  `question` input and `timed_out`, `fallback` and `question` outputs, so a flow can branch on an expired
+  clarification. Saved in the node's `effectConfig.question`; the run checks refuse a clarification without a
+  fallback or with a deadline outside 120 to 300 seconds. Needs AbstractRuntime 0.16.0.
 
 ### Changed
-- The top bar's account is the kit's ONE account widget (operator ruling 2026-10-29: the docs button, Appearance,
-  About and the account are the same kit components in every app). Signed in, one button shows the person icon,
+- Every chat box uses the shared rounded multiline composer from `@abstractframework/panel-chat` 0.7.0:
+  the authoring assistant and Follow Up (Ctrl/Cmd+Enter sends, since each starts a run), the code
+  assistant and the run window's waiting input and Continue (Enter sends, Shift+Enter adds a line);
+  attachments through the + button or drag and drop. The dependency moves from panel-chat 0.5 to
+  0.7, which also brings the 0.6 docs assistant wording and read-aloud behaviour; requires
+  `@abstractframework/ui-kit` ^0.9.12.
+- **Run window: On Flow Start shows the flow's inputs.** Selecting the start step lists the flow's own inputs
+  under *Run parameters*, an input with no value marked *not set*; what the gateway adds at start (the workflow
+  selection, the workspace settings, session flags) sits apart under a folded section; the same values are no
+  longer repeated in a second preview below. A flow with no inputs of its own says so.
+- The top bar's account is the kit's account widget (the docs button, Appearance, About and the account are the
+  same kit components in every AbstractFramework app). Signed in, one button shows the person icon,
   your name and the connection light; its menu holds Signed in as, Gateway, Copy user id and Disconnect. It replaces
   the Disconnect pill. `AfTopBarActions` gets `identity="menu"` and the app server's connection status
-  (`topBarConnectionState`). Needs `@abstractframework/ui-kit` ^0.9.6 (was ^0.9.2). Test: `src/top_bar_set.test.tsx`.
+  (`topBarConnectionState`).
 
 ## [0.12.1] - 2026-10-28
 

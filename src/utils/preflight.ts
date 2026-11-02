@@ -724,6 +724,22 @@ export function computeRunPreflightIssues(
         }
       }
     }
+
+    // Ask User's clarification policy is checked by AbstractRuntime (core/questions.py make_question)
+    // when the node runs: a deadline of 120 to 300 seconds and a non-empty fallback. Refuse the run
+    // here with the same rule instead of failing at the node. A wired `question` pin decides at run time.
+    if (t === 'ask_user' && !inputConnected(edges, n.id, 'question') && !pinExpressionPresent(n, 'question')) {
+      const policy = n.data.effectConfig?.question;
+      if (policy?.importance === 'clarification') {
+        const timeout = policy.timeout_s ?? 180;
+        if (typeof timeout !== 'number' || !Number.isFinite(timeout) || timeout < 120 || timeout > 300) {
+          push(n, 'Clarification: Wait at most must be between 120 and 300 seconds');
+        }
+        if (!isNonEmptyString(policy.fallback)) {
+          push(n, 'Clarification: If no answer arrives needs a fallback (how the work continues)');
+        }
+      }
+    }
   }
 
   // Visual-primacy advisories (2026-07-30, doctrine 0155): what the canvas is
