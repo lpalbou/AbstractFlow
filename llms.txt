@@ -24,6 +24,7 @@ Key behavior:
 - Unconnected LLM Call and Agent `resp_schema` pins can be edited inline; schema-active nodes expose structured output on `data` while `response` stays textual.
 - Agent and LLM Call nodes expose an MTP depth setting and a `speculation` pin. Precedence: connected pin, node setting, host default (no run-level override).
 - **Decision** (`decide`, Essentials): one typed question about one text answered in one pass by a decision model; the question type (`choice` | `noul` | `score`), options and levels rewrite the typed output pins and their schemas (Break Object splits `answer`, Switch syncs cases from `choice`/`level`); `model` is one `provider/model` handle from the `output.decision` catalog; needs the Gateway `decision` capability (AbstractRuntime 0.16.0) (src/utils/decisionPins.ts).
+- **Ask User** question policy (Properties): Standard, Essential (waits, no deadline) or Clarification (120 to 300 s deadline plus a required fallback); outputs `response`, `timed_out`, `fallback`, `question`; saved in `effectConfig.question`; needs AbstractRuntime 0.16.0 (docs/web-editor.md "Ask User Questions").
 
 ## Core Docs
 

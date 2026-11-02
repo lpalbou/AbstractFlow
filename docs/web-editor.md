@@ -736,6 +736,8 @@ and in place of Send while busy — interrupts the autonomous loop between calls
 and best-effort cancels the in-flight Gateway planner run; applied edits stay
 in the draft and remain undoable via Undo Turn.
 
+The input is the shared AbstractFramework chat composer: a rounded multiline box where
+Ctrl/⌘+Enter sends (Enter adds a line, since each message starts an authoring run).
 Conversation actions are compact icon buttons on the input row (copy
 conversation, clear conversation, undo last turn) next to the Send/Stop button;
 the estimated context usage appears above the model row while a request is
@@ -914,6 +916,28 @@ text and answers it in a single pass with a decision model (Kev / Lev / Laya loc
   flow to wire in, then **Make Array** (builds the list from its pins) and a relay.
 - Run checks require `state`, `question`, at least one option for a choice and at least two
   ordered levels (lowest first) for a score, unless the advanced `questions` object is used.
+
+## Ask User Questions
+
+**Ask User** pauses the run until a person answers. Its Properties panel sets the
+**Question policy**:
+
+- **Standard question**: waits for an answer.
+- **Essential**: a tracked conversational question that waits for an answer, with no deadline
+  and no fallback.
+- **Clarification**: declares how long to wait (**Wait at most**, 120 to 300 seconds, 180 by
+  default) and **If no answer arrives**, the fallback that says exactly how the work continues.
+  The fallback is required; silence never counts as consent.
+
+The node's outputs are `response`, `timed_out` (true when a clarification's deadline passed with
+no answer), `fallback` (the declared fallback after expiry, never an invented answer) and
+`question` (the question's identity and how it was resolved), so a flow can branch on an expired
+clarification with an If on `timed_out`. The policy is saved in the node's
+`effectConfig.question` and needs AbstractRuntime 0.16.0.
+
+In the run window, a waiting question is answered in the chat composer: Enter sends,
+Shift+Enter adds a line. **Follow Up** after a run uses the same composer, with Ctrl/⌘+Enter
+to send and the + button (or drag and drop) for attachments.
 
 ## Media Nodes
 
