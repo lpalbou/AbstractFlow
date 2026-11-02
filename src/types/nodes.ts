@@ -1642,9 +1642,10 @@ const CONTROL_NODES: NodeTemplate[] = [
     description: 'Compare a and b using operator op (==, !=, <, <=, >, >=); no operator set compares with ==.',
     headerColor: '#F39C12',
     inputs: [
-      { id: 'a', label: 'a', type: 'any' },
+      // a and b carry one type (T): a value typed on one takes the type wired to the other.
+      { id: 'a', label: 'a', type: 'any', typeVar: 'T' },
       { id: 'op', label: 'op', type: 'string', description: 'The operator: ==, !=, >, >=, <, <= (not set: ==).' },
-      { id: 'b', label: 'b', type: 'any' },
+      { id: 'b', label: 'b', type: 'any', typeVar: 'T' },
     ],
     outputs: [{ id: 'result', label: 'result', type: 'boolean' }],
     category: 'control',
@@ -1656,8 +1657,8 @@ const CONTROL_NODES: NodeTemplate[] = [
 
 // Data nodes - Pure functions (no execution pins, just data in/out)
 const DATA_NODES: NodeTemplate[] = [
-  { type: 'coalesce', icon: '&#x21C4;', label: 'Coalesce', description: 'Return the first non-null value (A, then B, ...).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'any' }], category: 'data' },
-  { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', description: 'Safely read a nested path from an object (dot/bracket path) with an optional default.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'default', label: 'default', type: 'any' }], outputs: [{ id: 'value', label: 'value', type: 'any' }], category: 'data' },
+  { type: 'coalesce', icon: '&#x21C4;', label: 'Coalesce', description: 'Return the first non-null value (A, then B, ...).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any', typeVar: 'T' }, { id: 'b', label: 'b', type: 'any', typeVar: 'T' }], outputs: [{ id: 'result', label: 'result', type: 'any', typeVar: 'T' }], category: 'data' },
+  { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', description: 'Safely read a nested path from an object (dot/bracket path) with an optional default.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'default', label: 'default', type: 'any', typeVar: 'T' }], outputs: [{ id: 'value', label: 'value', type: 'any', typeVar: 'T' }], category: 'data' },
   {
     type: 'get_element',
     icon: '&#x1F449;', // Pointing hand
@@ -1667,10 +1668,10 @@ const DATA_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'array', label: 'array', type: 'array', description: 'Input array (list/tuple).' },
       { id: 'index', label: 'index', type: 'number', description: '0-based index (negative allowed; -1 is last).' },
-      { id: 'default', label: 'default', type: 'any', description: 'Fallback value when index is invalid (default null).' },
+      { id: 'default', label: 'default', type: 'any', typeVar: 'T', description: 'Fallback value when index is invalid (default null).' },
     ],
     outputs: [
-      { id: 'result', label: 'result', type: 'any', description: 'Element value (or default when not found).' },
+      { id: 'result', label: 'result', type: 'any', typeVar: 'T', description: 'Element value (or default when not found).' },
       { id: 'found', label: 'found', type: 'boolean', description: 'True when index is valid for the given array.' },
     ],
     category: 'data',
@@ -1683,10 +1684,10 @@ const DATA_NODES: NodeTemplate[] = [
     headerColor: '#3498DB',
     inputs: [
       { id: 'array', label: 'array', type: 'array', description: 'Input array (list/tuple).' },
-      { id: 'default', label: 'default', type: 'any', description: 'Fallback value when the array is empty (default null).' },
+      { id: 'default', label: 'default', type: 'any', typeVar: 'T', description: 'Fallback value when the array is empty (default null).' },
     ],
     outputs: [
-      { id: 'result', label: 'result', type: 'any', description: 'Random element (or default when not found).' },
+      { id: 'result', label: 'result', type: 'any', typeVar: 'T', description: 'Random element (or default when not found).' },
       { id: 'found', label: 'found', type: 'boolean', description: 'True when an element was selected.' },
     ],
     category: 'data',
@@ -1902,9 +1903,10 @@ const VARIABLE_NODES: NodeTemplate[] = [
       // `vars.x.get(key, fallback)` and silently resolved to None on a missing path.
       // On a boolean control pin (`wait_gating`) that flips a gate from shown to
       // skipped, which is why every trivial-read expression had to stay an expression.
-      { id: 'default', label: 'default', type: 'any', description: 'Value used when the path is missing.' },
+      // default and value carry one type (T): the variable's, once its name is picked.
+      { id: 'default', label: 'default', type: 'any', typeVar: 'T', description: 'Value used when the path is missing.' },
     ],
-    outputs: [{ id: 'value', label: 'value', type: 'any' }],
+    outputs: [{ id: 'value', label: 'value', type: 'any', typeVar: 'T' }],
     category: 'variables',
   },
   {

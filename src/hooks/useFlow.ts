@@ -23,6 +23,7 @@ import { computeFoldedGetters } from '../utils/foldedGetters';
 import { decisionOutputPinsForData, withDecisionOutputs } from '../utils/decisionPins';
 import { withTrailStep } from '../utils/runSpotlight';
 import { withLoopItemTypes, withRelayTypes } from '../utils/relays';
+import { typePinLiterals, type RetypedLiteral } from '../utils/pinLiterals';
 import { withAgentSchemaOnInput } from '../utils/structuredOutput';
 import { withSetVariableRows } from '../utils/setVariables';
 import { withoutRedundantTemplateVars } from '../utils/textTemplate';
@@ -179,6 +180,8 @@ interface FlowState {
    * document excludes them, so such a flow opens with unsaved changes.
    */
   interfacePinsAddedOnLoad: number;
+  /** Values the last loadFlow converted to their inputs' types (utils/pinLiterals.ts); shown once, saved on the next save. */
+  literalsRetypedOnLoad: RetypedLiteral[];
   /**
    * Stored edges the canvas cannot draw because a handle is not a declared
    * pin (the runtime resolves it by key: code-node dict returns, a subflow's
@@ -736,6 +739,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   flowAutomationDefaults: null,
   canvasNote: null,
   interfacePinsAddedOnLoad: 0,
+  literalsRetypedOnLoad: [],
   preservedEdges: [],
   loadEdgeReport: { preserved: [], dropped: [] },
   selectedNode: null,
@@ -3328,6 +3332,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       ...(flowAutomationDefaults ? { automation_defaults: deepClone(flowAutomationDefaults) } : {}),
     };
 
+    // A value stored as text on an input whose type is now known (a flow saved by
+    // Flow 0.13.0 typed `5` next to a wired number as "5") takes that type here;
+    // the returned document stays the flow AS STORED, so the flow opens with
+    // unsaved changes and a notice until it is saved (utils/pinLiterals.ts).
+    const typedOnLoad = typedGraph(nodes.map(withoutStoredRouteOverrides), displayEdges);
+
     set((state) => ({
       flowId: flow.id,
       draftInstanceId: newDraftInstanceId(),
@@ -3335,7 +3345,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowDescription: typeof flow.description === 'string' ? flow.description : '',
       flowInterfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       // Per-path values now live only on the drawn per-path wires (displayEdges).
-      nodes: nodes.map(withoutStoredRouteOverrides),
+      nodes: typedOnLoad.nodes,
+      literalsRetypedOnLoad: typedOnLoad.retyped,
       edges: displayEdges,
       preservedEdges,
       loadEdgeReport: edgeReport,
@@ -3415,6 +3426,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowAutomationDefaults: null,
       canvasNote: null,
       interfacePinsAddedOnLoad: 0,
+      literalsRetypedOnLoad: [],
       preservedEdges: [],
       loadEdgeReport: { preserved: [], dropped: [] },
       selectedNode: null,
@@ -3469,13 +3481,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 }));
 
+/** Relay and ForEach pin types, then the typed values that follow from them. */
+function typedGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): { nodes: Node<FlowNodeData>[]; retyped: RetypedLiteral[] } {
+  const relayTyped = withRelayTypes(nodes, edges);
+  // ForEach over an Email list gives each Email (utils/relays.ts withLoopItemTypes).
+  return typePinLiterals(withLoopItemTypes(relayTyped, edges), edges);
+}
+
+function withTypedGraph(nodes: Node<FlowNodeData>[], edges: Edge[]): Node<FlowNodeData>[] {
+  return typedGraph(nodes, edges).nodes;
+}
+
 // Relays take the type of the wire that feeds them (utils/relays.ts). One
 // subscription keeps that true whatever changed the wiring (connect, delete,
 // undo, the authoring assistant, load); it writes only when a type changes.
+// Typed values on unwired inputs follow the same way: a rewire that changes an
+// input's type converts its value when exact, else the card flags it
+// (utils/pinLiterals.ts, root ADR 0049).
 useFlowStore.subscribe((state, previous) => {
   if (state.nodes === previous.nodes && state.edges === previous.edges) return;
-  const relayTyped = withRelayTypes(state.nodes, state.edges);
-  // ForEach over an Email list gives each Email (utils/relays.ts withLoopItemTypes).
-  const typed = withLoopItemTypes(relayTyped, state.edges);
+  const typed = withTypedGraph(state.nodes, state.edges);
   if (typed !== state.nodes) useFlowStore.setState({ nodes: typed });
 });

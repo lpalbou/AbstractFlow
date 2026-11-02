@@ -566,6 +566,32 @@ descriptions. The canvas carries no explanatory prose under pins.
 - **Join** takes its delimiter from a list (Comma, Comma and space, New line, Blank line, Space,
   Tab) or **Custom…**, a text where `\n` is a new line and `\t` a tab.
 
+### Values typed on a card
+
+A value you type in an unwired input's box is stored with the input's type, and the runtime
+uses it as stored:
+
+- A **number** input stores a number and a **true/false** input a boolean. A value that is not
+  one (`abc` on a number input) is outlined, explained under its row ("a: “abc” is not a
+  number"), and the run checks refuse to run the flow until you fix it.
+- An input that takes **any value** but shares its type with other inputs of its node (Compare's
+  `a` and `b`, Coalesce's inputs and result, the `default` of Get Property, Get Element, Get
+  Random Element and Get Variable) takes the type of what is wired to them: with `a` wired to a
+  number, `5` typed in `b` is the number 5, so `a == b` compares 5 with 5. A small tag beside the
+  box says what you get: **number**, **text**, **true/false**, **JSON** or **list**.
+- With nothing wired to give it a type, what you type is **text**. Make Array's elements and the
+  other inputs that take any value are always text when typed; the ƒx control is the way to
+  compute a value instead.
+- When the wiring changes an input's type, its value follows when the conversion is exact (`5`
+  and the text "5", `true` and the text "true"); otherwise the value stays as you typed it and is
+  flagged. A value already stored with a type of its own keeps it while nothing wired says
+  otherwise.
+
+A flow saved before this rule may hold such a value as text next to a wired number. Opening it
+converts the value, says which values changed ("2 typed values now take the type of their input
+… Save to keep them"), and the flow shows unsaved changes until you save it. A flow run without
+being opened and saved again keeps the value it stored.
+
 ### If/Else branch order
 
 The up/down arrows button at the top right of an If/Else node swaps the order in which its True and
@@ -1544,7 +1570,12 @@ Node fields:
   transcript", not "Variable"). Only On Flow Start / On Flow End may keep
   defaults.
 - `pin_defaults`: values for unconnected input pins. Merged per key — omitted
-  keys keep their current values; emit a key to change it.
+  keys keep their current values; emit a key to change it. Give each value
+  the JSON type of its pin: `5` on a `number` pin, and on a `[type T]` pin of
+  the catalog the type of what is wired to its peers (Compare `b` is `5`
+  when `a` is wired to a number, `"5"` when it is wired to text). The editor
+  converts exact text (`"5"` to `5`) and refuses a run on a value that is not
+  of its pin's type.
 - `pin_expressions`: sandboxed Python expressions computing input pins at
   resolution time: `{"condition": "vars.fix_cycles < 3"}`. An expression
   reads `vars.*` (run variables, read-only) and `value` (the pin's wire value
@@ -2423,6 +2454,8 @@ It is the stable AI-readable companion to `docs/workflow-authoring-skill.md`.
 
 Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edges": ["node.pin -> node.pin", ...]}`. Each document node uses `type` matching the value shown here; if several visible palette entries share a `type`, set `template` to the exact variant label shown in the document node snippet.
 
+A pin marked `[type T]` shares one type with the other `[type T]` pins of its node (Compare's `a` and `b`): the type comes from what is wired to them. A pin default on such a pin is stored with that type, so give a JSON number (`5`) where the peer carries a number and a JSON string (`"5"`) only where it carries text; with nothing wired, a typed value is text.
+
 ## Visible Authoring Templates
 
 ### artifacts / Artifact
@@ -2547,7 +2580,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `a` any; `op` string: The operator: ==, !=, >, >=, <, <= (not set: ==).; `b` any
+- Inputs: `a` any [type T]; `op` string: The operator: ==, !=, >, >=, <, <= (not set: ==).; `b` any [type T]
 - Outputs: `result` boolean
 - Default config: none
 
@@ -2963,8 +2996,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `a` any; `b` any
-- Outputs: `result` any
+- Inputs: `a` any [type T]; `b` any [type T]
+- Outputs: `result` any [type T]
 - Default config: none
 
 ### data / Concat
@@ -3027,8 +3060,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `array` array: Input array (list/tuple).; `index` number: 0-based index (negative allowed; -1 is last).; `default` any: Fallback value when index is invalid (default null).
-- Outputs: `result` any: Element value (or default when not found).; `found` boolean: True when index is valid for the given array.
+- Inputs: `array` array: Input array (list/tuple).; `index` number: 0-based index (negative allowed; -1 is last).; `default` any [type T]: Fallback value when index is invalid (default null).
+- Outputs: `result` any [type T]: Element value (or default when not found).; `found` boolean: True when index is valid for the given array.
 - Default config: none
 
 ### data / Get Random Element
@@ -3039,8 +3072,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `array` array: Input array (list/tuple).; `default` any: Fallback value when the array is empty (default null).
-- Outputs: `result` any: Random element (or default when not found).; `found` boolean: True when an element was selected.
+- Inputs: `array` array: Input array (list/tuple).; `default` any [type T]: Fallback value when the array is empty (default null).
+- Outputs: `result` any [type T]: Random element (or default when not found).; `found` boolean: True when an element was selected.
 - Default config: none
 
 ### data / Get Property
@@ -3051,8 +3084,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `object` object; `key` string; `default` any
-- Outputs: `value` any
+- Inputs: `object` object; `key` string; `default` any [type T]
+- Outputs: `value` any [type T]
 - Default config: none
 
 ### data / Has Tools
@@ -4624,8 +4657,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `name` string; `default` any: Value used when the path is missing.
-- Outputs: `value` any
+- Inputs: `name` string; `default` any [type T]: Value used when the path is missing.
+- Outputs: `value` any [type T]
 - Default config: none
 
 ### variables / Get Variables
@@ -5461,6 +5494,11 @@ The Waits nodes, **Wait Until** (`on_schedule`) and **Wait for Event** (`on_even
 ## Authoring Rules
 
 - Nodes contain editor data and runtime-facing pin defaults.
+- A pin default is a JSON value stored with its type (`5`, `"5"`, `true`, `[]`), and the
+  runtime uses it exactly as stored. The editor stores what is typed on a card as the input's
+  type, or for an input with a type variable (`typeVar` on the node template, such as Compare's
+  `a` and `b`) as the type wired to its peers; see
+  [Web editor > Values typed on a card](web-editor.md#values-typed-on-a-card).
 - Execution edges connect `exec-out` to `exec-in`.
 - Data edges connect typed pins.
 - Provider/model pins should use Gateway-discovered provider ids and models.
@@ -6588,6 +6626,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [Unreleased]
+
+### Fixed
+- A value typed on an unwired input takes the input's type (root ADR 0049). A number input stores a number and a
+  true/false input a boolean; an input that shares its type with others of its node (Compare's `a` and `b`,
+  Coalesce, the `default` of Get Property, Get Element, Get Random Element and Get Variable, declared as a template
+  `typeVar`) takes the type wired to them, so `5` typed in Compare `b` next to a wired number is the number 5 and
+  `a == b` holds. With nothing wired, a typed value is text. A small tag beside the box says the type; a value that
+  is not of its input's type is flagged under its row and refused by the run checks; a rewire converts a value
+  when the conversion is exact. A flow saved by 0.13.0 with such a value stored as text is converted when you open
+  it, with a notice, and keeps the stored text until you save it.
 
 ## [0.13.0] - 2026-11-02
 

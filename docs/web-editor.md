@@ -192,6 +192,32 @@ descriptions. The canvas carries no explanatory prose under pins.
 - **Join** takes its delimiter from a list (Comma, Comma and space, New line, Blank line, Space,
   Tab) or **Custom…**, a text where `\n` is a new line and `\t` a tab.
 
+### Values typed on a card
+
+A value you type in an unwired input's box is stored with the input's type, and the runtime
+uses it as stored:
+
+- A **number** input stores a number and a **true/false** input a boolean. A value that is not
+  one (`abc` on a number input) is outlined, explained under its row ("a: “abc” is not a
+  number"), and the run checks refuse to run the flow until you fix it.
+- An input that takes **any value** but shares its type with other inputs of its node (Compare's
+  `a` and `b`, Coalesce's inputs and result, the `default` of Get Property, Get Element, Get
+  Random Element and Get Variable) takes the type of what is wired to them: with `a` wired to a
+  number, `5` typed in `b` is the number 5, so `a == b` compares 5 with 5. A small tag beside the
+  box says what you get: **number**, **text**, **true/false**, **JSON** or **list**.
+- With nothing wired to give it a type, what you type is **text**. Make Array's elements and the
+  other inputs that take any value are always text when typed; the ƒx control is the way to
+  compute a value instead.
+- When the wiring changes an input's type, its value follows when the conversion is exact (`5`
+  and the text "5", `true` and the text "true"); otherwise the value stays as you typed it and is
+  flagged. A value already stored with a type of its own keeps it while nothing wired says
+  otherwise.
+
+A flow saved before this rule may hold such a value as text next to a wired number. Opening it
+converts the value, says which values changed ("2 typed values now take the type of their input
+… Save to keep them"), and the flow shows unsaved changes until you save it. A flow run without
+being opened and saved again keeps the value it stored.
+
 ### If/Else branch order
 
 The up/down arrows button at the top right of an If/Else node swaps the order in which its True and
