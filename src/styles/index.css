@@ -9784,3 +9784,22 @@ button.flow-nature-badge:hover:not(:disabled),
   gap: 6px;
   margin: 2px 0 4px;
 }
+
+/* Run window, On Flow Start: unset inputs and the folded run context. */
+.run-param-empty {
+  color: var(--af-fg-muted, #8a93a6);
+  font-style: italic;
+}
+.run-param-context {
+  margin-top: 12px;
+}
+.run-param-context > summary {
+  cursor: pointer;
+  list-style: revert;
+}
+.run-param-context-hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--af-fg-muted, #8a93a6);
+}

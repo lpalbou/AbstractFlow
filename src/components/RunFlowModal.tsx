@@ -183,6 +183,16 @@ type JsonParseResult<T> =
 type FollowUpMessage = { role: 'user' | 'assistant'; content: string };
 type FollowUpContext = { messages: FollowUpMessage[]; workflowKey?: string; rootRunId?: string | null };
 
+
+// Keys the gateway writes into a run's inputs at start (bundle identity, the workspace policy
+// rows, session flags): run context, not the flow's own parameters.
+const isRunContextKey = (key: string): boolean =>
+  key === 'workflow_selection' ||
+  key.startsWith('workspace') ||
+  key === 'use_session_history' ||
+  key === 'sessionId' ||
+  key === 'session_id';
+
 function parseJson<T>(raw: string): JsonParseResult<T> {
   const text = typeof raw === 'string' ? raw.trim() : '';
   if (!text) {
@@ -5793,7 +5803,7 @@ export function RunFlowModal({
 
   const showGenericOutputPreview = Boolean(outputPreview?.previewText) && !(
     Boolean(generatedImagePreview || generatedAudioPreview || generatedVideoPreview) && Boolean(outputPreview?.previewIsJson)
-  );
+  ) && selectedStep?.nodeType !== 'on_flow_start'; // the parameters grid IS the start node's preview
   const isImplicitFlowEndStep = selectedStep?.nodeId === '__implicit_flow_end__';
 
   const selectedEventIndex = useMemo(() => {
@@ -6011,7 +6021,9 @@ export function RunFlowModal({
     if (Array.isArray(out)) return null;
 
     const obj = out as Record<string, unknown>;
-    const entries = Object.entries(obj).filter(([k]) => k && k !== 'exec-out' && !k.startsWith('_'));
+    const entries = Object.entries(obj).filter(
+      ([k]) => k && k !== 'exec-out' && !k.startsWith('_') && !isRunContextKey(k)
+    );
     if (entries.length === 0) return null;
 
     const weight = (k: string) => {
@@ -6030,6 +6042,95 @@ export function RunFlowModal({
 
     return entries;
   }, [selectedStep]);
+
+  // What the gateway added at start (bundle identity, workspace, session flags): shown folded,
+  // apart from the flow's own inputs.
+  const onFlowStartContext = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'on_flow_start') return null;
+    const out = selectedStep.output;
+    if (!out || typeof out !== 'object' || Array.isArray(out)) return null;
+    const entries = Object.entries(out as Record<string, unknown>).filter(([k]) => isRunContextKey(k));
+    return entries.length ? entries.sort((a, b) => a[0].localeCompare(b[0])) : null;
+  }, [selectedStep]);
+
+  const renderOnFlowStartParam = ([k, v]: [string, unknown]) => {
+    const isProvider = k === 'provider' && typeof v === 'string' && v.trim();
+    const isModel = k === 'model' && typeof v === 'string' && v.trim();
+    const isPrompt = k === 'prompt' && typeof v === 'string' && v.trim();
+    const isSessionId = k === 'sessionId' && typeof v === 'string' && v.trim();
+    const isWorkspaceRoot = k === 'workspace_root' && typeof v === 'string' && v.trim();
+    const isUnset = v === null || v === undefined || (typeof v === 'string' && !v.trim());
+
+    return (
+      <div key={k} className="run-param-row">
+        <div className="run-param-key">{k}</div>
+        <div className="run-param-val">
+          {isUnset ? (
+            <span className="run-param-empty">not set</span>
+          ) : isProvider ? (
+            <span className="run-metric-badge metric-provider">{String(v).trim()}</span>
+          ) : isModel ? (
+            <span className="run-metric-badge metric-model">{String(v).trim()}</span>
+          ) : isSessionId ? (
+            <div className="run-param-inline">
+              <span className="run-param-text">{String(v)}</span>
+              <button
+                type="button"
+                className="run-param-copy"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void copyToClipboard(v);
+                }}
+                title="Copy session id"
+                aria-label="Copy session id"
+              >
+                ⧉
+              </button>
+            </div>
+          ) : isWorkspaceRoot ? (
+            <div className="run-param-inline">
+              <button
+                type="button"
+                className="run-param-link"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void copyToClipboard(v);
+                }}
+                title="Copy workspace path (server-side)"
+                aria-label="Copy workspace path"
+              >
+                {String(v)}
+              </button>
+              <button
+                type="button"
+                className="run-param-copy"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void copyToClipboard(v);
+                }}
+                title="Copy workspace path"
+                aria-label="Copy workspace path"
+              >
+                ⧉
+              </button>
+            </div>
+          ) : typeof v === 'boolean' ? (
+            <span className="run-metric-badge metric-bool">{v ? 'true' : 'false'}</span>
+          ) : typeof v === 'number' ? (
+            <span className="run-metric-badge metric-number">{String(v)}</span>
+          ) : isPrompt ? (
+            <div className="run-details-markdown run-param-markdown">
+              <MarkdownRenderer markdown={String(v).trim()} />
+            </div>
+          ) : typeof v === 'string' ? (
+            <span className="run-param-text">{v}</span>
+          ) : (
+            <JsonViewer value={v} className="run-param-json" collapseAfterDepth={1} />
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const shouldDefaultRawJsonOpen = useMemo(() => {
     if (!selectedStep || resolvedStepOutput == null) return false;
@@ -7418,82 +7519,20 @@ export function RunFlowModal({
                             <div className="run-output-section">
                               <div className="run-output-title">Run parameters</div>
                               <div className="run-param-grid">
-                                {onFlowStartParams.map(([k, v]) => {
-                                  const isProvider = k === 'provider' && typeof v === 'string' && v.trim();
-                                  const isModel = k === 'model' && typeof v === 'string' && v.trim();
-                                  const isPrompt = k === 'prompt' && typeof v === 'string' && v.trim();
-                                  const isSessionId = k === 'sessionId' && typeof v === 'string' && v.trim();
-                                  const isWorkspaceRoot = k === 'workspace_root' && typeof v === 'string' && v.trim();
-
-                                  return (
-                                    <div key={k} className="run-param-row">
-                                      <div className="run-param-key">{k}</div>
-                                      <div className="run-param-val">
-                                        {isProvider ? (
-                                          <span className="run-metric-badge metric-provider">{String(v).trim()}</span>
-                                        ) : isModel ? (
-                                          <span className="run-metric-badge metric-model">{String(v).trim()}</span>
-                                        ) : isSessionId ? (
-                                          <div className="run-param-inline">
-                                            <span className="run-param-text">{String(v)}</span>
-                                            <button
-                                              type="button"
-                                              className="run-param-copy"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                void copyToClipboard(v);
-                                              }}
-                                              title="Copy session id"
-                                              aria-label="Copy session id"
-                                            >
-                                              ⧉
-                                            </button>
-                                          </div>
-                                        ) : isWorkspaceRoot ? (
-                                          <div className="run-param-inline">
-                                            <button
-                                              type="button"
-                                              className="run-param-link"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                void copyToClipboard(v);
-                                              }}
-                                              title="Copy workspace path (server-side)"
-                                              aria-label="Copy workspace path"
-                                            >
-                                              {String(v)}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="run-param-copy"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                void copyToClipboard(v);
-                                              }}
-                                              title="Copy workspace path"
-                                              aria-label="Copy workspace path"
-                                            >
-                                              ⧉
-                                            </button>
-                                          </div>
-                                        ) : typeof v === 'boolean' ? (
-                                          <span className="run-metric-badge metric-bool">{v ? 'true' : 'false'}</span>
-                                        ) : typeof v === 'number' ? (
-                                          <span className="run-metric-badge metric-number">{String(v)}</span>
-                                        ) : isPrompt ? (
-                                          <div className="run-details-markdown run-param-markdown">
-                                            <MarkdownRenderer markdown={String(v).trim()} />
-                                          </div>
-                                        ) : typeof v === 'string' ? (
-                                          <span className="run-param-text">{v}</span>
-                                        ) : (
-                                          <JsonViewer value={v} className="run-param-json" />
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                                {onFlowStartParams.map(renderOnFlowStartParam)}
                               </div>
+                              {onFlowStartContext ? (
+                                <details className="run-param-context">
+                                  <summary className="run-output-title">
+                                    Run context
+                                    <span className="run-param-context-hint">
+                                      {' '}
+                                      · what the gateway added at start ({onFlowStartContext.length})
+                                    </span>
+                                  </summary>
+                                  <div className="run-param-grid">{onFlowStartContext.map(renderOnFlowStartParam)}</div>
+                                </details>
+                              ) : null}
                             </div>
                           ) : null}
 
