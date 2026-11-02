@@ -319,7 +319,14 @@ export function parseLiteralText(text: string, kind: LiteralKind): LiteralConver
   if (kind === 'number') {
     if (!DECIMAL_NUMBER.test(t)) return { ok: false, problem: `${quoted(text)} is not a number` };
     const n = Number(t);
-    return Number.isFinite(n) ? { ok: true, value: n } : { ok: false, problem: `${quoted(text)} is too large a number` };
+    if (!Number.isFinite(n)) return { ok: false, problem: `${quoted(text)} is too large a number` };
+    // A whole number beyond 2^53 has no exact JSON number in the browser (9007199254740993 would
+    // be stored as ...992): it stays text and is flagged rather than stored rounded.
+    const integerText = !t.includes('.') && !t.toLowerCase().includes('e');
+    if (integerText && !Number.isSafeInteger(n)) {
+      return { ok: false, problem: `${quoted(text)} is too large a number to store exactly` };
+    }
+    return { ok: true, value: n };
   }
   if (kind === 'boolean') {
     const lower = t.toLowerCase();
@@ -365,7 +372,10 @@ export function convertLiteral(value: JsonValue, kind: LiteralKind): LiteralConv
   return { ok: false, problem: `${literalText(value)} is ${LITERAL_KIND_NOUN[has]}, not ${LITERAL_KIND_NOUN[kind]}` };
 }
 
-/** The text a stored value shows in its box. */
+/**
+ * The text a stored value shows in its box, and the text a number becomes when its input turns
+ * to text: the number as JavaScript writes it (1e21 is "1e+21", as Python writes it too).
+ */
 export function literalText(value: JsonValue | undefined): string {
   if (value === undefined || value === null) return '';
   if (typeof value === 'string') return value;

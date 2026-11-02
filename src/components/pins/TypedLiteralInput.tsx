@@ -47,6 +47,8 @@ export function TypedLiteralInput({
           onCommit(undefined);
           return;
         }
+        // Every keystroke commits, so the flow always holds what the box shows: "-" on the way
+        // to "-5" is briefly stored as that text (flagged once the box loses focus).
         const parsed = parseLiteralText(text, kind);
         // Text that is not a value of the kind is kept as typed: the card says why it is wrong.
         onCommit(parsed.ok ? parsed.value : text);

@@ -3,11 +3,14 @@
 
 `src/utils/__fixtures__/typed_literals_flow.json` is what the editor saves for Compare `b`
 typed next to a wired number: the JSON numbers 5 and 9. The runtime executes them as stored,
-so `5 == 5` and `10 > 9` are true. `typed_literals_flow.legacy.json` is the same flow as
-Flow 0.13.0 saved it (the text "5" and "9"): the runtime still executes it as stored, never
-guessing a type from the text, so both comparisons are false; the editor converts such a flow
-when it opens it (src/utils/pinLiterals.test.ts proves that conversion gives exactly the
-typed fixture). No model, no network.
+so `5 == 5` and `10 > 9` are true. No model, no network.
+
+`typed_literals_flow.legacy.json` is the same flow as Flow 0.13.0 saved it (the text "5" and
+"9"). The editor converts it when it opens it (src/utils/pinLiterals.test.ts proves the
+conversion gives exactly the typed fixture). How the runtime runs it unconverted is the
+runtime's contract, tested where it is implemented (AbstractRuntime
+tests/test_visual_compare_typed_values.py: a run error naming the Compare node, never a
+silent False); this smoke runs against the runtime published on PyPI.
 """
 from __future__ import annotations
 
@@ -44,10 +47,6 @@ def main() -> None:
     check("typed: 5 == 5 (b stored as the number 5)", typed.get("same") is True, str(typed))
     check("typed: 10 > 9 (b stored as the number 9)", typed.get("above") is True, str(typed))
 
-    legacy = run(FIXTURES / "typed_literals_flow.legacy.json")
-    print(f"  legacy output: {legacy}")
-    check("legacy: 5 == '5' runs as stored (false)", legacy.get("same") is False, str(legacy))
-    check("legacy: 10 > '9' runs as stored (false)", legacy.get("above") is False, str(legacy))
     print("typed literals smoke: OK")
 
 

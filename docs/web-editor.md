@@ -205,9 +205,13 @@ uses it as stored:
   Random Element and Get Variable) takes the type of what is wired to them: with `a` wired to a
   number, `5` typed in `b` is the number 5, so `a == b` compares 5 with 5. A small tag beside the
   box says what you get: **number**, **text**, **true/false**, **JSON** or **list**.
-- With nothing wired to give it a type, what you type is **text**. Make Array's elements and the
-  other inputs that take any value are always text when typed; the ƒx control is the way to
-  compute a value instead.
+- With nothing wired to give it a type, what you type is **text**. Make Array's elements, Add to
+  List Variable's `item` and the other inputs that take any value are always text when typed;
+  the ƒx control is the way to compute a value instead.
+- Spaces around a number or a true/false are ignored, and true/false is read in any case
+  (`True`, `FALSE`). A whole number larger than 9007199254740991 (2^53 − 1) cannot be stored
+  exactly, so it stays text and is flagged. A number that becomes text is written the way
+  JavaScript writes it (`1e21` becomes `1e+21`).
 - When the wiring changes an input's type, its value follows when the conversion is exact (`5`
   and the text "5", `true` and the text "true"); otherwise the value stays as you typed it and is
   flagged. A value already stored with a type of its own keeps it while nothing wired says
@@ -216,7 +220,8 @@ uses it as stored:
 A flow saved before this rule may hold such a value as text next to a wired number. Opening it
 converts the value, says which values changed ("2 typed values now take the type of their input
 … Save to keep them"), and the flow shows unsaved changes until you save it. A flow run without
-being opened and saved again keeps the value it stored.
+being opened and saved again keeps the value it stored, and a Compare that meets a number on one
+side and text on the other stops the run with "One side is a number and the other is text. Open the flow in the editor and save it to store typed values."
 
 ### If/Else branch order
 

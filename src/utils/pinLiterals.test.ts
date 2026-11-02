@@ -195,6 +195,13 @@ describe('conversion', () => {
     expect(parseLiteralText('0x10', 'number').ok).toBe(false);
     expect(parseLiteralText('Infinity', 'number').ok).toBe(false);
     expect(parseLiteralText('1e999', 'number')).toEqual({ ok: false, problem: '“1e999” is too large a number' });
+    expect(parseLiteralText('9007199254740991', 'number')).toEqual({ ok: true, value: 9007199254740991 });
+    expect(parseLiteralText('9007199254740993', 'number')).toEqual({
+      ok: false,
+      problem: '“9007199254740993” is too large a number to store exactly',
+    });
+    expect(parseLiteralText('-12345678901234567890', 'number').ok).toBe(false);
+    expect(parseLiteralText('1e21', 'number')).toEqual({ ok: true, value: 1e21 });
     expect(parseLiteralText('', 'number')).toEqual({ ok: true, value: undefined });
     expect(parseLiteralText('TRUE', 'boolean')).toEqual({ ok: true, value: true });
     expect(parseLiteralText('5', 'string')).toEqual({ ok: true, value: '5' });
@@ -207,6 +214,9 @@ describe('conversion', () => {
   it('converts stored values exactly or says why not', () => {
     expect(convertLiteral(5, 'string')).toEqual({ ok: true, value: '5' });
     expect(convertLiteral(true, 'string')).toEqual({ ok: true, value: 'true' });
+    expect(convertLiteral(1e21, 'string')).toEqual({ ok: true, value: '1e+21' });
+    // A stored text beyond 2^53 is never stored rounded: it stays text and is flagged.
+    expect(convertLiteral('9007199254740993', 'number').ok).toBe(false);
     expect(convertLiteral(5, 'boolean')).toEqual({ ok: false, problem: '5 is a number, not true or false' });
     expect(convertLiteral({ a: 1 }, 'string')).toEqual({ ok: false, problem: '{"a":1} is a JSON object, not text' });
     expect(convertLiteral(null, 'number')).toEqual({ ok: true, value: null });
