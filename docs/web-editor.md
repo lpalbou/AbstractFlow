@@ -732,7 +732,7 @@ state (collapse toggle) and a copy button that exports the whole activity feed
 persists after the turn ends with its final state (green dot for "Draft graph
 updated", red dot for "Authoring failed" or "Interrupted by user") so the
 cycle history can be reviewed post-turn. A Stop control — in the status card
-and in place of Send while busy — interrupts the autonomous loop between calls
+and beside the Send button while busy — interrupts the autonomous loop between calls
 and best-effort cancels the in-flight Gateway planner run; applied edits stay
 in the draft and remain undoable via Undo Turn.
 
@@ -927,7 +927,8 @@ text and answers it in a single pass with a decision model (Kev / Lev / Laya loc
   and no fallback.
 - **Clarification**: declares how long to wait (**Wait at most**, 120 to 300 seconds, 180 by
   default) and **If no answer arrives**, the fallback that says exactly how the work continues.
-  The fallback is required; silence never counts as consent.
+  The fallback is required; silence never counts as consent. The run checks refuse a
+  clarification without a fallback or with a deadline outside 120 to 300 seconds.
 
 The node's outputs are `response`, `timed_out` (true when a clarification's deadline passed with
 no answer), `fallback` (the declared fallback after expiry, never an invented answer) and

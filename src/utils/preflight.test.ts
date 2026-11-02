@@ -557,3 +557,50 @@ describe('preflight — a loop-back out of a loop body (backlog 1018)', () => {
     expect(issues.some((i) => i.message.includes('loop body'))).toBe(false);
   });
 });
+
+describe('preflight — Ask User clarification policy (AbstractRuntime make_question)', () => {
+  const ask = (question: NonNullable<FlowNodeData['effectConfig']>['question']): Node<FlowNodeData> => ({
+    id: 'ask',
+    type: 'default',
+    position: { x: 150, y: 0 },
+    data: {
+      nodeType: 'ask_user',
+      label: 'Ask',
+      icon: '',
+      headerColor: '',
+      inputs: [
+        { id: 'exec-in', label: '', type: 'execution' },
+        { id: 'prompt', label: 'prompt', type: 'string' },
+        { id: 'question', label: 'question', type: 'object' },
+      ],
+      outputs: [{ id: 'exec-out', label: '', type: 'execution' }],
+      pinDefaults: { prompt: 'Which repo?' },
+      effectConfig: question ? { question } : {},
+    } as FlowNodeData,
+  });
+  const wire: Edge = { id: 'e1', source: 'start', sourceHandle: 'exec-out', target: 'ask', targetHandle: 'exec-in' };
+  const messages = (n: Node<FlowNodeData>, edges: Edge[] = [wire]) =>
+    computeRunPreflightIssues([startNode(), n], edges).filter((i) => i.nodeId === 'ask').map((i) => i.message);
+
+  it('refuses a clarification with no fallback (the default the panel saves)', () => {
+    expect(messages(ask({ importance: 'clarification', timeout_s: 180, fallback: '' }))).toContain(
+      'Clarification: If no answer arrives needs a fallback (how the work continues)'
+    );
+  });
+
+  it('refuses a deadline outside 120 to 300 seconds, a cleared field included', () => {
+    for (const timeout_s of [0, 119, 301, Number.NaN]) {
+      expect(messages(ask({ importance: 'clarification', timeout_s, fallback: 'Use main.' }))).toContain(
+        'Clarification: Wait at most must be between 120 and 300 seconds'
+      );
+    }
+  });
+
+  it('passes a valid clarification, an essential question and a standard one; a wired question pin decides at run time', () => {
+    expect(messages(ask({ importance: 'clarification', timeout_s: 120, fallback: 'Use main.' }))).toEqual([]);
+    expect(messages(ask({ importance: 'essential' }))).toEqual([]);
+    expect(messages(ask(undefined))).toEqual([]);
+    const wired: Edge = { id: 'e2', source: 'start', sourceHandle: 'policy', target: 'ask', targetHandle: 'question' };
+    expect(messages(ask({ importance: 'clarification', timeout_s: 180, fallback: '' }), [wire, wired])).toEqual([]);
+  });
+});

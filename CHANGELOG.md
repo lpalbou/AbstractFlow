@@ -36,7 +36,8 @@ Needs AbstractRuntime 0.16.0 (the Decision node and the Ask User question policy
   (waits for an answer) or *Clarification*, which declares how long to wait (120 to 300 seconds, 180 by default) and
   what happens if no answer arrives; the fallback is required, and silence never counts as consent. The node gains a
   `question` input and `timed_out`, `fallback` and `question` outputs, so a flow can branch on an expired
-  clarification. Saved in the node's `effectConfig.question`. Needs AbstractRuntime 0.16.0.
+  clarification. Saved in the node's `effectConfig.question`; the run checks refuse a clarification without a
+  fallback or with a deadline outside 120 to 300 seconds. Needs AbstractRuntime 0.16.0.
 
 ### Changed
 - Every chat box uses the shared rounded multiline composer from `@abstractframework/panel-chat` 0.7.0:
@@ -48,7 +49,7 @@ Needs AbstractRuntime 0.16.0 (the Decision node and the Ask User question policy
 - **Run window: On Flow Start shows the flow's inputs.** Selecting the start step lists the flow's own inputs
   under *Run parameters*, an input with no value marked *not set*; what the gateway adds at start (the workflow
   selection, the workspace settings, session flags) sits apart under a folded section; the same values are no
-  longer repeated in a second preview below.
+  longer repeated in a second preview below. A flow with no inputs of its own says so.
 - The top bar's account is the kit's account widget (the docs button, Appearance, About and the account are the
   same kit components in every AbstractFramework app). Signed in, one button shows the person icon,
   your name and the connection light; its menu holds Signed in as, Gateway, Copy user id and Disconnect. It replaces

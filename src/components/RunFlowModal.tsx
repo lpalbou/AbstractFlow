@@ -7500,15 +7500,19 @@ export function RunFlowModal({
                         generatedImagePreview ||
                         generatedAudioPreview ||
                         generatedVideoPreview ||
-                        (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams) ||
+                        (selectedStep?.nodeType === 'on_flow_start' && (onFlowStartParams || onFlowStartContext)) ||
                         (selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null)) ? (
                         <div className="run-output-preview">
-                          {selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams ? (
+                          {selectedStep?.nodeType === 'on_flow_start' && (onFlowStartParams || onFlowStartContext) ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Run parameters</div>
-                              <div className="run-param-grid">
-                                {onFlowStartParams.map(renderOnFlowStartParam)}
-                              </div>
+                              {onFlowStartParams ? (
+                                <div className="run-param-grid">
+                                  {onFlowStartParams.map(renderOnFlowStartParam)}
+                                </div>
+                              ) : (
+                                <div className="run-param-empty">This flow has no inputs of its own.</div>
+                              )}
                               {onFlowStartContext ? (
                                 <details className="run-param-context">
                                   <summary className="run-output-title">
