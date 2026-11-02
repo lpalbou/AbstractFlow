@@ -482,13 +482,15 @@ const CORE_NODES: NodeTemplate[] = [
         id: 'options',
         label: 'options',
         type: 'array',
-        description: 'Choice only: the option names ["returns", "shipping"] or a {name: description} object. At least one.',
+        description: 'Choice only: the option names, typed as "returns, shipping, billing" on the card (or a {name: description} object from the panel). At least one.',
+        schema: { type: 'array', items: { type: 'string' } },
       },
       {
         id: 'levels',
         label: 'levels',
         type: 'array',
-        description: 'Score only: the ordered level labels, lowest first ["Calm", "Frustrated", "Very angry"]. At least two.',
+        description: 'Score only: the ordered level labels, lowest first, typed as "Calm, Frustrated, Very angry". At least two.',
+        schema: { type: 'array', items: { type: 'string' } },
       },
       {
         id: 'provider',

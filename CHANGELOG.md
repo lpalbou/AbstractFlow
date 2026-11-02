@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Typing into an unwired `any` input on a node card (Make Array's elements, Is Empty's text) stores the text as the pin's value; writing an expression is the explicit fx control. A plain word used to be stored as a pin expression and failed at run time as an undefined Python name.
+- Setting a value on a card pin replaces an ƒx expression on that pin, and `array` pins whose items are strings (a Decision's `options` / `levels`) are typed on the card as one comma-separated line.
 
 ### Added
 - **Decision** node (`decide`), a first-level node in the palette's Essentials next to Agent and LLM Call: one

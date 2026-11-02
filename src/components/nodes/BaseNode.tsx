@@ -7,7 +7,8 @@
  */
 
 import { isNotifyMeNode, notifyMeChannels, notifyMeReaches } from '../../utils/afterTheRun';
-import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isStringListPin, stringListToText, textToStringList } from '../../utils/pinLists';
+import { Fragment, memo, type MouseEvent, type ReactElement, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Handle, Position, NodeProps, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
@@ -765,6 +766,51 @@ const VarDeclInline = memo(function VarDeclInline({
     </div>
   );
 });
+
+
+/** One comma-separated line for an `array` of strings; the list is stored when the field loses
+ *  focus or on Enter, so commas and spaces can be typed freely. */
+function PinListInput({
+  value,
+  placeholder,
+  onCommit,
+}: {
+  value: unknown;
+  placeholder?: string;
+  onCommit: (list: string[]) => void;
+}): ReactElement {
+  const stored = stringListToText(value);
+  const [draft, setDraft] = useState<string>(stored);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!editing) setDraft(stored);
+  }, [stored, editing]);
+  const commit = () => {
+    setEditing(false);
+    const list = textToStringList(draft);
+    if (stringListToText(list) !== stored) onCommit(list);
+  };
+  return (
+    <input
+      className="af-pin-input nodrag"
+      type="text"
+      value={draft}
+      placeholder={placeholder}
+      title="Comma-separated values"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onFocus={() => setEditing(true)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+    />
+  );
+}
 
 export const BaseNode = memo(function BaseNode({
   id,
@@ -3441,9 +3487,18 @@ export const BaseNode = memo(function BaseNode({
       } else {
         next[pinId] = value;
       }
+      // Setting a value on the card is the value: an ƒx expression on the same pin would
+      // shadow it at run time, so it goes (the fx control writes one back on purpose).
+      const expressions = data.pinExpressions || {};
+      if (value !== undefined && Object.prototype.hasOwnProperty.call(expressions, pinId)) {
+        const rest = { ...expressions };
+        delete rest[pinId];
+        updateNodeData(id, { pinDefaults: next, pinExpressions: Object.keys(rest).length ? rest : undefined });
+        return;
+      }
       updateNodeData(id, { pinDefaults: next });
     },
-    [data.pinDefaults, id, updateNodeData]
+    [data.pinDefaults, data.pinExpressions, id, updateNodeData]
   );
 
   // Inline pin expressions (tier 1): one pin edits at a time per node card;
@@ -4429,11 +4484,15 @@ export const BaseNode = memo(function BaseNode({
                 // field: what you type is the value. The fx control beside it is the explicit
                 // way to write an expression, so a plain word is never read as a Python name.
                 const isAnyTextPin = pin.type === 'any';
+                // A list of short texts (`array` of strings: a Decision's options / levels)
+                // is typed on the card as one comma-separated line.
+                const isListTextPin = isStringListPin(pin);
                 const isPrimitive =
                   pin.type === 'string' ||
                   pin.type === 'number' ||
                   pin.type === 'boolean' ||
-                  isAnyTextPin;
+                  isAnyTextPin ||
+                  isListTextPin;
                 const isEmitEventName = isEmitEventNode && pin.id === 'name';
                 const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
                 const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
@@ -5677,6 +5736,15 @@ export const BaseNode = memo(function BaseNode({
                         />
                         <span className="af-pin-checkbox-box" aria-hidden="true" />
                       </label>
+                    );
+                  } else if (isListTextPin) {
+                    controls.push(
+                      <PinListInput
+                        key="pin-default"
+                        value={raw}
+                        placeholder="a, b, c"
+                        onCommit={(list) => setPinDefault(pin.id, list.length > 0 ? list : undefined)}
+                      />
                     );
                   }
                 }

@@ -43,8 +43,8 @@ DECIDE_INPUTS = [
          schema={"type": "string", "enum": ["choice", "noul", "score"],
                  "oneOf": [{"const": "choice", "title": "Choice"}, {"const": "noul", "title": "Yes-no (noul)"},
                            {"const": "score", "title": "Score"}]}),
-    pin("options", "options", "array"),
-    pin("levels", "levels", "array"),
+    dict(pin("options", "options", "array"), schema={"type": "array", "items": {"type": "string"}}),
+    dict(pin("levels", "levels", "array"), schema={"type": "array", "items": {"type": "string"}}),
     pin("provider", "provider", "provider"),   # a decision provider; empty here: the handle in `model` names it
     pin("model", "model", "model"),
     pin("truncate", "truncate", "boolean"),
