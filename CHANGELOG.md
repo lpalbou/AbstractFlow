@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.16.0.
 
 ### Changed
+- Every chat box uses the shared rounded multiline composer from `@abstractframework/panel-chat` 0.7.0:
+  the authoring assistant and Follow Up (Ctrl/Cmd+Enter sends, since each starts a run), the code
+  assistant and the run window's waiting input and Continue (Enter sends, Shift+Enter adds a line);
+  attachments through the + button or drag and drop. The dependency moves from panel-chat 0.5 to
+  0.7, which also brings the 0.6 docs assistant wording and read-aloud behaviour; requires
+  `@abstractframework/ui-kit` ^0.9.8.
 - The top bar's account is the kit's ONE account widget (operator ruling 2026-10-29: the docs button, Appearance,
   About and the account are the same kit components in every app). Signed in, one button shows the person icon,
   your name and the connection light; its menu holds Signed in as, Gateway, Copy user id and Disconnect. It replaces

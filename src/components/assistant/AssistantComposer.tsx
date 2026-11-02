@@ -1,5 +1,6 @@
 import { AUTHORING_CYCLE_OPTIONS, normalizeMaxCycles } from './assistantSettings';
 import { IconClear, IconCopy, IconUndo } from './icons';
+import { ChatComposer } from '@abstractframework/panel-chat';
 
 interface AssistantComposerProps {
   draft: string;
@@ -33,23 +34,21 @@ export function AssistantComposer({
 }: AssistantComposerProps) {
   return (
     <div className="assistant-input-area">
-      <textarea
+      <ChatComposer
         value={draft}
-        onChange={(event) => onDraftChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            onSubmit();
-          }
-        }}
+        onChange={onDraftChange}
+        onSubmit={onSubmit}
+        submitKey="mod-enter"
+        busy={busy}
+        busyLabel={stopRequested ? 'Stopping…' : 'Working…'}
+        ariaLabel="Message to workflow assistant"
         placeholder="Create an internet research workflow…"
-        rows={4}
-      />
-      <div className="assistant-actions">
+        actions={
+        <>
         <div className="assistant-actions-icons">
           <button
             type="button"
-            className="assistant-icon-button"
+            className="assistant-icon-button pc-workflow-chat__icon-button"
             onClick={onCopyConversation}
             title="Copy conversation"
             aria-label="Copy assistant conversation"
@@ -58,7 +57,7 @@ export function AssistantComposer({
           </button>
           <button
             type="button"
-            className="assistant-icon-button"
+            className="assistant-icon-button pc-workflow-chat__icon-button"
             onClick={onClearConversation}
             disabled={busy}
             title="Clear conversation"
@@ -68,7 +67,7 @@ export function AssistantComposer({
           </button>
           <button
             type="button"
-            className="assistant-icon-button"
+            className="assistant-icon-button pc-workflow-chat__icon-button"
             onClick={onUndo}
             disabled={!canUndo || busy}
             title="Undo last assistant turn"
@@ -77,7 +76,6 @@ export function AssistantComposer({
             <IconUndo />
           </button>
         </div>
-        <div className="assistant-actions-send">
           <select
             className="assistant-cycles-select"
             value={maxCycles}
@@ -92,17 +90,14 @@ export function AssistantComposer({
               </option>
             ))}
           </select>
-          {busy ? (
-            <button type="button" className="danger" onClick={onStop} disabled={stopRequested}>
+        </>
+        }
+        trailingActions={busy ? (
+            <button type="button" className="pc-workflow-chat__stop" onClick={onStop} disabled={stopRequested}>
               {stopRequested ? 'Stopping…' : 'Stop'}
             </button>
-          ) : (
-            <button type="button" className="primary" onClick={onSubmit} disabled={!draft.trim()}>
-              Send
-            </button>
-          )}
-        </div>
-      </div>
+          ) : null}
+      />
     </div>
   );
 }

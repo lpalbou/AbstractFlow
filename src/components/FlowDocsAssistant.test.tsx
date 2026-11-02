@@ -65,7 +65,7 @@ describe('Flow Docs assistant (kit DocsAssistantDrawer)', () => {
     expect(html).toContain('pc-chat-item--user');
     expect(html).toContain('pc-chat-item--assistant');
     expect(html).toContain('<strong>Run</strong>');
-    expect(html).toContain('Grounded on AbstractFlow’s documentation (llms.txt) · docs-qa');
+    expect(html).toContain('Powered by AbstractFlow’s documentation.');
   });
 
   it('renders the shared drawer: icon-only New conversation, close, attach, keep-alive', () => {

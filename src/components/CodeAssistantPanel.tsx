@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clipboardWriteOrThrow } from '../lib/copy_feedback';
+import { ChatComposer } from '@abstractframework/panel-chat';
 import {
   askCodeAssistant,
   buildCodeAssistantPrompt,
@@ -155,44 +156,28 @@ export function CodeAssistantPanel({ context, contracts: givenContracts, onInser
         ))}
         {busy ? <div className="code-assistant-msg assistant pending">Thinking…</div> : null}
       </div>
-      <form
+      <ChatComposer
         className="code-assistant-composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void ask(draft);
-        }}
-      >
-        <textarea
-          className="code-assistant-input"
-          value={draft}
-          placeholder={model ? 'Describe the code you need (Python)…' : 'Waiting for the gateway model…'}
-          rows={2}
-          spellCheck={false}
-          disabled={!model}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void ask(draft);
-            }
-          }}
-        />
-        {busy ? (
+        value={draft}
+        onChange={setDraft}
+        onSubmit={() => void ask(draft)}
+        placeholder={model ? 'Describe the code you need (Python)…' : 'Waiting for the gateway model…'}
+        ariaLabel="Message to coding assistant"
+        disabled={!model}
+        busy={busy}
+        sendLabel="Ask"
+        trailingActions={busy ? (
           <button
             type="button"
-            className="modal-button secondary"
+            className="pc-workflow-chat__stop"
             onClick={() => {
               cancelledRef.current = true;
             }}
           >
             Stop
           </button>
-        ) : (
-          <button type="submit" className="modal-button primary" disabled={disabled || !draft.trim()}>
-            Ask
-          </button>
-        )}
-      </form>
+        ) : null}
+      />
     </div>
   );
 }
