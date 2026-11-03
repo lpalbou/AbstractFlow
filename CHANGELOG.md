@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is not of its input's type (including a whole number beyond 2^53, which cannot be stored exactly) is flagged
   under its row and refused by the run checks; a rewire converts a value when the conversion is exact. A flow saved by 0.13.0 with such a value stored as text is converted when you open
   it, with a notice, and keeps the stored text until you save it.
+- Run dialog: a flow input wired only to Decision `model` inputs picks from the decision models
+  (`provider/model` handles from the `output.decision` route) instead of being a text-model picker
+  disabled behind "Pick provider…". A model input of a form with no provider input can be picked or
+  typed on its own; it waits for a provider only when the form has one.
+- Run dialog: a run that ends in a fraction of a second showed an invented "On Flow End" step and
+  the last node's answer as its Final Result. The final result is now the run record's output, and a
+  flow with an On Flow End never gets an invented end row.
+- The "Decision triage" example loads with every wire drawn: its end output `model` (a text, the
+  provider/model that answered) is now `answered_by`; an end pin named `model` is a model picker
+  that a text cannot feed.
 
 ## [0.13.0] - 2026-11-02
 

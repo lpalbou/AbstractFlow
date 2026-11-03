@@ -41,7 +41,8 @@ import { COMPARE_DEFAULT_OP, COMPARE_OPS, isCollapsibleOperator } from '../../ut
 import { HiddenConnectionsBadge } from './HiddenConnectionsBadge';
 import { NodeStatusGlyph } from './NodeStatusGlyph';
 import { categoryColorVar, colorSectionForCategory, nodeSemanticCategory } from '../../utils/nodeCategoryColors';
-import { useDecisionCatalog, useModels, useProviders, type DecisionCatalog } from '../../hooks/useProviders';
+import { useDecisionCatalog, useModels, useProviders } from '../../hooks/useProviders';
+import { decisionModelOptions } from '../../utils/decisionPins';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../../utils/capabilityRoutes';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../../hooks/useGatewayCapabilities';
 import { useVisionAdapterCatalog } from '../../hooks/useVisionAdapterCatalog';
@@ -257,19 +258,6 @@ function withCurrentOption(options: SelectOption[], current: string): SelectOpti
   if (!clean) return options;
   if (options.some((option) => option.value === clean)) return options;
   return [...options, { value: clean, label: clean }];
-}
-
-/**
- * The Decision `model` choices: the chosen provider's decision models as bare ids, or,
- * with no provider, every `provider/model` handle on the output.decision route.
- */
-function decisionModelOptions(catalog: DecisionCatalog | undefined, provider: string): SelectOption[] {
-  const clean = provider.trim();
-  if (!catalog) return [];
-  if (clean) return (catalog.modelsByProvider[clean] || []).map((model) => ({ value: model, label: model }));
-  return catalog.providers.flatMap((p) =>
-    (catalog.modelsByProvider[p.name] || []).map((model) => ({ value: `${p.name}/${model}`, label: `${p.name}/${model}` }))
-  );
 }
 
 /** Why a typed Decision model is refused: with no provider it must be a `provider/model` handle. */

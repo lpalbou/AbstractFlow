@@ -9,6 +9,7 @@
  * options or levels change (like Switch cases) and re-derives them on load.
  * Pure: values in, pins out.
  */
+import type { DecisionCatalog } from '../hooks/useProviders';
 import type { FlowNodeData, Pin } from '../types/flow';
 
 export const DECISION_QUESTION_TYPES = ['choice', 'noul', 'score'] as const;
@@ -196,4 +197,44 @@ export function mergeDecisionOptionRows(previous: unknown, rows: string[]): unkn
     return merged;
   }
   return rows;
+}
+
+/**
+ * The Decision `model` choices: the chosen provider's decision models as bare ids, or,
+ * with no provider, every `provider/model` handle on the output.decision route (the
+ * handle carries its provider, so no separate provider input is needed).
+ */
+export function decisionModelOptions(
+  catalog: DecisionCatalog | undefined,
+  provider: string
+): Array<{ value: string; label: string }> {
+  const clean = provider.trim();
+  if (!catalog) return [];
+  if (clean) return (catalog.modelsByProvider[clean] || []).map((model) => ({ value: model, label: model }));
+  return catalog.providers.flatMap((p) =>
+    (catalog.modelsByProvider[p.name] || []).map((model) => ({ value: `${p.name}/${model}`, label: `${p.name}/${model}` }))
+  );
+}
+
+/**
+ * The entry node's output pins that pick a decision model: every wire leaving the pin ends on
+ * the `model` input of a Decision node (and there is at least one). The Run dialog offers those
+ * pins the decision-model catalog instead of the text-model one. Read from the graph only.
+ */
+export function decisionModelPinIds(
+  entryNodeId: string | undefined,
+  nodes: ReadonlyArray<{ id: string; data: { nodeType?: string } }>,
+  edges: ReadonlyArray<{ source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null }>
+): Set<string> {
+  const out = new Set<string>();
+  if (!entryNodeId) return out;
+  const typeById = new Map(nodes.map((n) => [n.id, n.data?.nodeType]));
+  const feedsDecisionOnly = new Map<string, boolean>();
+  for (const e of edges) {
+    if (e.source !== entryNodeId || !e.sourceHandle) continue;
+    const toDecisionModel = typeById.get(e.target) === 'decide' && e.targetHandle === 'model';
+    feedsDecisionOnly.set(e.sourceHandle, (feedsDecisionOnly.get(e.sourceHandle) ?? true) && toDecisionModel);
+  }
+  for (const [pinId, only] of feedsDecisionOnly) if (only) out.add(pinId);
+  return out;
 }

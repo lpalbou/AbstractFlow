@@ -143,7 +143,9 @@ def build() -> dict:
                      pin("escalate_probability", "escalate_probability", "number"),
                      pin("frustration", "frustration", "string"),
                      pin("frustration_score", "frustration_score", "number"),
-                     pin("model", "model", "string")]),
+                     # `answered_by`: the provider/model that answered (text). An end pin named
+                     # `model` is a model picker (type `model`) once loaded, which a text cannot feed.
+                     pin("answered_by", "answered_by", "string")]),
     ]
     edges = [
         edge("start", "exec-out", "department", "exec-in", animated=True),
@@ -165,7 +167,7 @@ def build() -> dict:
         edge("escalate", "noul", "end", "escalate_probability"),
         edge("frustration", "level", "end", "frustration"),
         edge("frustration", "score", "end", "frustration_score"),
-        edge("department", "model", "end", "model"),
+        edge("department", "model", "end", "answered_by"),
     ]
     flow["nodes"] = nodes
     flow["edges"] = edges

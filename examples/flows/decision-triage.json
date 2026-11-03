@@ -741,8 +741,8 @@
             "type": "number"
           },
           {
-            "id": "model",
-            "label": "model",
+            "id": "answered_by",
+            "label": "answered_by",
             "type": "string"
           }
         ],
@@ -917,15 +917,15 @@
       "animated": false
     },
     {
-      "id": "e-department-model-end-model",
+      "id": "e-department-model-end-answered_by",
       "source": "department",
       "sourceHandle": "model",
       "target": "end",
-      "targetHandle": "model",
+      "targetHandle": "answered_by",
       "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-11-02T00:10:18.514134+00:00",
-  "updated_at": "2026-11-02T00:10:18.514134+00:00"
+  "created_at": "2026-11-03T02:28:57.989476+00:00",
+  "updated_at": "2026-11-03T02:28:57.989476+00:00"
 }

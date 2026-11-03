@@ -940,6 +940,9 @@ text and answers it in a single pass with a decision model (Kev / Lev / Laya loc
   models (a bare id, sent with `provider`); with no provider the model list is every
   `provider/model` handle, and a handle can be typed (`typesafe/jev-latest`). Empty: the
   Gateway `output.decision` default.
+- **Run dialog.** A flow input wired only to Decision `model` inputs (the example's On Flow Start
+  `model`) is a decision-model picker in the Run dialog: every `provider/model` handle on the
+  `output.decision` route, no provider input needed. Empty: the Gateway `output.decision` default.
 - The option names and level labels are edited as lists in the panel; they become the `enum` of
   `choice` / `level` and the keys of `probabilities`, so **Break Object** splits `answer` by
   name and a **Switch** wired from `choice` or `level` offers **Sync cases from enum**. A wire
