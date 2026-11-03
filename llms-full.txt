@@ -10,14 +10,13 @@ AbstractFlow is the visual workflow editor for AbstractFramework.
 
 It is a web package (`@abstractframework/flow`). It runs a browser editor and a small Node server that serves the built UI and forwards `/api/*` to AbstractGateway. The server runs on its own (`http://127.0.0.1:3003/`) or behind the Gateway at `/apps/flow/`, where the Gateway console opens it signed in. AbstractGateway owns users, sessions, runtime routing, provider configuration, workflow storage, run execution, ledgers, artifacts, and media catalogs.
 
-## What's New In 0.13.0
+## What's New In 0.14.0
 
-- **Decision** node: one typed question about one text, answered by a decision model.
-- **Ask User** question policy: essential questions, or clarifications with a deadline and a fallback.
-- Every chat box uses the shared rounded multiline composer; the top bar uses the shared account widget.
-- The run window lists On Flow Start's inputs, with what the gateway added folded apart.
+- A value typed on an unwired input takes the input's type: `5` next to a wired number is the number 5, and a tag says the type.
+- The Run window picks a decision model for an input that feeds Decision nodes, and a fast run shows its real result.
+- The "Decision triage" example opens with every wire drawn.
 
-See the [changelog](CHANGELOG.md#0130---2026-11-02) for details.
+See the [changelog](CHANGELOG.md#0140---2026-11-03) for details.
 
 ## Install
 
@@ -594,8 +593,10 @@ uses it as stored:
 A flow saved before this rule may hold such a value as text next to a wired number. Opening it
 converts the value, says which values changed ("2 typed values now take the type of their input
 … Save to keep them"), and the flow shows unsaved changes until you save it. A flow run without
-being opened and saved again keeps the value it stored, and a Compare that meets a number on one
-side and text on the other stops the run with "One side is a number and the other is text. Open the flow in the editor and save it to store typed values."
+being opened and saved again keeps the value it stored. With AbstractRuntime 0.17.0 a Compare that
+meets a number or true/false on one side and text on the other reads the text the way the editor
+does (`"5"` is 5, `"true"` is true) and stops the run, naming the node and the pin, when the text is
+not one (`b is text ('five'), not a number`).
 
 ### If/Else branch order
 
@@ -6635,6 +6636,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-03
+
+Needs AbstractRuntime 0.17.0 (Compare reads text next to a number or true/false exactly) and `@abstractframework/ui-kit` ^0.9.14 with `@abstractframework/panel-chat` ^0.8.1 and `@abstractframework/app-server` ^0.1.13.
+
 ### Fixed
 - A value typed on an unwired input takes the input's type (root ADR 0049). A number input stores a number and a
   true/false input a boolean; an input that shares its type with others of its node (Compare's `a` and `b`,
@@ -6643,7 +6648,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `a == b` holds. With nothing wired, a typed value is text. A small tag beside the box says the type; a value that
   is not of its input's type (including a whole number beyond 2^53, which cannot be stored exactly) is flagged
   under its row and refused by the run checks; a rewire converts a value when the conversion is exact. A flow saved by 0.13.0 with such a value stored as text is converted when you open
-  it, with a notice, and keeps the stored text until you save it.
+  it, with a notice, and keeps the stored text until you save it. A flow run without being opened and saved
+  again: AbstractRuntime 0.17.0's Compare reads text next to a number or true/false with the editor's grammar
+  (`"5"` is 5, `"true"` is true) and stops the run, naming the node and the pin, when the text is not one.
 - Run dialog: a flow input wired only to Decision `model` inputs picks from the decision models
   (`provider/model` handles from the `output.decision` route) instead of being a text-model picker
   disabled behind "Pick provider…". A model input of a form with no provider input can be picked or
