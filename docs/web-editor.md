@@ -220,8 +220,10 @@ uses it as stored:
 A flow saved before this rule may hold such a value as text next to a wired number. Opening it
 converts the value, says which values changed ("2 typed values now take the type of their input
 … Save to keep them"), and the flow shows unsaved changes until you save it. A flow run without
-being opened and saved again keeps the value it stored, and a Compare that meets a number on one
-side and text on the other stops the run with "One side is a number and the other is text. Open the flow in the editor and save it to store typed values."
+being opened and saved again keeps the value it stored. With AbstractRuntime 0.17.0 a Compare that
+meets a number or true/false on one side and text on the other reads the text the way the editor
+does (`"5"` is 5, `"true"` is true) and stops the run, naming the node and the pin, when the text is
+not one (`b is text ('five'), not a number`).
 
 ### If/Else branch order
 

@@ -4,14 +4,13 @@ AbstractFlow is the visual workflow editor for AbstractFramework.
 
 It is a web package (`@abstractframework/flow`). It runs a browser editor and a small Node server that serves the built UI and forwards `/api/*` to AbstractGateway. The server runs on its own (`http://127.0.0.1:3003/`) or behind the Gateway at `/apps/flow/`, where the Gateway console opens it signed in. AbstractGateway owns users, sessions, runtime routing, provider configuration, workflow storage, run execution, ledgers, artifacts, and media catalogs.
 
-## What's New In 0.13.0
+## What's New In 0.14.0
 
-- **Decision** node: one typed question about one text, answered by a decision model.
-- **Ask User** question policy: essential questions, or clarifications with a deadline and a fallback.
-- Every chat box uses the shared rounded multiline composer; the top bar uses the shared account widget.
-- The run window lists On Flow Start's inputs, with what the gateway added folded apart.
+- A value typed on an unwired input takes the input's type: `5` next to a wired number is the number 5, and a tag says the type.
+- The Run window picks a decision model for an input that feeds Decision nodes, and a fast run shows its real result.
+- The "Decision triage" example opens with every wire drawn.
 
-See the [changelog](CHANGELOG.md#0130---2026-11-02) for details.
+See the [changelog](CHANGELOG.md#0140---2026-11-03) for details.
 
 ## Install
 

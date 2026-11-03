@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-03
+
+Needs AbstractRuntime 0.17.0 (Compare reads text next to a number or true/false exactly).
+
 ### Fixed
 - A value typed on an unwired input takes the input's type (root ADR 0049). A number input stores a number and a
   true/false input a boolean; an input that shares its type with others of its node (Compare's `a` and `b`,
@@ -16,7 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `a == b` holds. With nothing wired, a typed value is text. A small tag beside the box says the type; a value that
   is not of its input's type (including a whole number beyond 2^53, which cannot be stored exactly) is flagged
   under its row and refused by the run checks; a rewire converts a value when the conversion is exact. A flow saved by 0.13.0 with such a value stored as text is converted when you open
-  it, with a notice, and keeps the stored text until you save it.
+  it, with a notice, and keeps the stored text until you save it. A flow run without being opened and saved
+  again: AbstractRuntime 0.17.0's Compare reads text next to a number or true/false with the editor's grammar
+  (`"5"` is 5, `"true"` is true) and stops the run, naming the node and the pin, when the text is not one.
 - Run dialog: a flow input wired only to Decision `model` inputs picks from the decision models
   (`provider/model` handles from the `output.decision` route) instead of being a text-model picker
   disabled behind "Pick provider…". A model input of a form with no provider input can be picked or
