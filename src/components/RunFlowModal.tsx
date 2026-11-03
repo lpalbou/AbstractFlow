@@ -33,7 +33,8 @@ import { useListOpen } from '../utils/listOpen';
 import { parseSpeculationInput } from '../utils/speculationControls';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
-import { useProviders, useModels } from '../hooks/useProviders';
+import { useDecisionCatalog, useProviders, useModels } from '../hooks/useProviders';
+import { decisionModelOptions, decisionModelPinIds } from '../utils/decisionPins';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 import { thinkingOptionsFromModelCapabilities } from '../utils/thinkingControls';
 import { RESEARCH_EFFORT_OPTIONS, isResearchEffortPin, normalizeResearchEffort } from '../utils/researchEffort';
@@ -1776,7 +1777,7 @@ function isWorkspacePinType(type: string | undefined): type is 'workspace_file' 
   return type === 'workspace_file' || type === 'workspace_folder';
 }
 
-type ProviderScope = 'text' | 'image' | 'voice' | 'music';
+type ProviderScope = 'text' | 'image' | 'voice' | 'music' | 'decision';
 type RunSelectOption = { value: string; label: string };
 
 function providerScopeForPin(pin: Pin): ProviderScope | null {
@@ -1810,7 +1811,11 @@ function isMusicProviderInputPin(pin: Pin): boolean {
   return providerScopeForPin(pin) === 'music';
 }
 
-function modelScopeForPin(pin: Pin, pins: Pin[]): ProviderScope {
+/**
+ * The catalog a Run-form model input picks from. `decisionPins` are the entry pins that only feed
+ * Decision `model` inputs (utils/decisionPins `decisionModelPinIds`): they pick a decision model.
+ */
+export function modelScopeForPin(pin: Pin, pins: Pin[], decisionPins?: ReadonlySet<string>): ProviderScope {
   if (pin.type === 'model_image' || pin.id === 'image_model' || pin.id === 'model_image') return 'image';
   if (
     pin.type === 'model_voice' ||
@@ -1827,6 +1832,7 @@ function modelScopeForPin(pin: Pin, pins: Pin[]): ProviderScope {
   // launch form. If a form only exposes an image or voice provider, the model
   // dropdown must use that catalog rather than the generic LLM model catalog.
   if (pin.type === 'model' || pin.id === 'model') {
+    if (decisionPins?.has(pin.id)) return 'decision';
     const scopes = new Set(pins.map(providerScopeForPin).filter(Boolean) as ProviderScope[]);
     if (scopes.size === 1 && scopes.has('image')) return 'image';
     if (scopes.size === 1 && scopes.has('voice')) return 'voice';
@@ -1834,6 +1840,27 @@ function modelScopeForPin(pin: Pin, pins: Pin[]): ProviderScope {
     return 'text';
   }
   return 'text';
+}
+
+/**
+ * What a run's `flow_complete` does to the timeline: complete the On Flow End row already
+ * shown, add an "On Flow End" row for a graph that has none (it ends implicitly), or add
+ * nothing. A graph WITH an On Flow End never gets an invented row: its own step comes from
+ * the ledger, and the final result is the run record's output (`flow_complete.result`).
+ */
+export function flowCompletionRow(hasEndRow: boolean, graphHasFlowEnd: boolean): 'update' | 'implicit' | 'none' {
+  if (hasEndRow) return 'update';
+  return graphHasFlowEnd ? 'none' : 'implicit';
+}
+
+/**
+ * Whether a Run-form model picker waits for a provider: only when the form has that provider
+ * input and it is still empty. A decision model is a `provider/model` handle, and a form with no
+ * provider input lets the model be picked or typed on its own.
+ */
+export function modelPickerWaitsForProvider(scope: ProviderScope, hasProviderPin: boolean, provider: string): boolean {
+  if (scope === 'decision') return false;
+  return hasProviderPin && !provider.trim();
 }
 
 function isModelInputPin(pin: Pin): boolean {
@@ -2081,6 +2108,8 @@ export function RunFlowModal({
     return inputPins.filter((p) => p.id !== 'workspace_root');
   }, [inputPins]);
 
+  const decisionPinIds = useMemo(() => decisionModelPinIds(entryNode?.id, nodes, edges), [entryNode?.id, edges, nodes]);
+
   // Form state for each input pin
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [toolsValues, setToolsValues] = useState<Record<string, string[]>>({});
@@ -2230,7 +2259,7 @@ export function RunFlowModal({
   }, [formValues, musicProviderPinId]);
 
   const modelPinId = useMemo(() => {
-    const pin = formInputPins.find((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'text');
+    const pin = formInputPins.find((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins, decisionPinIds) === 'text');
     return pin?.id || null;
   }, [formInputPins]);
 
@@ -2331,10 +2360,13 @@ export function RunFlowModal({
 
   const wantProviderDropdown = Boolean(isOpen && formInputPins.some(isTextProviderInputPin));
   const wantModelDropdown = Boolean(
-    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'text')
+    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins, decisionPinIds) === 'text')
   );
   const providersQuery = useProviders(wantProviderDropdown);
   const modelsQuery = useModels(selectedProvider || undefined, wantModelDropdown, TEXT_OUTPUT_CAPABILITY_ROUTE);
+  const decisionCatalogQuery = useDecisionCatalog(
+    Boolean(isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins, decisionPinIds) === 'decision'))
+  );
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
 
@@ -2415,7 +2447,7 @@ export function RunFlowModal({
 
   const wantsImageProviderDropdown = Boolean(isOpen && formInputPins.some(isImageProviderInputPin));
   const wantsImageModelDropdown = Boolean(
-    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'image')
+    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins, decisionPinIds) === 'image')
   );
   const imageProvidersQuery = useQuery({
     queryKey: ['run-input', 'image-providers', visionProviderModelsEndpoint],
@@ -2446,7 +2478,7 @@ export function RunFlowModal({
 
   const wantsVoiceProviderDropdown = Boolean(isOpen && formInputPins.some(isVoiceProviderInputPin));
   const wantsVoiceModelDropdown = Boolean(
-    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'voice')
+    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins, decisionPinIds) === 'voice')
   );
   const voiceProvidersQuery = useQuery({
     queryKey: ['run-input', 'voice-providers', voiceCatalogEndpoint, ttsModelsEndpoint, sttModelsEndpoint, voiceModelMode],
@@ -2507,7 +2539,7 @@ export function RunFlowModal({
 
   const wantsMusicProviderDropdown = Boolean(isOpen && formInputPins.some(isMusicProviderInputPin));
   const wantsMusicModelDropdown = Boolean(
-    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'music')
+    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins, decisionPinIds) === 'music')
   );
   const musicProvidersQuery = useQuery({
     queryKey: ['run-input', 'music-providers', musicProvidersEndpoint, musicProviderModelsTask],
@@ -3151,6 +3183,7 @@ export function RunFlowModal({
       ev.execId ? `${getActualRunId(ev)}:exec:${ev.execId}` : `${getActualRunId(ev)}:${nodeId || ''}`;
     const terminalIndexByNode = new Map<string, number>();
     const all: Step[] = [];
+    const graphHasFlowEnd = Array.from(nodeById.values()).some((n) => n.data?.nodeType === 'on_flow_end');
 
     const forcedThreadId = typeof threadRootRunId === 'string' ? threadRootRunId.trim() : '';
     let threadId: string | null = forcedThreadId || null;
@@ -3334,7 +3367,8 @@ export function RunFlowModal({
 
         const completedAt = typeof ev.ts === 'string' ? ev.ts : undefined;
         const terminalSummary = summarize(ev.result) || 'Workflow completed';
-        if (terminalIdx >= 0) {
+        const completionRow = flowCompletionRow(terminalIdx >= 0, graphHasFlowEnd);
+        if (completionRow === 'update') {
           const prior = all[terminalIdx];
           all[terminalIdx] = {
             ...prior,
@@ -3346,7 +3380,7 @@ export function RunFlowModal({
             runtimeStepId: prior.runtimeStepId ?? evStepId,
             endedAt: completedAt || prior.endedAt,
           };
-        } else {
+        } else if (completionRow === 'implicit') {
           const implicitId = '__implicit_flow_end__';
           const meta = resolveNodeMeta(implicitId);
           all.push({
@@ -8212,7 +8246,7 @@ export function RunFlowModal({
                                     setFormValues((prev) => {
                                       const next = { ...prev, [pin.id]: v };
                                       for (const candidate of formInputPins) {
-                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins) === 'image') next[candidate.id] = '';
+                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins, decisionPinIds) === 'image') next[candidate.id] = '';
                                       }
                                       return next;
                                     })
@@ -8241,7 +8275,7 @@ export function RunFlowModal({
                                     setFormValues((prev) => {
                                       const next = { ...prev, [pin.id]: v };
                                       for (const candidate of formInputPins) {
-                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins) === 'voice') next[candidate.id] = '';
+                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins, decisionPinIds) === 'voice') next[candidate.id] = '';
                                       }
                                       return next;
                                     })
@@ -8270,7 +8304,7 @@ export function RunFlowModal({
                                     setFormValues((prev) => {
                                       const next = { ...prev, [pin.id]: v };
                                       for (const candidate of formInputPins) {
-                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins) === 'music') next[candidate.id] = '';
+                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins, decisionPinIds) === 'music') next[candidate.id] = '';
                                       }
                                       return next;
                                     })
@@ -8299,7 +8333,7 @@ export function RunFlowModal({
                                     setFormValues((prev) => {
                                       const next = { ...prev, [pin.id]: v };
                                       for (const candidate of formInputPins) {
-                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins) === 'text') next[candidate.id] = '';
+                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins, decisionPinIds) === 'text') next[candidate.id] = '';
                                       }
                                       return next;
                                     })
@@ -8310,7 +8344,7 @@ export function RunFlowModal({
                           }
 
                           if (isModelInputPin(pin)) {
-                            const scope = modelScopeForPin(pin, formInputPins);
+                            const scope = modelScopeForPin(pin, formInputPins, decisionPinIds);
                             const scopeProvider =
                               scope === 'image'
                                 ? selectedImageProvider
@@ -8319,8 +8353,19 @@ export function RunFlowModal({
                                   : scope === 'music'
                                     ? selectedMusicProvider
                                     : selectedProvider;
-                            const scopeLoading =
+                            const scopeProviderPinId =
                               scope === 'image'
+                                ? imageProviderPinId
+                                : scope === 'voice'
+                                  ? voiceProviderPinId
+                                  : scope === 'music'
+                                    ? musicProviderPinId
+                                    : textProviderPinId;
+                            const waitsForProvider = modelPickerWaitsForProvider(scope, Boolean(scopeProviderPinId), scopeProvider);
+                            const scopeLoading =
+                              scope === 'decision'
+                                ? decisionCatalogQuery.isLoading
+                                : scope === 'image'
                                 ? imageModelsQuery.isLoading
                                 : scope === 'voice'
                                   ? voiceModelsQuery.isLoading
@@ -8328,7 +8373,9 @@ export function RunFlowModal({
                                     ? musicModelsQuery.isLoading
                                   : modelsQuery.isLoading;
                             const scopeOptions =
-                              scope === 'image'
+                              scope === 'decision'
+                                ? decisionModelOptions(decisionCatalogQuery.data, '')
+                                : scope === 'image'
                                 ? imageModelOptions
                                 : scope === 'voice'
                                   ? voiceModelOptions
@@ -8344,10 +8391,16 @@ export function RunFlowModal({
                                 <AfSelect
                                   value={value}
                                   placeholder={
-                                    !scopeProvider ? 'Pick provider…' : scopeLoading ? 'Loading…' : 'Select…'
+                                    waitsForProvider
+                                      ? 'Pick provider…'
+                                      : scopeLoading
+                                        ? 'Loading…'
+                                        : scope === 'decision'
+                                          ? 'Default decision model'
+                                          : 'Select…'
                                   }
                                   options={scopeOptions}
-                                  disabled={!scopeProvider}
+                                  disabled={waitsForProvider}
                                   loading={scopeLoading}
                                   allowCustom
                                   searchable
@@ -8360,6 +8413,8 @@ export function RunFlowModal({
                                           : 'Search TTS models…'
                                         : scope === 'music'
                                           ? 'Search music models…'
+                                        : scope === 'decision'
+                                          ? 'Search decision models…'
                                         : 'Search models…'
                                   }
                                   onChange={(v) => {

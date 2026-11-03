@@ -86,7 +86,7 @@ def main() -> None:
     check("escalate probability", out.get("escalate_probability") == 0.73, str(out))
     check("frustration level from the legend", out.get("frustration") == "Frustrated", str(out))
     check("frustration score", out.get("frustration_score") == 1.29, str(out))
-    check("model that answered", out.get("model") == "ggml-org/Kev-4B-GGUF:Q4_K_M", str(out))
+    check("model that answered", out.get("answered_by") == "ggml-org/Kev-4B-GGUF:Q4_K_M", str(out))
     print("decision-triage smoke: all checks passed")
 
 

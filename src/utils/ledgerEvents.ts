@@ -432,3 +432,19 @@ export function closeOpenNodes({
   openNodes.clear();
   return out;
 }
+
+/**
+ * The `flow_complete` event of a run whose summary reads `completed`. Its `result` is the run
+ * record's final output (`summary.output`, the On Flow End's values), so the Run dialog's final
+ * result never depends on which ledger rows the stream delivered before the run ended.
+ */
+export function flowCompleteEventFromSummary(
+  runId: string,
+  summary: Record<string, unknown>,
+  ts: string | undefined
+): ExecutionEvent {
+  const output = summary.output;
+  return output === undefined || output === null
+    ? { type: 'flow_complete', runId, ts }
+    : { type: 'flow_complete', runId, ts, result: output };
+}

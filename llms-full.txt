@@ -1314,6 +1314,9 @@ text and answers it in a single pass with a decision model (Kev / Lev / Laya loc
   models (a bare id, sent with `provider`); with no provider the model list is every
   `provider/model` handle, and a handle can be typed (`typesafe/jev-latest`). Empty: the
   Gateway `output.decision` default.
+- **Run dialog.** A flow input wired only to Decision `model` inputs (the example's On Flow Start
+  `model`) is a decision-model picker in the Run dialog: every `provider/model` handle on the
+  `output.decision` route, no provider input needed. Empty: the Gateway `output.decision` default.
 - The option names and level labels are edited as lists in the panel; they become the `enum` of
   `choice` / `level` and the keys of `probabilities`, so **Break Object** splits `answer` by
   name and a **Switch** wired from `choice` or `level` offers **Sync cases from enum**. A wire
@@ -6641,6 +6644,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is not of its input's type (including a whole number beyond 2^53, which cannot be stored exactly) is flagged
   under its row and refused by the run checks; a rewire converts a value when the conversion is exact. A flow saved by 0.13.0 with such a value stored as text is converted when you open
   it, with a notice, and keeps the stored text until you save it.
+- Run dialog: a flow input wired only to Decision `model` inputs picks from the decision models
+  (`provider/model` handles from the `output.decision` route) instead of being a text-model picker
+  disabled behind "Pick provider…". A model input of a form with no provider input can be picked or
+  typed on its own; it waits for a provider only when the form has one.
+- Run dialog: a run that ends in a fraction of a second showed an invented "On Flow End" step and
+  the last node's answer as its Final Result. The final result is now the run record's output, and a
+  flow with an On Flow End never gets an invented end row.
+- The "Decision triage" example loads with every wire drawn: its end output `model` (a text, the
+  provider/model that answered) is now `answered_by`; an end pin named `model` is a model picker
+  that a text cannot feed.
 
 ## [0.13.0] - 2026-11-02
 

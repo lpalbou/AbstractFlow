@@ -9,6 +9,7 @@ import { useFlowStore } from './useFlow';
 import {
   closeOpenNodes,
   createLedgerMappingState,
+  flowCompleteEventFromSummary,
   mapLedgerRecordToEvents,
   type LedgerRecord,
 } from '../utils/ledgerEvents';
@@ -690,7 +691,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         const closeEvents = closeOpenNodes({ runId: rid, state: mappingStateRef.current, ts: updatedAt });
         closeEvents.forEach(dispatchEvent);
         terminalEmittedRef.current.set(rid, terminalKey);
-        dispatchEvent({ type: 'flow_complete', runId: rid, ts: updatedAt });
+        dispatchEvent(flowCompleteEventFromSummary(rid, summary, updatedAt));
         return;
       }
       if (status === 'failed') {
