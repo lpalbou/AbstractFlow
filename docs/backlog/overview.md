@@ -1,11 +1,17 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-10-28
+- Updated: 2026-11-03
 - Planned: 0
-- Proposed: 51 (on disk, recursive; 0161 added 2026-10-28)
+- Proposed: 52 (on disk, recursive; 0162 added 2026-11-03)
 - Completed: 55
 - Deprecated: 0
+
+## 2026-11-03 Pin kind from the declared type (0162), PROPOSED
+Item 0162 (`proposed/0162_pin_kind_from_declared_type_not_name.md`): `isModelPin` / `isProviderPin`
+(`src/utils/pinCatalog.ts:38-61`), the Run dialog's `isModelInputPin` and the load migration at
+`src/hooks/useFlow.ts:2458` decide a pin's kind from its NAME; the "Decision triage" example's text
+output `model` was retyped to a model picker and its wire hidden (Flow #8 renamed it `answered_by`).
 
 ## 2026-10-28 Email-triage QA (0160), COMPLETED in 0.12.0
 Item 0160 (`completed/0160_email_triage_qa_compare_notify_help_mailbox_join.md`): the operator's

@@ -5,7 +5,7 @@ import type { Pin, VisualFlow } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
 import { decisionModelOptions, decisionModelPinIds } from '../utils/decisionPins';
 import { flowCompleteEventFromSummary } from '../utils/ledgerEvents';
-import { flowCompletionRow, modelPickerWaitsForProvider, modelScopeForPin } from './RunFlowModal';
+import { flowCompletionRow, modelPickerWaitsForProvider, modelScopeForPin, runFormTypeLabel } from './RunFlowModal';
 
 const EXAMPLE = resolve(__dirname, '../../examples/flows/decision-triage.json');
 const example = (): VisualFlow => JSON.parse(readFileSync(EXAMPLE, 'utf8')) as VisualFlow;
@@ -100,5 +100,13 @@ describe('a completed run`s final result is the run record`s output', () => {
       runId: 'r1',
       ts: 't',
     });
+  });
+});
+
+describe('Run-form type tag', () => {
+  it('never repeats the label ("model (model)"), and names a decision model', () => {
+    expect(runFormTypeLabel(modelPin)).toBeNull();
+    expect(runFormTypeLabel(modelPin, 'decision')).toBe('decision model');
+    expect(runFormTypeLabel({ id: 'ticket', label: 'ticket', type: 'string' })).toBe('string');
   });
 });

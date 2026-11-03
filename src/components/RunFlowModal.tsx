@@ -1769,6 +1769,21 @@ function getPlaceholderForPin(pin: Pin): string {
   }
 }
 
+/**
+ * The type tag after a Run-form label: "(text)", "(decision model)". None when it would only repeat
+ * the label ("model (model)").
+ */
+export function runFormTypeLabel(pin: Pin, scope?: ProviderScope): string | null {
+  const type = scope === 'decision' ? 'decision model' : displayPinType(pin);
+  if (!type || type.trim().toLowerCase() === String(pin.label || pin.id).trim().toLowerCase()) return null;
+  return type;
+}
+
+function RunFormType({ pin, scope }: { pin: Pin; scope?: ProviderScope }) {
+  const type = runFormTypeLabel(pin, scope);
+  return type ? <span className="run-form-type">({type})</span> : null;
+}
+
 function displayPinType(pin: Pick<Pin, 'type' | 'schema'> | undefined): string {
   return displayDataPinTypeLabel(pin);
 }
@@ -8169,7 +8184,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <ArtifactInputField
                                   pin={pin}
@@ -8192,7 +8207,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <ArtifactListInputField
                                   pin={pin}
@@ -8213,7 +8228,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <WorkspacePathInputField
                                   kind={pin.type === 'workspace_folder' ? 'folder' : 'file'}
@@ -8232,7 +8247,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -8261,7 +8276,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -8290,7 +8305,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -8319,7 +8334,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -8386,7 +8401,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} scope={scope} />
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -8431,7 +8446,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfSelect
                                   value={current}
@@ -8453,7 +8468,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfSelect
                                   value={current}
@@ -8475,7 +8490,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfMultiSelect
                                   values={values}
@@ -8499,7 +8514,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -8519,7 +8534,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -8538,7 +8553,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                  <RunFormType pin={pin} />
                                 </label>
                                 <ArrayParamEditor
                                   value={value}
@@ -8553,7 +8568,7 @@ export function RunFlowModal({
                             <div key={pin.id} className="run-form-field">
                               <label className="run-form-label">
                                 {pin.label}
-                                <span className="run-form-type">({displayPinType(pin)})</span>
+                                <RunFormType pin={pin} />
                               </label>
 
                               {inputType === 'textarea' ? (

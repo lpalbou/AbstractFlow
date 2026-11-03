@@ -30,6 +30,8 @@ Needs AbstractRuntime 0.17.0 (Compare reads text next to a number or true/false 
 - Run dialog: a run that ends in a fraction of a second showed an invented "On Flow End" step and
   the last node's answer as its Final Result. The final result is now the run record's output, and a
   flow with an On Flow End never gets an invented end row.
+- Run dialog: the type after a field's label no longer repeats the label ("model (model)"); a field that picks a
+  decision model says "(decision model)".
 - The "Decision triage" example loads with every wire drawn: its end output `model` (a text, the
   provider/model that answered) is now `answered_by`; an end pin named `model` is a model picker
   that a text cannot feed.
