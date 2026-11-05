@@ -10,7 +10,7 @@ It is a web package (`@abstractframework/flow`). It runs a browser editor and a 
 - The Run window picks a decision model for an input that feeds Decision nodes, and a fast run shows its real result.
 - The "Decision triage" example opens with every wire drawn.
 
-See the [changelog](CHANGELOG.md#0140---2026-11-03) for details.
+See the [changelog](CHANGELOG.md#0140---2026-11-04) for details.
 
 ## Install
 

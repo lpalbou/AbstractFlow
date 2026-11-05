@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.14.0] - 2026-11-03
+## [0.14.0] - 2026-11-04
 
-Needs AbstractRuntime 0.17.0 (Compare reads text next to a number or true/false exactly) and `@abstractframework/ui-kit` ^0.9.14 with `@abstractframework/panel-chat` ^0.8.1 and `@abstractframework/app-server` ^0.1.13.
+Needs AbstractRuntime 0.17.0 (Compare reads text next to a number or true/false exactly), which AbstractGateway 0.20.0 installs, and `@abstractframework/ui-kit` ^0.9.14 with `@abstractframework/panel-chat` ^0.8.1 and `@abstractframework/app-server` ^0.1.13.
 
 ### Fixed
 - A value typed on an unwired input takes the input's type (root ADR 0049). A number input stores a number and a
