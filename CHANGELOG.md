@@ -6,7 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [Unreleased]
+## [0.14.1] - 2026-11-07
+
+Needs `@abstractframework/ui-kit` ^0.9.19 (its model picker and send-time check). AbstractGateway 0.21.0 also drops an
+MTP request the model cannot honour, so a flow saved with an old MTP choice still runs.
+
+### Changed
+- Changing the model of an Agent or LLM call node resets its reasoning and MTP to the gateway default, and MTP is
+  offered only for models the gateway says support it (operator rule 2026-11-07). The nodes use the shared kit model
+  picker instead of Flow's own controls; the Run dialog sends only the reasoning and MTP the selected model can use.
+  An MTP depth is sent only when the gateway's card for the run's model is known (a flow with several text models, or a
+  card still loading, runs without the depth); an explicit Off is always kept.
+- Reasoning choices follow the model the gateway describes, never its name (operator rule 2026-11-07). The On Flow
+  Start/End defaults, the Run dialog and the reasoning pin on Agent and LLM call nodes offered reasoning levels to any
+  model whose name matched a text pattern (gpt-5, qwen3, "thinking"...), and the canvas pin fell back to a fixed
+  ladder. They now offer exactly the levels the gateway's capability card lists for the selected model (the kit's
+  `reasoningFacts`, as the kit model picker on the nodes does); a model the card gives no levels offers none, and a
+  saved level the card does not list stays visible as "(saved)" on the node.
+- Run dialog: a reasoning level is left out of the run only when the selected model's capability card rules it out
+  (a level the card does not list, or a model without reasoning). When the gateway does not describe the model's
+  reasoning, the level is sent as chosen (the kit's `usableReasoning`: unknown is not unsupported); it used to be
+  dropped because the dialog offered no levels for that model.
 
 ## [0.14.0] - 2026-11-04
 

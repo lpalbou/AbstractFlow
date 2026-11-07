@@ -10,6 +10,14 @@ AbstractFlow is the visual workflow editor for AbstractFramework.
 
 It is a web package (`@abstractframework/flow`). It runs a browser editor and a small Node server that serves the built UI and forwards `/api/*` to AbstractGateway. The server runs on its own (`http://127.0.0.1:3003/`) or behind the Gateway at `/apps/flow/`, where the Gateway console opens it signed in. AbstractGateway owns users, sessions, runtime routing, provider configuration, workflow storage, run execution, ledgers, artifacts, and media catalogs.
 
+## What's New In 0.14.1
+
+- Changing a node's model resets its reasoning and MTP to the default, and MTP is offered only for models that
+  support it.
+- Reasoning choices come from what the gateway says about the model, never from its name.
+
+See the [changelog](CHANGELOG.md#0141---2026-11-07) for details.
+
 ## What's New In 0.14.0
 
 - A value typed on an unwired input takes the input's type: `5` next to a wired number is the number 5, and a tag says the type.
@@ -51,7 +59,8 @@ set/pin values such as `off`, `low`, `medium`, `high`, or `xhigh` for reasoning
 models that support explicit effort controls.
 
 LLM Call and Agent nodes also expose an **MTP depth** setting (inherit, Off, or
-a depth the selected provider/model advertises), set per node. See
+a depth the selected provider/model advertises, offered only when the gateway says that model
+supports MTP), set per node; changing the model puts reasoning and MTP back on the default. See
 [Getting started](docs/getting-started.md) for precedence.
 
 Data input pins can carry small sandboxed Python expressions over run variables,
@@ -326,11 +335,17 @@ Use the canvas to create VisualFlow graphs. The editor sends VisualFlow JSON to 
 
 Provider and model selectors come from Gateway discovery. Configure providers, endpoint profiles, API keys, and default models in the Gateway console.
 
-Agent and LLM Call nodes expose **MTP depth** in Properties: inherit, Off, or a depth
-advertised by that provider/model's execution capability. It is set per node; the Run
+Agent and LLM Call nodes choose provider, model, reasoning and **MTP depth** with the shared
+AbstractFramework model picker. Off and the depths appear only when the gateway says the
+selected model supports MTP; otherwise the control is disabled and says why. Changing the
+provider or the model puts reasoning and MTP back on the default, in Properties, in On Flow
+Start defaults and in the Run dialog, and a saved level or depth the selected model cannot use
+is not sent from the Run dialog (a level is kept when the gateway does not describe the model's
+reasoning). MTP is set per node; the Run
 dialog asks only for the flow's own inputs. A connected `speculation` pin wins over the node
 setting, then the execution host's Core default. Inheritance sends no override; Off sends
-`false`. Explicit depths require native MTP and fail honestly if the host cannot honor them.
+`false`. A depth saved earlier for a model the gateway says has no MTP does not fail the run: the gateway
+(0.21.0 and later) runs that step without MTP and the step's record says so.
 
 Discovery is read-only: these controls do not download heads or load models. Unknown support,
 head readiness, reload requirements, and saved unavailable choices are shown explicitly.
@@ -6634,7 +6649,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [Unreleased]
+## [0.14.1] - 2026-11-07
+
+Needs `@abstractframework/ui-kit` ^0.9.19 (its model picker and send-time check). AbstractGateway 0.21.0 also drops an
+MTP request the model cannot honour, so a flow saved with an old MTP choice still runs.
+
+### Changed
+- Changing the model of an Agent or LLM call node resets its reasoning and MTP to the gateway default, and MTP is
+  offered only for models the gateway says support it (operator rule 2026-11-07). The nodes use the shared kit model
+  picker instead of Flow's own controls; the Run dialog sends only the reasoning and MTP the selected model can use.
+  An MTP depth is sent only when the gateway's card for the run's model is known (a flow with several text models, or a
+  card still loading, runs without the depth); an explicit Off is always kept.
+- Reasoning choices follow the model the gateway describes, never its name (operator rule 2026-11-07). The On Flow
+  Start/End defaults, the Run dialog and the reasoning pin on Agent and LLM call nodes offered reasoning levels to any
+  model whose name matched a text pattern (gpt-5, qwen3, "thinking"...), and the canvas pin fell back to a fixed
+  ladder. They now offer exactly the levels the gateway's capability card lists for the selected model (the kit's
+  `reasoningFacts`, as the kit model picker on the nodes does); a model the card gives no levels offers none, and a
+  saved level the card does not list stays visible as "(saved)" on the node.
+- Run dialog: a reasoning level is left out of the run only when the selected model's capability card rules it out
+  (a level the card does not list, or a model without reasoning). When the gateway does not describe the model's
+  reasoning, the level is sent as chosen (the kit's `usableReasoning`: unknown is not unsupported); it used to be
+  dropped because the dialog offered no levels for that model.
 
 ## [0.14.0] - 2026-11-04
 

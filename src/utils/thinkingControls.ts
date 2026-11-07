@@ -1,70 +1,29 @@
+// Reasoning (`thinking`) choices follow the SELECTED model's served facts (operator rule
+// 2026-11-07, no model-name guessing): the levels the gateway's capability card lists, read with
+// the kit's `reasoningFacts` (the same rule the kit ProviderModelPicker applies on the Agent and
+// LLM call nodes). A model whose card lists no levels offers none.
+import { reasoningFacts } from '@abstractframework/ui-kit';
+
 export type ThinkingOption = {
   value: string;
   label: string;
 };
 
-export const DEFAULT_THINKING_OPTIONS: ThinkingOption[] = [
-  { value: '', label: 'Auto (Gateway default)' },
-  { value: 'off', label: 'off' },
-  { value: 'low', label: 'low' },
-  { value: 'medium', label: 'medium' },
-  { value: 'high', label: 'high' },
-  { value: 'xhigh', label: 'xhigh' },
-];
+export const AUTO_THINKING_OPTION: ThinkingOption = { value: '', label: 'Auto (Gateway default)' };
 
-const THINKING_MODEL_PATTERNS = [
-  /\bo[134](?:[-.]|$)/i,
-  /\bgpt[-_.]?5/i,
-  /\bgpt[-_.]?oss/i,
-  /\bclaude.*(?:4|opus|sonnet|haiku)/i,
-  /\bdeepseek.*(?:r1|v4)/i,
-  /\bqwen3\b/i,
-  /\bqwen3[.-]/i,
-  /\bthinking\b/i,
-  /\breasoning\b/i,
-  /\bseed[-_.]?oss\b/i,
-];
-
-function stringListFrom(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const item of value) {
-    const text = typeof item === 'string' ? item.trim() : '';
-    if (!text || seen.has(text)) continue;
-    seen.add(text);
-    out.push(text);
-  }
-  return out;
+/** The reasoning choices for a model's capability payload: Auto, then the served levels; none when
+ * the card lists no levels (or there is no card yet). */
+export function thinkingOptionsFromModelCapabilities(payload: unknown): ThinkingOption[] {
+  const { levels } = reasoningFacts(payload);
+  if (!levels.length) return [];
+  return [AUTO_THINKING_OPTION, ...levels.map((value) => ({ value, label: value }))];
 }
 
-function recordFrom(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-export function modelNameLooksThinkingCapable(modelName: string): boolean {
-  const clean = String(modelName || '').trim();
-  if (!clean) return false;
-  return THINKING_MODEL_PATTERNS.some((pattern) => pattern.test(clean));
-}
-
-export function thinkingOptionsFromModelCapabilities(payload: unknown, modelName: string): ThinkingOption[] {
-  const response = recordFrom(payload);
-  const caps = recordFrom(response?.capabilities) || response;
-  const levels = stringListFrom(caps?.reasoning_levels || caps?.thinking_levels);
-  const support =
-    caps?.thinking_support === true ||
-    caps?.thinking_budget === true ||
-    typeof caps?.thinking_control_mode === 'string' ||
-    levels.length > 0;
-
-  if (levels.length > 0) {
-    return [
-      { value: '', label: 'Auto (Gateway default)' },
-      ...levels.map((value) => ({ value, label: value })),
-    ];
-  }
-
-  if (support || modelNameLooksThinkingCapable(modelName)) return DEFAULT_THINKING_OPTIONS;
-  return [];
+/** The options a select shows: the served ones, plus a saved level they do not list, marked as
+ * saved (as the kit picker does), so a stored choice is never silently relabelled as Auto. */
+export function thinkingOptionsWithSaved(options: ThinkingOption[], saved: string): ThinkingOption[] {
+  const base = options.length ? options : [AUTO_THINKING_OPTION];
+  const clean = String(saved || '').trim();
+  if (!clean || base.some((option) => option.value === clean)) return base;
+  return [...base, { value: clean, label: `${clean} (saved)` }];
 }

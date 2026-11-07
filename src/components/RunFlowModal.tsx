@@ -31,6 +31,7 @@ import { AF_MEDIA, AfAudioPlayer, AfSwitch, SteerComposer, SpeculationSelect, us
 import { ListDisclosure } from './ListDisclosure';
 import { useListOpen } from '../utils/listOpen';
 import { parseSpeculationInput } from '../utils/speculationControls';
+import { sendableRunPins, withRouteOptionsReset } from '../utils/runModelOptions';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import { useDecisionCatalog, useProviders, useModels } from '../hooks/useProviders';
@@ -2397,11 +2398,17 @@ export function RunFlowModal({
     staleTime: 30_000,
   });
   const thinkingOptions = useMemo(
-    () => thinkingOptionsFromModelCapabilities(thinkingCapabilitiesQuery.data, selectedModel),
-    [selectedModel, thinkingCapabilitiesQuery.data]
+    // Served facts only (no model-name guess): the levels the capability card lists.
+    () => thinkingOptionsFromModelCapabilities(thinkingCapabilitiesQuery.data),
+    [thinkingCapabilitiesQuery.data]
   );
   const thinkingSupported = thinkingOptions.length > 0;
   const speculationCapabilitiesQuery = useExecutionCapabilities(promptCacheProvider, promptCacheModel, isOpen && !promptCacheGraphAmbiguous);
+  // The run pins that follow the selected text model (reset on a provider/model change).
+  const routeOptionPinIds = useMemo(
+    () => formInputPins.filter((pin) => pin.id === 'thinking' || pin.id === 'speculation').map((pin) => pin.id),
+    [formInputPins]
+  );
   const visibleFormInputPins = useMemo(
     () => formInputPins.filter((pin) => pin.id !== 'thinking' || thinkingSupported),
     [formInputPins, thinkingSupported]
@@ -3017,10 +3024,19 @@ export function RunFlowModal({
 
     // "Run as if triggered": the sampled trigger inputs win over the form's.
     if (overrides) Object.assign(inputData, overrides);
+    // Reasoning and MTP reach the run only when the selected model allows them (operator rule 2026-11-07).
+    const sendable = sendableRunPins(inputData, {
+      speculationCard: speculationCapabilitiesQuery.data,
+      reasoningCard: thinkingCapabilitiesQuery.data,
+    });
+    if ('speculation' in inputData) inputData.speculation = sendable.speculation;
+    if ('thinking' in inputData) inputData.thinking = sendable.thinking;
     // The run's workspaces ride the start body (absent = Use my default); never input_data.
     onRun(inputData, runWorkspace ? { workspace: runWorkspace } : {});
     if (followUpContext) setFollowUpContext(null);
   }, [
+    speculationCapabilitiesQuery.data,
+    thinkingCapabilitiesQuery.data,
     formInputPins,
     formValues,
     onRun,
@@ -8346,7 +8362,7 @@ export function RunFlowModal({
                                   searchPlaceholder="Search providers…"
                                   onChange={(v) =>
                                     setFormValues((prev) => {
-                                      const next = { ...prev, [pin.id]: v };
+                                      const next = withRouteOptionsReset({ ...prev, [pin.id]: v }, routeOptionPinIds);
                                       for (const candidate of formInputPins) {
                                         if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins, decisionPinIds) === 'text') next[candidate.id] = '';
                                       }
@@ -8434,6 +8450,8 @@ export function RunFlowModal({
                                   }
                                   onChange={(v) => {
                                     handleFieldChange(pin.id, v);
+                                    // A text model change puts reasoning and MTP back on the default.
+                                    if (scope === 'text' && v !== value) setFormValues((prev) => withRouteOptionsReset(prev, routeOptionPinIds));
                                   }}
                                 />
                               </div>
