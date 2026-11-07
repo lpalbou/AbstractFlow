@@ -15,6 +15,8 @@ MTP request the model cannot honour, so a flow saved with an old MTP choice stil
 - Changing the model of an Agent or LLM call node resets its reasoning and MTP to the gateway default, and MTP is
   offered only for models the gateway says support it (operator rule 2026-11-07). The nodes use the shared kit model
   picker instead of Flow's own controls; the Run dialog sends only the reasoning and MTP the selected model can use.
+  An MTP depth is sent only when the gateway's card for the run's model is known (a flow with several text models, or a
+  card still loading, runs without the depth); an explicit Off is always kept.
 - Reasoning choices follow the model the gateway describes, never its name (operator rule 2026-11-07). The On Flow
   Start/End defaults, the Run dialog and the reasoning pin on Agent and LLM call nodes offered reasoning levels to any
   model whose name matched a text pattern (gpt-5, qwen3, "thinking"...), and the canvas pin fell back to a fixed
