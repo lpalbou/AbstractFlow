@@ -44,7 +44,8 @@ Start defaults and in the Run dialog, and a saved level or depth the selected mo
 is not sent from the Run dialog. MTP is set per node; the Run
 dialog asks only for the flow's own inputs. A connected `speculation` pin wins over the node
 setting, then the execution host's Core default. Inheritance sends no override; Off sends
-`false`. Explicit depths require native MTP and fail honestly if the host cannot honor them.
+`false`. A depth saved earlier for a model the gateway says has no MTP does not fail the run: the gateway
+(0.21.0 and later) runs that step without MTP and the step's record says so.
 
 Discovery is read-only: these controls do not download heads or load models. Unknown support,
 head readiness, reload requirements, and saved unavailable choices are shown explicitly.
