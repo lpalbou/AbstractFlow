@@ -16,8 +16,9 @@ describe('run form model options', () => {
   it('drops a saved MTP depth for a model without MTP, and a level the model does not offer', () => {
     expect(sendableRunPins({ speculation: DEPTH2, thinking: 'high', prompt: 'x' }, { speculationCard: NO_MTP, reasoningCard: NO_MTP }))
       .toEqual({ speculation: undefined, thinking: 'high', prompt: 'x' });
+    // An explicit Off is always kept (kit 0.9.19 rule): dropping it would let a gateway default with MTP on win.
     expect(sendableRunPins({ speculation: false, thinking: 'xhigh' }, { speculationCard: NO_MTP, reasoningCard: NO_MTP }))
-      .toEqual({ speculation: undefined, thinking: undefined });
+      .toEqual({ speculation: false, thinking: undefined });
   });
   it('keeps what the model supports; no card = no MTP', () => {
     expect(sendableRunPins({ speculation: DEPTH2 }, { speculationCard: MTP, reasoningCard: MTP })).toEqual({ speculation: DEPTH2 });
