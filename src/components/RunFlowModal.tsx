@@ -3027,7 +3027,7 @@ export function RunFlowModal({
     // Reasoning and MTP reach the run only when the selected model allows them (operator rule 2026-11-07).
     const sendable = sendableRunPins(inputData, {
       speculationCard: speculationCapabilitiesQuery.data,
-      offeredReasoning: thinkingOptions.map((option) => option.value),
+      reasoningCard: thinkingCapabilitiesQuery.data,
     });
     if ('speculation' in inputData) inputData.speculation = sendable.speculation;
     if ('thinking' in inputData) inputData.thinking = sendable.thinking;
@@ -3036,7 +3036,7 @@ export function RunFlowModal({
     if (followUpContext) setFollowUpContext(null);
   }, [
     speculationCapabilitiesQuery.data,
-    thinkingOptions,
+    thinkingCapabilitiesQuery.data,
     formInputPins,
     formValues,
     onRun,

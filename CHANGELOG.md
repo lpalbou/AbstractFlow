@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ladder. They now offer exactly the levels the gateway's capability card lists for the selected model (the kit's
   `reasoningFacts`, as the kit model picker on the nodes does); a model the card gives no levels offers none, and a
   saved level the card does not list stays visible as "(saved)" on the node.
+- Run dialog: a reasoning level is left out of the run only when the selected model's capability card rules it out
+  (a level the card does not list, or a model without reasoning). When the gateway does not describe the model's
+  reasoning, the level is sent as chosen (the kit's `usableReasoning`: unknown is not unsupported); it used to be
+  dropped because the dialog offered no levels for that model.
 
 ## [0.14.0] - 2026-11-04
 

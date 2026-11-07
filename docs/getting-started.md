@@ -41,7 +41,8 @@ AbstractFramework model picker. Off and the depths appear only when the gateway 
 selected model supports MTP; otherwise the control is disabled and says why. Changing the
 provider or the model puts reasoning and MTP back on the default, in Properties, in On Flow
 Start defaults and in the Run dialog, and a saved level or depth the selected model cannot use
-is not sent from the Run dialog. MTP is set per node; the Run
+is not sent from the Run dialog (a level is kept when the gateway does not describe the model's
+reasoning). MTP is set per node; the Run
 dialog asks only for the flow's own inputs. A connected `speculation` pin wins over the node
 setting, then the execution host's Core default. Inheritance sends no override; Off sends
 `false`. A depth saved earlier for a model the gateway says has no MTP does not fail the run: the gateway
