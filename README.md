@@ -45,7 +45,8 @@ set/pin values such as `off`, `low`, `medium`, `high`, or `xhigh` for reasoning
 models that support explicit effort controls.
 
 LLM Call and Agent nodes also expose an **MTP depth** setting (inherit, Off, or
-a depth the selected provider/model advertises), set per node. See
+a depth the selected provider/model advertises, offered only when the gateway says that model
+supports MTP), set per node; changing the model puts reasoning and MTP back on the default. See
 [Getting started](docs/getting-started.md) for precedence.
 
 Data input pins can carry small sandboxed Python expressions over run variables,

@@ -6,11 +6,12 @@ import { MailNodeSection, PublishNodeSection } from './automation/MailNodeSectio
 import { LoadingLine } from './ReadState';
 import { NodeHelpModal } from './NodeHelpModal';
 import { MAIL_NODE_TYPES, PUBLISH_NODE_TYPES } from '../utils/mailNodes';
-import React, { useCallback, useEffect, useState, useRef, type CSSProperties } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
-import { AfSwitch, Icon, SpeculationSelect, normalizeSpeculationValue, randomId, type SpeculationValue } from '@abstractframework/ui-kit';
+import { AfSwitch, Icon, ProviderModelPicker, createGatewayModelTransport, randomId } from '@abstractframework/ui-kit';
+import { nodeRoutePatch, nodeRouteValue, withoutRouteOptionDefaults } from '../utils/nodeModelRoute';
 import { nodeIconName } from '../utils/nodeIcons';
 import { categoryColorVar, nodeColorSection } from '../utils/nodeCategoryColors';
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin, PinType } from '../types/flow';
@@ -35,7 +36,6 @@ import {
   variableNameProblem,
 } from '../utils/setVariables';
 import { isCollapsibleOperator } from '../utils/operatorNodes';
-import { useExecutionCapabilities } from '../hooks/useExecutionCapabilities';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import { useVisionAdapterCatalog } from '../hooks/useVisionAdapterCatalog';
 import { useSemanticsRegistry } from '../hooks/useSemantics';
@@ -753,11 +753,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     selectedTextModelForThinking
   );
   const thinkingSupported = thinkingOptions.length > 0;
-  const speculationCapabilitiesQuery = useExecutionCapabilities(
-    String(node?.data.pinDefaults?.provider ?? node?.data.agentConfig?.provider ?? node?.data.effectConfig?.provider ?? ''),
-    String(node?.data.pinDefaults?.model ?? node?.data.agentConfig?.model ?? node?.data.effectConfig?.model ?? ''),
-    node?.data.nodeType === 'agent' || node?.data.nodeType === 'llm_call',
-  );
+  // The kit's provider/model/capability transport over this app's gateway client (Agent and LLM
+  // call nodes: the kit ProviderModelPicker).
+  const modelTransport = useMemo(() => createGatewayModelTransport((path) => gatewayJson(gatewayPath(path))), []);
   // Decision node: the provider / model selects read the output.decision catalog (hooks/useProviders.ts).
   const decisionCatalogQuery = useDecisionCatalog(node?.data.nodeType === 'decide');
 
@@ -1165,35 +1163,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       });
   }, [gatewayReadiness.operations.save.ready, node?.id, node?.data.subflowId, flowId, updateNodeData, visualflowItemEndpoint]);
 
-  const handleProviderChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      if (node) {
-        updateNodeData(node.id, {
-          agentConfig: {
-            ...node.data.agentConfig,
-            provider: e.target.value || undefined,
-            model: undefined, // Reset model when provider changes
-          },
-        });
-      }
-    },
-    [node, updateNodeData]
-  );
-
-  const handleModelChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      if (node) {
-        updateNodeData(node.id, {
-          agentConfig: {
-            ...node.data.agentConfig,
-            model: e.target.value || undefined,
-          },
-        });
-      }
-    },
-    [node, updateNodeData]
-  );
-
   const handleLabelChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (node) {
@@ -1524,9 +1493,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const isInputPinConnected = (pinId: string) =>
     edges.some((e) => e.target === node.id && e.targetHandle === pinId);
 
-  const setPinDefault = (pinId: string, value: unknown) => {
+  const setPinDefault = (pinId: string, value: unknown, opts: { routeChange?: boolean } = {}) => {
     const prevDefaults = data.pinDefaults || {};
-    const nextDefaults = { ...(prevDefaults as any) } as Record<string, unknown>;
+    // A text provider/model default change puts the reasoning and MTP defaults back on the
+    // gateway default (operator rule 2026-11-07).
+    const nextDefaults = (opts.routeChange && value !== (prevDefaults as any)[pinId]
+      ? withoutRouteOptionDefaults(prevDefaults as Record<string, unknown>)
+      : { ...(prevDefaults as any) }) as Record<string, unknown>;
 
     // `undefined` removes the default (pin treated as unset).
     if (value === undefined) {
@@ -1805,17 +1778,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         ...(data.effectConfig || {}),
         ...patch,
       },
-    });
-  };
-
-  const setNodeSpeculation = (speculation?: SpeculationValue) => {
-    const pinDefaults = { ...data.pinDefaults };
-    delete pinDefaults.speculation;
-    updateNodeData(node.id, {
-      pinDefaults,
-      ...(data.nodeType === 'agent'
-        ? { agentConfig: { ...data.agentConfig, speculation } }
-        : { effectConfig: { ...data.effectConfig, speculation } }),
     });
   };
 
@@ -4504,51 +4466,23 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {data.nodeType === 'agent' && (
         <div className="property-section">
           <label className="property-label">Agent Configuration</label>
+          {/* The kit picker (operator rule 2026-11-07): reasoning and MTP follow the selected model. */}
           <div className="property-group">
-            <label className="property-sublabel">Provider</label>
-            {providerPinConnected ? (
-              <span className="property-hint">Provided by connected pin.</span>
-            ) : (
-              <select
-                className="property-select"
-                value={data.agentConfig?.provider || ''}
-                onChange={handleProviderChange}
-                disabled={loadingProviders}
-              >
-                <option value="">
-                  {loadingProviders ? 'Loading...' : 'Auto (Gateway default)'}
-                </option>
-                {providers.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.display_name}
-                  </option>
-                ))}
-              </select>
-            )}
+            <ProviderModelPicker
+              layout="compact"
+              inheritLabel="Workflow / Gateway default"
+              value={nodeRouteValue(data)}
+              onChange={(next) => updateNodeData(node.id, nodeRoutePatch(data, next))}
+              fetchProviders={modelTransport.fetchProviders}
+              fetchModels={modelTransport.fetchModels}
+              fetchModelCapabilities={modelTransport.fetchModelCapabilities}
+              fetchGatewayDefault={modelTransport.fetchGatewayDefault}
+              enableSpeculation
+              reasoningLabel="Reasoning"
+              disabled={gatewayCapabilitiesQuery.isLoading}
+              pinned={{ provider: providerPinConnected, model: modelPinConnected, reasoning: thinkingPinConnected, speculation: speculationPinConnected }}
+            />
           </div>
-          <div className="property-group">
-            <label className="property-sublabel">Model</label>
-            {modelPinConnected ? (
-              <span className="property-hint">Provided by connected pin.</span>
-            ) : (
-              <select
-                className="property-select"
-                value={data.agentConfig?.model || ''}
-                onChange={handleModelChange}
-                disabled={!data.agentConfig?.provider || loadingModels}
-              >
-                <option value="">
-                  {loadingModels ? 'Loading...' : 'Auto (Gateway default)'}
-                </option>
-                {models.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
           <div className="property-group">
             <label className="property-sublabel">Temperature</label>
             {temperaturePinConnected ? (
@@ -4589,38 +4523,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
           </div>
 
-          {thinkingSupported ? (
-            <div className="property-group">
-              <label className="property-sublabel">Reasoning</label>
-              {thinkingPinConnected ? (
-                <span className="property-hint">Provided by connected pin.</span>
-              ) : (
-                <select
-                  className="property-select"
-                  value={
-                    thinkingOptions.some((option) => option.value === data.agentConfig?.thinking)
-                      ? data.agentConfig?.thinking || ''
-                      : ''
-                  }
-                  onChange={(e) => updateAgentConfig({ thinking: e.target.value || undefined })}
-                >
-                  {thinkingOptions.map((option) => (
-                    <option key={option.value || 'auto'} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          ) : null}
-
-          <div className="property-group">
-            {speculationPinConnected ? <span className="property-hint">MTP: provided by connected pin.</span> :
-              <SpeculationSelect value={normalizeSpeculationValue(data.pinDefaults?.speculation ?? data.agentConfig?.speculation)}
-                capabilities={speculationCapabilitiesQuery.data} loading={speculationCapabilitiesQuery.isFetching}
-                error={speculationCapabilitiesQuery.isError ? 'MTP capability discovery failed.' : undefined}
-                onChange={setNodeSpeculation} />}
-          </div>
           <div className="property-group">
             <label className="property-sublabel">Max iterations</label>
             {maxIterationsPinConnected ? (
@@ -5333,7 +5235,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     searchPlaceholder={providerSearchPlaceholderForScope(providerScope)}
                     clearable
                     onOpen={() => requestProviderOptionsForScope(providerScope)}
-                    onChange={(v) => setPinDefault(pin.id, v)}
+                    onChange={(v) => setPinDefault(pin.id, v, { routeChange: providerScope === 'text' })}
                   />
                 );
               }
@@ -5358,7 +5260,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     onOpen={() => {
                       if (!disabled) requestModelOptionsForScope(modelScope, providerDefault);
                     }}
-                    onChange={(v) => setPinDefault(pin.id, v)}
+                    onChange={(v) => setPinDefault(pin.id, v, { routeChange: modelScope === 'text' })}
                   />
                 );
               }
@@ -5772,7 +5674,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     searchPlaceholder={providerSearchPlaceholderForScope(providerScope)}
                     clearable
                     onOpen={() => requestProviderOptionsForScope(providerScope)}
-                    onChange={(v) => setPinDefault(pin.id, v)}
+                    onChange={(v) => setPinDefault(pin.id, v, { routeChange: providerScope === 'text' })}
                   />
                 );
               }
@@ -5797,7 +5699,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     onOpen={() => {
                       if (!disabled) requestModelOptionsForScope(modelScope, providerDefault);
                     }}
-                    onChange={(v) => setPinDefault(pin.id, v)}
+                    onChange={(v) => setPinDefault(pin.id, v, { routeChange: modelScope === 'text' })}
                   />
                 );
               }
@@ -6569,64 +6471,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {data.nodeType === 'llm_call' && (
         <div className="property-section">
           <label className="property-label">LLM Configuration</label>
+          {/* The kit picker (operator rule 2026-11-07): reasoning and MTP follow the selected model. */}
           <div className="property-group">
-            <label className="property-sublabel">Provider</label>
-            {providerPinConnected ? (
-              <span className="property-hint">Provided by connected pin.</span>
-            ) : (
-              <select
-                className="property-select"
-                value={data.effectConfig?.provider || ''}
-                onChange={(e) =>
-                  updateNodeData(node.id, {
-                    effectConfig: {
-                      ...data.effectConfig,
-                      provider: e.target.value || undefined,
-                      model: undefined, // Reset model when provider changes
-                    },
-                  })
-                }
-                disabled={loadingProviders}
-              >
-                <option value="">
-                  {loadingProviders ? 'Loading...' : 'Auto (Gateway default)'}
-                </option>
-                {providers.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.display_name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div className="property-group">
-            <label className="property-sublabel">Model</label>
-            {modelPinConnected ? (
-              <span className="property-hint">Provided by connected pin.</span>
-            ) : (
-              <select
-                className="property-select"
-                value={data.effectConfig?.model || ''}
-                onChange={(e) =>
-                  updateNodeData(node.id, {
-                    effectConfig: {
-                      ...data.effectConfig,
-                      model: e.target.value || undefined,
-                    },
-                  })
-                }
-                disabled={!data.effectConfig?.provider || loadingModels}
-              >
-                <option value="">
-                  {loadingModels ? 'Loading...' : 'Auto (Gateway default)'}
-                </option>
-                {models.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            )}
+            <ProviderModelPicker
+              layout="compact"
+              inheritLabel="Workflow / Gateway default"
+              value={nodeRouteValue(data)}
+              onChange={(next) => updateNodeData(node.id, nodeRoutePatch(data, next))}
+              fetchProviders={modelTransport.fetchProviders}
+              fetchModels={modelTransport.fetchModels}
+              fetchModelCapabilities={modelTransport.fetchModelCapabilities}
+              fetchGatewayDefault={modelTransport.fetchGatewayDefault}
+              enableSpeculation
+              reasoningLabel="Reasoning"
+              disabled={gatewayCapabilitiesQuery.isLoading}
+              pinned={{ provider: providerPinConnected, model: modelPinConnected, reasoning: thinkingPinConnected, speculation: speculationPinConnected }}
+            />
           </div>
           <div className="property-group">
             <label className="property-sublabel">Temperature</label>
@@ -6668,38 +6528,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
           </div>
 
-          {thinkingSupported ? (
-            <div className="property-group">
-              <label className="property-sublabel">Reasoning</label>
-              {thinkingPinConnected ? (
-                <span className="property-hint">Provided by connected pin.</span>
-              ) : (
-                <select
-                  className="property-select"
-                  value={
-                    thinkingOptions.some((option) => option.value === data.effectConfig?.thinking)
-                      ? data.effectConfig?.thinking || ''
-                      : ''
-                  }
-                  onChange={(e) => updateLlmCallEffectConfig({ thinking: e.target.value || undefined })}
-                >
-                  {thinkingOptions.map((option) => (
-                    <option key={option.value || 'auto'} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-          ) : null}
-
-          <div className="property-group">
-            {speculationPinConnected ? <span className="property-hint">MTP: provided by connected pin.</span> :
-              <SpeculationSelect value={normalizeSpeculationValue(data.pinDefaults?.speculation ?? data.effectConfig?.speculation)}
-                capabilities={speculationCapabilitiesQuery.data} loading={speculationCapabilitiesQuery.isFetching}
-                error={speculationCapabilitiesQuery.isError ? 'MTP capability discovery failed.' : undefined}
-                onChange={setNodeSpeculation} />}
-          </div>
           <div className="property-group">
             <label className="property-sublabel">Tools (optional)</label>
             {toolsPinConnected ? (
