@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Reasoning choices follow the model the gateway describes, never its name (operator rule 2026-11-07). The On Flow
+  Start/End defaults, the Run dialog and the reasoning pin on Agent and LLM call nodes offered reasoning levels to any
+  model whose name matched a text pattern (gpt-5, qwen3, "thinking"...), and the canvas pin fell back to a fixed
+  ladder. They now offer exactly the levels the gateway's capability card lists for the selected model (the kit's
+  `reasoningFacts`, as the kit model picker on the nodes does); a model the card gives no levels offers none, and a
+  saved level the card does not list stays visible as "(saved)" on the node.
+
 ## [0.14.0] - 2026-11-04
 
 Needs AbstractRuntime 0.17.0 (Compare reads text next to a number or true/false exactly), which AbstractGateway 0.20.0 installs, and `@abstractframework/ui-kit` ^0.9.14 with `@abstractframework/panel-chat` ^0.8.1 and `@abstractframework/app-server` ^0.1.13.

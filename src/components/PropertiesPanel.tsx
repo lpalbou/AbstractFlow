@@ -748,10 +748,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       !gatewayCapabilitiesQuery.isError,
     staleTime: 30_000,
   });
-  const thinkingOptions = thinkingOptionsFromModelCapabilities(
-    thinkingCapabilitiesQuery.data,
-    selectedTextModelForThinking
-  );
+  // Served facts only (no model-name guess): the levels the capability card lists.
+  const thinkingOptions = thinkingOptionsFromModelCapabilities(thinkingCapabilitiesQuery.data);
   const thinkingSupported = thinkingOptions.length > 0;
   // The kit's provider/model/capability transport over this app's gateway client (Agent and LLM
   // call nodes: the kit ProviderModelPicker).

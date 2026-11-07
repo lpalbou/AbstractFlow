@@ -1,7 +1,6 @@
 import type { FlowNodeData, NodeType, Pin } from '../types/flow';
 import { createNodeData, getNodeTemplate } from '../types/nodes';
 import { hasStructuredResponseSchema, isStructuredResponseDataPin } from './structuredOutputs';
-import { modelNameLooksThinkingCapable } from './thinkingControls';
 import { normalizeDecisionQuestionType } from './decisionPins';
 
 export type PinDisclosureDirection = 'input' | 'output';
@@ -836,26 +835,11 @@ function isReasoningNodeType(nodeType: NodeType | string): boolean {
   return nodeType === 'agent' || nodeType === 'llm_call';
 }
 
-function selectedReasoningModel(data: FlowNodeData | undefined, nodeType: NodeType | string): string {
-  if (!data) return '';
-  const candidates: unknown[] = [];
-  if (nodeType === 'agent') {
-    candidates.push(data.agentConfig?.model);
-  } else if (nodeType === 'llm_call') {
-    candidates.push(data.effectConfig?.model);
-  }
-  candidates.push(data.pinDefaults?.model);
-  for (const value of candidates) {
-    const text = typeof value === 'string' ? value.trim() : '';
-    if (text) return text;
-  }
-  return '';
-}
-
-function supportsThinkingFromData(data: FlowNodeData | undefined, nodeType: NodeType | string, hint?: ThinkingSupportHint): boolean {
+function supportsThinkingFromData(nodeType: NodeType | string, hint?: ThinkingSupportHint): boolean {
   if (!isReasoningNodeType(nodeType)) return false;
-  if (typeof hint?.supported === 'boolean') return hint.supported;
-  return modelNameLooksThinkingCapable(selectedReasoningModel(data, nodeType));
+  // Served facts only (operator rule 2026-11-07): the caller's capability-card answer; without
+  // one the reasoning pin is not offered (never a guess from the model name).
+  return hint?.supported === true;
 }
 
 function hasPolicyPin(values: readonly string[] | undefined, pinId: string): boolean {
@@ -1143,7 +1127,7 @@ function decidePinVisibility<TPin extends PinLike>(args: {
     args.direction === 'input' &&
     args.pin.id === 'thinking' &&
     isReasoningNodeType(args.nodeType) &&
-    !supportsThinkingFromData(args.data, args.nodeType, args.thinkingSupport);
+    !supportsThinkingFromData(args.nodeType, args.thinkingSupport);
 
   const policy = POLICY_BY_NODE_TYPE[String(args.nodeType) as NodeType];
   const className = classifyPin({

@@ -18,6 +18,7 @@ function disclosure(
     input?: string[];
     output?: string[];
     expanded?: boolean;
+    thinkingSupport?: { supported?: boolean | null };
   } = {}
 ) {
   return getNodePinDisclosure({
@@ -27,6 +28,7 @@ function disclosure(
     connectedInputPinIds: new Set(options.input || []),
     connectedOutputPinIds: new Set(options.output || []),
     expanded: Boolean(options.expanded),
+    thinkingSupport: options.thinkingSupport,
   });
 }
 
@@ -167,18 +169,18 @@ describe('node pin disclosure policy', () => {
     expect(ids(result.inputPins)).toContain('model');
   });
 
-  it('suppresses thinking for non-reasoning selected models', () => {
-    const data = nodeData('llm_call');
-    data.effectConfig = { provider: 'lmstudio', model: 'gemma-4-e4b-it' };
-    const result = disclosure(data, { expanded: true });
-
-    expect(ids(result.inputPins)).not.toContain('thinking');
-  });
-
-  it('shows thinking for reasoning-capable selected models when expanded', () => {
+  it('suppresses thinking when the capability card does not say the model reasons', () => {
     const data = nodeData('llm_call');
     data.effectConfig = { provider: 'lmstudio', model: 'qwen/qwen3.6-35b-a3b' };
-    const result = disclosure(data, { expanded: true });
+    // A name that USED to be matched by a text pattern: without served facts, no reasoning pin.
+    expect(ids(disclosure(data, { expanded: true }).inputPins)).not.toContain('thinking');
+    expect(ids(disclosure(data, { expanded: true, thinkingSupport: { supported: false } }).inputPins)).not.toContain('thinking');
+  });
+
+  it('shows thinking when the capability card says the model reasons, whatever its name', () => {
+    const data = nodeData('llm_call');
+    data.effectConfig = { provider: 'lmstudio', model: 'gemma-4-e4b-it' };
+    const result = disclosure(data, { expanded: true, thinkingSupport: { supported: true } });
 
     expect(ids(result.inputPins)).toContain('thinking');
   });

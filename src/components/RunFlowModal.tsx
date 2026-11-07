@@ -2398,8 +2398,9 @@ export function RunFlowModal({
     staleTime: 30_000,
   });
   const thinkingOptions = useMemo(
-    () => thinkingOptionsFromModelCapabilities(thinkingCapabilitiesQuery.data, selectedModel),
-    [selectedModel, thinkingCapabilitiesQuery.data]
+    // Served facts only (no model-name guess): the levels the capability card lists.
+    () => thinkingOptionsFromModelCapabilities(thinkingCapabilitiesQuery.data),
+    [thinkingCapabilitiesQuery.data]
   );
   const thinkingSupported = thinkingOptions.length > 0;
   const speculationCapabilitiesQuery = useExecutionCapabilities(promptCacheProvider, promptCacheModel, isOpen && !promptCacheGraphAmbiguous);

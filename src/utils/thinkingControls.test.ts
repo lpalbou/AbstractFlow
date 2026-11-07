@@ -1,23 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { modelNameLooksThinkingCapable, thinkingOptionsFromModelCapabilities } from './thinkingControls';
+import { thinkingOptionsFromModelCapabilities, thinkingOptionsWithSaved } from './thinkingControls';
 
 describe('thinkingControls', () => {
-  it('recognizes reasoning model names', () => {
-    expect(modelNameLooksThinkingCapable('gpt-5')).toBe(true);
-    expect(modelNameLooksThinkingCapable('qwen/qwen3.6-35b-a3b')).toBe(true);
-    expect(modelNameLooksThinkingCapable('gemma-4-e4b-it')).toBe(false);
-  });
-
-  it('uses advertised reasoning levels when available', () => {
-    const options = thinkingOptionsFromModelCapabilities(
-      { capabilities: { reasoning_levels: ['low', 'medium', 'high'] } },
-      'custom-model'
-    );
-
+  it('uses the reasoning levels the capability card serves', () => {
+    const options = thinkingOptionsFromModelCapabilities({ capabilities: { reasoning_levels: ['low', 'medium', 'high'] } });
     expect(options.map((option) => option.value)).toEqual(['', 'low', 'medium', 'high']);
   });
 
-  it('returns no options for non-reasoning models without capability support', () => {
-    expect(thinkingOptionsFromModelCapabilities({ capabilities: { thinking_support: false } }, 'gemma-4-e4b-it')).toEqual([]);
+  it('never guesses from the model name: no served levels, no choices', () => {
+    // These names used to be matched by text patterns (gpt-5, qwen3, "thinking").
+    for (const model of ['gpt-5', 'qwen/qwen3.6-35b-a3b', 'some-thinking-model']) {
+      expect(thinkingOptionsFromModelCapabilities({ model, capabilities: {} })).toEqual([]);
+    }
+    expect(thinkingOptionsFromModelCapabilities(undefined)).toEqual([]);
+    expect(thinkingOptionsFromModelCapabilities({ capabilities: { thinking_support: false } })).toEqual([]);
+  });
+
+  it('offers off/auto for a model whose only served control is a prompt switch', () => {
+    const options = thinkingOptionsFromModelCapabilities({
+      capabilities: { thinking_support: true, thinking_control: { prompt_disable_token: '/no_think' } },
+    });
+    expect(options.map((option) => option.value)).toEqual(['', 'off', 'auto']);
+  });
+
+  it('keeps a saved level the card does not list visible as saved', () => {
+    expect(thinkingOptionsWithSaved([], 'high').map((o) => o.label)).toEqual(['Auto (Gateway default)', 'high (saved)']);
+    const served = thinkingOptionsFromModelCapabilities({ capabilities: { reasoning_levels: ['low'] } });
+    expect(thinkingOptionsWithSaved(served, 'low')).toBe(served);
   });
 });

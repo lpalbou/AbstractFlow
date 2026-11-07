@@ -78,7 +78,7 @@ import {
   type ModelResidencyOperation,
 } from '../../utils/modelResidencyGraph';
 import { getNodePinDisclosure, isMediaPresentationNode } from '../../utils/nodePinDisclosure';
-import { DEFAULT_THINKING_OPTIONS, thinkingOptionsFromModelCapabilities } from '../../utils/thinkingControls';
+import { thinkingOptionsFromModelCapabilities, thinkingOptionsWithSaved } from '../../utils/thinkingControls';
 import { hasJsonSchemaPinDefault, isJsonSchemaInputPin } from '../../utils/jsonSchemaPins';
 import { pinEnumOptions } from '../../utils/jsonSchemaEditor';
 import {
@@ -901,10 +901,15 @@ export const BaseNode = memo(function BaseNode({
     staleTime: 30_000,
   });
   const thinkingOptions = useMemo(
-    () => thinkingOptionsFromModelCapabilities(modelCapabilitiesQuery.data, selectedTextModelForThinking),
-    [modelCapabilitiesQuery.data, selectedTextModelForThinking]
+    // Served facts only (no model-name guess): the levels the capability card lists.
+    () => thinkingOptionsFromModelCapabilities(modelCapabilitiesQuery.data),
+    [modelCapabilitiesQuery.data]
   );
-  const effectiveThinkingOptions = thinkingOptions.length > 0 ? thinkingOptions : DEFAULT_THINKING_OPTIONS;
+  // No fixed ladder for a model the gateway does not describe: Auto, plus a saved level shown as saved.
+  const effectiveThinkingOptions = useMemo(
+    () => thinkingOptionsWithSaved(thinkingOptions, selectedThinkingValue),
+    [selectedThinkingValue, thinkingOptions]
+  );
   const thinkingSupported = thinkingOptions.length > 0;
   const artifactUploadInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
   const [artifactUploadBusyPins, setArtifactUploadBusyPins] = useState<Record<string, true>>({});
