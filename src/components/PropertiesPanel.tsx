@@ -115,6 +115,7 @@ import {
 import { startHasTriggerEvent } from '../utils/triggerEvent';
 import { wiredSourceType } from '../utils/relays';
 import { BREAK_EMAIL_HINT, hasEmailFields, withEmailFields } from '../utils/emailType';
+import { AGENT_MAX_ITERATIONS_DEFAULT } from '../utils/agentIterationDefaults';
 import {
   EDITOR_DATA_PIN_TYPES,
   FLOW_IO_EDITOR_DATA_PIN_TYPES,
@@ -1475,7 +1476,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (typeof pinVal === 'number' && Number.isFinite(pinVal)) return pinVal;
     const cfgVal = data.agentConfig?.max_iterations;
     if (typeof cfgVal === 'number' && Number.isFinite(cfgVal)) return cfgVal;
-    return 20;
+    return AGENT_MAX_ITERATIONS_DEFAULT;
   })();
   const emitEventNamePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'name');
   const scopePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'scope');
@@ -4538,7 +4539,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   }
                   const parsed = parseInt(raw, 10);
                   if (!Number.isFinite(parsed) || parsed < 1) {
-                    setAgentMaxIterations(50);
+                    setAgentMaxIterations(AGENT_MAX_ITERATIONS_DEFAULT);
                     return;
                   }
                   setAgentMaxIterations(parsed);
@@ -4547,7 +4548,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 step={1}
               />
             )}
-            <span className="property-hint">Safety cap for the agent loop (default 50)</span>
+            <span className="property-hint">Safety cap for the agent loop (default {AGENT_MAX_ITERATIONS_DEFAULT})</span>
           </div>
 
           <div className="property-group">

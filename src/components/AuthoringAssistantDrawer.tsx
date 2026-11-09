@@ -155,6 +155,7 @@ export {
 } from './assistant/assistantSettings';
 export { isNearBottom, nextFollowingState } from './assistant/followLive';
 import { useFollowLive } from './assistant/followLive';
+import { AGENT_MAX_ITERATIONS_DEFAULT } from '../utils/agentIterationDefaults';
 
 /** Verdict of the acceptance review run after the planner claims "done". */
 export interface AcceptanceReview {
@@ -1176,7 +1177,7 @@ export function computeAuthoringReadiness(
       return maxIterations !== null && maxIterations >= 50;
     });
     if (!agentWithBudget) {
-      issues.push('Set Agent.max_iterations to at least 50 for deep iterative research work (an explicit workflow choice; the unset default is 20).');
+      issues.push(`Set Agent.max_iterations to at least 50 for deep iterative research work (an explicit workflow choice; new Agent nodes start at ${AGENT_MAX_ITERATIONS_DEFAULT}).`);
     }
     const hasEndReport = endNodes.some((node) =>
       connectedEndInput(flow, node.id, [/report/, /markdown/, /response/, /result/])

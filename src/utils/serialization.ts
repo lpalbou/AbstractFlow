@@ -5,6 +5,7 @@
 import type { Node, Edge } from 'reactflow';
 import type { FlowNodeData, VisualFlow, VisualNode, VisualEdge } from '../types/flow';
 import { getNodeTemplate, createNodeData, mergePinDocsFromTemplate } from '../types/nodes';
+import { AGENT_MAX_ITERATIONS_DEFAULT } from './agentIterationDefaults';
 import { inferEntryNode, isRouteOverrideEdge, withMultiEntryRouteData } from './multiEntryRoutes';
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from './visualFlowCompat';
 import { withoutInertNotifyPin } from './triggerPins';
@@ -149,9 +150,10 @@ export function fromVisualFlow(flow: VisualFlow): {
       );
       if (!hasDefault && !hasConfig && !maxPinConnected) {
         const nextDefaults: Record<string, any> = { ...(defaultsRaw || {}) };
-        // Ruled default (2026-07-11): 20 when the workflow author has not
-        // chosen; an explicit workflow value is authoritative at any number.
-        nextDefaults.max_iterations = 20;
+        // The editor default (operator 2026-11-08: 50) when the workflow author
+        // has not chosen; an explicit workflow value is authoritative at any
+        // number and is never rewritten (a saved 20 stays 20).
+        nextDefaults.max_iterations = AGENT_MAX_ITERATIONS_DEFAULT;
         data = { ...data, pinDefaults: nextDefaults };
       }
     }

@@ -7,6 +7,7 @@ import { generatePythonTransformCode, upsertPythonAvailableVariablesComments } f
 import { NODE_GATEWAY_CAPABILITIES, type GatewayAuthoringCapability } from '../utils/nodeCapabilities';
 import { BREAK_EMAIL_LABEL, breakEmailInputPin, emailFieldPins, emailPin, emailsPin } from '../utils/emailType';
 import { DECISION_QUESTION_TYPE_SCHEMA, decisionOutputPins } from '../utils/decisionPins';
+import { AGENT_MAX_ITERATIONS_DEFAULT } from '../utils/agentIterationDefaults';
 
 // Node template used in the palette
 export interface NodeTemplate {
@@ -3069,10 +3070,10 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     inputs: [...template.inputs],
     outputs: [...template.outputs],
     // Default pin values for input-driven nodes.
-    // max_iterations default is 20 (maintainer ruling 2026-07-11: the workflow
-    // decides — an explicit pin is authoritative design; 20 is only the seed
-    // when the author has not chosen).
-    ...(template.type === 'agent' && { pinDefaults: { max_iterations: 20 } }),
+    // max_iterations seed: AGENT_MAX_ITERATIONS_DEFAULT (operator 2026-11-08:
+    // 50 everywhere). The workflow decides — an explicit pin is authoritative
+    // design; the seed only applies when the author has not chosen.
+    ...(template.type === 'agent' && { pinDefaults: { max_iterations: AGENT_MAX_ITERATIONS_DEFAULT } }),
     ...(template.type === 'decide' && { pinDefaults: { question_type: 'choice' } }),
     ...(template.type === 'loop_limit' && { pinDefaults: { max: 3 } }),
     ...(template.type === 'publish_event' && !(template.label in MAIL_PRESET_DEFAULTS) ? { pinDefaults: { channel: 'results', alert: false } } : {}),

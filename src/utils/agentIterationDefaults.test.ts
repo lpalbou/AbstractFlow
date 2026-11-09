@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { VisualFlow } from '../types/flow';
+import type { FlowNodeData, VisualFlow } from '../types/flow';
 import { createNodeData, getNodeTemplate } from '../types/nodes';
+import { AGENT_MAX_ITERATIONS_DEFAULT } from './agentIterationDefaults';
+import { hasNonDefaultConfiguredPinValue } from './nodePinDisclosure';
 import { fromVisualFlow } from './serialization';
 
-// Maintainer ruling 2026-07-11 (agora commons c726): the agent
-// max_iterations DEFAULT — applied only when the workflow author has not
-// chosen — is 20. Workflow-declared values are authoritative at any number
-// ("if the workflow put 3, it's 3"). This incident class is silent drift
-// (the January 5 landed in an unrelated commit), so the ruled values are
-// pinned here.
-const RULED_AGENT_MAX_ITERATIONS_DEFAULT = 20;
+// The agent max_iterations DEFAULT - applied only when the workflow author has
+// not chosen - is 50 (operator 2026-11-08: "by default, set it to 50
+// everywhere"; it was 20 under the 2026-07-11 ruling). Workflow-declared values
+// stay authoritative at any number ("if the workflow put 3, it's 3"), and a
+// saved 20 stays 20: the editor never rewrites a value the author set. This
+// incident class is silent drift, so the number is pinned here as a literal.
+const RULED_AGENT_MAX_ITERATIONS_DEFAULT = 50;
 
 function agentVisualFlow(overrides: {
   pinDefaults?: Record<string, unknown>;
@@ -53,24 +55,41 @@ function agentVisualFlow(overrides: {
   } as VisualFlow;
 }
 
-describe('agent max_iterations ruled defaults (2026-07-11)', () => {
-  it('seeds new agent nodes with the ruled default of 20', () => {
+describe('agent max_iterations defaults (operator 2026-11-08: 50)', () => {
+  it('the editor default is one named constant, 50', () => {
+    expect(AGENT_MAX_ITERATIONS_DEFAULT).toBe(RULED_AGENT_MAX_ITERATIONS_DEFAULT);
+  });
+
+  it('seeds new agent nodes with 50', () => {
     const template = getNodeTemplate('agent');
     expect(template).toBeTruthy();
     const data = createNodeData(template!);
     expect(data.pinDefaults?.max_iterations).toBe(RULED_AGENT_MAX_ITERATIONS_DEFAULT);
   });
 
-  it('backfills legacy pin-less agent nodes with 20 on load', () => {
+  it('backfills legacy pin-less, unwired agent nodes with 50 on load', () => {
     const { nodes } = fromVisualFlow(agentVisualFlow({}));
     const agent = nodes.find((n) => n.id === 'agent-1');
     expect(agent?.data.pinDefaults?.max_iterations).toBe(RULED_AGENT_MAX_ITERATIONS_DEFAULT);
   });
 
-  it('preserves an explicit workflow-declared value (the workflow decides)', () => {
-    const { nodes } = fromVisualFlow(agentVisualFlow({ pinDefaults: { max_iterations: 3 } }));
+  it('preserves an explicit workflow-declared value (the workflow decides): 7 stays 7', () => {
+    const { nodes } = fromVisualFlow(agentVisualFlow({ pinDefaults: { max_iterations: 7 } }));
     const agent = nodes.find((n) => n.id === 'agent-1');
-    expect(agent?.data.pinDefaults?.max_iterations).toBe(3);
+    expect(agent?.data.pinDefaults?.max_iterations).toBe(7);
+  });
+
+  it('never rewrites a saved 20 (the old seed) to the new default', () => {
+    const { nodes } = fromVisualFlow(agentVisualFlow({ pinDefaults: { max_iterations: 20 } }));
+    const agent = nodes.find((n) => n.id === 'agent-1');
+    expect(agent?.data.pinDefaults?.max_iterations).toBe(20);
+  });
+
+  it('pin disclosure: 50 is the default, a saved 20 is an authored value', () => {
+    const agentData = (maxIterations: number) =>
+      ({ nodeType: 'agent', label: 'Agent', icon: '', headerColor: '', inputs: [], outputs: [], pinDefaults: { max_iterations: maxIterations } }) as FlowNodeData;
+    expect(hasNonDefaultConfiguredPinValue(agentData(RULED_AGENT_MAX_ITERATIONS_DEFAULT), 'max_iterations')).toBe(false);
+    expect(hasNonDefaultConfiguredPinValue(agentData(20), 'max_iterations')).toBe(true);
   });
 
   it('does not backfill when the pin is edge-connected (the graph decides)', () => {

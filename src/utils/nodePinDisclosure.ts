@@ -1,5 +1,6 @@
 import type { FlowNodeData, NodeType, Pin } from '../types/flow';
 import { createNodeData, getNodeTemplate } from '../types/nodes';
+import { AGENT_MAX_ITERATIONS_DEFAULT } from './agentIterationDefaults';
 import { hasStructuredResponseSchema, isStructuredResponseDataPin } from './structuredOutputs';
 import { normalizeDecisionQuestionType } from './decisionPins';
 
@@ -106,7 +107,7 @@ const VIDEO_DEFAULT_PIN_VALUES = {
 const DEFAULT_PIN_VALUES_BY_NODE_TYPE: Record<string, PinValueMap> = {
   agent: {
     use_context: false,
-    max_iterations: 20,
+    max_iterations: AGENT_MAX_ITERATIONS_DEFAULT,
   },
   llm_call: {
     use_context: false,

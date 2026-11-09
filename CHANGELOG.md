@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [Unreleased]
+
+### Changed
+- A new Agent node starts with `max_iterations` 50 (was 20), the framework default (operator 2026-11-08: "by default,
+  set it to 50 everywhere"; AbstractRuntime `DEFAULT_MAX_ITERATIONS`). The editor reads the number from one place
+  (`AGENT_MAX_ITERATIONS_DEFAULT`): the new-node seed, the backfill for an old Agent node saved without the pin, the
+  Properties field's fallback and the canvas's "is this the default" check. A value the author set is kept as saved:
+  a 7 stays 7 and a flow saved with 20 keeps 20 (open the node to raise it). The node catalog and `llms-full.txt`
+  show the new seed.
+
 ## [0.14.1] - 2026-11-07
 
 Needs `@abstractframework/ui-kit` ^0.9.19 (its model picker and send-time check). AbstractGateway 0.21.0 also drops an
